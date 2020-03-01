@@ -1,0 +1,16 @@
+(library
+ (name schematic_ppx)
+ (modules ppx)
+ (public_name schematic.ppx)
+ (kind ppx_deriver)
+ (preprocess
+  (pps ppxlib.metaquot))
+ (libraries batteries ppxlib))
+
+(executable
+ (name pp)
+ (public_name schematic-ppx)
+ (modules pp)
+ (preprocess
+  (pps ppxlib.metaquot))
+ (libraries schematic_ppx ppxlib))
