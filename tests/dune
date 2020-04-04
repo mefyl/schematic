@@ -9,15 +9,3 @@
  (alias runtest)
  (action
   (run ./test.exe)))
-
-(executable
- (name openapi)
- (modules openapi)
- (preprocess
-  (pps schematic_ppx))
- (libraries alcotest schematic ocplib-json-typed))
-
-(rule
- (alias runtest)
- (action
-  (run ./openapi.exe)))
