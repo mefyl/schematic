@@ -1,4 +1,4 @@
-(lang dune 2.3)
+(lang dune 2.2)
 (generate_opam_files true)
 
 (license GPLv3)
