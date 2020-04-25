@@ -1,4 +1,6 @@
 (lang dune 2.2)
+
+(name schematic)
 (generate_opam_files true)
 
 (license GPLv3)
