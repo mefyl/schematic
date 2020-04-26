@@ -112,6 +112,22 @@ let parametric_type () =
     "[{\"major\": 0, \"minor\": 1, \"subminor\": 2},{\"major\": 6, \"minor\": \
      7, \"subminor\": 8}]."
 
+type escape =
+  { special_char : int [@schematic.as "'char$"]
+  ; keyword : string [@schematic.as "type"]
+  }
+[@@deriving schema]
+
+let pp_escape fmt { special_char; keyword } =
+  Format.fprintf fmt "(%i, %s)" special_char keyword
+
+let test_escape = Alcotest.testable pp_escape ( = )
+
+let escape () =
+  roundtrip "escape" test_escape escape_schema
+    { special_char = 128; keyword = "coin" }
+    "{\"'char$\": 128, \"type\": \"coin\"}"
+
 let () =
   let open Alcotest in
   run "Schematic"
@@ -125,4 +141,5 @@ let () =
     ; ("list", [ test_case "list" `Quick list_test ])
     ; ("parametric_type", [ test_case "parametric_type" `Quick parametric_type ])
     ; ("failure", [ test_case "failure" `Quick failure ])
+    ; ("escape", [ test_case "escape" `Quick escape ])
     ]

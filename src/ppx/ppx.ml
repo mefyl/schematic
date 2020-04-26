@@ -165,24 +165,47 @@ let expand ~loc ~path:_ (_, types) =
           let schema =
             let args =
               let f = function
-                | { pld_name = { txt; _ }
-                  ; pld_type =
-                      { ptyp_desc =
-                          Ptyp_constr ({ txt = Lident "option"; _ }, [ t ])
-                      ; _
-                      }
+                | { pld_attributes
                   ; pld_loc = loc
+                  ; pld_name = { txt; _ }
+                  ; pld_type
                   ; _
-                  } ->
-                  [%expr
-                    field Optional
-                      [%e expr_string ~loc (rename txt)]
-                      [%e encode_type ~loc t]]
-                | { pld_type = t; pld_name = { txt; loc }; _ } ->
-                  [%expr
-                    field Required
-                      [%e expr_string ~loc (rename txt)]
-                      [%e encode_type ~loc t]]
+                  } -> (
+                  let f txt { attr_name; attr_loc = loc; attr_payload } =
+                    match attr_name.txt with
+                    | "schematic.as" -> (
+                      match attr_payload with
+                      | PStr
+                          [%str
+                            [%e?
+                              { pexp_desc =
+                                  Pexp_constant (Pconst_string (txt, None))
+                              ; _
+                              }]] ->
+                        txt
+                      | _ ->
+                        Ppxlib.Location.raise_errorf ~loc
+                          "schematic-ppx: string payload expected" )
+                    | name when String.starts_with name "schematic." ->
+                      Ppxlib.Location.raise_errorf ~loc
+                        "schematic-ppx: unknown schematic annotation %s" name
+                    | _ -> txt
+                  in
+                  let txt = List.fold_left f txt pld_attributes in
+                  match pld_type with
+                  | { ptyp_desc =
+                        Ptyp_constr ({ txt = Lident "option"; _ }, [ t ])
+                    ; _
+                    } ->
+                    [%expr
+                      field Optional
+                        [%e expr_string ~loc (rename txt)]
+                        [%e encode_type ~loc t]]
+                  | t ->
+                    [%expr
+                      field Required
+                        [%e expr_string ~loc (rename txt)]
+                        [%e encode_type ~loc t]] )
               in
               List.map f fields
             in
