@@ -1,47 +1,11 @@
-type version =
-  { major : int
-  ; minor : int
-  ; subminor : int
-  }
-
-and range = version * version [@@deriving schema]
-
-let v1 = { major = 0; minor = 1; subminor = 2 }
-
-and v2 = { major = 3; minor = 4; subminor = 5 }
-
-and v3 = { major = 6; minor = 7; subminor = 8 }
-
-let pp_version fmt { major; minor; subminor } =
-  Format.fprintf fmt "%i.%i.%i" major minor subminor
-
-let pp_range fmt (l, r) =
-  Format.fprintf fmt "(%a, %a)" pp_version l pp_version r
-
-type version_alias = version [@@deriving schema]
-
-type expectation =
-  | Exact of version
-  | Range of range
-[@@deriving schema]
-
-let pp_expectation fmt = function
-  | Exact v -> pp_version fmt v
-  | Range (l, r) -> Format.fprintf fmt "(%a, %a)" pp_version l pp_version r
-
-let json = Alcotest.testable Schematic.Json.pp ( = )
-
-let test_version = Alcotest.testable pp_version ( = )
-
-let test_range = Alcotest.testable pp_range ( = )
-
-let test_expectation = Alcotest.testable pp_expectation ( = )
-
 let roundtrip name test schema value j =
+  let json = Alcotest.testable Schematic.Json.pp ( = ) in
   Alcotest.check json name (Schematic.Json.of_string j)
   @@ Schematic.Json.encode schema value;
   Alcotest.check test name value
   @@ Schematic.Json.decode schema (Schematic.Json.of_string j)
+
+(* Failure *)
 
 let failure () =
   let open Schematic.Schema in
@@ -49,6 +13,8 @@ let failure () =
     roundtrip "int atom" Alcotest.int int_schema 28 "29";
     Alcotest.fail "failure test failed"
   with Failure _ -> ()
+
+(* Atoms *)
 
 let atom_int () =
   let open Schematic.Schema in
@@ -59,10 +25,41 @@ let atom_string () =
   roundtrip "int atom" Alcotest.string string_schema "trente trois"
     "\"trente trois\""
 
+(* Record *)
+
+type version =
+  { major : int
+  ; minor : int
+  ; subminor : int
+  }
+[@@deriving schema]
+
+let pp_version fmt { major; minor; subminor } =
+  Format.fprintf fmt "%i.%i.%i" major minor subminor
+
+let test_version = Alcotest.testable pp_version ( = )
+
+type version_alias = version [@@deriving schema]
+
+let v1 = { major = 0; minor = 1; subminor = 2 }
+
+and v2 = { major = 3; minor = 4; subminor = 5 }
+
+and v3 = { major = 6; minor = 7; subminor = 8 }
+
 let record () =
   roundtrip "record" test_version version_schema
     { major = 1; minor = 2; subminor = 3 }
     "{\"major\": 1, \"minor\": 2, \"subminor\": 3}"
+
+(* Tuple *)
+
+type range = version * version [@@deriving schema]
+
+let pp_range fmt (l, r) =
+  Format.fprintf fmt "(%a, %a)" pp_version l pp_version r
+
+let test_range = Alcotest.testable pp_range ( = )
 
 let tuple () =
   roundtrip "tuple" test_range range_schema
@@ -70,6 +67,19 @@ let tuple () =
     , { major = 4; minor = 5; subminor = 6 } )
     "[{\"major\": 1, \"minor\": 2, \"subminor\": 3}, {\"major\": 1, \"minor\": \
      2, \"subminor\": 3}]"
+
+(* Variant *)
+
+type expectation =
+  | Exact of version
+  | Range of range
+[@@deriving schema]
+
+let pp_expectation fmt = function
+  | Exact v -> pp_version fmt v
+  | Range (l, r) -> Format.fprintf fmt "(%a, %a)" pp_version l pp_version r
+
+let test_expectation = Alcotest.testable pp_expectation ( = )
 
 let variant () =
   roundtrip "variant" test_expectation expectation_schema
@@ -81,6 +91,8 @@ let variant () =
        , { major = 4; minor = 5; subminor = 6 } ))
     "[{\"major\": 1, \"minor\": 2, \"subminor\": 3}, {\"major\": 4, \"minor\": \
      5, \"subminor\": 6}]"
+
+(* List *)
 
 let list_test () =
   roundtrip "list"
@@ -102,6 +114,8 @@ let list_test () =
     "[{\"major\": 0, \"minor\": 1, \"subminor\": 2},{\"major\": 3, \"minor\": \
      4, \"subminor\": 5.00000},{\"major\": 6, \"minor\": 7, \"subminor\": 8}]."
 
+(* Parametric *)
+
 type 'a pair = 'a * 'a [@@deriving schema]
 
 let parametric_type () =
@@ -111,6 +125,8 @@ let parametric_type () =
     (v1, v3)
     "[{\"major\": 0, \"minor\": 1, \"subminor\": 2},{\"major\": 6, \"minor\": \
      7, \"subminor\": 8}]."
+
+(* Escape *)
 
 type escape =
   { special_char : int [@schematic.as "'char$"]
@@ -127,6 +143,8 @@ let escape () =
   roundtrip "escape" test_escape escape_schema
     { special_char = 128; keyword = "coin" }
     "{\"'char$\": 128, \"type\": \"coin\"}"
+
+(* Recursive *)
 
 type recursive =
   { value : int
@@ -153,6 +171,8 @@ let recursive () =
     "{\"value\": 0, \"next\": {\"value\": 1}}";
   Schematic.Json.of_schema recursive_schema
   |> Schematic.Json.to_string |> print_endline
+
+(* Driver *)
 
 let () =
   let open Alcotest in
