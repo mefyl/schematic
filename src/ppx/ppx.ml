@@ -156,6 +156,11 @@ and combinator :
   [%expr
     [%e expr_id ~loc (Lident closer)] [%e construct] [%e deconstruct] [%e obj]]
 
+let make_recursive ~loc ~name_loc name encoder =
+  let name = pattern_id ~loc:name_loc (schema_name name)
+  and def = expr_string ~loc (schema_name name) in
+  [%expr recursive [%e def] (fun [%p name] -> [%e encoder])]
+
 let expand ~loc ~path:_ (_, types) =
   let f t =
     let encoder =
@@ -311,7 +316,8 @@ let expand ~loc ~path:_ (_, types) =
             "schematic-ppx: non supported type parameter %a" Pprintast.core_type
             t
       in
-      List.fold_right wrap t.ptype_params body
+      List.fold_right wrap t.ptype_params
+        (make_recursive ~loc ~name_loc:t.ptype_name.loc t.ptype_name.txt body)
     and name =
       pattern_id ~loc:t.ptype_name.loc (schema_name t.ptype_name.txt)
     in

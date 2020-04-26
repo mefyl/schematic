@@ -128,6 +128,32 @@ let escape () =
     { special_char = 128; keyword = "coin" }
     "{\"'char$\": 128, \"type\": \"coin\"}"
 
+type recursive =
+  { value : int
+  ; next : recursive option
+  }
+[@@deriving schema]
+
+let pp_option pp fmt =
+  let open Format in
+  function
+  | None -> pp_print_string fmt "None"
+  | Some v ->
+    pp_print_string fmt "Some ";
+    pp fmt v
+
+let rec pp_recursive fmt { value; next } =
+  Format.fprintf fmt "(%i, %a)" value (pp_option pp_recursive) next
+
+let test_recursive = Alcotest.testable pp_recursive ( = )
+
+let recursive () =
+  roundtrip "recursive" test_recursive recursive_schema
+    { value = 0; next = Some { value = 1; next = None } }
+    "{\"value\": 0, \"next\": {\"value\": 1}}";
+  Schematic.Json.of_schema recursive_schema
+  |> Schematic.Json.to_string |> print_endline
+
 let () =
   let open Alcotest in
   run "Schematic"
@@ -142,4 +168,5 @@ let () =
     ; ("parametric_type", [ test_case "parametric_type" `Quick parametric_type ])
     ; ("failure", [ test_case "failure" `Quick failure ])
     ; ("escape", [ test_case "escape" `Quick escape ])
+    ; ("recursive", [ test_case "recursive" `Quick recursive ])
     ]

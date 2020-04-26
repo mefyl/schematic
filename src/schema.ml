@@ -27,6 +27,8 @@ let field (type a req) ?title ?description
   | Optional -> Json_encoding.opt ?title ?description name schema
   | Default v -> Json_encoding.dft ?title ?description name schema v
 
+let recursive = Json_encoding.mu
+
 type 'a obj = 'a schema
 
 let obj = Json_encoding.obj1

@@ -28,6 +28,13 @@ module type Schema = sig
     -> 'a schema
     -> 'req field
 
+  val recursive :
+       string
+    -> ?title:string
+    -> ?description:string
+    -> ('a schema -> 'a schema)
+    -> 'a schema
+
   type 'a obj
 
   val obj : 'f field -> 'f obj
