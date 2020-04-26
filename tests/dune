@@ -3,7 +3,7 @@
  (modules test)
  (preprocess
   (pps schematic_ppx))
- (libraries alcotest schematic ocplib-json-typed))
+ (libraries alcotest schematic))
 
 (rule
  (alias runtest)

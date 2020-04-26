@@ -2,5 +2,4 @@ alcotest
 batteries
 dune
 ezjsonm
-ocplib-json-typed
 ppxlib
