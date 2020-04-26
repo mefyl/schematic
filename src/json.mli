@@ -1,8 +1,12 @@
+open Batteries
+
+include module type of Json_intf
+
 open Schema
 
 type t
 
-val decode : 'a schema -> t -> 'a
+val decode : 'a schema -> t -> 'a Result.t
 
 val encode : 'a schema -> 'a -> t
 
@@ -13,7 +17,5 @@ val to_channel : out_channel -> t -> unit
 val of_string : string -> t
 
 val to_string : t -> string
-
-val of_schema : 'a schema -> t
 
 val pp : Format.formatter -> t -> unit

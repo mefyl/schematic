@@ -1,4 +1,4 @@
 (library
  (name schematic)
  (public_name schematic)
- (libraries batteries ezjsonm ocplib-json-typed))
+ (libraries batteries ezjsonm))

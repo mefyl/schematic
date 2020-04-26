@@ -1,9 +1,14 @@
+open Batteries
+
 let roundtrip name test schema value j =
   let json = Alcotest.testable Schematic.Json.pp ( = ) in
-  Alcotest.check json name (Schematic.Json.of_string j)
-  @@ Schematic.Json.encode schema value;
-  Alcotest.check test name value
-  @@ Schematic.Json.decode schema (Schematic.Json.of_string j)
+  Alcotest.check json name
+    (Schematic.Json.of_string j)
+    (Schematic.Json.encode schema value);
+  match Schematic.Json.decode schema (Schematic.Json.of_string j) with
+  | Result.Ok decoded -> Alcotest.check test name value decoded
+  | Result.Error (`Json_decode e) ->
+    Alcotest.fail (Format.sprintf "JSON decode error: %s" e)
 
 (* Failure *)
 
@@ -39,7 +44,7 @@ let pp_version fmt { major; minor; subminor } =
 
 let test_version = Alcotest.testable pp_version ( = )
 
-type version_alias = version [@@deriving schema]
+(* type version_alias = version [@@deriving schema] *)
 
 let v1 = { major = 0; minor = 1; subminor = 2 }
 
@@ -168,9 +173,7 @@ let test_recursive = Alcotest.testable pp_recursive ( = )
 let recursive () =
   roundtrip "recursive" test_recursive recursive_schema
     { value = 0; next = Some { value = 1; next = None } }
-    "{\"value\": 0, \"next\": {\"value\": 1}}";
-  Schematic.Json.of_schema recursive_schema
-  |> Schematic.Json.to_string |> print_endline
+    "{\"value\": 0, \"next\": {\"value\": 1}}"
 
 (* Driver *)
 

@@ -86,7 +86,7 @@ let rec encode_type ~loc = function
       ; ppat_attributes = []
       }
     in
-    combinator ~loc types "tuple_close" field_name constructed deconstructed
+    combinator ~loc types field_name constructed deconstructed
       (tuple_schema ~loc types)
   (* Type variable *)
   | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ } ->
@@ -98,36 +98,31 @@ let rec encode_type ~loc = function
 
 and tuple_schema ~loc types =
   let args = List.map (encode_type ~loc) types in
-  match args with
-  | [] -> failwith "empty tuple"
-  | init :: tl ->
-    let init = [%expr tuple [%e init]] in
-    let f l r = [%expr tuple_extend [%e l] [%e r]] in
-    List.fold_left f init tl
+  let init = [%expr Null] in
+  let f l r = [%expr Tuple { schema = [%e r]; rest = [%e l] }] in
+  List.fold_left f init args
 
 and combinator :
     type f.
        loc:location
     -> f list
-    -> label
     -> (int -> f -> location * label)
     -> expression
     -> pattern
     -> expression
     -> expression =
- fun ~loc fields closer field_name constructed deconstructed obj ->
+ fun ~loc fields field_name constructed deconstructed obj ->
   let construct =
     let pattern =
       let pattern i f =
         let loc, name = field_name i f in
         pattern_id ~loc name
       in
-      match fields with
-      | [] -> failwith "empty object"
-      | hd :: tl ->
-        List.fold_lefti
-          (fun l i r -> [%pat? [%p l], [%p pattern (i + 1) r]])
-          (pattern 0 hd) tl
+      let f i field tl =
+        let pattern = pattern i field in
+        [%pat? [%p pattern], [%p tl]]
+      in
+      List.fold_righti f fields [%pat? ()]
     in
     { pexp_desc = Pexp_fun (Nolabel, None, pattern, constructed)
     ; pexp_loc = loc
@@ -136,16 +131,15 @@ and combinator :
     }
   and deconstruct =
     let value =
-      let field i f =
+      let expr i f =
         let loc, name = field_name i f in
         expr_id ~loc (Lident name)
       in
-      match fields with
-      | [] -> failwith "empty object"
-      | hd :: tl ->
-        List.fold_lefti
-          (fun l i r -> [%expr [%e l], [%e field (i + 1) r]])
-          (field 0 hd) tl
+      let f i field tl =
+        let expr = expr i field in
+        [%expr [%e expr], [%e tl]]
+      in
+      List.fold_righti f fields [%expr ()]
     in
     { pexp_desc = Pexp_fun (Nolabel, None, deconstructed, value)
     ; pexp_loc = loc
@@ -153,16 +147,11 @@ and combinator :
     ; pexp_attributes = []
     }
   in
-  [%expr
-    [%e expr_id ~loc (Lident closer)] [%e construct] [%e deconstruct] [%e obj]]
-
-let make_recursive ~loc ~name_loc name encoder =
-  let name = pattern_id ~loc:name_loc (schema_name name)
-  and def = expr_string ~loc (schema_name name) in
-  [%expr recursive [%e def] (fun [%p name] -> [%e encoder])]
+  [%expr Map ([%e construct], [%e deconstruct], [%e obj])]
 
 let expand ~loc ~path:_ (_, types) =
   let f t =
+    let name = schema_name t.ptype_name.txt in
     let encoder =
       let body =
         match t.ptype_kind with
@@ -202,24 +191,29 @@ let expand ~loc ~path:_ (_, types) =
                         Ptyp_constr ({ txt = Lident "option"; _ }, [ t ])
                     ; _
                     } ->
-                    [%expr
-                      field Optional
-                        [%e expr_string ~loc (rename txt)]
-                        [%e encode_type ~loc t]]
+                    ( [%expr Optional]
+                    , expr_string ~loc (rename txt)
+                    , encode_type ~loc t )
                   | t ->
-                    [%expr
-                      field Required
-                        [%e expr_string ~loc (rename txt)]
-                        [%e encode_type ~loc t]] )
+                    ( [%expr Required]
+                    , expr_string ~loc (rename txt)
+                    , encode_type ~loc t ) )
               in
               List.map f fields
             in
-            match args with
-            | [] -> failwith "empty object"
-            | init :: tl ->
-              let init = [%expr obj [%e init]] in
-              let f l r = [%expr obj_extend [%e l] [%e r]] in
-              List.fold_left f init tl
+            let init = [%expr Null] in
+            let f (requirement, field, schema) rest =
+              [%expr
+                Object
+                  { field = [%e field]
+                  ; title = None
+                  ; description = None
+                  ; schema = [%e schema]
+                  ; requirement = [%e requirement]
+                  ; rest = [%e rest]
+                  }]
+            in
+            List.fold_right f args init
           and field_name _ { pld_name = { txt; loc }; _ } = (loc, txt)
           and constructed =
             let f { pld_name = { txt; loc }; _ } =
@@ -250,8 +244,7 @@ let expand ~loc ~path:_ (_, types) =
             ; ppat_attributes = []
             }
           in
-          combinator ~loc fields "obj_close" field_name constructed
-            deconstructed schema
+          combinator ~loc fields field_name constructed deconstructed schema
         | Ptype_abstract -> (
           match t.ptype_manifest with
           | Some t -> encode_type ~loc t
@@ -304,9 +297,14 @@ let expand ~loc ~path:_ (_, types) =
                 function
                 | x -> [%e value]]
             in
-            [%expr case [%e schema] [%e construct] [%e destruct]]
+            [%expr
+              Case
+                { schema = [%e schema]
+                ; encoder = [%e construct]
+                ; decoder = [%e destruct]
+                }]
           in
-          [%expr union [%e expr_list ~loc (List.map f options)]]
+          [%expr Union [%e expr_list ~loc (List.map f options)]]
       and wrap arg exp =
         match arg with
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, Invariant ->
@@ -316,15 +314,13 @@ let expand ~loc ~path:_ (_, types) =
             "schematic-ppx: non supported type parameter %a" Pprintast.core_type
             t
       in
-      List.fold_right wrap t.ptype_params
-        (make_recursive ~loc ~name_loc:t.ptype_name.loc t.ptype_name.txt body)
-    and name =
-      pattern_id ~loc:t.ptype_name.loc (schema_name t.ptype_name.txt)
-    in
+      List.fold_right wrap t.ptype_params body
+    and pattern = pattern_id ~loc:t.ptype_name.loc name in
     [%str
-      let [%p name] =
+      let rec [%p pattern] =
         let open Schematic.Schema in
-        ignore int_schema;
+        let _ = int_schema in
+        let _ = [%e expr_id ~loc (Lident name)] in
         [%e encoder]]
   in
   List.map f types |> List.concat
