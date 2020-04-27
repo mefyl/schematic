@@ -317,15 +317,15 @@ let expand_type ~loc t =
     in
     [%expr Union [%e expr_list ~loc (List.map f options)]]
   in
-  let body =
+  let body, recursive =
     match t.ptype_kind with
-    | Ptype_record fields -> expand_record fields
+    | Ptype_record fields -> (expand_record fields, true)
     | Ptype_abstract -> (
       match t.ptype_manifest with
-      | Some t -> encode_type ~loc t
+      | Some t -> (encode_type ~loc t, false)
       | None -> failwith "no manifest on abstract type" )
-    | Ptype_open -> [%expr 51]
-    | Ptype_variant options -> expand_variant options
+    | Ptype_open -> failwith "unsupported Ptype_open"
+    | Ptype_variant options -> (expand_variant options, true)
   and wrap arg exp =
     match arg with
     | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, Invariant ->
@@ -334,17 +334,17 @@ let expand_type ~loc t =
       Ppxlib.Location.raise_errorf ~loc
         "schematic-ppx: non supported type parameter %a" Pprintast.core_type t
   in
-  List.fold_right wrap t.ptype_params body
+  (List.fold_right wrap t.ptype_params body, recursive)
 
 let expand ~loc ~path:_ ~inside (_, types) =
   let f t =
     let name = schema_name t.ptype_name.txt in
     let pattern = pattern_id ~loc:t.ptype_name.loc name in
+    let body, recursive = expand_type ~loc t in
     let body =
       [%expr
         let _ = int_schema in
-        let _ = [%e expr_id ~loc (Lident name)] in
-        [%e expand_type ~loc t]]
+        [%e body]]
     in
     let body =
       if inside then
@@ -356,6 +356,12 @@ let expand ~loc ~path:_ ~inside (_, types) =
           let open Schematic.Schema in
           [%e body]]
     in
-    [%str let rec [%p pattern] = [%e body]]
+    if recursive then
+      [%str
+        let rec [%p pattern] =
+          let _ = [%e expr_id ~loc (Lident name)] in
+          [%e body]]
+    else
+      [%str let [%p pattern] = [%e body]]
   in
   List.map f types |> List.concat

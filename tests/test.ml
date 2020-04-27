@@ -44,8 +44,6 @@ let pp_version fmt { major; minor; subminor } =
 
 let test_version = Alcotest.testable pp_version ( = )
 
-(* type version_alias = version [@@deriving schema] *)
-
 let v1 = { major = 0; minor = 1; subminor = 2 }
 
 and v2 = { major = 3; minor = 4; subminor = 5 }
@@ -53,9 +51,16 @@ and v2 = { major = 3; minor = 4; subminor = 5 }
 and v3 = { major = 6; minor = 7; subminor = 8 }
 
 let record () =
-  roundtrip "record" test_version version_schema
-    { major = 1; minor = 2; subminor = 3 }
-    "{\"major\": 1, \"minor\": 2, \"subminor\": 3}"
+  roundtrip "record" test_version version_schema v1
+    "{\"major\": 0, \"minor\": 1, \"subminor\": 2}"
+
+(* Alias *)
+
+type version_alias = version [@@deriving schema]
+
+let alias () =
+  roundtrip "record" test_version version_alias_schema v2
+    "{\"major\": 3, \"minor\": 4, \"subminor\": 5}"
 
 (* Tuple *)
 
@@ -211,9 +216,11 @@ let () =
       , [ test_case "int" `Quick atom_int
         ; test_case "string" `Quick atom_string
         ] )
-    ; ( "composite"
+    ; ( "record"
       , [ test_case "record" `Quick record; test_case "tuple" `Quick variant ]
       )
+    ; ( "alias"
+      , [ test_case "alias" `Quick record; test_case "alias" `Quick alias ] )
     ; ("list", [ test_case "list" `Quick list_test ])
     ; ("parametric_type", [ test_case "parametric_type" `Quick parametric_type ])
     ; ("failure", [ test_case "failure" `Quick failure ])
