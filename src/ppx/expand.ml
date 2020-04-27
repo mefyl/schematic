@@ -58,16 +58,19 @@ let rec encode_type ~loc = function
     [%expr assoc_schema [%e encode_type ~loc t]]
   (* Plain type *)
   | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
-    [%expr [%e expr_id ~loc (schema_id txt)]]
+    expr_id ~loc (schema_id txt)
   (* Parametric type *)
-  | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } ->
-    let schema = [%expr [%e expr_id ~loc (schema_id txt)]]
-    and f t = (Nolabel, encode_type ~loc t) in
-    { pexp_desc = Pexp_apply (schema, List.map f args)
-    ; pexp_loc = loc
-    ; pexp_loc_stack = []
-    ; pexp_attributes = []
-    }
+  | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } -> (
+    match (txt, args) with
+    | Lident "list", [ arg ] -> [%expr List [%e encode_type ~loc arg]]
+    | _ ->
+      let schema = expr_id ~loc (schema_id txt)
+      and f t = (Nolabel, encode_type ~loc t) in
+      { pexp_desc = Pexp_apply (schema, List.map f args)
+      ; pexp_loc = loc
+      ; pexp_loc_stack = []
+      ; pexp_attributes = []
+      } )
   (* Tuple *)
   | { ptyp_desc = Ptyp_tuple types; _ } ->
     let field_name i { ptyp_loc = loc; _ } = (loc, "e" ^ Int.to_string i)
@@ -265,48 +268,79 @@ let expand_type ~loc t =
     let f { pcd_name = { txt; loc = _ }; pcd_args; pcd_loc = loc; _ } =
       let schema =
         match pcd_args with
+        | Pcstr_tuple [] ->
+          [%expr String_const [%e expr_string ~loc (String.lowercase txt)]]
         | Pcstr_tuple [ field ] -> encode_type ~loc field
         | Pcstr_tuple fields -> tuple_schema ~loc fields
         | Pcstr_record _ -> failwith "not implemented"
       and construct =
-        let pattern =
-          { ppat_desc =
-              Ppat_construct
-                ( { txt = Lident txt; loc }
-                , Some
-                    { ppat_desc = Ppat_var { txt = "x"; loc }
-                    ; ppat_loc = loc
-                    ; ppat_loc_stack = []
-                    ; ppat_attributes = []
-                    } )
-          ; ppat_loc = loc
-          ; ppat_loc_stack = []
-          ; ppat_attributes = []
-          }
-        in
-        [%expr
-          function
-          | [%p pattern] -> Some x
-          | _ -> None]
+        match pcd_args with
+        | Pcstr_tuple [] ->
+          let pattern =
+            { ppat_desc = Ppat_construct ({ txt = Lident txt; loc }, None)
+            ; ppat_loc = loc
+            ; ppat_loc_stack = []
+            ; ppat_attributes = []
+            }
+          in
+          [%expr
+            function
+            | [%p pattern] -> Some ()
+            | _ -> None]
+        | Pcstr_tuple _ ->
+          let pattern =
+            { ppat_desc =
+                Ppat_construct
+                  ( { txt = Lident txt; loc }
+                  , Some
+                      { ppat_desc = Ppat_var { txt = "x"; loc }
+                      ; ppat_loc = loc
+                      ; ppat_loc_stack = []
+                      ; ppat_attributes = []
+                      } )
+            ; ppat_loc = loc
+            ; ppat_loc_stack = []
+            ; ppat_attributes = []
+            }
+          in
+          [%expr
+            function
+            | [%p pattern] -> Some x
+            | _ -> None]
+        | Pcstr_record _ -> failwith "not implemented"
       and destruct =
-        let value =
-          { pexp_desc =
-              Pexp_construct
-                ( { txt = Lident txt; loc }
-                , Some
-                    { pexp_desc = Pexp_ident { txt = Lident "x"; loc }
-                    ; pexp_loc = loc
-                    ; pexp_loc_stack = []
-                    ; pexp_attributes = []
-                    } )
-          ; pexp_loc = loc
-          ; pexp_loc_stack = []
-          ; pexp_attributes = []
-          }
-        in
-        [%expr
-          function
-          | x -> [%e value]]
+        match pcd_args with
+        | Pcstr_tuple [] ->
+          let value =
+            { pexp_desc = Pexp_construct ({ txt = Lident txt; loc }, None)
+            ; pexp_loc = loc
+            ; pexp_loc_stack = []
+            ; pexp_attributes = []
+            }
+          in
+          [%expr
+            function
+            | () -> [%e value]]
+        | Pcstr_tuple _ ->
+          let value =
+            { pexp_desc =
+                Pexp_construct
+                  ( { txt = Lident txt; loc }
+                  , Some
+                      { pexp_desc = Pexp_ident { txt = Lident "x"; loc }
+                      ; pexp_loc = loc
+                      ; pexp_loc_stack = []
+                      ; pexp_attributes = []
+                      } )
+            ; pexp_loc = loc
+            ; pexp_loc_stack = []
+            ; pexp_attributes = []
+            }
+          in
+          [%expr
+            function
+            | x -> [%e value]]
+        | Pcstr_record _ -> failwith "not implemented"
       in
       [%expr
         Case

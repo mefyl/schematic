@@ -6,6 +6,8 @@ let int_schema = Int
 
 let string_schema = String
 
+let string_const_schema s = String_const s
+
 let bool_schema = Bool
 
 let list_schema schema = List schema

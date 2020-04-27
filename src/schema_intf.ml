@@ -20,6 +20,7 @@ and _ schema =
   | Mapping : 'a schema -> (string * 'a) list schema
   | Null : unit schema
   | String : string schema
+  | String_const : string -> unit schema
   | Object :
       { field : string
       ; title : string option

@@ -63,8 +63,6 @@ let rec decode : type t. t schema -> Ezjsonm.value -> t Result.t =
   | Null, _ -> type_error "null"
   | Int, `Float f -> Result.ok @@ Float.to_int f
   | Int, _ -> type_error "float"
-  | String, `String s -> Result.ok s
-  | String, _ -> type_error "string"
   | Bool, `Bool b -> Result.ok b
   | Bool, _ -> type_error "boolean"
   | List items_schema, `A items -> List.map (decode items_schema) items
@@ -85,6 +83,16 @@ let rec decode : type t. t schema -> Ezjsonm.value -> t Result.t =
     value >>= fun value ->
     Result.both (decode_field field requirement value) (decode rest json)
   | Object _, _ -> type_error "object"
+  | String, `String s -> Result.ok s
+  | String, _ -> type_error "string"
+  | String_const expected, `String effective when effective = expected ->
+    Result.ok ()
+  | String_const expected, `String effective ->
+    Result.error
+      (`Json_decode
+        (Format.sprintf "expected \"%s\", got \"%s\"" (String.escaped expected)
+           (String.escaped effective)))
+  | String_const _, _ -> type_error "string"
   | Tuple { schema; rest = Null }, `A [ hd ] ->
     decode schema hd >>= fun hd -> Result.ok (hd, ())
   | Tuple { schema = _; rest = Null }, `A [] ->
@@ -124,7 +132,6 @@ let rec encode : type t. t schema -> t -> Ezjsonm.value =
   match schema with
   | Int -> `Float (Float.of_int v)
   | Null -> `Null
-  | String -> `String v
   | Bool -> `Bool v
   | List items_schema -> `A (List.map (encode items_schema) v)
   | Mapping fields_schema ->
@@ -156,6 +163,8 @@ let rec encode : type t. t schema -> t -> Ezjsonm.value =
       | _ -> failwith "tuple schema chained with a non-tuple schema"
     in
     `A (encode schema hd :: rest)
+  | String -> `String v
+  | String_const v -> `String v
   | Union cases -> (
     let conv (Case { schema; encoder; _ }) =
       match encoder v with

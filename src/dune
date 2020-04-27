@@ -2,4 +2,5 @@
  (name schematic)
  (public_name schematic)
  (libraries batteries ezjsonm)
- (preprocess future_syntax))
+ (preprocess
+  (pps schematic_ppx_inside)))

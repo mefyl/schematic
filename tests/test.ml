@@ -84,12 +84,15 @@ let tuple () =
 type expectation =
   | Exact of version
   | Range of range
+  | Nothing
 [@@deriving schema]
 
-let pp_expectation fmt = function
+let pp_expectation fmt =
+  let open Format in
+  function
   | Exact v -> pp_version fmt v
-  | Range (l, r, i) ->
-    Format.fprintf fmt "(%a, %a, %i)" pp_version l pp_version r i
+  | Range (l, r, i) -> fprintf fmt "(%a, %a, %i)" pp_version l pp_version r i
+  | Nothing -> pp_print_string fmt "nothing"
 
 let test_expectation = Alcotest.testable pp_expectation ( = )
 
@@ -103,7 +106,8 @@ let variant () =
        , { major = 4; minor = 5; subminor = 6 }
        , 108 ))
     "[{\"major\": 1, \"minor\": 2, \"subminor\": 3}, {\"major\": 4, \"minor\": \
-     5, \"subminor\": 6}, 108]"
+     5, \"subminor\": 6}, 108]";
+  roundtrip "variant" test_expectation expectation_schema Nothing "\"nothing\""
 
 (* List *)
 
