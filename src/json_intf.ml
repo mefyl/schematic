@@ -1,9 +1,15 @@
 open Batteries
 
 module Result = struct
-  include Result
+  (* FIXME: 4.06: include Result instead *)
 
   type 'a t = ('a, [ `Json_decode of string ]) Result.t
+
+  let ok = Result.ok
+
+  let error = Result.error
+
+  let bind = Result.bind
 
   let return = Result.ok
 

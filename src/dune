@@ -1,4 +1,5 @@
 (library
  (name schematic)
  (public_name schematic)
- (libraries batteries ezjsonm))
+ (libraries batteries ezjsonm)
+ (preprocess future_syntax))

@@ -54,7 +54,8 @@ let rec decode : type t. t schema -> Ezjsonm.value -> t Result.t =
  fun schema json ->
   let module List = List_monad (Result) in
   let module Option = Option_monad (Result) in
-  let open Let_syntax (Result) in
+  let module Syntax = Let_syntax (Result) in
+  let open Syntax in
   let type_error expected =
     Result.error
       (`Json_decode
@@ -110,9 +111,9 @@ let rec decode : type t. t schema -> Ezjsonm.value -> t Result.t =
       | Batteries.Result.Ok v -> Some (decoder v)
       | Batteries.Result.Error _ -> None
     in
-    match Batteries.List.find_map_opt conv cases with
-    | Some res -> Result.ok res
-    | None -> Result.error (`Json_decode "no union case was matched") )
+    match Batteries.List.find_map conv cases with
+    | res -> Result.ok res
+    | exception Not_found -> Result.error (`Json_decode "no union case was matched") )
 
 let encode_field : type t r. (t, r) field_requirement -> r -> t option =
   function
@@ -159,9 +160,9 @@ let rec encode : type t. t schema -> t -> Ezjsonm.value =
       | Some v -> Some (encode schema v)
       | None -> None
     in
-    match List.find_map_opt conv cases with
-    | Some res -> res
-    | None -> failwith "unmatched variant schema case" )
+    match List.find_map conv cases with
+    | res -> res
+    | exception Not_found -> failwith "unmatched variant schema case" )
   | Map (_, decons, schema) -> encode schema @@ decons v
 
 let from_channel = Ezjsonm.value_from_channel
