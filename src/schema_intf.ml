@@ -12,14 +12,14 @@ type _ case =
       -> 't case
 
 and _ schema =
-  | Null : unit schema
+  | Bool : bool schema
   | End : unit schema
   | Int : int schema
-  | String : string schema
-  | Bool : bool schema
   | List : 'a schema -> 'a list schema
-  | Mapping : 'a schema -> (string * 'a) list schema
   | Map : ('a -> 'b) * ('b -> 'a) * 'a schema -> 'b schema
+  | Mapping : 'a schema -> (string * 'a) list schema
+  | Null : unit schema
+  | String : string schema
   | Object :
       { field : string
       ; title : string option
