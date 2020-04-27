@@ -25,6 +25,12 @@ let expr_apply ~loc f args =
 let expr_list ~loc list =
   List.fold_right (fun m l -> [%expr [%e m] :: [%e l]]) list [%expr []]
 
+let expr_bool ~loc b =
+  if b then
+    [%expr true]
+  else
+    [%expr false]
+
 let schema_name s = s ^ "_schema"
 
 let schema_id = function
@@ -149,201 +155,198 @@ and combinator :
   in
   [%expr Map ([%e construct], [%e deconstruct], [%e obj])]
 
+let expand_type ~loc t =
+  let expand_record fields =
+    let schema =
+      let expand_fields fields =
+        let expand_field = function
+          | { pld_attributes
+            ; pld_loc = loc
+            ; pld_name = { txt; _ }
+            ; pld_type
+            ; _
+            } ->
+            let read_attribute (txt, inline)
+                { attr_name; attr_loc = loc; attr_payload } =
+              match attr_name.txt with
+              | "schematic.as" -> (
+                match attr_payload with
+                | PStr
+                    [%str
+                      [%e?
+                        { pexp_desc = Pexp_constant (Pconst_string (txt, None))
+                        ; _
+                        }]] ->
+                  (txt, inline)
+                | _ ->
+                  Ppxlib.Location.raise_errorf ~loc
+                    "schematic-ppx: string payload expected" )
+              | "schematic.inline" -> (
+                match attr_payload with
+                | PStr [] ->
+                  if not inline then
+                    (txt, true)
+                  else
+                    Ppxlib.Location.raise_errorf ~loc
+                      "schematic-ppx: inline specified multiple times"
+                | _ ->
+                  Ppxlib.Location.raise_errorf ~loc
+                    "schematic-ppx: no payload expected" )
+              | name when String.starts_with name "schematic." ->
+                Ppxlib.Location.raise_errorf ~loc
+                  "schematic-ppx: unknown schematic annotation %s" name
+              | _ -> (txt, inline)
+            in
+            let txt, inline =
+              List.fold_left read_attribute (txt, false) pld_attributes
+            and requirement, schema =
+              match pld_type with
+              | { ptyp_desc = Ptyp_constr ({ txt = Lident "option"; _ }, [ t ])
+                ; _
+                } ->
+                ([%expr Optional], encode_type ~loc t)
+              | t -> ([%expr Required], encode_type ~loc t)
+            in
+            ( requirement
+            , expr_string ~loc (rename txt)
+            , schema
+            , expr_bool ~loc inline )
+        in
+        List.map expand_field fields
+      in
+      let init = [%expr End] in
+      let f (requirement, field, schema, inline) rest =
+        [%expr
+          Object
+            { field = [%e field]
+            ; title = None
+            ; description = None
+            ; inline = [%e inline]
+            ; schema = [%e schema]
+            ; requirement = [%e requirement]
+            ; rest = [%e rest]
+            }]
+      in
+      List.fold_right f (expand_fields fields) init
+    and field_name _ { pld_name = { txt; loc }; _ } = (loc, txt)
+    and constructed =
+      let f { pld_name = { txt; loc }; _ } =
+        ( { txt = Lident txt; loc }
+        , { pexp_desc = Pexp_ident { txt = Lident txt; loc }
+          ; pexp_loc = loc
+          ; pexp_loc_stack = []
+          ; pexp_attributes = []
+          } )
+      in
+      { pexp_desc = Pexp_record (List.map f fields, None)
+      ; pexp_loc = loc
+      ; pexp_loc_stack = []
+      ; pexp_attributes = []
+      }
+    and deconstructed =
+      let f { pld_name = { txt; loc }; _ } =
+        ( { txt = Lident txt; loc }
+        , { ppat_desc = Ppat_var { txt; loc }
+          ; ppat_loc = loc
+          ; ppat_loc_stack = []
+          ; ppat_attributes = []
+          } )
+      in
+      { ppat_desc = Ppat_record (List.map f fields, Closed)
+      ; ppat_loc = loc
+      ; ppat_loc_stack = []
+      ; ppat_attributes = []
+      }
+    in
+    combinator ~loc fields field_name constructed deconstructed schema
+  and expand_variant options =
+    let f { pcd_name = { txt; loc = _ }; pcd_args; pcd_loc = loc; _ } =
+      let schema =
+        match pcd_args with
+        | Pcstr_tuple [ field ] -> encode_type ~loc field
+        | Pcstr_tuple fields -> tuple_schema ~loc fields
+        | Pcstr_record _ -> failwith "not implemented"
+      and construct =
+        let pattern =
+          { ppat_desc =
+              Ppat_construct
+                ( { txt = Lident txt; loc }
+                , Some
+                    { ppat_desc = Ppat_var { txt = "x"; loc }
+                    ; ppat_loc = loc
+                    ; ppat_loc_stack = []
+                    ; ppat_attributes = []
+                    } )
+          ; ppat_loc = loc
+          ; ppat_loc_stack = []
+          ; ppat_attributes = []
+          }
+        in
+        [%expr
+          function
+          | [%p pattern] -> Some x
+          | _ -> None]
+      and destruct =
+        let value =
+          { pexp_desc =
+              Pexp_construct
+                ( { txt = Lident txt; loc }
+                , Some
+                    { pexp_desc = Pexp_ident { txt = Lident "x"; loc }
+                    ; pexp_loc = loc
+                    ; pexp_loc_stack = []
+                    ; pexp_attributes = []
+                    } )
+          ; pexp_loc = loc
+          ; pexp_loc_stack = []
+          ; pexp_attributes = []
+          }
+        in
+        [%expr
+          function
+          | x -> [%e value]]
+      in
+      [%expr
+        Case
+          { schema = [%e schema]
+          ; encoder = [%e construct]
+          ; decoder = [%e destruct]
+          }]
+    in
+    [%expr Union [%e expr_list ~loc (List.map f options)]]
+  in
+  let body =
+    match t.ptype_kind with
+    | Ptype_record fields -> expand_record fields
+    | Ptype_abstract -> (
+      match t.ptype_manifest with
+      | Some t -> encode_type ~loc t
+      | None -> failwith "no manifest on abstract type" )
+    | Ptype_open -> [%expr 51]
+    | Ptype_variant options -> expand_variant options
+  and wrap arg exp =
+    match arg with
+    | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, Invariant ->
+      [%expr fun [%p pattern_id ~loc (schema_name name)] -> [%e exp]]
+    | t, _ ->
+      Ppxlib.Location.raise_errorf ~loc
+        "schematic-ppx: non supported type parameter %a" Pprintast.core_type t
+  in
+  List.fold_right wrap t.ptype_params body
+
 let expand ~loc ~path:_ (_, types) =
   let f t =
     let name = schema_name t.ptype_name.txt in
-    let encoder =
-      let body =
-        match t.ptype_kind with
-        | Ptype_record fields ->
-          let schema =
-            let args =
-              let f = function
-                | { pld_attributes
-                  ; pld_loc = loc
-                  ; pld_name = { txt; _ }
-                  ; pld_type
-                  ; _
-                  } ->
-                  let read_attribute (txt, inline)
-                      { attr_name; attr_loc = loc; attr_payload } =
-                    match attr_name.txt with
-                    | "schematic.as" -> (
-                      match attr_payload with
-                      | PStr
-                          [%str
-                            [%e?
-                              { pexp_desc =
-                                  Pexp_constant (Pconst_string (txt, None))
-                              ; _
-                              }]] ->
-                        (txt, inline)
-                      | _ ->
-                        Ppxlib.Location.raise_errorf ~loc
-                          "schematic-ppx: string payload expected" )
-                    | "schematic.inline" -> (
-                      match attr_payload with
-                      | PStr [] ->
-                        if not inline then
-                          (txt, true)
-                        else
-                          Ppxlib.Location.raise_errorf ~loc
-                            "schematic-ppx: inline specified multiple times"
-                      | _ ->
-                        Ppxlib.Location.raise_errorf ~loc
-                          "schematic-ppx: no payload expected" )
-                    | name when String.starts_with name "schematic." ->
-                      Ppxlib.Location.raise_errorf ~loc
-                        "schematic-ppx: unknown schematic annotation %s" name
-                    | _ -> (txt, inline)
-                  in
-                  let txt, inline =
-                    List.fold_left read_attribute (txt, false) pld_attributes
-                  and requirement, schema =
-                    match pld_type with
-                    | { ptyp_desc =
-                          Ptyp_constr ({ txt = Lident "option"; _ }, [ t ])
-                      ; _
-                      } ->
-                      ([%expr Optional], encode_type ~loc t)
-                    | t -> ([%expr Required], encode_type ~loc t)
-                  in
-                  ( requirement
-                  , expr_string ~loc (rename txt)
-                  , schema
-                  , if inline then
-                      [%expr true]
-                    else
-                      [%expr false] )
-              in
-              List.map f fields
-            in
-            let init = [%expr End] in
-            let f (requirement, field, schema, inline) rest =
-              [%expr
-                Object
-                  { field = [%e field]
-                  ; title = None
-                  ; description = None
-                  ; inline = [%e inline]
-                  ; schema = [%e schema]
-                  ; requirement = [%e requirement]
-                  ; rest = [%e rest]
-                  }]
-            in
-            List.fold_right f args init
-          and field_name _ { pld_name = { txt; loc }; _ } = (loc, txt)
-          and constructed =
-            let f { pld_name = { txt; loc }; _ } =
-              ( { txt = Lident txt; loc }
-              , { pexp_desc = Pexp_ident { txt = Lident txt; loc }
-                ; pexp_loc = loc
-                ; pexp_loc_stack = []
-                ; pexp_attributes = []
-                } )
-            in
-            { pexp_desc = Pexp_record (List.map f fields, None)
-            ; pexp_loc = loc
-            ; pexp_loc_stack = []
-            ; pexp_attributes = []
-            }
-          and deconstructed =
-            let f { pld_name = { txt; loc }; _ } =
-              ( { txt = Lident txt; loc }
-              , { ppat_desc = Ppat_var { txt; loc }
-                ; ppat_loc = loc
-                ; ppat_loc_stack = []
-                ; ppat_attributes = []
-                } )
-            in
-            { ppat_desc = Ppat_record (List.map f fields, Closed)
-            ; ppat_loc = loc
-            ; ppat_loc_stack = []
-            ; ppat_attributes = []
-            }
-          in
-          combinator ~loc fields field_name constructed deconstructed schema
-        | Ptype_abstract -> (
-          match t.ptype_manifest with
-          | Some t -> encode_type ~loc t
-          | None -> failwith "no manifest on abstract type" )
-        | Ptype_open -> [%expr 51]
-        | Ptype_variant options ->
-          let f { pcd_name = { txt; loc = _ }; pcd_args; pcd_loc = loc; _ } =
-            let schema =
-              match pcd_args with
-              | Pcstr_tuple [ field ] -> encode_type ~loc field
-              | Pcstr_tuple fields -> tuple_schema ~loc fields
-              | Pcstr_record _ -> failwith "not implemented"
-            and construct =
-              let pattern =
-                { ppat_desc =
-                    Ppat_construct
-                      ( { txt = Lident txt; loc }
-                      , Some
-                          { ppat_desc = Ppat_var { txt = "x"; loc }
-                          ; ppat_loc = loc
-                          ; ppat_loc_stack = []
-                          ; ppat_attributes = []
-                          } )
-                ; ppat_loc = loc
-                ; ppat_loc_stack = []
-                ; ppat_attributes = []
-                }
-              in
-              [%expr
-                function
-                | [%p pattern] -> Some x
-                | _ -> None]
-            and destruct =
-              let value =
-                { pexp_desc =
-                    Pexp_construct
-                      ( { txt = Lident txt; loc }
-                      , Some
-                          { pexp_desc = Pexp_ident { txt = Lident "x"; loc }
-                          ; pexp_loc = loc
-                          ; pexp_loc_stack = []
-                          ; pexp_attributes = []
-                          } )
-                ; pexp_loc = loc
-                ; pexp_loc_stack = []
-                ; pexp_attributes = []
-                }
-              in
-              [%expr
-                function
-                | x -> [%e value]]
-            in
-            [%expr
-              Case
-                { schema = [%e schema]
-                ; encoder = [%e construct]
-                ; decoder = [%e destruct]
-                }]
-          in
-          [%expr Union [%e expr_list ~loc (List.map f options)]]
-      and wrap arg exp =
-        match arg with
-        | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, Invariant ->
-          [%expr fun [%p pattern_id ~loc (schema_name name)] -> [%e exp]]
-        | t, _ ->
-          Ppxlib.Location.raise_errorf ~loc
-            "schematic-ppx: non supported type parameter %a" Pprintast.core_type
-            t
-      in
-      List.fold_right wrap t.ptype_params body
-    and pattern = pattern_id ~loc:t.ptype_name.loc name in
+    let pattern = pattern_id ~loc:t.ptype_name.loc name in
     [%str
       let rec [%p pattern] =
         let open Schematic.Schema in
         let _ = int_schema in
         let _ = [%e expr_id ~loc (Lident name)] in
-        [%e encoder]]
+        [%e expand_type ~loc t]]
   in
   List.map f types |> List.concat
 
-let str_type_decl_generator =
-  Deriving.Generator.make_noarg ~attributes:[] expand
+let str_type_decl = Deriving.Generator.make_noarg ~attributes:[] expand
 
-let my_deriver = Deriving.add ~str_type_decl:str_type_decl_generator "schema"
+let my_deriver = Deriving.add ~str_type_decl "schema"
