@@ -175,6 +175,33 @@ let recursive () =
     { value = 0; next = Some { value = 1; next = None } }
     "{\"value\": 0, \"next\": {\"value\": 1}}"
 
+(* Inline *)
+
+type inlined =
+  { b : int
+  ; c : int
+  }
+[@@deriving schema]
+
+type inline =
+  { a : int
+  ; coin : inlined [@schematic.inline]
+  ; d : int
+  }
+[@@deriving schema]
+
+let pp_inlined fmt { b; c } = Format.fprintf fmt "(%i, %i)" b c
+
+let pp_inline fmt { a; coin; d } =
+  Format.fprintf fmt "(%i, %a, %i)" a pp_inlined coin d
+
+let test_inline = Alcotest.testable pp_inline ( = )
+
+let inline () =
+  roundtrip "inline" test_inline inline_schema
+    { a = 0; coin = { b = 1; c = 2 }; d = 3 }
+    "{\"a\": 0.000000, \"b\": 1.000000, \"c\": 2.000000, \"d\": 3.000000}"
+
 (* Driver *)
 
 let () =
@@ -192,4 +219,5 @@ let () =
     ; ("failure", [ test_case "failure" `Quick failure ])
     ; ("escape", [ test_case "escape" `Quick escape ])
     ; ("recursive", [ test_case "recursive" `Quick recursive ])
+    ; ("inline", [ test_case "inline" `Quick inline ])
     ]

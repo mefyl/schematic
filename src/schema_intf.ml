@@ -13,6 +13,7 @@ type _ case =
 
 and _ schema =
   | Null : unit schema
+  | End : unit schema
   | Int : int schema
   | String : string schema
   | Bool : bool schema
@@ -24,6 +25,7 @@ and _ schema =
       ; title : string option
       ; description : string option
       ; requirement : ('a, 'req) field_requirement
+      ; inline : bool
       ; schema : 'a schema
       ; rest : 'b schema
       }

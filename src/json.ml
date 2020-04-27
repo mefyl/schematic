@@ -79,14 +79,12 @@ let rec decode : type t. t schema -> Ezjsonm.value -> t Result.t =
     in
     List.map f fields
   | Mapping _, _ -> type_error "mapping"
-  | Object { field; requirement; schema; rest = Null; _ }, `O fields ->
+  | Object { field; requirement; schema; rest; inline; _ }, (`O fields as o) ->
     let* value =
-      Option.map (decode schema) @@ Batteries.List.assoc_opt field fields
-    in
-    Result.both (decode_field field requirement value) (Result.ok ())
-  | Object { field; requirement; schema; rest; _ }, `O fields ->
-    let* value =
-      Option.map (decode schema) @@ Batteries.List.assoc_opt field fields
+      if inline then
+        Option.map (decode schema) (Some o)
+      else
+        Option.map (decode schema) @@ Batteries.List.assoc_opt field fields
     in
     Result.both (decode_field field requirement value) (decode rest json)
   | Object _, _ -> type_error "object"
@@ -113,7 +111,10 @@ let rec decode : type t. t schema -> Ezjsonm.value -> t Result.t =
     in
     match Batteries.List.find_map conv cases with
     | res -> Result.ok res
-    | exception Not_found -> Result.error (`Json_decode "no union case was matched") )
+    | exception Not_found ->
+      Result.error (`Json_decode "no union case was matched") )
+  | End, `O _ -> Result.ok ()
+  | End, _ -> failwith "end on a non-object"
 
 let encode_field : type t r. (t, r) field_requirement -> r -> t option =
   function
@@ -134,7 +135,7 @@ let rec encode : type t. t schema -> t -> Ezjsonm.value =
   | List items_schema -> `A (List.map (encode items_schema) v)
   | Mapping fields_schema ->
     `O (List.map (fun (name, v) -> (name, encode fields_schema v)) v)
-  | Object { field; requirement; schema; rest; _ } -> (
+  | Object { field; requirement; schema; rest; inline; _ } -> (
     let hd, tl = v in
     let rest =
       match encode rest tl with
@@ -143,7 +144,14 @@ let rec encode : type t. t schema -> t -> Ezjsonm.value =
       | _ -> failwith "object schema chained with a non-object schema"
     in
     match encode_field requirement hd with
-    | Some hd -> `O ((field, encode schema hd) :: rest)
+    | Some hd ->
+      let encoded = encode schema hd in
+      if inline then
+        match encoded with
+        | `O fields -> `O (List.concat [ fields; rest ])
+        | _ -> `O ((field, encoded) :: rest)
+      else
+        `O ((field, encoded) :: rest)
     | None -> `O rest )
   | Tuple { schema; rest } ->
     let hd, tl = v in
@@ -164,6 +172,7 @@ let rec encode : type t. t schema -> t -> Ezjsonm.value =
     | res -> res
     | exception Not_found -> failwith "unmatched variant schema case" )
   | Map (_, decons, schema) -> encode schema @@ decons v
+  | End -> `Null
 
 let from_channel = Ezjsonm.value_from_channel
 

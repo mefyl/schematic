@@ -164,8 +164,9 @@ let expand ~loc ~path:_ (_, types) =
                   ; pld_name = { txt; _ }
                   ; pld_type
                   ; _
-                  } -> (
-                  let f txt { attr_name; attr_loc = loc; attr_payload } =
+                  } ->
+                  let read_attribute (txt, inline)
+                      { attr_name; attr_loc = loc; attr_payload } =
                     match attr_name.txt with
                     | "schematic.as" -> (
                       match attr_payload with
@@ -176,38 +177,55 @@ let expand ~loc ~path:_ (_, types) =
                                   Pexp_constant (Pconst_string (txt, None))
                               ; _
                               }]] ->
-                        txt
+                        (txt, inline)
                       | _ ->
                         Ppxlib.Location.raise_errorf ~loc
                           "schematic-ppx: string payload expected" )
+                    | "schematic.inline" -> (
+                      match attr_payload with
+                      | PStr [] ->
+                        if not inline then
+                          (txt, true)
+                        else
+                          Ppxlib.Location.raise_errorf ~loc
+                            "schematic-ppx: inline specified multiple times"
+                      | _ ->
+                        Ppxlib.Location.raise_errorf ~loc
+                          "schematic-ppx: no payload expected" )
                     | name when String.starts_with name "schematic." ->
                       Ppxlib.Location.raise_errorf ~loc
                         "schematic-ppx: unknown schematic annotation %s" name
-                    | _ -> txt
+                    | _ -> (txt, inline)
                   in
-                  let txt = List.fold_left f txt pld_attributes in
-                  match pld_type with
-                  | { ptyp_desc =
-                        Ptyp_constr ({ txt = Lident "option"; _ }, [ t ])
-                    ; _
-                    } ->
-                    ( [%expr Optional]
-                    , expr_string ~loc (rename txt)
-                    , encode_type ~loc t )
-                  | t ->
-                    ( [%expr Required]
-                    , expr_string ~loc (rename txt)
-                    , encode_type ~loc t ) )
+                  let txt, inline =
+                    List.fold_left read_attribute (txt, false) pld_attributes
+                  and requirement, schema =
+                    match pld_type with
+                    | { ptyp_desc =
+                          Ptyp_constr ({ txt = Lident "option"; _ }, [ t ])
+                      ; _
+                      } ->
+                      ([%expr Optional], encode_type ~loc t)
+                    | t -> ([%expr Required], encode_type ~loc t)
+                  in
+                  ( requirement
+                  , expr_string ~loc (rename txt)
+                  , schema
+                  , if inline then
+                      [%expr true]
+                    else
+                      [%expr false] )
               in
               List.map f fields
             in
-            let init = [%expr Null] in
-            let f (requirement, field, schema) rest =
+            let init = [%expr End] in
+            let f (requirement, field, schema, inline) rest =
               [%expr
                 Object
                   { field = [%e field]
                   ; title = None
                   ; description = None
+                  ; inline = [%e inline]
                   ; schema = [%e schema]
                   ; requirement = [%e requirement]
                   ; rest = [%e rest]
