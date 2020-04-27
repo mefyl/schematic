@@ -187,6 +187,21 @@ let recursive () =
     { value = 0; next = Some { value = 1; next = None } }
     "{\"value\": 0, \"next\": {\"value\": 1}}"
 
+type mutually_a = { next_b : mutually_b option }
+
+and mutually_b = { next_a : mutually_a option } [@@deriving schema]
+
+let rec pp_mutually_a fmt { next_b } = pp_option pp_mutally_b fmt next_b
+
+and pp_mutally_b fmt { next_a } = pp_option pp_mutually_a fmt next_a
+
+let test_mutually_a = Alcotest.testable pp_mutually_a ( = )
+
+let mutually () =
+  roundtrip "mutually recursive" test_mutually_a mutually_a_schema
+    { next_b = Some { next_a = Some { next_b = None } } }
+    "{\"next_b\": {\"next_a\": {}}}"
+
 (* Inline *)
 
 type inlined =
@@ -232,6 +247,9 @@ let () =
     ; ("parametric_type", [ test_case "parametric_type" `Quick parametric_type ])
     ; ("failure", [ test_case "failure" `Quick failure ])
     ; ("escape", [ test_case "escape" `Quick escape ])
-    ; ("recursive", [ test_case "recursive" `Quick recursive ])
+    ; ( "recursive"
+      , [ test_case "recursive" `Quick recursive
+        ; test_case "mutually recursive" `Quick mutually
+        ] )
     ; ("inline", [ test_case "inline" `Quick inline ])
     ]

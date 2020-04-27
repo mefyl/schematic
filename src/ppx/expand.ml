@@ -390,12 +390,28 @@ let expand ~loc ~path:_ ~inside (_, types) =
           let open Schematic.Schema in
           [%e body]]
     in
-    if recursive then
-      [%str
-        let rec [%p pattern] =
+    let body =
+      if recursive then
+        [%expr
           let _ = [%e expr_id ~loc (Lident name)] in
           [%e body]]
-    else
-      [%str let [%p pattern] = [%e body]]
+      else
+        body
+    in
+    ( recursive
+    , { pvb_pat = pattern; pvb_expr = body; pvb_loc = loc; pvb_attributes = [] }
+    )
   in
-  List.map f types |> List.concat
+  let schemas = List.map f types in
+  [ { pstr_desc =
+        Pstr_value
+          ( ( if List.exists fst schemas then
+              Recursive
+            else
+              Nonrecursive )
+          , List.map snd schemas )
+    ; pstr_loc = loc
+    }
+  ]
+
+(* let rec [%p pattern] = [%str let [%p pattern] = [%e body]] *)
