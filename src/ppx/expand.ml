@@ -31,7 +31,14 @@ let expr_bool ~loc b =
   else
     [%expr false]
 
-let schema_name s = s ^ "_schema"
+let rename name =
+  let len = String.length name in
+  if name.[len - 1] = '_' then
+    String.sub name 0 (len - 1)
+  else
+    name
+
+let schema_name s = rename s ^ "_schema"
 
 let schema_id = function
   | Lident name -> Lident (schema_name name)
@@ -45,23 +52,18 @@ let expr_string ~loc txt =
   ; pexp_attributes = []
   }
 
-let rename name =
-  let len = String.length name in
-  if name.[len - 1] = '_' then
-    String.sub name 0 (len - 1)
-  else
-    name
-
 let rec encode_type ~loc = function
   (* Mapping *)
-  | [%type: (string * [%t? t]) list] -> [%expr Mapping [%e encode_type ~loc t]]
+  | [%type: (string * [%t? t]) list] ->
+    [%expr { id = None; descriptor = Mapping [%e encode_type ~loc t] }]
   (* Plain type *)
   | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
     expr_id ~loc (schema_id txt)
   (* Parametric type *)
   | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } -> (
     match (txt, args) with
-    | Lident "list", [ arg ] -> [%expr List [%e encode_type ~loc arg]]
+    | Lident "list", [ arg ] ->
+      [%expr { id = None; descriptor = List [%e encode_type ~loc arg] }]
     | _ ->
       let schema = expr_id ~loc (schema_id txt)
       and f t = (Nolabel, encode_type ~loc t) in
@@ -94,8 +96,11 @@ let rec encode_type ~loc = function
       ; ppat_attributes = []
       }
     in
-    combinator ~loc types field_name constructed deconstructed
-      (tuple_schema ~loc types)
+    let body =
+      combinator ~loc types field_name constructed deconstructed
+        (tuple_schema ~loc types)
+    in
+    [%expr { id = None; descriptor = [%e body] }]
   (* Type variable *)
   | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ } ->
     [%expr [%e expr_id ~loc (schema_id (Lident name))]]
@@ -268,7 +273,11 @@ let expand_type ~loc t =
       let schema =
         match pcd_args with
         | Pcstr_tuple [] ->
-          [%expr String_const [%e expr_string ~loc (String.lowercase txt)]]
+          [%expr
+            { id = None
+            ; descriptor =
+                String_const [%e expr_string ~loc (String.lowercase txt)]
+            }]
         | Pcstr_tuple [ field ] -> encode_type ~loc field
         | Pcstr_tuple fields -> tuple_schema ~loc fields
         | Pcstr_record _ -> failwith "not implemented"
@@ -355,7 +364,7 @@ let expand_type ~loc t =
     | Ptype_record fields -> (expand_record fields, true)
     | Ptype_abstract -> (
       match t.ptype_manifest with
-      | Some t -> (encode_type ~loc t, false)
+      | Some t -> ([%expr [%e encode_type ~loc t].descriptor], false)
       | None -> failwith "no manifest on abstract type" )
     | Ptype_open -> failwith "unsupported Ptype_open"
     | Ptype_variant options -> (expand_variant options, true)
@@ -366,6 +375,12 @@ let expand_type ~loc t =
     | t, _ ->
       Ppxlib.Location.raise_errorf ~loc
         "schematic-ppx: non supported type parameter %a" Pprintast.core_type t
+  in
+  let body =
+    [%expr
+      { id = Some [%e expr_string ~loc (rename t.ptype_name.txt)]
+      ; descriptor = [%e body]
+      }]
   in
   (List.fold_right wrap t.ptype_params body, recursive)
 

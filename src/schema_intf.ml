@@ -11,16 +11,16 @@ type _ case =
       }
       -> 't case
 
-and _ schema =
-  | Bool : bool schema
-  | End : unit schema
-  | Int : int schema
-  | List : 'a schema -> 'a list schema
-  | Map : ('a -> 'b) * ('b -> 'a) * 'a schema -> 'b schema
-  | Mapping : 'a schema -> (string * 'a) list schema
-  | Null : unit schema
-  | String : string schema
-  | String_const : string -> unit schema
+and _ descriptor =
+  | Bool : bool descriptor
+  | End : unit descriptor
+  | Int : int descriptor
+  | List : 'a schema -> 'a list descriptor
+  | Map : ('a -> 'b) * ('b -> 'a) * 'a descriptor -> 'b descriptor
+  | Mapping : 'a schema -> (string * 'a) list descriptor
+  | Null : unit descriptor
+  | String : string descriptor
+  | String_const : string -> unit descriptor
   | Object :
       { field : string
       ; title : string option
@@ -28,12 +28,17 @@ and _ schema =
       ; requirement : ('a, 'req) field_requirement
       ; inline : bool
       ; schema : 'a schema
-      ; rest : 'b schema
+      ; rest : 'b descriptor
       }
-      -> ('req * 'b) schema
+      -> ('req * 'b) descriptor
   | Tuple :
       { schema : 'a schema
-      ; rest : 'b schema
+      ; rest : 'b descriptor
       }
-      -> ('a * 'b) schema
-  | Union : 't case list -> 't schema
+      -> ('a * 'b) descriptor
+  | Union : 't case list -> 't descriptor
+
+and 't schema =
+  { id : string option
+  ; descriptor : 't descriptor
+  }
