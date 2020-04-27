@@ -8,6 +8,13 @@ let pattern_id ~loc txt =
   ; ppat_attributes = []
   }
 
+let pattern_string ~loc txt =
+  { ppat_desc = Ppat_constant (Pconst_string (txt, None))
+  ; ppat_loc = loc
+  ; ppat_loc_stack = []
+  ; ppat_attributes = []
+  }
+
 let expr_id ~loc txt =
   { pexp_desc = Pexp_ident { txt; loc }
   ; pexp_loc = loc
@@ -24,6 +31,13 @@ let expr_apply ~loc f args =
 
 let expr_list ~loc list =
   List.fold_right (fun m l -> [%expr [%e m] :: [%e l]]) list [%expr []]
+
+let expr_array ~loc list =
+  { pexp_desc = Pexp_array list
+  ; pexp_loc = loc
+  ; pexp_loc_stack = []
+  ; pexp_attributes = []
+  }
 
 let expr_bool ~loc b =
   if b then

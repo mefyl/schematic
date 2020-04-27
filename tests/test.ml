@@ -10,12 +10,22 @@ let roundtrip name test schema value j =
   | Result.Error (`Json_decode e) ->
     Alcotest.fail (Format.sprintf "JSON decode error: %s" e)
 
+let json_schema schema =
+  let open Schematic in
+  let js = Json.Schema.of_schema schema in
+  Json.encode Json.Schema.schema js |> Json.to_string |> print_endline
+
+let test name test schema value j =
+  let () = roundtrip name test schema value j in
+  let () = json_schema schema in
+  ()
+
 (* Failure *)
 
 let failure () =
   let open Schematic.Schema in
   try
-    roundtrip "int atom" Alcotest.int int_schema 28 "29";
+    test "int atom" Alcotest.int int_schema 28 "29";
     Alcotest.fail "failure test failed"
   with Failure _ -> ()
 
@@ -23,11 +33,11 @@ let failure () =
 
 let atom_int () =
   let open Schematic.Schema in
-  roundtrip "int atom" Alcotest.int int_schema 28 "28"
+  test "int atom" Alcotest.int int_schema 28 "28"
 
 let atom_string () =
   let open Schematic.Schema in
-  roundtrip "int atom" Alcotest.string string_schema "trente trois"
+  test "int atom" Alcotest.string string_schema "trente trois"
     "\"trente trois\""
 
 (* Record *)
@@ -51,7 +61,7 @@ and v2 = { major = 3; minor = 4; subminor = 5 }
 and v3 = { major = 6; minor = 7; subminor = 8 }
 
 let record () =
-  roundtrip "record" test_version version_schema v1
+  test "record" test_version version_schema v1
     "{\"major\": 0, \"minor\": 1, \"subminor\": 2}"
 
 (* Alias *)
@@ -59,7 +69,7 @@ let record () =
 type version_alias = version [@@deriving schema]
 
 let alias () =
-  roundtrip "record" test_version version_alias_schema v2
+  test "record" test_version version_alias_schema v2
     "{\"major\": 3, \"minor\": 4, \"subminor\": 5}"
 
 (* Tuple *)
@@ -72,7 +82,7 @@ let pp_range fmt (l, r, i) =
 let test_range = Alcotest.testable pp_range ( = )
 
 let tuple () =
-  roundtrip "tuple" test_range range_schema (v1, v2, 83)
+  test "tuple" test_range range_schema (v1, v2, 83)
     "[{\"major\": 0, \"minor\": 1, \"subminor\": 2}, {\"major\": 3, \"minor\": \
      4, \"subminor\": 5}, 83]"
 
@@ -94,31 +104,31 @@ let pp_expectation fmt =
 let test_expectation = Alcotest.testable pp_expectation ( = )
 
 let variant () =
-  roundtrip "variant" test_expectation expectation_schema
+  test "variant" test_expectation expectation_schema
     (Exact { major = 1; minor = 2; subminor = 3 })
     "{\"major\": 1, \"minor\": 2, \"subminor\": 3}";
-  roundtrip "variant" test_expectation expectation_schema
+  test "variant" test_expectation expectation_schema
     (Range
        ( { major = 1; minor = 2; subminor = 3 }
        , { major = 4; minor = 5; subminor = 6 }
        , 108 ))
     "[{\"major\": 1, \"minor\": 2, \"subminor\": 3}, {\"major\": 4, \"minor\": \
      5, \"subminor\": 6}, 108]";
-  roundtrip "variant" test_expectation expectation_schema Nothing "\"nothing\""
+  test "variant" test_expectation expectation_schema Nothing "\"nothing\""
 
 (* List *)
 
 let list_test () =
-  roundtrip "list"
+  test "list"
     (Alcotest.list test_version)
     (Schematic.Schema.list_schema version_schema)
     [] "[]";
-  roundtrip "list"
+  test "list"
     (Alcotest.list test_version)
     (Schematic.Schema.list_schema version_schema)
     [ { major = 0; minor = 1; subminor = 2 } ]
     "[{\"major\": 0.000000, \"minor\": 1.000000, \"subminor\": 2.000000}].";
-  roundtrip "list"
+  test "list"
     (Alcotest.list test_version)
     (Schematic.Schema.list_schema version_schema)
     [ { major = 0; minor = 1; subminor = 2 }
@@ -133,7 +143,7 @@ let list_test () =
 type 'a pair = 'a * 'a [@@deriving schema]
 
 let parametric_type () =
-  roundtrip "parametric_type"
+  test "parametric_type"
     (Alcotest.pair test_version test_version)
     (pair_schema version_schema)
     (v1, v3)
@@ -154,7 +164,7 @@ let pp_escape fmt { special_char; keyword } =
 let test_escape = Alcotest.testable pp_escape ( = )
 
 let escape () =
-  roundtrip "escape" test_escape escape_schema
+  test "escape" test_escape escape_schema
     { special_char = 128; keyword = "coin" }
     "{\"'char$\": 128, \"type\": \"coin\"}"
 
@@ -180,7 +190,7 @@ let rec pp_recursive fmt { value; next } =
 let test_recursive = Alcotest.testable pp_recursive ( = )
 
 let recursive () =
-  roundtrip "recursive" test_recursive recursive_schema
+  test "recursive" test_recursive recursive_schema
     { value = 0; next = Some { value = 1; next = None } }
     "{\"value\": 0, \"next\": {\"value\": 1}}"
 
@@ -195,7 +205,7 @@ and pp_mutally_b fmt { next_a } = pp_option pp_mutually_a fmt next_a
 let test_mutually_a = Alcotest.testable pp_mutually_a ( = )
 
 let mutually () =
-  roundtrip "mutually recursive" test_mutually_a mutually_a_schema
+  test "mutually recursive" test_mutually_a mutually_a_schema
     { next_b = Some { next_a = Some { next_b = None } } }
     "{\"next_b\": {\"next_a\": {}}}"
 
@@ -222,7 +232,7 @@ let pp_inline fmt { a; coin; d } =
 let test_inline = Alcotest.testable pp_inline ( = )
 
 let inline () =
-  roundtrip "inline" test_inline inline_schema
+  test "inline" test_inline inline_schema
     { a = 0; coin = { b = 1; c = 2 }; d = 3 }
     "{\"a\": 0.000000, \"b\": 1.000000, \"c\": 2.000000, \"d\": 3.000000}"
 
