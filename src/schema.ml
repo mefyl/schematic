@@ -1,5 +1,7 @@
 include Schema_intf
 
+let unit_schema = Null
+
 let int_schema = Int
 
 let string_schema = String

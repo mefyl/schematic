@@ -1,5 +1,7 @@
 include module type of Schema_intf
 
+val unit_schema : unit schema
+
 val int_schema : int schema
 
 val string_schema : string schema

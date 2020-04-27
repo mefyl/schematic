@@ -343,7 +343,7 @@ let expand ~loc ~path:_ ~inside (_, types) =
     let body, recursive = expand_type ~loc t in
     let body =
       [%expr
-        let _ = int_schema in
+        let _ = unit_schema in
         [%e body]]
     in
     let body =
