@@ -1,11 +1,27 @@
 (library
+ (name schematic_ppx_expand)
+ (modules expand)
+ (public_name schematic.ppx_expand)
+ (libraries batteries ppxlib)
+ (preprocess
+  (pps ppxlib.metaquot)))
+
+(library
  (name schematic_ppx)
  (modules ppx)
  (public_name schematic.ppx)
  (kind ppx_deriver)
+ (libraries batteries ppxlib schematic_ppx_expand)
  (preprocess
-  (pps ppxlib.metaquot))
- (libraries batteries ppxlib))
+  (pps ppxlib.metaquot)))
+
+(library
+ (name schematic_ppx_inside)
+ (modules ppx_inside)
+ (kind ppx_deriver)
+ (libraries batteries ppxlib schematic_ppx_expand)
+ (preprocess
+  (pps ppxlib.metaquot)))
 
 (executable
  (name pp)
