@@ -72,12 +72,9 @@ let pp_range fmt (l, r, i) =
 let test_range = Alcotest.testable pp_range ( = )
 
 let tuple () =
-  roundtrip "tuple" test_range range_schema
-    ( { major = 1; minor = 2; subminor = 3 }
-    , { major = 4; minor = 5; subminor = 6 }
-    , 83 )
-    "[{\"major\": 1, \"minor\": 2, \"subminor\": 3}, {\"major\": 1, \"minor\": \
-     2, \"subminor\": 3}, 83]"
+  roundtrip "tuple" test_range range_schema (v1, v2, 83)
+    "[{\"major\": 0, \"minor\": 1, \"subminor\": 2}, {\"major\": 3, \"minor\": \
+     4, \"subminor\": 5}, 83]"
 
 (* Variant *)
 
@@ -238,18 +235,17 @@ let () =
       , [ test_case "int" `Quick atom_int
         ; test_case "string" `Quick atom_string
         ] )
-    ; ( "record"
-      , [ test_case "record" `Quick record; test_case "tuple" `Quick variant ]
-      )
-    ; ( "alias"
-      , [ test_case "alias" `Quick record; test_case "alias" `Quick alias ] )
+    ; ("record", [ test_case "record" `Quick record ])
+    ; ("tuple", [ test_case "tuple" `Quick tuple ])
+    ; ("variant", [ test_case "variant" `Quick variant ])
+    ; ("alias", [ test_case "alias" `Quick alias ])
     ; ("list", [ test_case "list" `Quick list_test ])
     ; ("parametric_type", [ test_case "parametric_type" `Quick parametric_type ])
-    ; ("failure", [ test_case "failure" `Quick failure ])
     ; ("escape", [ test_case "escape" `Quick escape ])
     ; ( "recursive"
       , [ test_case "recursive" `Quick recursive
         ; test_case "mutually recursive" `Quick mutually
         ] )
     ; ("inline", [ test_case "inline" `Quick inline ])
+    ; ("failure", [ test_case "failure" `Quick failure ])
     ]

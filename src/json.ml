@@ -116,6 +116,7 @@ let rec decode : type t. t schema -> Ezjsonm.value -> t Result.t =
     | exception Not_found ->
       Result.error (`Json_decode "no union case was matched") )
   | End, `O _ -> Result.ok ()
+  | End, `A _ -> Result.ok ()
   | End, _ -> failwith "end on a non-object"
 
 let encode_field : type t r. (t, r) field_requirement -> r -> t option =

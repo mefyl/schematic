@@ -54,8 +54,7 @@ let rename name =
 
 let rec encode_type ~loc = function
   (* Mapping *)
-  | [%type: (string * [%t? t]) list] ->
-    [%expr assoc_schema [%e encode_type ~loc t]]
+  | [%type: (string * [%t? t]) list] -> [%expr Mapping [%e encode_type ~loc t]]
   (* Plain type *)
   | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
     expr_id ~loc (schema_id txt)
@@ -107,7 +106,7 @@ let rec encode_type ~loc = function
 
 and tuple_schema ~loc types =
   let args = List.map (encode_type ~loc) types in
-  let init = [%expr Null] in
+  let init = [%expr End] in
   let f r l = [%expr Tuple { schema = [%e r]; rest = [%e l] }] in
   List.fold_right f args init
 
