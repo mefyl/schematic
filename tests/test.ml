@@ -1,23 +1,37 @@
 open Batteries
 
+let root =
+  Filename.dirname @@ Filename.dirname @@ Filename.dirname @@ Filename.dirname
+  @@ Sys.executable_name
+
 let roundtrip name test schema value j =
   let json = Alcotest.testable Schematic.Json.pp ( = ) in
-  Alcotest.check json name
-    (Schematic.Json.of_string j)
-    (Schematic.Json.encode schema value);
-  match Schematic.Json.decode schema (Schematic.Json.of_string j) with
-  | Result.Ok decoded -> Alcotest.check test name value decoded
-  | Result.Error (`Json_decode e) ->
-    Alcotest.fail (Format.sprintf "JSON decode error: %s" e)
-
-let json_schema schema =
-  let open Schematic in
-  let js = Json.Schema.of_schema schema in
-  Json.encode Json.Schema.schema js |> Json.to_string |> print_endline
+  let encoded = Schematic.Json.encode schema value in
+  let _encoding =
+    Alcotest.check json name (Schematic.Json.of_string j) encoded
+  in
+  let _decoding =
+    match Schematic.Json.decode schema (Schematic.Json.of_string j) with
+    | Result.Ok decoded -> Alcotest.check test name value decoded
+    | Result.Error (`Json_decode e) ->
+      Alcotest.fail (Format.sprintf "JSON decode error: %s" e)
+  in
+  let _validation =
+    let schema =
+      Schematic.Json.Schema.of_schema schema
+      |> Schematic.Json.encode Schematic.Json.Schema.schema
+    in
+    let cmd =
+      Format.sprintf "%s/tests/validate-schema \"%s\" \"%s\"" root
+        (String.escaped @@ Schematic.Json.to_string @@ schema)
+        (String.escaped @@ Schematic.Json.to_string @@ encoded)
+    in
+    if Sys.command cmd <> 0 then Alcotest.check json name schema encoded
+  in
+  ()
 
 let test name test schema value j =
   let () = roundtrip name test schema value j in
-  let () = json_schema schema in
   ()
 
 (* Failure *)
