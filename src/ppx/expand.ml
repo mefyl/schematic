@@ -105,8 +105,8 @@ let rec encode_type ~loc = function
 and tuple_schema ~loc types =
   let args = List.map (encode_type ~loc) types in
   let init = [%expr Null] in
-  let f l r = [%expr Tuple { schema = [%e r]; rest = [%e l] }] in
-  List.fold_left f init args
+  let f r l = [%expr Tuple { schema = [%e r]; rest = [%e l] }] in
+  List.fold_right f args init
 
 and combinator :
     type f.

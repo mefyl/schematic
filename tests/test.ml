@@ -64,19 +64,20 @@ let alias () =
 
 (* Tuple *)
 
-type range = version * version [@@deriving schema]
+type range = version * version * int [@@deriving schema]
 
-let pp_range fmt (l, r) =
-  Format.fprintf fmt "(%a, %a)" pp_version l pp_version r
+let pp_range fmt (l, r, i) =
+  Format.fprintf fmt "(%a, %a, %i)" pp_version l pp_version r i
 
 let test_range = Alcotest.testable pp_range ( = )
 
 let tuple () =
   roundtrip "tuple" test_range range_schema
     ( { major = 1; minor = 2; subminor = 3 }
-    , { major = 4; minor = 5; subminor = 6 } )
+    , { major = 4; minor = 5; subminor = 6 }
+    , 83 )
     "[{\"major\": 1, \"minor\": 2, \"subminor\": 3}, {\"major\": 1, \"minor\": \
-     2, \"subminor\": 3}]"
+     2, \"subminor\": 3}, 83]"
 
 (* Variant *)
 
@@ -87,7 +88,8 @@ type expectation =
 
 let pp_expectation fmt = function
   | Exact v -> pp_version fmt v
-  | Range (l, r) -> Format.fprintf fmt "(%a, %a)" pp_version l pp_version r
+  | Range (l, r, i) ->
+    Format.fprintf fmt "(%a, %a, %i)" pp_version l pp_version r i
 
 let test_expectation = Alcotest.testable pp_expectation ( = )
 
@@ -98,9 +100,10 @@ let variant () =
   roundtrip "variant" test_expectation expectation_schema
     (Range
        ( { major = 1; minor = 2; subminor = 3 }
-       , { major = 4; minor = 5; subminor = 6 } ))
+       , { major = 4; minor = 5; subminor = 6 }
+       , 108 ))
     "[{\"major\": 1, \"minor\": 2, \"subminor\": 3}, {\"major\": 4, \"minor\": \
-     5, \"subminor\": 6}]"
+     5, \"subminor\": 6}, 108]"
 
 (* List *)
 
