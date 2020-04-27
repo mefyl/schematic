@@ -15,24 +15,21 @@ let type_name = function
   | `Null -> "null"
 
 module List_monad (Monad : Monad) = struct
-  let ( let* ) = Monad.bind
+  let ( >>= ) = Monad.bind
 
   let rec map f = function
     | [] -> Monad.return []
     | hd :: tl ->
-      let* hd = f hd in
-      let* tl = map f tl in
-      Monad.return (hd :: tl)
+      f hd >>= fun hd ->
+      map f tl >>= fun tl -> Monad.return (hd :: tl)
 end
 
 module Option_monad (Monad : Monad) = struct
-  let ( let* ) = Monad.bind
+  let ( >>= ) = Monad.bind
 
   let map f = function
     | None -> Monad.return None
-    | Some value ->
-      let* value = f value in
-      Monad.return (Some value)
+    | Some value -> f value >>= fun value -> Monad.return (Some value)
 end
 
 let decode_field :
@@ -74,35 +71,32 @@ let rec decode : type t. t schema -> Ezjsonm.value -> t Result.t =
   | List _, _ -> type_error "list"
   | Mapping fields_schema, `O fields ->
     let f (name, value) =
-      let* value = decode fields_schema value in
-      Result.ok (name, value)
+      decode fields_schema value >>= fun value -> Result.ok (name, value)
     in
     List.map f fields
   | Mapping _, _ -> type_error "mapping"
   | Object { field; requirement; schema; rest; inline; _ }, (`O fields as o) ->
-    let* value =
+    let value =
       if inline then
         Option.map (decode schema) (Some o)
       else
         Option.map (decode schema) @@ Batteries.List.assoc_opt field fields
     in
+    value >>= fun value ->
     Result.both (decode_field field requirement value) (decode rest json)
   | Object _, _ -> type_error "object"
   | Tuple { schema; rest = Null }, `A [ hd ] ->
-    let* hd = decode schema hd in
-    Result.ok (hd, ())
+    decode schema hd >>= fun hd -> Result.ok (hd, ())
   | Tuple { schema = _; rest = Null }, `A [] ->
     Result.error (`Json_decode "not enough tuple elements")
   | Tuple { schema = _; rest = Null }, `A _ ->
     Result.error (`Json_decode "too many tuple elements")
   | Tuple { schema; rest }, `A (hd :: tl) ->
-    let* hd = decode schema hd in
-    let* tl = decode rest (`A tl) in
-    Result.ok (hd, tl)
+    decode schema hd >>= fun hd ->
+    decode rest (`A tl) >>= fun tl -> Result.ok (hd, tl)
   | Tuple _, _ -> type_error "tuple"
   | Map (cons, _, schema), _ ->
-    let* value = decode schema json in
-    Result.ok @@ cons value
+    decode schema json >>= fun value -> Result.ok @@ cons value
   | Union cases, _ -> (
     let conv (Case { schema; decoder; _ }) =
       match decode schema json with

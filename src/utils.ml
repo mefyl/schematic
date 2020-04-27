@@ -7,5 +7,5 @@ module type Monad = sig
 end
 
 module Let_syntax (Monad : Monad) = struct
-  let ( let* ) = Monad.bind
+  let ( >>= ) = Monad.bind
 end
