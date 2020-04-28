@@ -216,7 +216,7 @@ let rec pp =
   | `String s -> escape s
   | `Null -> text "null"
   | `A elements ->
-    box ~indent
+    hvbox ~indent
     @@ text "[" ++ space
        ++ concat ~sep:(text "," ++ space) (List.map (box % pp) elements)
        ++ break ~nspaces:1 ~shift:(-indent)
