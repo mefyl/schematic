@@ -5,11 +5,13 @@ type ('a, 'b) either =
   | That of 'b
 [@@deriving schema]
 
+type any = Ezjsonm.value
+
+let any_schema = { Schema.id = None; descriptor = Any }
+
 type uri_reference = string
 
 and uri = string
-
-and any = unit
 
 and core =
   { id : uri_reference option [@schematic.as "$id"]
@@ -184,6 +186,7 @@ let of_schema schema =
       type t. Ids.t -> t Schema.descriptor -> Ids.t * json_schema =
    fun marks schema ->
     let rec validation : type t. t Schema.descriptor -> validation = function
+      | Schema.Any -> validation_empty
       | Schema.Bool -> { validation_empty with type_ = Some Boolean }
       | Schema.End -> failwith "unexpected End in schema"
       | Schema.Int -> { validation_empty with type_ = Some Integer }
@@ -192,17 +195,15 @@ let of_schema schema =
       | Schema.Mapping _ -> validation_empty
       | Schema.Null -> { validation_empty with type_ = Some Null }
       | Schema.String -> { validation_empty with type_ = Some String }
-      | Schema.String_const _ ->
-        { validation_empty with
-          type_ = Some String
-        ; const = Some () (* FIXME *)
-        }
+      | Schema.String_const v ->
+        { validation_empty with type_ = Some String; const = Some (`String v) }
       | Schema.Object _ -> { validation_empty with type_ = Some Object }
       | Schema.Tuple _ -> { validation_empty with type_ = Some Array }
       | Schema.Union _ -> validation_empty
     and applicator :
         type t. Ids.t -> t Schema.descriptor -> Ids.t * applicator option =
      fun marks -> function
+      | Schema.Any -> (marks, Some applicator_empty)
       | Schema.Bool -> (marks, Some applicator_empty)
       | Schema.End -> (marks, None)
       | Schema.Int -> (marks, Some applicator_empty)

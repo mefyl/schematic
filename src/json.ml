@@ -60,15 +60,19 @@ let decode schema =
           (Format.sprintf "expected %s, got %s" expected (type_name json)))
     in
     match (schema, json) with
-    | Null, `Null -> Result.ok ()
-    | Null, _ -> type_error "null"
-    | Int, `Float f -> Result.ok @@ Float.to_int f
-    | Int, _ -> type_error "float"
+    | Any, v -> Result.ok v
     | Bool, `Bool b -> Result.ok b
     | Bool, _ -> type_error "boolean"
+    | End, `O _ -> Result.ok ()
+    | End, `A _ -> Result.ok ()
+    | End, _ -> failwith "end not on an object or tuple"
+    | Int, `Float f -> Result.ok @@ Float.to_int f
+    | Int, _ -> type_error "float"
     | List items_schema, `A items ->
       List.map (decode items_schema.descriptor) items
     | List _, _ -> type_error "list"
+    | Map (cons, _, schema), _ ->
+      decode schema json >>= fun value -> Result.ok @@ cons value
     | Mapping fields_schema, `O fields ->
       let f (name, value) =
         decode fields_schema.descriptor value >>= fun value ->
@@ -76,6 +80,8 @@ let decode schema =
       in
       List.map f fields
     | Mapping _, _ -> type_error "mapping"
+    | Null, `Null -> Result.ok ()
+    | Null, _ -> type_error "null"
     | Object { field; requirement; schema; rest; inline; _ }, (`O fields as o)
       ->
       let value =
@@ -108,8 +114,6 @@ let decode schema =
       decode schema.descriptor hd >>= fun hd ->
       decode rest (`A tl) >>= fun tl -> Result.ok (hd, tl)
     | Tuple _, _ -> type_error "tuple"
-    | Map (cons, _, schema), _ ->
-      decode schema json >>= fun value -> Result.ok @@ cons value
     | Union cases, _ -> (
       let conv (Case { schema; decoder; _ }) =
         match decode schema.descriptor json with
@@ -120,9 +124,6 @@ let decode schema =
       | res -> Result.ok res
       | exception Not_found ->
         Result.error (`Json_decode "no union case was matched") )
-    | End, `O _ -> Result.ok ()
-    | End, `A _ -> Result.ok ()
-    | End, _ -> failwith "end on a non-object"
   in
   decode schema.descriptor
 
@@ -139,10 +140,13 @@ let encode schema =
   let rec encode : type t. t descriptor -> t -> Ezjsonm.value =
    fun schema v ->
     match schema with
-    | Int -> `Float (Float.of_int v)
-    | Null -> `Null
+    | Any -> v
     | Bool -> `Bool v
+    | End -> `Null
+    | Int -> `Float (Float.of_int v)
     | List items_schema -> `A (List.map (encode items_schema.descriptor) v)
+    | Map (_, decons, schema) -> encode schema @@ decons v
+    | Null -> `Null
     | Mapping fields_schema ->
       `O
         (List.map
@@ -186,8 +190,6 @@ let encode schema =
       match List.find_map conv cases with
       | res -> res
       | exception Not_found -> failwith "unmatched variant schema case" )
-    | Map (_, decons, schema) -> encode schema @@ decons v
-    | End -> `Null
   in
   encode schema.descriptor
 

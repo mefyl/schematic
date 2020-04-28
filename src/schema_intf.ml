@@ -12,6 +12,7 @@ type _ case =
       -> 't case
 
 and _ descriptor =
+  | Any : Ezjsonm.value descriptor
   | Bool : bool descriptor
   | End : unit descriptor
   | Int : int descriptor
