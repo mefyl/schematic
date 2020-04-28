@@ -199,46 +199,37 @@ let to_channel chan t = Ezjsonm.value_to_channel ~minify:true chan t
 
 let to_string t = Ezjsonm.value_to_string ~minify:true t
 
-let rec pp fmt : t -> unit =
-  let iter_tail head tail = function
-    | [] -> ()
-    | [ hd ] -> head hd
-    | hd :: tl ->
-      head hd;
-      List.iter tail tl
-  in
-  let open Format in
+let escape str =
+  let open Pp in
+  let open Pp.O in
+  text "\"" ++ verbatim (String.escaped str) ++ text "\""
+
+let rec pp =
+  let open Pp in
+  let open Pp.O in
   let indent = 2 in
   function
-  | `Bool b -> fprintf fmt "%b" b
-  | `Float f -> fprintf fmt "%f" f
-  | `String s -> fprintf fmt "\"%s\"" s (* FIXME: escape *)
-  | `Null -> fprintf fmt "null"
+  | `Bool b -> textf "%b" b
+  | `Float f -> textf "%f" f
+  | `String s -> escape s
+  | `Null -> text "null"
   | `A elements ->
-    let f e =
-      pp_print_string fmt ",";
-      pp_print_space fmt ();
-      pp fmt e
-    in
-    pp_print_string fmt "[";
-    pp_open_hvbox fmt indent;
-    iter_tail (pp fmt) f elements;
-    pp_close_box fmt ();
-    pp_print_string fmt "]"
+    box ~indent
+    @@ text "[" ++ space
+       ++ concat ~sep:(text "," ++ space) (List.map (box % pp) elements)
+       ++ break ~nspaces:1 ~shift:(-indent)
+       ++ text "]"
   | `O elements ->
+    hvbox ~indent
+    @@
     let pp_field (name, value) =
-      fprintf fmt "\"%s\":" name;
-      (* FIXME: escape *)
-      pp_print_space fmt ();
-      pp fmt value
+      box (escape name ++ space ++ char ':' ++ space ++ pp value)
     in
-    let f field =
-      pp_print_string fmt ",";
-      pp_print_space fmt ();
-      pp_field field
-    in
-    pp_print_string fmt "{";
-    pp_open_hvbox fmt indent;
-    iter_tail pp_field f elements;
-    pp_close_box fmt ();
-    pp_print_string fmt "}"
+    text "{" ++ space
+    ++ hvbox (concat ~sep:(text "," ++ space) (List.map pp_field elements))
+    ++ break ~nspaces:1 ~shift:(-indent)
+    ++ text "}"
+
+let pp fmt json =
+  let pp = pp json in
+  Format.fprintf fmt "%a@." Pp.to_fmt pp
