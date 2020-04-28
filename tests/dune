@@ -9,6 +9,4 @@
  (alias runtest)
  (deps validate-schema)
  (action
-  (progn
-   (copy %{deps} tests/)
-   (run ./test.exe))))
+  (run ./test.exe)))
