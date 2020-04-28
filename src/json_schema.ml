@@ -222,34 +222,61 @@ let of_schema schema =
       | Schema.Null -> (marks, Some applicator_empty)
       | Schema.String -> (marks, Some applicator_empty)
       | Schema.String_const _ -> (marks, Some applicator_empty)
-      | Schema.Object
-          { field
-          ; title = _
-          ; description = _
-          ; requirement = _
-          ; schema
-          ; inline = _
-          ; rest
-          } -> (
-        let marks, schema = of_schema marks schema in
-        let field = (field, schema) in
-        match applicator marks rest with
-        | marks, None ->
-          ( marks
-          , Some
-              { applicator_empty with
-                properties = Some [ field ]
-              ; additionalProperties = Some (Allowed false)
-              } )
-        | marks, Some applicator ->
-          ( marks
-          , Some
-              { applicator with
-                properties =
-                  Some
-                    ( field
-                    :: Option.get_exn applicator.properties (Failure "no 1") )
-              } ) )
+      | Schema.Object _ as o ->
+        let rec get_fields :
+            type t.
+               Ids.t
+            -> t Schema.descriptor
+            -> Ids.t * (string * json_schema) list option =
+         fun marks -> function
+          | Schema.End -> (marks, Some [])
+          | Schema.Map (_, _, d) -> get_fields marks d
+          | Schema.Object
+              { field
+              ; title = _
+              ; description = _
+              ; requirement = _
+              ; schema
+              ; inline
+              ; rest
+              } -> (
+            let marks, fields =
+              if inline then
+                let marks, fields = get_fields marks schema.descriptor in
+                match fields with
+                | Some fields -> (marks, fields)
+                | None ->
+                  let marks, schema = of_schema marks schema in
+                  (marks, [ (field, schema) ])
+              else
+                let marks, schema = of_schema marks schema in
+                (marks, [ (field, schema) ])
+            in
+            match applicator marks rest with
+            | marks, None -> (marks, Some fields)
+            | marks, Some applicator ->
+              ( marks
+              , Some
+                  ( fields
+                  @ Option.get_exn applicator.properties (Failure "no 1") ) ) )
+          | Schema.Any -> (marks, None)
+          | Schema.Bool -> (marks, None)
+          | Schema.Int -> (marks, None)
+          | Schema.List _ -> (marks, None)
+          | Schema.Mapping _ -> (marks, None)
+          | Schema.Null -> (marks, None)
+          | Schema.String -> (marks, None)
+          | Schema.String_const _ -> (marks, None)
+          | Schema.Tuple _ -> (marks, None)
+          | Schema.Union _ -> (marks, None)
+        in
+        let marks, fields = get_fields marks o in
+        ( marks
+        , Some
+            { applicator_empty with
+              properties = fields
+            ; additionalProperties = Some (Allowed false)
+            } )
       | Schema.Tuple { schema; rest } -> (
         let marks, field = of_schema marks schema in
         match applicator marks rest with
