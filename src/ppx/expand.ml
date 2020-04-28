@@ -52,7 +52,12 @@ let rename name =
   else
     name
 
-let schema_name s = rename s ^ "_schema"
+let schema_name s =
+  let s = rename s in
+  if s = "t" then
+    "schema"
+  else
+    s ^ "_schema"
 
 let schema_id = function
   | Lident name -> Lident (schema_name name)
