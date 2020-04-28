@@ -1,8 +1,6 @@
 open Batteries
 
-let root =
-  Filename.dirname @@ Filename.dirname @@ Filename.dirname @@ Filename.dirname
-  @@ Sys.executable_name
+let root = Filename.dirname @@ Sys.executable_name
 
 let roundtrip name test schema value j =
   let json = Alcotest.testable Schematic.Json.pp ( = ) in
@@ -22,7 +20,7 @@ let roundtrip name test schema value j =
       |> Schematic.Json.encode Schematic.Json.Schema.schema
     in
     let cmd =
-      Format.sprintf "%s/tests/validate-schema \"%s\" \"%s\"" root
+      Format.sprintf "%s/validate-schema \"%s\" \"%s\"" root
         (String.escaped @@ Schematic.Json.to_string @@ schema)
         (String.escaped @@ Schematic.Json.to_string @@ encoded)
     in
