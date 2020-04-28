@@ -201,11 +201,6 @@ let to_channel chan t = Ezjsonm.value_to_channel ~minify:true chan t
 
 let to_string t = Ezjsonm.value_to_string ~minify:true t
 
-let escape str =
-  let open Pp in
-  let open Pp.O in
-  text "\"" ++ verbatim (String.escaped str) ++ text "\""
-
 let rec pp =
   let open Pp in
   let open Pp.O in

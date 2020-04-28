@@ -9,3 +9,8 @@ end
 module Let_syntax (Monad : Monad) = struct
   let ( >>= ) = Monad.bind
 end
+
+let escape str =
+  let open Pp in
+  let open Pp.O in
+  text "\"" ++ verbatim (String.escaped str) ++ text "\""
