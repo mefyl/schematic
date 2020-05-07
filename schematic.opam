@@ -12,7 +12,7 @@ depends: [
   "batteries" {>= "3.0.0"}
   "ezjsonm" {>= "1.1.0"}
   "merlin" {dev}
-  "ocamlformat" {= "0.13.0" & dev}
+  "ocamlformat" {= "0.14.1" & dev}
   "pp" {= "1.0.1"}
   "ppxlib" {>= "0.13.0"}
 ]
