@@ -19,8 +19,12 @@
  (depends
   (alcotest
    (or
-    (and (>= 1.1.0) :with-test)
-    (and (>= 1.1.0) :dev)))
+    (and
+     (>= 1.1.0)
+     :with-test)
+    (and
+     (>= 1.1.0)
+     :dev)))
   (batteries
    (>= 3.0.0))
   (ezjsonm
@@ -28,7 +32,7 @@
   (merlin :dev)
   (ocamlformat
    (and
-    (= 0.13.0)
+    (= 0.14.1)
     :dev))
   (pp
    (= 1.0.1))
