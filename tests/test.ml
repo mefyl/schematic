@@ -3,14 +3,17 @@ open Batteries
 let root = Filename.dirname @@ Sys.executable_name
 
 let roundtrip name test schema value j =
+  let open Batteries.Result.Infix in
   let json = Alcotest.testable Schematic.Json.pp ( = ) in
   let encoded = Schematic.Json.encode schema value in
   let _encoding =
-    Alcotest.check json name (Schematic.Json.of_string j) encoded
+    Schematic.Json.of_string j >>= function
+    | parsed -> Result.ok @@ Alcotest.check json name parsed encoded
   in
   let _decoding =
-    match Schematic.Json.decode schema (Schematic.Json.of_string j) with
-    | Result.Ok decoded -> Alcotest.check test name value decoded
+    Schematic.Json.of_string j >>= fun parsed ->
+    match Schematic.Json.decode schema parsed with
+    | Result.Ok decoded -> Result.ok @@ Alcotest.check test name value decoded
     | Result.Error (`Json_decode e) ->
       Alcotest.fail (Format.sprintf "JSON decode error: %s" e)
   in
@@ -252,7 +255,7 @@ let inline () =
 
 let () =
   let open Alcotest in
-  run "Schematic"
+  run "Schematic.Schema"
     [ ( "atoms"
       , [ test_case "int" `Quick atom_int
         ; test_case "string" `Quick atom_string

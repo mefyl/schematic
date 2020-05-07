@@ -10,3 +10,15 @@
  (deps validate-schema)
  (action
   (run ./test.exe)))
+
+(executable
+ (name json)
+ (modules json)
+ (preprocess
+  (pps schematic_ppx))
+ (libraries alcotest schematic))
+
+(rule
+ (alias runtest)
+ (action
+  (run ./json.exe)))

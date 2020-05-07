@@ -193,9 +193,15 @@ let encode schema =
   in
   encode schema.descriptor
 
-let from_channel = Ezjsonm.value_from_channel
+let from_channel c =
+  match Ezjsonm.value_from_channel c with
+  | v -> Result.ok v
+  | exception Ezjsonm.Parse_error (_, msg) -> Result.error @@ `Parse msg
 
-let of_string = Ezjsonm.value_from_string
+let of_string s =
+  match Ezjsonm.value_from_string s with
+  | v -> Result.ok v
+  | exception Ezjsonm.Parse_error (_, msg) -> Result.error @@ `Parse msg
 
 let to_channel chan t = Ezjsonm.value_to_channel ~minify:true chan t
 

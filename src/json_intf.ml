@@ -19,3 +19,5 @@ module Result = struct
     | Result.Error e, _ -> Result.Error e
     | _, Result.Error e -> Result.Error e
 end
+
+type parse_error = [ `Parse of string ]
