@@ -183,6 +183,9 @@ let of_schema schema =
       | Schema.String -> { validation_empty with type_ = Some String }
       | Schema.String_const v ->
         { validation_empty with type_ = Some String; const = Some (`String v) }
+      | Schema.Time
+      | Schema.Time_local ->
+        { validation_empty with type_ = Some String }
       | Schema.Object _ -> { validation_empty with type_ = Some Object }
       | Schema.Tuple _ -> { validation_empty with type_ = Some Array }
       | Schema.Union _ -> validation_empty
@@ -205,9 +208,12 @@ let of_schema schema =
             { applicator_empty with
               additionalProperties = Some (Properties_schema schema)
             } )
-      | Schema.Null -> (marks, Some applicator_empty)
-      | Schema.String -> (marks, Some applicator_empty)
-      | Schema.String_const _ -> (marks, Some applicator_empty)
+      | Schema.Null
+      | Schema.String
+      | Schema.String_const _
+      | Schema.Time
+      | Schema.Time_local ->
+        (marks, Some applicator_empty)
       | Schema.Object _ as o ->
         let rec get_fields :
             type t.
@@ -242,16 +248,19 @@ let of_schema schema =
             | marks, None -> (marks, Some fields)
             | marks, Some applicator ->
               (marks, Some (fields @ Option.value_exn applicator.properties)) )
-          | Schema.Any -> (marks, None)
-          | Schema.Bool -> (marks, None)
-          | Schema.Int -> (marks, None)
-          | Schema.List _ -> (marks, None)
-          | Schema.Mapping _ -> (marks, None)
-          | Schema.Null -> (marks, None)
-          | Schema.String -> (marks, None)
-          | Schema.String_const _ -> (marks, None)
-          | Schema.Tuple _ -> (marks, None)
-          | Schema.Union _ -> (marks, None)
+          | Schema.Any
+          | Schema.Bool
+          | Schema.Int
+          | Schema.List _
+          | Schema.Mapping _
+          | Schema.Null
+          | Schema.String
+          | Schema.Time
+          | Schema.Time_local
+          | Schema.String_const _
+          | Schema.Tuple _
+          | Schema.Union _ ->
+            (marks, None)
         in
         let marks, fields = get_fields marks o in
         ( marks

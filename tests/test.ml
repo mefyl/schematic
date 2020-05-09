@@ -253,6 +253,61 @@ let inline () =
     { a = 0; coin = { b = 1; c = 2 }; d = 3 }
     "{\"a\": 0.000000, \"b\": 1.000000, \"c\": 2.000000, \"d\": 3.000000}"
 
+(* Time *)
+
+open Schematic.Schema.Schemas
+
+type event =
+  { start : Ptime.t
+  ; end_ : Ptime.t
+  }
+
+and event_local =
+  { start_local : Ptime.local
+  ; end_local : Ptime.local
+  }
+[@@deriving schema]
+
+let pp_event fmt e =
+  let pp = Ptime.pp_rfc3339 () in
+  Caml.Format.fprintf fmt "%a-%a" pp e.start pp e.end_
+
+let pp_event_local fmt e =
+  let pp fmt (t, tz) = Ptime.pp_rfc3339 ~tz_offset_s:tz () fmt t in
+  Caml.Format.fprintf fmt "%a-%a" pp e.start_local pp e.end_local
+
+let test_time = Alcotest.testable pp_event ( = )
+
+let test_time_local = Alcotest.testable pp_event_local ( = )
+
+let make_time s =
+  Ptime.of_rfc3339 s |> Result.ok
+  |> Option.value_exn ?here:None ?error:None ?message:None
+  |> fun (t, _, _) -> t
+
+let make_time_local s =
+  Ptime.of_rfc3339 s |> Result.ok
+  |> Option.value_exn ?here:None ?error:None ?message:None
+  |> fun (t, tz, _) -> (t, Option.value_exn tz)
+
+let time () =
+  test "time" test_time event_schema
+    { start = make_time "2020-05-08T23:48:34+02:00"
+    ; end_ = make_time "2020-05-08T23:48:47+02:00"
+    }
+    {| {
+         "start" : "2020-05-08T21:48:34-00:00",
+         "end" : "2020-05-08T21:48:47-00:00"
+       } |};
+  test "time-local" test_time_local event_local_schema
+    { start_local = make_time_local "2020-05-08T23:48:34+02:00"
+    ; end_local = make_time_local "2020-05-08T23:48:47+02:00"
+    }
+    {| {
+         "start_local" : "2020-05-08T23:48:34+02:00",
+         "end_local" : "2020-05-08T23:48:47+02:00"
+       } |}
+
 (* Driver *)
 
 let () =
@@ -274,5 +329,6 @@ let () =
         ; test_case "mutually recursive" `Quick mutually
         ] )
     ; ("inline", [ test_case "inline" `Quick inline ])
+    ; ("time", [ test_case "time" `Quick time ])
     ; ("failure", [ test_case "failure" `Quick failure ])
     ]

@@ -43,6 +43,8 @@ let rec pp_descriptor : type t. t descriptor -> _ Pp.t =
   | Null -> text "()"
   | String -> text "string"
   | String_const v -> escape v
+  | Time -> text "time"
+  | Time_local -> text "local-time"
   | Object { field; schema; _ } ->
     (* FIXME: other fields *)
     hvbox ~indent
@@ -59,3 +61,15 @@ and pp_schema : type t. t schema -> _ Pp.t = function
 let pp fmt schema =
   let pp = pp_schema schema in
   Format.fprintf fmt "%a@." Pp.to_fmt pp
+
+module Schemas = struct
+  module Ptime = struct
+    include Ptime
+
+    let schema = { id = None; descriptor = Time }
+
+    type local = Ptime.t * Ptime.tz_offset_s
+
+    let local_schema = { id = None; descriptor = Time_local }
+  end
+end

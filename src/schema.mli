@@ -17,3 +17,17 @@ val string_const_schema : string -> unit schema
 val unit_schema : unit schema
 
 val pp : Format.formatter -> _ schema -> unit
+
+module Schemas : sig
+  module Ptime : sig
+    include module type of Ptime with type t = Ptime.t
+
+    val schema : Ptime.t schema
+
+    (** Unfortunately [Ptime] does not define a standard type for time points
+        with timezone and uses tuples all around. Define ours.*)
+    type local = Ptime.t * Ptime.tz_offset_s
+
+    val local_schema : local schema
+  end
+end

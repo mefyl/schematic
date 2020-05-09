@@ -114,6 +114,25 @@ let decode schema =
           (Printf.sprintf "expected \"%s\", got \"%s\""
              (String.escaped expected) (String.escaped effective)))
     | String_const _, _ -> type_error "string"
+    | Time, `String s ->
+      let open Result in
+      let error (`RFC3339 (_, e)) =
+        `Json_decode (Caml.Format.asprintf "%a" Ptime.pp_rfc3339_error e)
+      in
+      Ptime.of_rfc3339 ~strict:true s
+      >>| (fun (t, _tz, _) -> t)
+      |> Result.map_error ~f:error
+    | Time_local, `String s -> (
+      let open Result in
+      let error (`RFC3339 (_, e)) =
+        `Json_decode (Caml.Format.asprintf "%a" Ptime.pp_rfc3339_error e)
+      in
+      Ptime.of_rfc3339 ~strict:true s |> Result.map_error ~f:error >>= function
+      | t, Some tz, _ -> Result.return (t, tz)
+      | _, None, _ -> Result.fail (`Json_decode "missing timezone") )
+    | Time, _
+    | Time_local, _ ->
+      type_error "time"
     | Tuple { schema; rest = Null }, `A [ hd ] ->
       decode schema.descriptor hd >>= fun hd -> Result.return (hd, ())
     | Tuple { schema = _; rest = Null }, `A [] ->
@@ -190,6 +209,10 @@ let encode schema =
       `A (encode schema.descriptor hd :: rest)
     | String -> `String v
     | String_const v -> `String v
+    | Time -> `String (Ptime.to_rfc3339 v)
+    | Time_local ->
+      let t, tz_offset_s = v in
+      `String (Ptime.to_rfc3339 ~tz_offset_s t)
     | Union cases -> (
       let conv (Case { schema; encoder; _ }) =
         match encoder v with

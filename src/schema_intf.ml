@@ -22,6 +22,8 @@ and _ descriptor =
   | Null : unit descriptor
   | String : string descriptor
   | String_const : string -> unit descriptor
+  | Time : Ptime.t descriptor
+  | Time_local : (Ptime.t * Ptime.tz_offset_s) descriptor
   | Object :
       { field : string
       ; title : string option
