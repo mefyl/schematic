@@ -130,9 +130,8 @@ let decode schema =
       Ptime.of_rfc3339 ~strict:true s |> Result.map_error ~f:error >>= function
       | t, Some tz, _ -> Result.return (t, tz)
       | _, None, _ -> Result.fail (`Json_decode "missing timezone") )
-    | Time, _
-    | Time_local, _ ->
-      type_error "time"
+    | Time, _ -> type_error "time"
+    | Time_local, _ -> type_error "time"
     | Tuple { schema; rest = Null }, `A [ hd ] ->
       decode schema.descriptor hd >>= fun hd -> Result.return (hd, ())
     | Tuple { schema = _; rest = Null }, `A [] ->
