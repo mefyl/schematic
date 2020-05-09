@@ -1,4 +1,4 @@
-open Batteries
+open Base
 
 include module type of Json_intf
 
@@ -6,16 +6,16 @@ open Schema
 
 type t
 
-val decode : 'a schema -> t -> 'a Result.t
+val decode : 'a schema -> t -> ('a, [> decode_error ]) Result.t
 
 val encode : 'a schema -> 'a -> t
 
-val from_channel : in_channel -> (t, [> parse_error ]) Batteries.Result.t
+val from_channel : Stdio.In_channel.t -> (t, [> parse_error ]) Result.t
 
-val to_channel : out_channel -> t -> unit
+val to_channel : Stdio.Out_channel.t -> t -> unit
 
-val of_string : string -> (t, [> parse_error ]) Batteries.Result.t
+val of_string : string -> (t, [> parse_error ]) Result.t
 
 val to_string : t -> string
 
-val pp : Format.formatter -> t -> unit
+val pp : Formatter.t -> t -> unit

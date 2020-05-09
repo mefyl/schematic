@@ -25,8 +25,8 @@
     (and
      (>= 1.1.0)
      :dev)))
-  (batteries
-   (>= 3.0.0))
+  (base
+   (>= 0.13.1))
   (ezjsonm
    (>= 1.1.0))
   (merlin :dev)

@@ -1,5 +1,19 @@
-open Batteries
+open Base
+open Poly
 open Ppxlib
+
+module List = struct
+  include List
+
+  let fold_righti ~f ~init =
+    let rec fold i = function
+      | [] -> init
+      | hd :: tl ->
+        let tl = fold (i + 1) tl in
+        f i tl hd
+    in
+    fold 0
+end
 
 let pattern_id ~loc txt =
   { ppat_desc = Ppat_var { txt; loc }
@@ -30,7 +44,9 @@ let expr_apply ~loc f args =
   }
 
 let expr_list ~loc list =
-  List.fold_right (fun m l -> [%expr [%e m] :: [%e l]]) list [%expr []]
+  let f m l = [%expr [%e m] :: [%e l]]
+  and init = [%expr []] in
+  List.fold_right ~f ~init list
 
 let expr_array ~loc list =
   { pexp_desc = Pexp_array list
@@ -48,7 +64,7 @@ let expr_bool ~loc b =
 let rename name =
   let len = String.length name in
   if name.[len - 1] = '_' then
-    String.sub name 0 (len - 1)
+    String.sub name ~pos:0 ~len:(len - 1)
   else
     name
 
@@ -86,7 +102,7 @@ let rec encode_type ~loc = function
     | _ ->
       let schema = expr_id ~loc (schema_id txt)
       and f t = (Nolabel, encode_type ~loc t) in
-      { pexp_desc = Pexp_apply (schema, List.map f args)
+      { pexp_desc = Pexp_apply (schema, List.map ~f args)
       ; pexp_loc = loc
       ; pexp_loc_stack = []
       ; pexp_attributes = []
@@ -95,21 +111,15 @@ let rec encode_type ~loc = function
   | { ptyp_desc = Ptyp_tuple types; _ } ->
     let field_name i { ptyp_loc = loc; _ } = (loc, "e" ^ Int.to_string i)
     and constructed =
-      { pexp_desc =
-          Pexp_tuple
-            (List.mapi
-               (fun i _ -> expr_id ~loc (Lident ("e" ^ Int.to_string i)))
-               types)
+      let f i _ = expr_id ~loc (Lident ("e" ^ Int.to_string i)) in
+      { pexp_desc = Pexp_tuple (List.mapi ~f types)
       ; pexp_loc = loc
       ; pexp_loc_stack = []
       ; pexp_attributes = []
       }
     and deconstructed =
-      { ppat_desc =
-          Ppat_tuple
-            (List.mapi
-               (fun i _ -> pattern_id ~loc ("e" ^ Int.to_string i))
-               types)
+      let f i _ = pattern_id ~loc ("e" ^ Int.to_string i) in
+      { ppat_desc = Ppat_tuple (List.mapi ~f types)
       ; ppat_loc = loc
       ; ppat_loc_stack = []
       ; ppat_attributes = []
@@ -129,10 +139,10 @@ let rec encode_type ~loc = function
       Pprintast.core_type core_type
 
 and tuple_schema ~loc types =
-  let args = List.map (encode_type ~loc) types in
+  let args = List.map ~f:(encode_type ~loc) types in
   let init = [%expr End] in
   let f r l = [%expr Tuple { schema = [%e r]; rest = [%e l] }] in
-  List.fold_right f args init
+  List.fold_right ~f ~init args
 
 and combinator :
     type f.
@@ -150,11 +160,11 @@ and combinator :
         let loc, name = field_name i f in
         pattern_id ~loc name
       in
-      let f i field tl =
+      let f i tl field =
         let pattern = pattern i field in
         [%pat? [%p pattern], [%p tl]]
       in
-      List.fold_righti f fields [%pat? ()]
+      List.fold_righti ~f ~init:[%pat? ()] fields
     in
     { pexp_desc = Pexp_fun (Nolabel, None, pattern, constructed)
     ; pexp_loc = loc
@@ -167,11 +177,11 @@ and combinator :
         let loc, name = field_name i f in
         expr_id ~loc (Lident name)
       in
-      let f i field tl =
+      let f i tl field =
         let expr = expr i field in
         [%expr [%e expr], [%e tl]]
       in
-      List.fold_righti f fields [%expr ()]
+      List.fold_righti ~f ~init:[%expr ()] fields
     in
     { pexp_desc = Pexp_fun (Nolabel, None, deconstructed, value)
     ; pexp_loc = loc
@@ -220,13 +230,13 @@ let expand_type ~loc t =
                 | _ ->
                   Ppxlib.Location.raise_errorf ~loc
                     "schematic-ppx: no payload expected" )
-              | name when String.starts_with name "schematic." ->
+              | name when String.is_prefix name ~prefix:"schematic." ->
                 Ppxlib.Location.raise_errorf ~loc
                   "schematic-ppx: unknown schematic annotation %s" name
               | _ -> (txt, inline)
             in
             let txt, inline =
-              List.fold_left read_attribute (txt, false) pld_attributes
+              List.fold_left ~f:read_attribute ~init:(txt, false) pld_attributes
             and requirement, schema =
               match pld_type with
               | { ptyp_desc = Ptyp_constr ({ txt = Lident "option"; _ }, [ t ])
@@ -240,7 +250,7 @@ let expand_type ~loc t =
             , schema
             , expr_bool ~loc inline )
         in
-        List.map expand_field fields
+        List.map ~f:expand_field fields
       in
       let init = [%expr End] in
       let f (requirement, field, schema, inline) rest =
@@ -255,7 +265,7 @@ let expand_type ~loc t =
             ; rest = [%e rest]
             }]
       in
-      List.fold_right f (expand_fields fields) init
+      List.fold_right ~f ~init (expand_fields fields)
     and field_name _ { pld_name = { txt; loc }; _ } = (loc, txt)
     and constructed =
       let f { pld_name = { txt; loc }; _ } =
@@ -266,7 +276,7 @@ let expand_type ~loc t =
           ; pexp_attributes = []
           } )
       in
-      { pexp_desc = Pexp_record (List.map f fields, None)
+      { pexp_desc = Pexp_record (List.map ~f fields, None)
       ; pexp_loc = loc
       ; pexp_loc_stack = []
       ; pexp_attributes = []
@@ -280,7 +290,7 @@ let expand_type ~loc t =
           ; ppat_attributes = []
           } )
       in
-      { ppat_desc = Ppat_record (List.map f fields, Closed)
+      { ppat_desc = Ppat_record (List.map ~f fields, Closed)
       ; ppat_loc = loc
       ; ppat_loc_stack = []
       ; ppat_attributes = []
@@ -376,7 +386,7 @@ let expand_type ~loc t =
           ; decoder = [%e destruct]
           }]
     in
-    [%expr Union [%e expr_list ~loc (List.map f options)]]
+    [%expr Union [%e expr_list ~loc (List.map ~f options)]]
   in
   let body, recursive =
     match t.ptype_kind with
@@ -401,7 +411,7 @@ let expand_type ~loc t =
       ; descriptor = [%e body]
       }]
   in
-  (List.fold_right wrap t.ptype_params body, recursive)
+  (List.fold_right ~f:wrap ~init:body t.ptype_params, recursive)
 
 let expand ~loc ~path:_ ~inside (_, types) =
   let f t =
@@ -435,14 +445,14 @@ let expand ~loc ~path:_ ~inside (_, types) =
     , { pvb_pat = pattern; pvb_expr = body; pvb_loc = loc; pvb_attributes = [] }
     )
   in
-  let schemas = List.map f types in
+  let schemas = List.map ~f types in
   [ { pstr_desc =
         Pstr_value
-          ( ( if List.exists fst schemas then
+          ( ( if List.exists ~f:fst schemas then
               Recursive
             else
               Nonrecursive )
-          , List.map snd schemas )
+          , List.map ~f:snd schemas )
     ; pstr_loc = loc
     }
   ]

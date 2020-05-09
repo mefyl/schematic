@@ -1,6 +1,6 @@
 (library
  (name schematic)
  (public_name schematic)
- (libraries batteries ezjsonm pp)
+ (libraries base ezjsonm pp stdio)
  (preprocess
   (pps schematic_ppx_inside)))

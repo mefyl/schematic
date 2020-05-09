@@ -1,21 +1,23 @@
-open Batteries
+open Base
+open Poly
 
-let root = Filename.dirname @@ Sys.executable_name
+let root = Caml.Filename.dirname @@ Caml.Sys.executable_name
 
 let roundtrip name test schema value j =
-  let open Batteries.Result.Infix in
+  let open Result in
   let json = Alcotest.testable Schematic.Json.pp ( = ) in
   let encoded = Schematic.Json.encode schema value in
   let _encoding =
     Schematic.Json.of_string j >>= function
-    | parsed -> Result.ok @@ Alcotest.check json name parsed encoded
+    | parsed -> Result.return @@ Alcotest.check json name parsed encoded
   in
   let _decoding =
     Schematic.Json.of_string j >>= fun parsed ->
     match Schematic.Json.decode schema parsed with
-    | Result.Ok decoded -> Result.ok @@ Alcotest.check test name value decoded
+    | Result.Ok decoded ->
+      Result.return @@ Alcotest.check test name value decoded
     | Result.Error (`Json_decode e) ->
-      Alcotest.fail (Format.sprintf "JSON decode error: %s" e)
+      Alcotest.fail (Printf.sprintf "JSON decode error: %s" e)
   in
   let _validation =
     let schema =
@@ -23,11 +25,11 @@ let roundtrip name test schema value j =
       |> Schematic.Json.encode Schematic.Json.Schema.schema
     in
     let cmd =
-      Format.sprintf "%s/validate-schema \"%s\" \"%s\"" root
+      Printf.sprintf "%s/validate-schema \"%s\" \"%s\"" root
         (String.escaped @@ Schematic.Json.to_string @@ schema)
         (String.escaped @@ Schematic.Json.to_string @@ encoded)
     in
-    if Sys.command cmd <> 0 then Alcotest.check json name schema encoded
+    if Caml.Sys.command cmd <> 0 then Alcotest.check json name schema encoded
   in
   ()
 
@@ -64,8 +66,12 @@ type version =
   }
 [@@deriving schema]
 
+(* FIXME: Base complains that Caml.format is deprecated, but does not provide
+   Base.Printf.fprintf *)
+let fprintf = Caml.Format.fprintf
+
 let pp_version fmt { major; minor; subminor } =
-  Format.fprintf fmt "%i.%i.%i" major minor subminor
+  fprintf fmt "%i.%i.%i" major minor subminor
 
 let test_version = Alcotest.testable pp_version ( = )
 
@@ -92,7 +98,7 @@ let alias () =
 type range = version * version * int [@@deriving schema]
 
 let pp_range fmt (l, r, i) =
-  Format.fprintf fmt "(%a, %a, %i)" pp_version l pp_version r i
+  fprintf fmt "(%a, %a, %i)" pp_version l pp_version r i
 
 let test_range = Alcotest.testable pp_range ( = )
 
@@ -109,12 +115,10 @@ type expectation =
   | Nothing
 [@@deriving schema]
 
-let pp_expectation fmt =
-  let open Format in
-  function
+let pp_expectation fmt = function
   | Exact v -> pp_version fmt v
   | Range (l, r, i) -> fprintf fmt "(%a, %a, %i)" pp_version l pp_version r i
-  | Nothing -> pp_print_string fmt "nothing"
+  | Nothing -> fprintf fmt "nothing"
 
 let test_expectation = Alcotest.testable pp_expectation ( = )
 
@@ -174,7 +178,7 @@ type escape =
 [@@deriving schema]
 
 let pp_escape fmt { special_char; keyword } =
-  Format.fprintf fmt "(%i, %s)" special_char keyword
+  fprintf fmt "(%i, %s)" special_char keyword
 
 let test_escape = Alcotest.testable pp_escape ( = )
 
@@ -191,16 +195,14 @@ type recursive =
   }
 [@@deriving schema]
 
-let pp_option pp fmt =
-  let open Format in
-  function
-  | None -> pp_print_string fmt "None"
+let pp_option pp fmt = function
+  | None -> fprintf fmt "None"
   | Some v ->
-    pp_print_string fmt "Some ";
+    fprintf fmt "Some ";
     pp fmt v
 
 let rec pp_recursive fmt { value; next } =
-  Format.fprintf fmt "(%i, %a)" value (pp_option pp_recursive) next
+  fprintf fmt "(%i, %a)" value (pp_option pp_recursive) next
 
 let test_recursive = Alcotest.testable pp_recursive ( = )
 
@@ -239,10 +241,10 @@ type inline =
   }
 [@@deriving schema]
 
-let pp_inlined fmt { b; c } = Format.fprintf fmt "(%i, %i)" b c
+let pp_inlined fmt { b; c } = fprintf fmt "(%i, %i)" b c
 
 let pp_inline fmt { a; coin; d } =
-  Format.fprintf fmt "(%i, %a, %i)" a pp_inlined coin d
+  fprintf fmt "(%i, %a, %i)" a pp_inlined coin d
 
 let test_inline = Alcotest.testable pp_inline ( = )
 

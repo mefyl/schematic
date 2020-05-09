@@ -1,9 +1,4 @@
-open Batteries
-
-type ('a, 'b) either =
-  | This of 'a
-  | That of 'b
-[@@deriving schema]
+open Base
 
 type any = Ezjsonm.value
 
@@ -158,32 +153,23 @@ let json_schema_empty =
   ; applicator = applicator_empty
   }
 
-let this = function
-  | This v -> v
-  | That _ -> failwith "that instead of this"
-
-let that = function
-  | This _ -> failwith "this instead of that"
-  | That v -> v
-
-module Ids = Set.Make (String)
+type ids = (string, String.comparator_witness) Set.t
 
 let of_schema schema =
   let id_name s = "#" ^ s in
-  let rec of_schema : type t. Ids.t -> t Schema.schema -> Ids.t * json_schema =
+  let rec of_schema : type t. ids -> t Schema.schema -> ids * json_schema =
    fun marks -> function
     | { id = None; descriptor } -> of_descriptor marks descriptor
-    | { id = Some id; descriptor = _ } when Ids.mem id marks ->
+    | { id = Some id; descriptor = _ } when Set.mem marks id ->
       ( marks
       , { json_schema_empty with
           core = { core_empty with ref = Some (id_name id) }
         } )
     | { id = Some id; descriptor } ->
-      let marks = Ids.add id marks in
+      let marks = Set.add marks id in
       let marks, schema = of_descriptor marks descriptor in
       (marks, { schema with core = { schema.core with id = Some (id_name id) } })
-  and of_descriptor :
-      type t. Ids.t -> t Schema.descriptor -> Ids.t * json_schema =
+  and of_descriptor : type t. ids -> t Schema.descriptor -> ids * json_schema =
    fun marks schema ->
     let rec validation : type t. t Schema.descriptor -> validation = function
       | Schema.Any -> validation_empty
@@ -201,7 +187,7 @@ let of_schema schema =
       | Schema.Tuple _ -> { validation_empty with type_ = Some Array }
       | Schema.Union _ -> validation_empty
     and applicator :
-        type t. Ids.t -> t Schema.descriptor -> Ids.t * applicator option =
+        type t. ids -> t Schema.descriptor -> ids * applicator option =
      fun marks -> function
       | Schema.Any -> (marks, Some applicator_empty)
       | Schema.Bool -> (marks, Some applicator_empty)
@@ -225,9 +211,9 @@ let of_schema schema =
       | Schema.Object _ as o ->
         let rec get_fields :
             type t.
-               Ids.t
+               ids
             -> t Schema.descriptor
-            -> Ids.t * (string * json_schema) list option =
+            -> ids * (string * json_schema) list option =
          fun marks -> function
           | Schema.End -> (marks, Some [])
           | Schema.Map (_, _, d) -> get_fields marks d
@@ -255,10 +241,7 @@ let of_schema schema =
             match applicator marks rest with
             | marks, None -> (marks, Some fields)
             | marks, Some applicator ->
-              ( marks
-              , Some
-                  ( fields
-                  @ Option.get_exn applicator.properties (Failure "no 1") ) ) )
+              (marks, Some (fields @ Option.value_exn applicator.properties)) )
           | Schema.Any -> (marks, None)
           | Schema.Bool -> (marks, None)
           | Schema.Int -> (marks, None)
@@ -293,9 +276,7 @@ let of_schema schema =
                     (Tuple_schema
                        ( field
                        ::
-                       ( match
-                           Option.get_exn applicator.items (Failure "no 2")
-                         with
+                       ( match Option.value_exn applicator.items with
                        | Tuple_schema l -> l
                        | Items_schema _ -> failwith "mixed list and tuple" ) ))
               } ) )
@@ -304,7 +285,7 @@ let of_schema schema =
           let marks, schema = of_schema marks schema in
           (marks, schema :: l)
         in
-        let marks, schemas = List.fold_right f cases (marks, []) in
+        let marks, schemas = List.fold_right ~f ~init:(marks, []) cases in
         (marks, Some { applicator_empty with oneOf = Some schemas })
     in
     ( marks
@@ -312,9 +293,8 @@ let of_schema schema =
           { core_empty with
             schema = Some "https://json-schema.org/draft/2019-09/schema"
           }
-      ; applicator =
-          Option.get_exn (snd @@ applicator marks schema) (Failure "no 3")
+      ; applicator = Option.value_exn (snd @@ applicator marks schema)
       ; validation = validation schema
       } )
   in
-  of_schema Ids.empty schema |> snd
+  of_schema (Set.empty (module String)) schema |> snd

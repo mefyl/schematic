@@ -1,10 +1,15 @@
-open Batteries
+open Base
+open Poly
 open Utils
 include Json_intf
 
 type t = Ezjsonm.value
 
 open Schema
+
+(* FIXME: Base complains that Caml.format is deprecated, but does not provide
+   Base.Printf.fprintf *)
+let fprintf = Caml.Format.fprintf
 
 let type_name = function
   | `O _ -> "object"
@@ -14,8 +19,9 @@ let type_name = function
   | `String _ -> "string"
   | `Null -> "null"
 
-module List_monad (Monad : Monad) = struct
-  let ( >>= ) = Monad.bind
+module List_monad (Monad : Monad.S2) = struct
+  include List
+  open Monad
 
   let rec map f = function
     | [] -> Monad.return []
@@ -24,8 +30,9 @@ module List_monad (Monad : Monad) = struct
       map f tl >>= fun tl -> Monad.return (hd :: tl)
 end
 
-module Option_monad (Monad : Monad) = struct
-  let ( >>= ) = Monad.bind
+module Option_monad (Monad : Monad.S2) = struct
+  include Option
+  open Monad
 
   let map f = function
     | None -> Monad.return None
@@ -33,54 +40,55 @@ module Option_monad (Monad : Monad) = struct
 end
 
 let decode_field :
-    type t r. string -> (t, r) field_requirement -> t option -> r Result.t =
+    type t r.
+    string -> (t, r) field_requirement -> t option -> (r, 'error) Result.t =
  fun field -> function
   | Required -> (
     function
-    | Some v -> Result.ok v
+    | Some v -> Result.return v
     | None ->
-      Result.error
-        (`Json_decode (Format.sprintf "missing required field %s" field)) )
+      Result.fail
+        (`Json_decode (Printf.sprintf "missing required field %s" field)) )
   | Default default -> (
     function
-    | Some v -> Result.ok v
-    | None -> Result.ok default )
-  | Optional -> Result.ok
+    | Some v -> Result.return v
+    | None -> Result.return default )
+  | Optional -> Result.return
 
 let decode schema =
-  let rec decode : type t. t descriptor -> Ezjsonm.value -> t Result.t =
+  let rec decode : type t. t descriptor -> Ezjsonm.value -> (t, 'error) Result.t
+      =
    fun schema json ->
     let module List = List_monad (Result) in
     let module Option = Option_monad (Result) in
-    let module Syntax = Let_syntax (Result) in
-    let open Syntax in
     let type_error expected =
-      Result.error
+      Result.fail
         (`Json_decode
-          (Format.sprintf "expected %s, got %s" expected (type_name json)))
+          (Printf.sprintf "expected %s, got %s" expected (type_name json)))
     in
+    let open Result in
     match (schema, json) with
-    | Any, v -> Result.ok v
-    | Bool, `Bool b -> Result.ok b
+    | Any, v -> Result.return v
+    | Bool, `Bool b -> Result.return b
     | Bool, _ -> type_error "boolean"
-    | End, `O _ -> Result.ok ()
-    | End, `A _ -> Result.ok ()
+    | End, `O _ -> Result.return ()
+    | End, `A _ -> Result.return ()
     | End, _ -> failwith "end not on an object or tuple"
-    | Int, `Float f -> Result.ok @@ Float.to_int f
+    | Int, `Float f -> Result.return @@ Float.to_int f
     | Int, _ -> type_error "float"
     | List items_schema, `A items ->
       List.map (decode items_schema.descriptor) items
     | List _, _ -> type_error "list"
     | Map (cons, _, schema), _ ->
-      decode schema json >>= fun value -> Result.ok @@ cons value
+      decode schema json >>= fun value -> Result.return @@ cons value
     | Mapping fields_schema, `O fields ->
       let f (name, value) =
         decode fields_schema.descriptor value >>= fun value ->
-        Result.ok (name, value)
+        Result.return (name, value)
       in
       List.map f fields
     | Mapping _, _ -> type_error "mapping"
-    | Null, `Null -> Result.ok ()
+    | Null, `Null -> Result.return ()
     | Null, _ -> type_error "null"
     | Object { field; requirement; schema; rest; inline; _ }, (`O fields as o)
       ->
@@ -89,41 +97,42 @@ let decode schema =
           Option.map (decode schema.descriptor) (Some o)
         else
           Option.map (decode schema.descriptor)
-          @@ Batteries.List.assoc_opt field fields
+          @@ List.Assoc.find ~equal:( = ) fields field
       in
       value >>= fun value ->
-      Result.both (decode_field field requirement value) (decode rest json)
+      Result.Let_syntax.Let_syntax.both
+        (decode_field field requirement value)
+        (decode rest json)
     | Object _, _ -> type_error "object"
-    | String, `String s -> Result.ok s
+    | String, `String s -> Result.return s
     | String, _ -> type_error "string"
     | String_const expected, `String effective when effective = expected ->
-      Result.ok ()
+      Result.return ()
     | String_const expected, `String effective ->
-      Result.error
+      Result.fail
         (`Json_decode
-          (Format.sprintf "expected \"%s\", got \"%s\""
+          (Printf.sprintf "expected \"%s\", got \"%s\""
              (String.escaped expected) (String.escaped effective)))
     | String_const _, _ -> type_error "string"
     | Tuple { schema; rest = Null }, `A [ hd ] ->
-      decode schema.descriptor hd >>= fun hd -> Result.ok (hd, ())
+      decode schema.descriptor hd >>= fun hd -> Result.return (hd, ())
     | Tuple { schema = _; rest = Null }, `A [] ->
-      Result.error (`Json_decode "not enough tuple elements")
+      Result.fail (`Json_decode "not enough tuple elements")
     | Tuple { schema = _; rest = Null }, `A _ ->
-      Result.error (`Json_decode "too many tuple elements")
+      Result.fail (`Json_decode "too many tuple elements")
     | Tuple { schema; rest }, `A (hd :: tl) ->
       decode schema.descriptor hd >>= fun hd ->
-      decode rest (`A tl) >>= fun tl -> Result.ok (hd, tl)
+      decode rest (`A tl) >>= fun tl -> Result.return (hd, tl)
     | Tuple _, _ -> type_error "tuple"
     | Union cases, _ -> (
       let conv (Case { schema; decoder; _ }) =
         match decode schema.descriptor json with
-        | Batteries.Result.Ok v -> Some (decoder v)
-        | Batteries.Result.Error _ -> None
+        | Result.Ok v -> Some (decoder v)
+        | Result.Error _ -> None
       in
-      match Batteries.List.find_map conv cases with
-      | res -> Result.ok res
-      | exception Not_found ->
-        Result.error (`Json_decode "no union case was matched") )
+      match List.find_map ~f:conv cases with
+      | Some res -> Result.return res
+      | None -> Result.fail (`Json_decode "no union case was matched") )
   in
   decode schema.descriptor
 
@@ -134,7 +143,7 @@ let encode_field : type t r. (t, r) field_requirement -> r -> t option =
     function
     | v when v = default -> None
     | v -> Some v )
-  | Optional -> Batteries.identity
+  | Optional -> Fn.id
 
 let encode schema =
   let rec encode : type t. t descriptor -> t -> Ezjsonm.value =
@@ -144,13 +153,13 @@ let encode schema =
     | Bool -> `Bool v
     | End -> `Null
     | Int -> `Float (Float.of_int v)
-    | List items_schema -> `A (List.map (encode items_schema.descriptor) v)
+    | List items_schema -> `A (List.map ~f:(encode items_schema.descriptor) v)
     | Map (_, decons, schema) -> encode schema @@ decons v
     | Null -> `Null
     | Mapping fields_schema ->
       `O
         (List.map
-           (fun (name, v) -> (name, encode fields_schema.descriptor v))
+           ~f:(fun (name, v) -> (name, encode fields_schema.descriptor v))
            v)
     | Object { field; requirement; schema; rest; inline; _ } -> (
       let hd, tl = v in
@@ -187,21 +196,21 @@ let encode schema =
         | Some v -> Some (encode schema.descriptor v)
         | None -> None
       in
-      match List.find_map conv cases with
-      | res -> res
-      | exception Not_found -> failwith "unmatched variant schema case" )
+      match List.find_map ~f:conv cases with
+      | Some res -> res
+      | None -> failwith "unmatched variant schema case" )
   in
   encode schema.descriptor
 
 let from_channel c =
   match Ezjsonm.value_from_channel c with
-  | v -> Result.ok v
-  | exception Ezjsonm.Parse_error (_, msg) -> Result.error @@ `Parse msg
+  | v -> Result.return v
+  | exception Ezjsonm.Parse_error (_, msg) -> Result.fail @@ `Parse msg
 
 let of_string s =
   match Ezjsonm.value_from_string s with
-  | v -> Result.ok v
-  | exception Ezjsonm.Parse_error (_, msg) -> Result.error @@ `Parse msg
+  | v -> Result.return v
+  | exception Ezjsonm.Parse_error (_, msg) -> Result.fail @@ `Parse msg
 
 let to_channel chan t = Ezjsonm.value_to_channel ~minify:true chan t
 
@@ -219,7 +228,9 @@ let rec pp =
   | `A elements ->
     hvbox ~indent
     @@ text "[" ++ space
-       ++ concat ~sep:(text "," ++ space) (List.map (box % pp) elements)
+       ++ concat
+            ~sep:(text "," ++ space)
+            (List.map ~f:(Fn.compose box pp) elements)
        ++ break ~nspaces:1 ~shift:(-indent)
        ++ text "]"
   | `O elements ->
@@ -229,10 +240,10 @@ let rec pp =
       box (escape name ++ space ++ char ':' ++ space ++ pp value)
     in
     text "{" ++ space
-    ++ hvbox (concat ~sep:(text "," ++ space) (List.map pp_field elements))
+    ++ hvbox (concat ~sep:(text "," ++ space) (List.map ~f:pp_field elements))
     ++ break ~nspaces:1 ~shift:(-indent)
     ++ text "}"
 
 let pp fmt json =
   let pp = pp json in
-  Format.fprintf fmt "%a@." Pp.to_fmt pp
+  fprintf fmt "%a@." Pp.to_fmt pp

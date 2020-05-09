@@ -1,4 +1,4 @@
-open Batteries
+open Base
 
 module Parse_error = struct
   let empty () = Schematic.Json.of_string ""
