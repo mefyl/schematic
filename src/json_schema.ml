@@ -285,7 +285,7 @@ let of_schema schema =
                             json_schema.metadata with
                             default =
                               ( match requirement with
-                              | Default v -> Some (to_json v)
+                              | Schema.Default v -> Some (to_json v)
                               | _ -> None );
                             description;
                             title =
