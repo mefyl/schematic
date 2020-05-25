@@ -16,31 +16,35 @@ module List = struct
 end
 
 let pattern_id ~loc txt =
-  { ppat_desc = Ppat_var { txt; loc }
-  ; ppat_loc = loc
-  ; ppat_loc_stack = []
-  ; ppat_attributes = []
+  {
+    ppat_desc = Ppat_var { txt; loc };
+    ppat_loc = loc;
+    ppat_loc_stack = [];
+    ppat_attributes = [];
   }
 
 let pattern_string ~loc txt =
-  { ppat_desc = Ppat_constant (Pconst_string (txt, None))
-  ; ppat_loc = loc
-  ; ppat_loc_stack = []
-  ; ppat_attributes = []
+  {
+    ppat_desc = Ppat_constant (Pconst_string (txt, None));
+    ppat_loc = loc;
+    ppat_loc_stack = [];
+    ppat_attributes = [];
   }
 
 let expr_id ~loc txt =
-  { pexp_desc = Pexp_ident { txt; loc }
-  ; pexp_loc = loc
-  ; pexp_loc_stack = []
-  ; pexp_attributes = []
+  {
+    pexp_desc = Pexp_ident { txt; loc };
+    pexp_loc = loc;
+    pexp_loc_stack = [];
+    pexp_attributes = [];
   }
 
 let expr_apply ~loc f args =
-  { pexp_desc = Pexp_apply (f, args)
-  ; pexp_loc = loc
-  ; pexp_loc_stack = []
-  ; pexp_attributes = []
+  {
+    pexp_desc = Pexp_apply (f, args);
+    pexp_loc = loc;
+    pexp_loc_stack = [];
+    pexp_attributes = [];
   }
 
 let expr_list ~loc list =
@@ -49,10 +53,11 @@ let expr_list ~loc list =
   List.fold_right ~f ~init list
 
 let expr_array ~loc list =
-  { pexp_desc = Pexp_array list
-  ; pexp_loc = loc
-  ; pexp_loc_stack = []
-  ; pexp_attributes = []
+  {
+    pexp_desc = Pexp_array list;
+    pexp_loc = loc;
+    pexp_loc_stack = [];
+    pexp_attributes = [];
   }
 
 let expr_bool ~loc b =
@@ -81,11 +86,16 @@ let schema_id = function
   | Lapply (_, _) -> failwith "Lapply"
 
 let expr_string ~loc txt =
-  { pexp_desc = Pexp_constant (Pconst_string (txt, None))
-  ; pexp_loc = loc
-  ; pexp_loc_stack = []
-  ; pexp_attributes = []
+  {
+    pexp_desc = Pexp_constant (Pconst_string (txt, None));
+    pexp_loc = loc;
+    pexp_loc_stack = [];
+    pexp_attributes = [];
   }
+
+let expr_option ~loc expr = function
+  | None -> [%expr None]
+  | Some e -> [%expr Some [%e expr ~loc e]]
 
 let rec encode_type ~loc = function
   (* Mapping *)
@@ -102,27 +112,30 @@ let rec encode_type ~loc = function
     | _ ->
       let schema = expr_id ~loc (schema_id txt)
       and f t = (Nolabel, encode_type ~loc t) in
-      { pexp_desc = Pexp_apply (schema, List.map ~f args)
-      ; pexp_loc = loc
-      ; pexp_loc_stack = []
-      ; pexp_attributes = []
+      {
+        pexp_desc = Pexp_apply (schema, List.map ~f args);
+        pexp_loc = loc;
+        pexp_loc_stack = [];
+        pexp_attributes = [];
       } )
   (* Tuple *)
   | { ptyp_desc = Ptyp_tuple types; _ } ->
     let field_name i { ptyp_loc = loc; _ } = (loc, "e" ^ Int.to_string i)
     and constructed =
       let f i _ = expr_id ~loc (Lident ("e" ^ Int.to_string i)) in
-      { pexp_desc = Pexp_tuple (List.mapi ~f types)
-      ; pexp_loc = loc
-      ; pexp_loc_stack = []
-      ; pexp_attributes = []
+      {
+        pexp_desc = Pexp_tuple (List.mapi ~f types);
+        pexp_loc = loc;
+        pexp_loc_stack = [];
+        pexp_attributes = [];
       }
     and deconstructed =
       let f i _ = pattern_id ~loc ("e" ^ Int.to_string i) in
-      { ppat_desc = Ppat_tuple (List.mapi ~f types)
-      ; ppat_loc = loc
-      ; ppat_loc_stack = []
-      ; ppat_attributes = []
+      {
+        ppat_desc = Ppat_tuple (List.mapi ~f types);
+        ppat_loc = loc;
+        ppat_loc_stack = [];
+        ppat_attributes = [];
       }
     in
     let body =
@@ -146,13 +159,13 @@ and tuple_schema ~loc types =
 
 and combinator :
     type f.
-       loc:location
-    -> f list
-    -> (int -> f -> location * label)
-    -> expression
-    -> pattern
-    -> expression
-    -> expression =
+    loc:location ->
+    f list ->
+    (int -> f -> location * label) ->
+    expression ->
+    pattern ->
+    expression ->
+    expression =
  fun ~loc fields field_name constructed deconstructed obj ->
   let construct =
     let pattern =
@@ -166,10 +179,11 @@ and combinator :
       in
       List.fold_righti ~f ~init:[%pat? ()] fields
     in
-    { pexp_desc = Pexp_fun (Nolabel, None, pattern, constructed)
-    ; pexp_loc = loc
-    ; pexp_loc_stack = []
-    ; pexp_attributes = []
+    {
+      pexp_desc = Pexp_fun (Nolabel, None, pattern, constructed);
+      pexp_loc = loc;
+      pexp_loc_stack = [];
+      pexp_attributes = [];
     }
   and deconstruct =
     let value =
@@ -183,39 +197,84 @@ and combinator :
       in
       List.fold_righti ~f ~init:[%expr ()] fields
     in
-    { pexp_desc = Pexp_fun (Nolabel, None, deconstructed, value)
-    ; pexp_loc = loc
-    ; pexp_loc_stack = []
-    ; pexp_attributes = []
+    {
+      pexp_desc = Pexp_fun (Nolabel, None, deconstructed, value);
+      pexp_loc = loc;
+      pexp_loc_stack = [];
+      pexp_attributes = [];
     }
   in
   [%expr Map ([%e construct], [%e deconstruct], [%e obj])]
+
+type specs = {
+  description : string option;
+  dummy : bool;
+}
+
+let specs_empty = { description = None; dummy = false }
 
 let expand_type ~loc t =
   let expand_record fields =
     let schema =
       let expand_fields fields =
         let expand_field = function
-          | { pld_attributes
-            ; pld_loc = loc
-            ; pld_name = { txt; _ }
-            ; pld_type
-            ; _
+          | {
+              pld_attributes;
+              pld_loc = loc;
+              pld_name = { txt; _ };
+              pld_type;
+              _;
             } ->
-            let read_attribute (txt, inline)
-                { attr_name; attr_loc = loc; attr_payload } =
+            let read_attribute
+                (txt, inline, specs) { attr_name; attr_loc = loc; attr_payload }
+                =
               match attr_name.txt with
-              | "schematic.properties" ->
-                (txt, inline) (* FIXME: handle properties *)
+              | "schematic.properties" -> (
+                match attr_payload with
+                | PStr
+                    [%str
+                      [%e?
+                        {
+                          pexp_desc = Pexp_record (properties, None);
+                          pexp_loc = loc;
+                          _;
+                        }]] ->
+                  let prop specs = function
+                    | ( { txt = Lident name; _ },
+                        { pexp_desc = value; pexp_loc = loc; _ } ) -> (
+                      match name with
+                      | "description" -> (
+                        match value with
+                        | Pexp_constant (Pconst_string (value, None)) ->
+                          { specs with description = Some value }
+                        | _ ->
+                          Ppxlib.Location.raise_errorf ~loc
+                            "schematic-ppx: string expected" )
+                      | "default" -> specs
+                      | "minimum" -> specs
+                      | "maximum" -> specs
+                      | "unique" -> specs
+                      | _ ->
+                        Ppxlib.Location.raise_errorf ~loc
+                          "schematic-ppx: unrecognized property %S" name )
+                    | _ ->
+                      Ppxlib.Location.raise_errorf ~loc
+                        "schematic-ppx: unrecognized property"
+                  in
+                  (txt, inline, List.fold ~init:specs_empty ~f:prop properties)
+                | _ ->
+                  Ppxlib.Location.raise_errorf ~loc
+                    "schematic-ppx: record payload expected" )
               | "schematic.as" -> (
                 match attr_payload with
                 | PStr
                     [%str
                       [%e?
-                        { pexp_desc = Pexp_constant (Pconst_string (txt, None))
-                        ; _
+                        {
+                          pexp_desc = Pexp_constant (Pconst_string (txt, None));
+                          _;
                         }]] ->
-                  (txt, inline)
+                  (txt, inline, specs)
                 | _ ->
                   Ppxlib.Location.raise_errorf ~loc
                     "schematic-ppx: string payload expected" )
@@ -223,7 +282,7 @@ let expand_type ~loc t =
                 match attr_payload with
                 | PStr [] ->
                   if not inline then
-                    (txt, true)
+                    (txt, true, specs)
                   else
                     Ppxlib.Location.raise_errorf ~loc
                       "schematic-ppx: inline specified multiple times"
@@ -233,67 +292,75 @@ let expand_type ~loc t =
               | name when String.is_prefix name ~prefix:"schematic." ->
                 Ppxlib.Location.raise_errorf ~loc
                   "schematic-ppx: unknown schematic annotation %s" name
-              | _ -> (txt, inline)
+              | _ -> (txt, inline, specs)
             in
-            let txt, inline =
-              List.fold_left ~f:read_attribute ~init:(txt, false) pld_attributes
+            let txt, inline, specs =
+              List.fold_left ~f:read_attribute ~init:(txt, false, specs_empty)
+                pld_attributes
             and requirement, schema =
               match pld_type with
-              | { ptyp_desc = Ptyp_constr ({ txt = Lident "option"; _ }, [ t ])
-                ; _
-                } ->
+              | {
+               ptyp_desc = Ptyp_constr ({ txt = Lident "option"; _ }, [ t ]);
+               _;
+              } ->
                 ([%expr Optional], encode_type ~loc t)
               | t -> ([%expr Required], encode_type ~loc t)
             in
-            ( requirement
-            , expr_string ~loc (rename txt)
-            , schema
-            , expr_bool ~loc inline )
+            ( requirement,
+              expr_string ~loc (rename txt),
+              schema,
+              expr_bool ~loc inline,
+              specs )
         in
         List.map ~f:expand_field fields
       in
       let init = [%expr End] in
-      let f (requirement, field, schema, inline) rest =
+      let f (requirement, field, schema, inline, specs) rest =
         [%expr
           Object
-            { field = [%e field]
-            ; title = None
-            ; description = None
-            ; inline = [%e inline]
-            ; schema = [%e schema]
-            ; requirement = [%e requirement]
-            ; rest = [%e rest]
+            {
+              field = [%e field];
+              title = None;
+              description = [%e expr_option ~loc expr_string specs.description];
+              inline = [%e inline];
+              schema = [%e schema];
+              requirement = [%e requirement];
+              rest = [%e rest];
             }]
       in
       List.fold_right ~f ~init (expand_fields fields)
     and field_name _ { pld_name = { txt; loc }; _ } = (loc, txt)
     and constructed =
       let f { pld_name = { txt; loc }; _ } =
-        ( { txt = Lident txt; loc }
-        , { pexp_desc = Pexp_ident { txt = Lident txt; loc }
-          ; pexp_loc = loc
-          ; pexp_loc_stack = []
-          ; pexp_attributes = []
+        ( { txt = Lident txt; loc },
+          {
+            pexp_desc = Pexp_ident { txt = Lident txt; loc };
+            pexp_loc = loc;
+            pexp_loc_stack = [];
+            pexp_attributes = [];
           } )
       in
-      { pexp_desc = Pexp_record (List.map ~f fields, None)
-      ; pexp_loc = loc
-      ; pexp_loc_stack = []
-      ; pexp_attributes = []
+      {
+        pexp_desc = Pexp_record (List.map ~f fields, None);
+        pexp_loc = loc;
+        pexp_loc_stack = [];
+        pexp_attributes = [];
       }
     and deconstructed =
       let f { pld_name = { txt; loc }; _ } =
-        ( { txt = Lident txt; loc }
-        , { ppat_desc = Ppat_var { txt; loc }
-          ; ppat_loc = loc
-          ; ppat_loc_stack = []
-          ; ppat_attributes = []
+        ( { txt = Lident txt; loc },
+          {
+            ppat_desc = Ppat_var { txt; loc };
+            ppat_loc = loc;
+            ppat_loc_stack = [];
+            ppat_attributes = [];
           } )
       in
-      { ppat_desc = Ppat_record (List.map ~f fields, Closed)
-      ; ppat_loc = loc
-      ; ppat_loc_stack = []
-      ; ppat_attributes = []
+      {
+        ppat_desc = Ppat_record (List.map ~f fields, Closed);
+        ppat_loc = loc;
+        ppat_loc_stack = [];
+        ppat_attributes = [];
       }
     in
     combinator ~loc fields field_name constructed deconstructed schema
@@ -303,9 +370,10 @@ let expand_type ~loc t =
         match pcd_args with
         | Pcstr_tuple [] ->
           [%expr
-            { id = None
-            ; descriptor =
-                String_const [%e expr_string ~loc (String.lowercase txt)]
+            {
+              id = None;
+              descriptor =
+                String_const [%e expr_string ~loc (String.lowercase txt)];
             }]
         | Pcstr_tuple [ field ] -> encode_type ~loc field
         | Pcstr_tuple fields -> tuple_schema ~loc fields
@@ -314,10 +382,11 @@ let expand_type ~loc t =
         match pcd_args with
         | Pcstr_tuple [] ->
           let pattern =
-            { ppat_desc = Ppat_construct ({ txt = Lident txt; loc }, None)
-            ; ppat_loc = loc
-            ; ppat_loc_stack = []
-            ; ppat_attributes = []
+            {
+              ppat_desc = Ppat_construct ({ txt = Lident txt; loc }, None);
+              ppat_loc = loc;
+              ppat_loc_stack = [];
+              ppat_attributes = [];
             }
           in
           [%expr
@@ -326,18 +395,20 @@ let expand_type ~loc t =
             | _ -> None]
         | Pcstr_tuple _ ->
           let pattern =
-            { ppat_desc =
+            {
+              ppat_desc =
                 Ppat_construct
-                  ( { txt = Lident txt; loc }
-                  , Some
-                      { ppat_desc = Ppat_var { txt = "x"; loc }
-                      ; ppat_loc = loc
-                      ; ppat_loc_stack = []
-                      ; ppat_attributes = []
-                      } )
-            ; ppat_loc = loc
-            ; ppat_loc_stack = []
-            ; ppat_attributes = []
+                  ( { txt = Lident txt; loc },
+                    Some
+                      {
+                        ppat_desc = Ppat_var { txt = "x"; loc };
+                        ppat_loc = loc;
+                        ppat_loc_stack = [];
+                        ppat_attributes = [];
+                      } );
+              ppat_loc = loc;
+              ppat_loc_stack = [];
+              ppat_attributes = [];
             }
           in
           [%expr
@@ -349,10 +420,11 @@ let expand_type ~loc t =
         match pcd_args with
         | Pcstr_tuple [] ->
           let value =
-            { pexp_desc = Pexp_construct ({ txt = Lident txt; loc }, None)
-            ; pexp_loc = loc
-            ; pexp_loc_stack = []
-            ; pexp_attributes = []
+            {
+              pexp_desc = Pexp_construct ({ txt = Lident txt; loc }, None);
+              pexp_loc = loc;
+              pexp_loc_stack = [];
+              pexp_attributes = [];
             }
           in
           [%expr
@@ -360,18 +432,20 @@ let expand_type ~loc t =
             | () -> [%e value]]
         | Pcstr_tuple _ ->
           let value =
-            { pexp_desc =
+            {
+              pexp_desc =
                 Pexp_construct
-                  ( { txt = Lident txt; loc }
-                  , Some
-                      { pexp_desc = Pexp_ident { txt = Lident "x"; loc }
-                      ; pexp_loc = loc
-                      ; pexp_loc_stack = []
-                      ; pexp_attributes = []
-                      } )
-            ; pexp_loc = loc
-            ; pexp_loc_stack = []
-            ; pexp_attributes = []
+                  ( { txt = Lident txt; loc },
+                    Some
+                      {
+                        pexp_desc = Pexp_ident { txt = Lident "x"; loc };
+                        pexp_loc = loc;
+                        pexp_loc_stack = [];
+                        pexp_attributes = [];
+                      } );
+              pexp_loc = loc;
+              pexp_loc_stack = [];
+              pexp_attributes = [];
             }
           in
           [%expr
@@ -381,9 +455,10 @@ let expand_type ~loc t =
       in
       [%expr
         Case
-          { schema = [%e schema]
-          ; encoder = [%e construct]
-          ; decoder = [%e destruct]
+          {
+            schema = [%e schema];
+            encoder = [%e construct];
+            decoder = [%e destruct];
           }]
     in
     [%expr Union [%e expr_list ~loc (List.map ~f options)]]
@@ -407,8 +482,9 @@ let expand_type ~loc t =
   in
   let body =
     [%expr
-      { id = Some [%e expr_string ~loc (rename t.ptype_name.txt)]
-      ; descriptor = [%e body]
+      {
+        id = Some [%e expr_string ~loc (rename t.ptype_name.txt)];
+        descriptor = [%e body];
       }]
   in
   (List.fold_right ~f:wrap ~init:body t.ptype_params, recursive)
@@ -441,20 +517,22 @@ let expand ~loc ~path:_ ~inside (_, types) =
       else
         body
     in
-    ( recursive
-    , { pvb_pat = pattern; pvb_expr = body; pvb_loc = loc; pvb_attributes = [] }
+    ( recursive,
+      { pvb_pat = pattern; pvb_expr = body; pvb_loc = loc; pvb_attributes = [] }
     )
   in
   let schemas = List.map ~f types in
-  [ { pstr_desc =
+  [
+    {
+      pstr_desc =
         Pstr_value
           ( ( if List.exists ~f:fst schemas then
               Recursive
             else
-              Nonrecursive )
-          , List.map ~f:snd schemas )
-    ; pstr_loc = loc
-    }
+              Nonrecursive ),
+            List.map ~f:snd schemas );
+      pstr_loc = loc;
+    };
   ]
 
 (* let rec [%p pattern] = [%str let [%p pattern] = [%e body]] *)
