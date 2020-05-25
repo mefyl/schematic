@@ -209,9 +209,10 @@ and combinator :
 type specs = {
   default : expression option;
   description : string option;
+  examples : expression list;
 }
 
-let specs_empty = { default = None; description = None }
+let specs_empty = { default = None; description = None; examples = [] }
 
 let expand_type ~loc t =
   let expand_record fields =
@@ -252,6 +253,7 @@ let expand_type ~loc t =
                           Ppxlib.Location.raise_errorf ~loc
                             "schematic-ppx: string expected" )
                       | "default" -> { specs with default = Some desc }
+                      | "example" -> { specs with examples = [ desc ] }
                       | "minimum" -> specs
                       | "maximum" -> specs
                       | "unique" -> specs
@@ -328,6 +330,7 @@ let expand_type ~loc t =
               field = [%e field];
               title = None;
               description = [%e expr_option ~loc expr_string specs.description];
+              examples = [%e expr_list ~loc specs.examples];
               inline = [%e inline];
               schema = [%e schema];
               requirement = [%e requirement];

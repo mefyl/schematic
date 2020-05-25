@@ -252,8 +252,16 @@ let of_schema schema =
           | Schema.End -> (marks, Some [])
           | Schema.Map (_, _, d) -> get_fields marks d
           | Schema.Object
-              { description; field; inline; requirement; rest; schema; title }
-            -> (
+              {
+                description;
+                examples;
+                field;
+                inline;
+                requirement;
+                rest;
+                schema;
+                title;
+              } -> (
             let marks, fields =
               if inline then
                 let marks, fields = get_fields marks schema.descriptor in
@@ -263,7 +271,8 @@ let of_schema schema =
                   let marks, schema = of_schema marks schema in
                   (marks, [ (field, schema) ])
               else
-                let marks, json_schema = of_schema marks schema in
+                let marks, json_schema = of_schema marks schema
+                and to_json v = Json.to_ezjsonm @@ Json.encode schema v in
                 ( marks,
                   [
                     ( field,
@@ -274,14 +283,14 @@ let of_schema schema =
                             json_schema.metadata with
                             default =
                               ( match requirement with
-                              | Default v ->
-                                Some (Json.to_ezjsonm @@ Json.encode schema v)
+                              | Default v -> Some (to_json v)
                               | _ -> None );
                             description;
                             title =
                               Option.return
                                 (Option.value ~default:(String.capitalize field)
                                    title);
+                            examples = List.map ~f:to_json examples;
                           };
                       } );
                   ] )

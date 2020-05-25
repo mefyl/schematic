@@ -25,6 +25,7 @@ and _ descriptor =
   | Time : Ptime.t descriptor
   | Time_local : (Ptime.t * Ptime.tz_offset_s) descriptor
   | Object : {
+      examples : 'a list;
       field : string;
       title : string option;
       description : string option;
