@@ -207,11 +207,11 @@ and combinator :
   [%expr Map ([%e construct], [%e deconstruct], [%e obj])]
 
 type specs = {
+  default : expression option;
   description : string option;
-  dummy : bool;
 }
 
-let specs_empty = { description = None; dummy = false }
+let specs_empty = { default = None; description = None }
 
 let expand_type ~loc t =
   let expand_record fields =
@@ -241,7 +241,8 @@ let expand_type ~loc t =
                         }]] ->
                   let prop specs = function
                     | ( { txt = Lident name; _ },
-                        { pexp_desc = value; pexp_loc = loc; _ } ) -> (
+                        ({ pexp_desc = value; pexp_loc = loc; _ } as desc) )
+                      -> (
                       match name with
                       | "description" -> (
                         match value with
@@ -250,7 +251,7 @@ let expand_type ~loc t =
                         | _ ->
                           Ppxlib.Location.raise_errorf ~loc
                             "schematic-ppx: string expected" )
-                      | "default" -> specs
+                      | "default" -> { specs with default = Some desc }
                       | "minimum" -> specs
                       | "maximum" -> specs
                       | "unique" -> specs
@@ -297,14 +298,19 @@ let expand_type ~loc t =
             let txt, inline, specs =
               List.fold_left ~f:read_attribute ~init:(txt, false, specs_empty)
                 pld_attributes
-            and requirement, schema =
+            in
+            let requirement, schema =
               match pld_type with
               | {
                ptyp_desc = Ptyp_constr ({ txt = Lident "option"; _ }, [ t ]);
                _;
               } ->
                 ([%expr Optional], encode_type ~loc t)
-              | t -> ([%expr Required], encode_type ~loc t)
+              | t -> (
+                match specs.default with
+                | Some default ->
+                  ([%expr Default [%e default]], encode_type ~loc t)
+                | None -> ([%expr Required], encode_type ~loc t) )
             in
             ( requirement,
               expr_string ~loc (rename txt),

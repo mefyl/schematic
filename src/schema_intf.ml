@@ -4,11 +4,11 @@ type (_, _) field_requirement =
   | Optional : ('a, 'a option) field_requirement
 
 type _ case =
-  | Case :
-      { schema : 'a schema
-      ; encoder : 't -> 'a option
-      ; decoder : 'a -> 't
-      }
+  | Case : {
+      schema : 'a schema;
+      encoder : 't -> 'a option;
+      decoder : 'a -> 't;
+    }
       -> 't case
 
 and _ descriptor =
@@ -24,24 +24,24 @@ and _ descriptor =
   | String_const : string -> unit descriptor
   | Time : Ptime.t descriptor
   | Time_local : (Ptime.t * Ptime.tz_offset_s) descriptor
-  | Object :
-      { field : string
-      ; title : string option
-      ; description : string option
-      ; requirement : ('a, 'req) field_requirement
-      ; inline : bool
-      ; schema : 'a schema
-      ; rest : 'b descriptor
-      }
+  | Object : {
+      field : string;
+      title : string option;
+      description : string option;
+      requirement : ('a, 'req) field_requirement;
+      inline : bool;
+      schema : 'a schema;
+      rest : 'b descriptor;
+    }
       -> ('req * 'b) descriptor
-  | Tuple :
-      { schema : 'a schema
-      ; rest : 'b descriptor
-      }
+  | Tuple : {
+      schema : 'a schema;
+      rest : 'b descriptor;
+    }
       -> ('a * 'b) descriptor
   | Union : 't case list -> 't descriptor
 
-and 't schema =
-  { id : string option
-  ; descriptor : 't descriptor
-  }
+and 't schema = {
+  id : string option;
+  descriptor : 't descriptor;
+}

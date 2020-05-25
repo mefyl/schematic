@@ -1,5 +1,7 @@
 open Base
 
+let ( % ) = Fn.compose
+
 type any = Ezjsonm.value
 
 let any_schema = { Schema.id = None; descriptor = Any }
@@ -250,15 +252,8 @@ let of_schema schema =
           | Schema.End -> (marks, Some [])
           | Schema.Map (_, _, d) -> get_fields marks d
           | Schema.Object
-              {
-                field;
-                title;
-                description;
-                requirement = _;
-                schema;
-                inline;
-                rest;
-              } -> (
+              { description; field; inline; requirement; rest; schema; title }
+            -> (
             let marks, fields =
               if inline then
                 let marks, fields = get_fields marks schema.descriptor in
@@ -268,15 +263,20 @@ let of_schema schema =
                   let marks, schema = of_schema marks schema in
                   (marks, [ (field, schema) ])
               else
-                let marks, schema = of_schema marks schema in
+                let marks, json_schema = of_schema marks schema in
                 ( marks,
                   [
                     ( field,
                       {
-                        schema with
+                        json_schema with
                         metadata =
                           {
-                            schema.metadata with
+                            json_schema.metadata with
+                            default =
+                              ( match requirement with
+                              | Default v ->
+                                Some (Json.to_ezjsonm @@ Json.encode schema v)
+                              | _ -> None );
                             description;
                             title =
                               Option.return

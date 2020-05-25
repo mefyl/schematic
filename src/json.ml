@@ -269,3 +269,5 @@ let rec pp =
 let pp fmt json =
   let pp = pp json in
   fprintf fmt "%a@." Pp.to_fmt pp
+
+let to_ezjsonm v = v

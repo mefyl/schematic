@@ -19,3 +19,5 @@ val of_string : string -> (t, [> parse_error ]) Result.t
 val to_string : t -> string
 
 val pp : Formatter.t -> t -> unit
+
+val to_ezjsonm : t -> Ezjsonm.value
