@@ -3,39 +3,31 @@ open Poly
 
 let root = Caml.Filename.dirname @@ Caml.Sys.executable_name
 
-let roundtrip name test schema value j =
-  let open Result in
+let test name test schema value j =
   let json = Alcotest.testable Schematic.Json.pp ( = ) in
   let encoded = Schematic.Json.encode schema value in
-  let _encoding =
-    Schematic.Json.of_string j >>= function
-    | parsed -> Result.return @@ Alcotest.check json name parsed encoded
+  let j =
+    match Schematic.Json.of_string j with
+    | Result.Ok parsed -> parsed
+    | Result.Error _ -> Alcotest.fail "invalid JSON expectation"
   in
-  let _decoding =
-    Schematic.Json.of_string j >>= fun parsed ->
-    match Schematic.Json.decode schema parsed with
-    | Result.Ok decoded ->
-      Result.return @@ Alcotest.check test name value decoded
+  Alcotest.check json name j encoded;
+  let () =
+    match Schematic.Json.decode schema j with
+    | Result.Ok decoded -> Alcotest.check test name value decoded
     | Result.Error (`Json_decode e) ->
       Alcotest.fail (Printf.sprintf "JSON decode error: %s" e)
   in
-  let _validation =
-    let schema =
-      Schematic.Json.Schema.of_schema schema
-      |> Schematic.Json.encode Schematic.Json.Schema.schema
-    in
-    let cmd =
-      Printf.sprintf "%s/validate-schema \"%s\" \"%s\"" root
-        (String.escaped @@ Schematic.Json.to_string @@ schema)
-        (String.escaped @@ Schematic.Json.to_string @@ encoded)
-    in
-    if Caml.Sys.command cmd <> 0 then Alcotest.check json name schema encoded
+  let schema =
+    Schematic.Json.Schema.of_schema schema
+    |> Schematic.Json.encode Schematic.Json.Schema.schema
   in
-  ()
-
-let test name test schema value j =
-  let () = roundtrip name test schema value j in
-  ()
+  let cmd =
+    Printf.sprintf "%s/validate-schema \"%s\" \"%s\"" root
+      (String.escaped @@ Schematic.Json.to_string @@ schema)
+      (String.escaped @@ Schematic.Json.to_string @@ encoded)
+  in
+  if Caml.Sys.command cmd <> 0 then Alcotest.check json name schema encoded
 
 (* Failure *)
 
