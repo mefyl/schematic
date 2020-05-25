@@ -308,13 +308,7 @@ let time () =
 (* JSON Schema metadata *)
 
 module Metadata = struct
-  type description = {
-    field_a : int; [@schematic.properties { description = "Describe A" }]
-    field_b : int; [@schematic.properties { description = "Describe B" }]
-  }
-  [@@deriving schema]
-
-  let test schema expected =
+  let test_schema schema expected =
     let expected =
       match Schematic.Json.of_string expected with
       | Result.Ok json -> json
@@ -322,13 +316,19 @@ module Metadata = struct
     and effective = json_schema schema in
     Alcotest.check json "json-schema" expected effective
 
+  type description = {
+    field_a : int; [@schematic.properties { description = "Describe A" }]
+    field_b : int; [@schematic.properties { description = "Describe B" }]
+  }
+  [@@deriving schema]
+
   let pp_description fmt { field_a; field_b } =
     fprintf fmt "(%i, %i)" field_a field_b
 
   let test_description = Alcotest.testable pp_description ( = )
 
   let description () =
-    test description_schema
+    test_schema description_schema
       {|{
           "additionalProperties" : false,
           "properties" :
@@ -352,6 +352,48 @@ module Metadata = struct
           "$schema" : "https://json-schema.org/draft/2019-09/schema",
           "type" : "object"
       }|}
+
+  type default = {
+    a : int; [@schematic.properties { default = 358 }]
+    b : string; [@schematic.properties { default = "359" }]
+  }
+  [@@deriving schema]
+
+  let pp_default fmt { a; b } = fprintf fmt "(%i, %s)" a b
+
+  let default () =
+    test_schema default_schema
+      {|{
+          "additionalProperties" : false,
+          "properties" :
+          {
+            "a" :
+            {
+              "$schema" : "https://json-schema.org/draft/2019-09/schema",
+              "title" : "A",
+              "default": 358,
+              "type" : "integer"
+            },
+            "b" :
+            {
+              "$schema" : "https://json-schema.org/draft/2019-09/schema",
+              "title" : "B",
+              "default": "359",
+              "type" : "string"
+            }
+          },
+          "$id" : "#default",
+          "$schema" : "https://json-schema.org/draft/2019-09/schema",
+          "type" : "object"
+       }|};
+    let tester = Alcotest.(testable pp_default ( = )) in
+    test "default-int" tester default_schema { a = 358; b = "---" }
+      {| { "b": "---" } |};
+    test "default-string" tester default_schema { a = 359; b = "359" }
+      {| { "a": 359 } |};
+    test "default-both" tester default_schema { a = 358; b = "359" } {| {} |};
+    test "default-none" tester default_schema { a = 395; b = "---" }
+      {| { "a": 395, "b": "---" } |}
 end
 
 (* Driver *)
@@ -379,6 +421,9 @@ let () =
       ("inline", [ test_case "inline" `Quick inline ]);
       ("time", [ test_case "time" `Quick time ]);
       ( "json-schema-metadata",
-        [ test_case "description" `Quick Metadata.description ] );
+        [
+          test_case "description" `Quick Metadata.description;
+          test_case "default" `Quick Metadata.default;
+        ] );
       ("failure", [ test_case "failure" `Quick failure ]);
     ]
