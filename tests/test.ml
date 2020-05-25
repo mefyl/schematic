@@ -3,8 +3,13 @@ open Poly
 
 let root = Caml.Filename.dirname @@ Caml.Sys.executable_name
 
+let json_schema schema =
+  Schematic.Json.Schema.of_schema schema
+  |> Schematic.Json.encode Schematic.Json.Schema.schema
+
+let json = Alcotest.testable Schematic.Json.pp ( = )
+
 let test name test schema value j =
-  let json = Alcotest.testable Schematic.Json.pp ( = ) in
   let encoded = Schematic.Json.encode schema value in
   let j =
     match Schematic.Json.of_string j with
@@ -18,10 +23,7 @@ let test name test schema value j =
     | Result.Error (`Json_decode e) ->
       Alcotest.fail (Printf.sprintf "JSON decode error: %s" e)
   in
-  let schema =
-    Schematic.Json.Schema.of_schema schema
-    |> Schematic.Json.encode Schematic.Json.Schema.schema
-  in
+  let schema = json_schema schema in
   let cmd =
     Printf.sprintf "%s/validate-schema \"%s\" \"%s\"" root
       (String.escaped @@ Schematic.Json.to_string @@ schema)
@@ -51,11 +53,11 @@ let atom_string () =
 
 (* Record *)
 
-type version =
-  { major : int
-  ; minor : int
-  ; subminor : int
-  }
+type version = {
+  major : int;
+  minor : int;
+  subminor : int;
+}
 [@@deriving schema]
 
 (* FIXME: Base complains that Caml.format is deprecated, but does not provide
@@ -120,9 +122,9 @@ let variant () =
     "{\"major\": 1, \"minor\": 2, \"subminor\": 3}";
   test "variant" test_expectation expectation_schema
     (Range
-       ( { major = 1; minor = 2; subminor = 3 }
-       , { major = 4; minor = 5; subminor = 6 }
-       , 108 ))
+       ( { major = 1; minor = 2; subminor = 3 },
+         { major = 4; minor = 5; subminor = 6 },
+         108 ))
     "[{\"major\": 1, \"minor\": 2, \"subminor\": 3}, {\"major\": 4, \"minor\": \
      5, \"subminor\": 6}, 108]";
   test "variant" test_expectation expectation_schema Nothing "\"nothing\""
@@ -142,9 +144,10 @@ let list_test () =
   test "list"
     (Alcotest.list test_version)
     (Schematic.Schema.list_schema version_schema)
-    [ { major = 0; minor = 1; subminor = 2 }
-    ; { major = 3; minor = 4; subminor = 5 }
-    ; { major = 6; minor = 7; subminor = 8 }
+    [
+      { major = 0; minor = 1; subminor = 2 };
+      { major = 3; minor = 4; subminor = 5 };
+      { major = 6; minor = 7; subminor = 8 };
     ]
     "[{\"major\": 0, \"minor\": 1, \"subminor\": 2},{\"major\": 3, \"minor\": \
      4, \"subminor\": 5.00000},{\"major\": 6, \"minor\": 7, \"subminor\": 8}]."
@@ -163,10 +166,10 @@ let parametric_type () =
 
 (* Escape *)
 
-type escape =
-  { special_char : int [@schematic.as "'char$"]
-  ; keyword : string [@schematic.as "type"]
-  }
+type escape = {
+  special_char : int; [@schematic.as "'char$"]
+  keyword : string; [@schematic.as "type"]
+}
 [@@deriving schema]
 
 let pp_escape fmt { special_char; keyword } =
@@ -181,10 +184,10 @@ let escape () =
 
 (* Recursive *)
 
-type recursive =
-  { value : int
-  ; next : recursive option
-  }
+type recursive = {
+  value : int;
+  next : recursive option;
+}
 [@@deriving schema]
 
 let pp_option pp fmt = function
@@ -220,17 +223,17 @@ let mutually () =
 
 (* Inline *)
 
-type inlined =
-  { b : int
-  ; c : int
-  }
+type inlined = {
+  b : int;
+  c : int;
+}
 [@@deriving schema]
 
-type inline =
-  { a : int
-  ; coin : inlined [@schematic.inline]
-  ; d : int
-  }
+type inline = {
+  a : int;
+  coin : inlined; [@schematic.inline]
+  d : int;
+}
 [@@deriving schema]
 
 let pp_inlined fmt { b; c } = fprintf fmt "(%i, %i)" b c
@@ -249,15 +252,15 @@ let inline () =
 
 open Schematic.Schema.Schemas
 
-type event =
-  { start : Ptime.t
-  ; end_ : Ptime.t
-  }
+type event = {
+  start : Ptime.t;
+  end_ : Ptime.t;
+}
 
-and event_local =
-  { start_local : Ptime.local
-  ; end_local : Ptime.local
-  }
+and event_local = {
+  start_local : Ptime.local;
+  end_local : Ptime.local;
+}
 [@@deriving schema]
 
 let pp_event fmt e =
@@ -284,43 +287,98 @@ let make_time_local s =
 
 let time () =
   test "time" test_time event_schema
-    { start = make_time "2020-05-08T23:48:34+02:00"
-    ; end_ = make_time "2020-05-08T23:48:47+02:00"
+    {
+      start = make_time "2020-05-08T23:48:34+02:00";
+      end_ = make_time "2020-05-08T23:48:47+02:00";
     }
     {| {
          "start" : "2020-05-08T21:48:34-00:00",
          "end" : "2020-05-08T21:48:47-00:00"
        } |};
   test "time-local" test_time_local event_local_schema
-    { start_local = make_time_local "2020-05-08T23:48:34+02:00"
-    ; end_local = make_time_local "2020-05-08T23:48:47+02:00"
+    {
+      start_local = make_time_local "2020-05-08T23:48:34+02:00";
+      end_local = make_time_local "2020-05-08T23:48:47+02:00";
     }
     {| {
          "start_local" : "2020-05-08T23:48:34+02:00",
          "end_local" : "2020-05-08T23:48:47+02:00"
        } |}
 
+(* JSON Schema metadata *)
+
+module Metadata = struct
+  type description = {
+    field_a : int; [@schematic.properties { description = "Describe A" }]
+    field_b : int; [@schematic.properties { description = "Describe B" }]
+  }
+  [@@deriving schema]
+
+  let test schema expected =
+    let expected =
+      match Schematic.Json.of_string expected with
+      | Result.Ok json -> json
+      | Result.Error _ -> Alcotest.fail "invalid literal JSON"
+    and effective = json_schema schema in
+    Alcotest.check json "json-schema" expected effective
+
+  let pp_description fmt { field_a; field_b } =
+    fprintf fmt "(%i, %i)" field_a field_b
+
+  let test_description = Alcotest.testable pp_description ( = )
+
+  let description () =
+    test description_schema
+      {|{
+          "additionalProperties" : false,
+          "properties" :
+          {
+            "field_a" :
+            {
+              "$schema" : "https://json-schema.org/draft/2019-09/schema",
+              "title" : "Field_a",
+              "description" : "Describe A",
+              "type" : "integer"
+            },
+            "field_b" :
+            {
+              "$schema" : "https://json-schema.org/draft/2019-09/schema",
+              "title" : "Field_b",
+              "description" : "Describe B",
+              "type" : "integer"
+            }
+          },
+          "$id" : "#description",
+          "$schema" : "https://json-schema.org/draft/2019-09/schema",
+          "type" : "object"
+      }|}
+end
+
 (* Driver *)
 
 let () =
   let open Alcotest in
   run "Schematic.Schema"
-    [ ( "atoms"
-      , [ test_case "int" `Quick atom_int
-        ; test_case "string" `Quick atom_string
-        ] )
-    ; ("record", [ test_case "record" `Quick record ])
-    ; ("tuple", [ test_case "tuple" `Quick tuple ])
-    ; ("variant", [ test_case "variant" `Quick variant ])
-    ; ("alias", [ test_case "alias" `Quick alias ])
-    ; ("list", [ test_case "list" `Quick list_test ])
-    ; ("parametric_type", [ test_case "parametric_type" `Quick parametric_type ])
-    ; ("escape", [ test_case "escape" `Quick escape ])
-    ; ( "recursive"
-      , [ test_case "recursive" `Quick recursive
-        ; test_case "mutually recursive" `Quick mutually
-        ] )
-    ; ("inline", [ test_case "inline" `Quick inline ])
-    ; ("time", [ test_case "time" `Quick time ])
-    ; ("failure", [ test_case "failure" `Quick failure ])
+    [
+      ( "atoms",
+        [
+          test_case "int" `Quick atom_int; test_case "string" `Quick atom_string;
+        ] );
+      ("record", [ test_case "record" `Quick record ]);
+      ("tuple", [ test_case "tuple" `Quick tuple ]);
+      ("variant", [ test_case "variant" `Quick variant ]);
+      ("alias", [ test_case "alias" `Quick alias ]);
+      ("list", [ test_case "list" `Quick list_test ]);
+      ("parametric_type", [ test_case "parametric_type" `Quick parametric_type ]);
+      ("escape", [ test_case "escape" `Quick escape ]);
+      ( "recursive",
+        [
+          test_case "recursive" `Quick recursive;
+          test_case "mutually recursive" `Quick mutually;
+        ] );
+      ("inline", [ test_case "inline" `Quick inline ]);
+      ("time", [ test_case "time" `Quick time ]);
+      ( "json-schema-metadata",
+        [ test_case "description" `Quick Metadata.description ] );
+      ("failure", [ test_case "failure" `Quick failure ]);
     ]
