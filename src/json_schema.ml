@@ -8,18 +8,18 @@ type uri_reference = string
 
 and uri = string
 
-and core =
-  { id : uri_reference option [@schematic.as "$id"]
-  ; schema : uri option [@schematic.as "$schema"]
-  ; anchor : string option [@schematic.as "$anchor"]
-  ; ref : uri_reference option [@schematic.as "$ref"]
-  ; recursive_ref : uri_reference option [@schematic.as "$recursiveRef"]
-  ; recursive_anchor : bool option [@schematic.as "$recursiveAnchor"]
-  ; vocabulary : (uri * bool) list option [@schematic.as "$vocabulary"]
-  ; comment : string option [@schematic.as "$comment"]
-  ; defs : (string * json_schema) list option
-        [@schematic.as "$defs"] [@schematic.properties { default = [] }]
-  }
+and core = {
+  id : uri_reference option; [@schematic.as "$id"]
+  schema : uri option; [@schematic.as "$schema"]
+  anchor : string option; [@schematic.as "$anchor"]
+  ref : uri_reference option; [@schematic.as "$ref"]
+  recursive_ref : uri_reference option; [@schematic.as "$recursiveRef"]
+  recursive_anchor : bool option; [@schematic.as "$recursiveAnchor"]
+  vocabulary : (uri * bool) list option; [@schematic.as "$vocabulary"]
+  comment : string option; [@schematic.as "$comment"]
+  defs : (string * json_schema) list option;
+      [@schematic.as "$defs"] [@schematic.properties { default = [] }]
+}
 
 and type_ =
   | Array
@@ -39,118 +39,144 @@ and items =
   | Items_schema of json_schema
   | Tuple_schema of json_schema list
 
-and applicator =
-  { additionalItems : json_schema option
-  ; unevaluatedItems : json_schema option
-  ; items : items option
-  ; contains : json_schema option
-  ; additionalProperties : additional_properties option
-  ; unevaluatedProperties : json_schema option
-  ; properties : (string * json_schema) list option
-  ; patternProperties : (string * json_schema) list option
-  ; dependentSchema : (string * json_schema) list option
-  ; propertyNames : json_schema option
-  ; if_ : json_schema option
-  ; then_ : json_schema option
-  ; else_ : json_schema option
-  ; not : json_schema option
-  ; allOf : json_schema list option
-  ; anyOf : json_schema list option
-  ; oneOf : json_schema list option
-  }
+and applicator = {
+  additionalItems : json_schema option;
+  unevaluatedItems : json_schema option;
+  items : items option;
+  contains : json_schema option;
+  additionalProperties : additional_properties option;
+  unevaluatedProperties : json_schema option;
+  properties : (string * json_schema) list option;
+  patternProperties : (string * json_schema) list option;
+  dependentSchema : (string * json_schema) list option;
+  propertyNames : json_schema option;
+  if_ : json_schema option;
+  then_ : json_schema option;
+  else_ : json_schema option;
+  not : json_schema option;
+  allOf : json_schema list option;
+  anyOf : json_schema list option;
+  oneOf : json_schema list option;
+}
 
-and validation =
-  { multipleOf : int option [@schematic.properties { minimum = 1 }]
-  ; maximum : int option
-  ; exclusiveMaximum : int option
-  ; minimum : int option
-  ; exclusiveMinimum : int option
-  ; maxLength : int option [@schematic.properties { minimum = 0 }]
-  ; minLength : int option [@schematic.properties { default = 0; minimum = 0 }]
-  ; pattern : string option
-  ; maxItems : int option [@schematic.properties { minimum = 0 }]
-  ; minItems : int option [@schematic.properties { default = 0; minimum = 0 }]
-  ; uniqueItems : bool option [@schematic.properties { default = false }]
-  ; maxContains : int option [@schematic.properties { minimum = 0 }]
-  ; minContains : int option
-        [@schematic.properties { default = 0; minimum = 1 }]
-  ; maxProperties : int option [@schematic.properties { minimum = 0 }]
-  ; minProperties : int option
-        [@schematic.properties { default = 0; minimum = 0 }]
-  ; required : string list option
-        [@schematic.properties { default = []; unique = true }]
-  ; dependentRequired : (string * string list) list option
-  ; const : any option
-  ; enum : any list option
-  ; type_ : type_ option
-  }
+and validation = {
+  multipleOf : int option; [@schematic.properties { minimum = 1 }]
+  maximum : int option;
+  exclusiveMaximum : int option;
+  minimum : int option;
+  exclusiveMinimum : int option;
+  maxLength : int option; [@schematic.properties { minimum = 0 }]
+  minLength : int option; [@schematic.properties { default = 0; minimum = 0 }]
+  pattern : string option;
+  maxItems : int option; [@schematic.properties { minimum = 0 }]
+  minItems : int option; [@schematic.properties { default = 0; minimum = 0 }]
+  uniqueItems : bool option; [@schematic.properties { default = false }]
+  maxContains : int option; [@schematic.properties { minimum = 0 }]
+  minContains : int option; [@schematic.properties { default = 0; minimum = 1 }]
+  maxProperties : int option; [@schematic.properties { minimum = 0 }]
+  minProperties : int option;
+      [@schematic.properties { default = 0; minimum = 0 }]
+  required : string list option;
+      [@schematic.properties { default = []; unique = true }]
+  dependentRequired : (string * string list) list option;
+  const : any option;
+  enum : any list option;
+  type_ : type_ option;
+}
 
-and json_schema =
-  { core : core [@schematic.inline]
-  ; applicator : applicator [@schematic.inline]
-  ; validation : validation [@schematic.inline]
-  }
+and metadata = {
+  title : string option;
+  description : string option;
+  default : any option;
+  deprecated : bool; [@schematic.properties { default = false }]
+  readOnly : bool; [@schematic.properties { default = false }]
+  writeOnly : bool; [@schematic.properties { default = false }]
+  examples : any list; [@schematic.properties { default = [] }]
+}
+
+and json_schema = {
+  applicator : applicator; [@schematic.inline]
+  core : core; [@schematic.inline]
+  metadata : metadata; [@schematic.inline]
+  validation : validation; [@schematic.inline]
+}
 [@@deriving schema]
 
-let core_empty =
-  { id = None
-  ; schema = None
-  ; anchor = None
-  ; ref = None
-  ; recursive_ref = None
-  ; recursive_anchor = None
-  ; vocabulary = None
-  ; comment = None
-  ; defs = None
+let applicator_empty =
+  {
+    additionalItems = None;
+    unevaluatedItems = None;
+    items = None;
+    contains = None;
+    additionalProperties = None;
+    unevaluatedProperties = None;
+    properties = None;
+    patternProperties = None;
+    dependentSchema = None;
+    propertyNames = None;
+    if_ = None;
+    then_ = None;
+    else_ = None;
+    not = None;
+    allOf = None;
+    anyOf = None;
+    oneOf = None;
   }
 
-let applicator_empty =
-  { additionalItems = None
-  ; unevaluatedItems = None
-  ; items = None
-  ; contains = None
-  ; additionalProperties = None
-  ; unevaluatedProperties = None
-  ; properties = None
-  ; patternProperties = None
-  ; dependentSchema = None
-  ; propertyNames = None
-  ; if_ = None
-  ; then_ = None
-  ; else_ = None
-  ; not = None
-  ; allOf = None
-  ; anyOf = None
-  ; oneOf = None
+let core_empty =
+  {
+    id = None;
+    schema = None;
+    anchor = None;
+    ref = None;
+    recursive_ref = None;
+    recursive_anchor = None;
+    vocabulary = None;
+    comment = None;
+    defs = None;
+  }
+
+and metadata_empty =
+  {
+    title = None;
+    description = None;
+    default = None;
+    deprecated = false;
+    readOnly = false;
+    writeOnly = false;
+    examples = [];
   }
 
 let validation_empty =
-  { multipleOf = None
-  ; maximum = None
-  ; exclusiveMaximum = None
-  ; minimum = None
-  ; exclusiveMinimum = None
-  ; maxLength = None
-  ; minLength = None
-  ; pattern = None
-  ; maxItems = None
-  ; minItems = None
-  ; uniqueItems = None
-  ; maxContains = None
-  ; minContains = None
-  ; maxProperties = None
-  ; minProperties = None
-  ; required = None
-  ; dependentRequired = None
-  ; const = None
-  ; enum = None
-  ; type_ = None
+  {
+    multipleOf = None;
+    maximum = None;
+    exclusiveMaximum = None;
+    minimum = None;
+    exclusiveMinimum = None;
+    maxLength = None;
+    minLength = None;
+    pattern = None;
+    maxItems = None;
+    minItems = None;
+    uniqueItems = None;
+    maxContains = None;
+    minContains = None;
+    maxProperties = None;
+    minProperties = None;
+    required = None;
+    dependentRequired = None;
+    const = None;
+    enum = None;
+    type_ = None;
   }
 
 let json_schema_empty =
-  { core = core_empty
-  ; validation = validation_empty
-  ; applicator = applicator_empty
+  {
+    applicator = applicator_empty;
+    core = core_empty;
+    metadata = metadata_empty;
+    validation = validation_empty;
   }
 
 type ids = (string, String.comparator_witness) Set.t
@@ -161,9 +187,10 @@ let of_schema schema =
    fun marks -> function
     | { id = None; descriptor } -> of_descriptor marks descriptor
     | { id = Some id; descriptor = _ } when Set.mem marks id ->
-      ( marks
-      , { json_schema_empty with
-          core = { core_empty with ref = Some (id_name id) }
+      ( marks,
+        {
+          json_schema_empty with
+          core = { core_empty with ref = Some (id_name id) };
         } )
     | { id = Some id; descriptor } ->
       let marks = Set.add marks id in
@@ -197,15 +224,16 @@ let of_schema schema =
       | Schema.Int -> (marks, Some applicator_empty)
       | Schema.List schema ->
         let marks, schema = of_schema marks schema in
-        ( marks
-        , Some { applicator_empty with items = Some (Items_schema schema) } )
+        ( marks,
+          Some { applicator_empty with items = Some (Items_schema schema) } )
       | Schema.Map (_, _, schema) -> applicator marks schema
       | Schema.Mapping schema ->
         let marks, schema = of_schema marks schema in
-        ( marks
-        , Some
-            { applicator_empty with
-              additionalProperties = Some (Properties_schema schema)
+        ( marks,
+          Some
+            {
+              applicator_empty with
+              additionalProperties = Some (Properties_schema schema);
             } )
       | Schema.Null -> (marks, Some applicator_empty)
       | Schema.String -> (marks, Some applicator_empty)
@@ -215,20 +243,21 @@ let of_schema schema =
       | Schema.Object _ as o ->
         let rec get_fields :
             type t.
-               ids
-            -> t Schema.descriptor
-            -> ids * (string * json_schema) list option =
+            ids ->
+            t Schema.descriptor ->
+            ids * (string * json_schema) list option =
          fun marks -> function
           | Schema.End -> (marks, Some [])
           | Schema.Map (_, _, d) -> get_fields marks d
           | Schema.Object
-              { field
-              ; title = _
-              ; description = _
-              ; requirement = _
-              ; schema
-              ; inline
-              ; rest
+              {
+                field;
+                title;
+                description;
+                requirement = _;
+                schema;
+                inline;
+                rest;
               } -> (
             let marks, fields =
               if inline then
@@ -240,7 +269,22 @@ let of_schema schema =
                   (marks, [ (field, schema) ])
               else
                 let marks, schema = of_schema marks schema in
-                (marks, [ (field, schema) ])
+                ( marks,
+                  [
+                    ( field,
+                      {
+                        schema with
+                        metadata =
+                          {
+                            schema.metadata with
+                            description;
+                            title =
+                              Option.return
+                                (Option.value ~default:(String.capitalize field)
+                                   title);
+                          };
+                      } );
+                  ] )
             in
             match applicator marks rest with
             | marks, None -> (marks, Some fields)
@@ -259,25 +303,26 @@ let of_schema schema =
           | Schema.Tuple _ -> (marks, None)
           | Schema.Union _ -> (marks, None)
         in
-
         let marks, fields = get_fields marks o in
-        ( marks
-        , Some
-            { applicator_empty with
-              properties = fields
-            ; additionalProperties = Some (Allowed false)
+        ( marks,
+          Some
+            {
+              applicator_empty with
+              properties = fields;
+              additionalProperties = Some (Allowed false);
             } )
       | Schema.Tuple { schema; rest } -> (
         let marks, field = of_schema marks schema in
         match applicator marks rest with
         | marks, None ->
-          ( marks
-          , Some { applicator_empty with items = Some (Tuple_schema [ field ]) }
+          ( marks,
+            Some { applicator_empty with items = Some (Tuple_schema [ field ]) }
           )
         | marks, Some applicator ->
-          ( marks
-          , Some
-              { applicator with
+          ( marks,
+            Some
+              {
+                applicator with
                 items =
                   Some
                     (Tuple_schema
@@ -285,7 +330,7 @@ let of_schema schema =
                        ::
                        ( match Option.value_exn applicator.items with
                        | Tuple_schema l -> l
-                       | Items_schema _ -> failwith "mixed list and tuple" ) ))
+                       | Items_schema _ -> failwith "mixed list and tuple" ) ));
               } ) )
       | Schema.Union cases ->
         let f (Schema.Case { schema; _ }) (marks, l) =
@@ -295,13 +340,16 @@ let of_schema schema =
         let marks, schemas = List.fold_right ~f ~init:(marks, []) cases in
         (marks, Some { applicator_empty with oneOf = Some schemas })
     in
-    ( marks
-    , { core =
-          { core_empty with
-            schema = Some "https://json-schema.org/draft/2019-09/schema"
-          }
-      ; applicator = Option.value_exn (snd @@ applicator marks schema)
-      ; validation = validation schema
+    ( marks,
+      {
+        applicator = Option.value_exn (snd @@ applicator marks schema);
+        core =
+          {
+            core_empty with
+            schema = Some "https://json-schema.org/draft/2019-09/schema";
+          };
+        metadata = metadata_empty;
+        validation = validation schema;
       } )
   in
   of_schema (Set.empty (module String)) schema |> snd
