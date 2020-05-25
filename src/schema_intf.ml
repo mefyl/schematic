@@ -25,14 +25,16 @@ and _ descriptor =
   | Time : Ptime.t descriptor
   | Time_local : (Ptime.t * Ptime.tz_offset_s) descriptor
   | Object : {
+      description : string option;
       examples : 'a list;
       field : string;
-      title : string option;
-      description : string option;
-      requirement : ('a, 'req) field_requirement;
       inline : bool;
-      schema : 'a schema;
+      maximum : int option;
+      minimum : int option;
+      requirement : ('a, 'req) field_requirement;
       rest : 'b descriptor;
+      schema : 'a schema;
+      title : string option;
     }
       -> ('req * 'b) descriptor
   | Tuple : {

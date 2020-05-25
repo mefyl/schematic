@@ -66,6 +66,22 @@ let expr_bool ~loc b =
   else
     [%expr false]
 
+let expr_int ~loc i =
+  {
+    pexp_desc = Pexp_constant (Pconst_integer (Int.to_string i, None));
+    pexp_loc = loc;
+    pexp_loc_stack = [];
+    pexp_attributes = [];
+  }
+
+let expect_string ~loc = function
+  | Pexp_constant (Pconst_string (value, None)) -> value
+  | _ -> Ppxlib.Location.raise_errorf ~loc "schematic-ppx: string expected"
+
+let expect_int ~loc = function
+  | Pexp_constant (Pconst_integer (value, None)) -> Int.of_string value
+  | _ -> Ppxlib.Location.raise_errorf ~loc "schematic-ppx: string expected"
+
 let rename name =
   let len = String.length name in
   if name.[len - 1] = '_' then
@@ -210,9 +226,18 @@ type specs = {
   default : expression option;
   description : string option;
   examples : expression list;
+  maximum : int option;
+  minimum : int option;
 }
 
-let specs_empty = { default = None; description = None; examples = [] }
+let specs_empty =
+  {
+    default = None;
+    description = None;
+    examples = [];
+    maximum = None;
+    minimum = None;
+  }
 
 let expand_type ~loc t =
   let expand_record fields =
@@ -245,17 +270,17 @@ let expand_type ~loc t =
                         ({ pexp_desc = value; pexp_loc = loc; _ } as desc) )
                       -> (
                       match name with
-                      | "description" -> (
-                        match value with
-                        | Pexp_constant (Pconst_string (value, None)) ->
-                          { specs with description = Some value }
-                        | _ ->
-                          Ppxlib.Location.raise_errorf ~loc
-                            "schematic-ppx: string expected" )
+                      | "description" ->
+                        {
+                          specs with
+                          description = Some (expect_string ~loc value);
+                        }
                       | "default" -> { specs with default = Some desc }
                       | "example" -> { specs with examples = [ desc ] }
-                      | "minimum" -> specs
-                      | "maximum" -> specs
+                      | "minimum" ->
+                        { specs with maximum = Some (expect_int ~loc value) }
+                      | "maximum" ->
+                        { specs with minimum = Some (expect_int ~loc value) }
                       | "unique" -> specs
                       | _ ->
                         Ppxlib.Location.raise_errorf ~loc
@@ -327,14 +352,16 @@ let expand_type ~loc t =
         [%expr
           Object
             {
-              field = [%e field];
-              title = None;
               description = [%e expr_option ~loc expr_string specs.description];
               examples = [%e expr_list ~loc specs.examples];
+              field = [%e field];
               inline = [%e inline];
-              schema = [%e schema];
+              maximum = [%e expr_option ~loc expr_int specs.maximum];
+              minimum = [%e expr_option ~loc expr_int specs.minimum];
               requirement = [%e requirement];
               rest = [%e rest];
+              schema = [%e schema];
+              title = None;
             }]
       in
       List.fold_right ~f ~init (expand_fields fields)

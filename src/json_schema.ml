@@ -257,6 +257,8 @@ let of_schema schema =
                 examples;
                 field;
                 inline;
+                maximum;
+                minimum;
                 requirement;
                 rest;
                 schema;
@@ -292,6 +294,8 @@ let of_schema schema =
                                    title);
                             examples = List.map ~f:to_json examples;
                           };
+                        validation =
+                          { json_schema.validation with maximum; minimum };
                       } );
                   ] )
             in
