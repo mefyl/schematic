@@ -35,10 +35,14 @@ let test name test schema value j =
 
 let failure () =
   let open Schematic.Schema in
-  try
-    test "int atom" Alcotest.int int_schema 28 "29";
-    Alcotest.fail "failure test failed"
-  with Failure _ -> ()
+  if
+    try
+      test "int atom" Alcotest.int int_schema 28 "29";
+      true
+    with  | _ -> false
+  then
+  Alcotest.fail "failure test failed"
+
 
 (* Atoms *)
 
