@@ -111,12 +111,14 @@ type expectation =
   | Exact of version
   | Range of range
   | Nothing
+  | Aliased [@schematic.as "aktually"]
 [@@deriving schema]
 
 let pp_expectation fmt = function
   | Exact v -> pp_version fmt v
   | Range (l, r, i) -> fprintf fmt "(%a, %a, %i)" pp_version l pp_version r i
   | Nothing -> fprintf fmt "nothing"
+  | Aliased -> fprintf fmt "aliased"
 
 let test_expectation = Alcotest.testable pp_expectation ( = )
 
@@ -131,7 +133,8 @@ let variant () =
          108 ))
     "[{\"major\": 1, \"minor\": 2, \"subminor\": 3}, {\"major\": 4, \"minor\": \
      5, \"subminor\": 6}, 108]";
-  test "variant" test_expectation expectation_schema Nothing "\"nothing\""
+  test "variant" test_expectation expectation_schema Nothing "\"nothing\"";
+  test "variant" test_expectation expectation_schema Aliased "\"aktually\""
 
 (* List *)
 

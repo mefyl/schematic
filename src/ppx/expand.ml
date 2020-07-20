@@ -2,6 +2,11 @@ open Base
 open Poly
 open Ppxlib
 
+let check_unknown_attribute ~loc name =
+  if String.is_prefix ~prefix:"schematic." name then
+    Ppxlib.Location.raise_errorf ~loc
+      "schematic-ppx: unknown schematic annotation %s" name
+
 module List = struct
   include List
 
@@ -78,9 +83,17 @@ let expect_string ~loc = function
   | Pexp_constant (Pconst_string (value, None)) -> value
   | _ -> Ppxlib.Location.raise_errorf ~loc "schematic-ppx: string expected"
 
+let expect_string_constant ~loc = function
+  | PStr
+      [%str [%e? { pexp_desc = Pexp_constant (Pconst_string (txt, None)); _ }]]
+    ->
+    txt
+  | _ ->
+    Ppxlib.Location.raise_errorf ~loc "schematic-ppx: string constant expected"
+
 let expect_int ~loc = function
   | Pexp_constant (Pconst_integer (value, None)) -> Int.of_string value
-  | _ -> Ppxlib.Location.raise_errorf ~loc "schematic-ppx: string expected"
+  | _ -> Ppxlib.Location.raise_errorf ~loc "schematic-ppx: int expected"
 
 let rename name =
   let len = String.length name in
@@ -293,19 +306,8 @@ let expand_type ~loc t =
                 | _ ->
                   Ppxlib.Location.raise_errorf ~loc
                     "schematic-ppx: record payload expected" )
-              | "schematic.as" -> (
-                match attr_payload with
-                | PStr
-                    [%str
-                      [%e?
-                        {
-                          pexp_desc = Pexp_constant (Pconst_string (txt, None));
-                          _;
-                        }]] ->
-                  (txt, inline, specs)
-                | _ ->
-                  Ppxlib.Location.raise_errorf ~loc
-                    "schematic-ppx: string payload expected" )
+              | "schematic.as" ->
+                (expect_string_constant ~loc attr_payload, inline, specs)
               | "schematic.inline" -> (
                 match attr_payload with
                 | PStr [] ->
@@ -317,10 +319,9 @@ let expand_type ~loc t =
                 | _ ->
                   Ppxlib.Location.raise_errorf ~loc
                     "schematic-ppx: no payload expected" )
-              | name when String.is_prefix name ~prefix:"schematic." ->
-                Ppxlib.Location.raise_errorf ~loc
-                  "schematic-ppx: unknown schematic annotation %s" name
-              | _ -> (txt, inline, specs)
+              | name ->
+                let () = check_unknown_attribute ~loc name in
+                (txt, inline, specs)
             in
             let txt, inline, specs =
               List.fold_left ~f:read_attribute ~init:(txt, false, specs_empty)
@@ -401,15 +402,43 @@ let expand_type ~loc t =
     in
     combinator ~loc fields field_name constructed deconstructed schema
   and expand_variant options =
-    let f { pcd_name = { txt; loc = _ }; pcd_args; pcd_loc = loc; _ } =
+    let f
+        {
+          pcd_name = { txt; loc = _ };
+          pcd_args;
+          pcd_loc = loc;
+          pcd_attributes = attrs;
+          _;
+        } =
       let schema =
         match pcd_args with
         | Pcstr_tuple [] ->
+          let alias =
+            let f alias = function
+              | {
+                  attr_name = { txt = "schematic.as"; _ };
+                  attr_loc = loc;
+                  attr_payload;
+                } ->
+                if Option.is_some alias then
+                  Ppxlib.Location.raise_errorf ~loc
+                    "schematic-ppx: duplicate schematic.as annotation"
+                else
+                  Some (expect_string_constant ~loc attr_payload)
+              | { attr_name = { txt = name; _ }; attr_loc = loc; _ } ->
+                let () = check_unknown_attribute ~loc name in
+                alias
+            in
+            List.fold_left ~init:None ~f attrs
+          in
           [%expr
             {
               id = None;
               descriptor =
-                String_const [%e expr_string ~loc (String.lowercase txt)];
+                String_const
+                  [%e
+                    expr_string ~loc
+                      (Option.value ~default:(String.lowercase txt) alias)];
             }]
         | Pcstr_tuple [ field ] -> encode_type ~loc field
         | Pcstr_tuple fields -> tuple_schema ~loc fields
