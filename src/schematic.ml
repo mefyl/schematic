@@ -10,4 +10,7 @@ module Json = struct
   end
 end
 
-module Schema = Schema
+module Schema = struct
+  include Schema
+  module Schemas = Schemas
+end
