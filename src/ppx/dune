@@ -2,7 +2,7 @@
  (name schematic_ppx_expand)
  (modules expand)
  (public_name schematic.ppx_expand)
- (libraries ppxlib)
+ (libraries base ppxlib)
  (preprocess
   (pps ppxlib.metaquot)))
 
