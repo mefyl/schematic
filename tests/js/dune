@@ -1,0 +1,12 @@
+(executable
+ (name test)
+ (modes js)
+ (libraries js_of_ocaml schematic schematic.schematic_jsoo)
+ (preprocess
+  (pps schematic.ppx js_of_ocaml-ppx)))
+
+(rule
+ (alias runtest)
+ (deps ./test.bc.js)
+ (action
+  (run ./test.js)))
