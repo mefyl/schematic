@@ -29,6 +29,10 @@
    (>= 0.13.1))
   (ezjsonm
    (>= 1.1.0))
+  (js_of_ocaml
+   (>= 3.6.0))
+  (js_of_ocaml-ppx
+   (>= 3.6.0))
   (merlin :dev)
   (ocamlformat
    (and
