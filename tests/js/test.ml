@@ -8,15 +8,7 @@ type o = {
   opt : bool option;
   a : int list;
 }
-[@@deriving schema]
-
-type js =
-  < i : int Js.readonly_prop
-  ; s : Js.js_string Js.t Js.readonly_prop
-  ; b : bool Js.t Js.readonly_prop
-  ; opt : bool Js.t Js.Opt.t Js.readonly_prop
-  ; a : int Js.js_array Js.t Js.readonly_prop >
-  Js.t
+[@@deriving schema ~jsoo]
 
 let fail s = Js.raise_js_error @@ new%js Js.error_constr (Js.string s)
 
@@ -25,7 +17,7 @@ let of_result = function
   | Result.Error (`Parse e) -> fail ("parse error: " ^ e)
   | Result.Error (`Json_decode e) -> fail ("decode error: " ^ e)
 
-let to_js { i; s; b; opt; a } : js =
+let to_js { i; s; b; opt; a } : o_js =
   object%js
     val i = i
 
@@ -38,7 +30,7 @@ let to_js { i; s; b; opt; a } : js =
     val a = List.to_array a |> Js.array
   end
 
-let of_js (o : js) =
+let of_js (o : o_js) =
   {
     i = o##.i;
     s = o##.s |> Js.to_string;

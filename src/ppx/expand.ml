@@ -102,12 +102,14 @@ let rename name =
   else
     name
 
-let schema_name s =
+let name suffix s =
   let s = rename s in
   if s = "t" then
-    "schema"
+    suffix
   else
-    s ^ "_schema"
+    s ^ "_" ^ suffix
+
+let schema_name = name "schema"
 
 let schema_id = function
   | Lident name -> Lident (schema_name name)
@@ -273,7 +275,7 @@ module type Expansion = sig
   val expand_variant : loc:location -> constructor_declaration list -> expanded
 end
 
-module Type : Expansion = struct
+module Schema : Expansion = struct
   type closed = value_binding * bool
 
   type expanded = expression * bool
@@ -573,11 +575,6 @@ module Type : Expansion = struct
           "schematic-ppx: non supported type parameter %a" Pprintast.core_type t
     in
     let body = List.fold_right ~f:wrap ~init params in
-    let body =
-      [%expr
-        let _ = unit_schema in
-        [%e body]]
-    in
     let name = schema_name t.ptype_name.txt in
     let pattern = pattern_id ~loc:t.ptype_name.loc name in
     let body =
@@ -602,6 +599,79 @@ module Type : Expansion = struct
         List.map ~f:fst expanded )
 end
 
+module Jsoo_type : Expansion = struct
+  type closed = type_declaration
+
+  type expanded = core_type
+
+  let rec expand_ident = function
+    | Lident n -> Lident (name "js" n)
+    | Ldot (ident, m) -> Ldot (expand_ident ident, m)
+    | Lapply _ -> failwith "Lapply"
+
+  let rec expand_type t =
+    match t.ptyp_desc with
+    | Ptyp_constr (name, args) ->
+      {
+        t with
+        ptyp_desc =
+          Ptyp_constr
+            ( { name with txt = expand_ident name.txt },
+              List.map ~f:expand_type args );
+      }
+    | _ ->
+      Ppxlib.Location.raise_errorf ~loc:t.ptyp_loc
+        "schematic-ppx: unsupported type"
+
+  let expand_record ~loc fields =
+    let f { pld_name; pld_type; pld_loc; _ } : object_field =
+      let t = expand_type pld_type in
+      let t = [%type: [%t t] Js.readonly_prop] in
+      {
+        pof_desc = Otag ({ pld_name with txt = rename pld_name.txt }, t);
+        pof_loc = pld_loc;
+        pof_attributes = [];
+      }
+    in
+    {
+      ptyp_desc =
+        Ptyp_constr
+          ( { loc; txt = Ldot (Ldot (Lident "Js_of_ocaml", "Js"), "t") },
+            [
+              {
+                ptyp_desc = Ptyp_object (List.map ~f fields, Closed);
+                ptyp_attributes = [];
+                ptyp_loc = loc;
+                ptyp_loc_stack = [];
+              };
+            ] );
+      ptyp_attributes = [];
+      ptyp_loc = loc;
+      ptyp_loc_stack = [];
+    }
+
+  (* [%type: < i : int Js.readonly_prop > Js_of_ocaml.Js.t] *)
+
+  let expand_variant ~loc _options =
+    Ppxlib.Location.raise_errorf ~loc "schematic-ppx: variant are unsupported"
+
+  let expand_abstract_type ~loc:_ t = expand_type t
+
+  let close ~loc { ptype_name = { loc = name_loc; txt }; _ } params js =
+    {
+      ptype_name = { loc = name_loc; txt = name "js" txt };
+      ptype_params = params;
+      ptype_cstrs = [];
+      ptype_kind = Ptype_abstract;
+      ptype_private = Public;
+      ptype_manifest = Some js;
+      ptype_loc = loc;
+      ptype_attributes = [];
+    }
+
+  let combine ~loc:_ items = Pstr_type (Recursive, items)
+end
+
 module Expander (Expansion : Expansion) = struct
   let expand ~loc t =
     let f t =
@@ -621,21 +691,47 @@ module Expander (Expansion : Expansion) = struct
     Expansion.combine ~loc expanded
 end
 
-module Type_expander = Expander (Type)
+module Schema_expander = Expander (Schema)
+module Jsoo_type_expander = Expander (Jsoo_type)
 
-let expand ~loc ~path:_ ~inside (_, types) =
+let expand ~loc ~path:_ ~inside (_, types) jsoo =
   let contents =
-    [ { pstr_desc = Type_expander.expand ~loc types; pstr_loc = loc } ]
+    let jsoo =
+      if jsoo then
+        [ { pstr_desc = Jsoo_type_expander.expand ~loc types; pstr_loc = loc } ]
+      else
+        []
+    in
+    { pstr_desc = Schema_expander.expand ~loc types; pstr_loc = loc } :: jsoo
   and namespace =
     if inside then
-      [%stri open Schema]
+      [%str
+        open Schema
+
+        let _ = unit_schema]
     else
-      [%stri open Schematic.Schema]
+      [%str
+        open Schematic.Schema
+
+        let _ = unit_schema]
+  and jsoo =
+    if jsoo then
+      [%str
+        open Schematic_jsoo.Jsoo
+
+        let _ = fun (_ : int_js) -> ()]
+    else
+      []
   in
-  namespace :: contents
+  namespace @ jsoo @ contents
 
 let add inside =
   let str_type_decl =
-    Deriving.Generator.make_noarg ~attributes:[] (expand ~inside)
+    let open Deriving.Args in
+    let arg =
+      let jsoo = flag "jsoo" in
+      empty +> jsoo
+    in
+    Deriving.Generator.make ~attributes:[] arg (expand ~inside)
   in
   Deriving.add ~str_type_decl "schema"
