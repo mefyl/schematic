@@ -703,6 +703,7 @@ let expand ~loc ~path:_ ~inside (_, types) jsoo =
     if inside then
       [%str
         open Schema
+        open Schemas
 
         let _ = unit_schema]
     else

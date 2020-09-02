@@ -39,10 +39,9 @@ let failure () =
     try
       test "int atom" Alcotest.int int_schema 28 "29";
       true
-    with  | _ -> false
+    with _ -> false
   then
-  Alcotest.fail "failure test failed"
-
+    Alcotest.fail "failure test failed"
 
 (* Atoms *)
 
@@ -257,16 +256,14 @@ let inline () =
 
 (* Time *)
 
-open Schematic.Schema.Schemas
-
 type event = {
   start : Ptime.t;
   end_ : Ptime.t;
 }
 
 and event_local = {
-  start_local : Ptime.local;
-  end_local : Ptime.local;
+  start_local : Schematic.Schema.Ptime.local;
+  end_local : Schematic.Schema.Ptime.local;
 }
 [@@deriving schema]
 
