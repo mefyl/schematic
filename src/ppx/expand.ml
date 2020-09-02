@@ -627,11 +627,7 @@ module Jsoo_type : Expansion = struct
     let f { pld_name; pld_type; pld_loc; _ } : object_field =
       let t = expand_type pld_type in
       let t = [%type: [%t t] Js.readonly_prop] in
-      {
-        pof_desc = Otag ({ pld_name with txt = rename pld_name.txt }, t);
-        pof_loc = pld_loc;
-        pof_attributes = [];
-      }
+      { pof_desc = Otag (pld_name, t); pof_loc = pld_loc; pof_attributes = [] }
     in
     {
       ptyp_desc =
