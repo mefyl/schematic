@@ -604,9 +604,9 @@ module Jsoo_type : Expansion = struct
 
   type expanded = core_type
 
-  let rec expand_ident = function
+  let expand_ident = function
     | Lident n -> Lident (name "js" n)
-    | Ldot (ident, m) -> Ldot (expand_ident ident, m)
+    | Ldot (ident, m) -> Ldot (ident, name "js" m)
     | Lapply _ -> failwith "Lapply"
 
   let rec expand_type t =

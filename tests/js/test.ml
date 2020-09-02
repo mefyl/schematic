@@ -1,12 +1,16 @@
 open Base
 open Js_of_ocaml
 
+module Namespace = struct
+  type int_alias = int [@@deriving schema ~jsoo]
+end
+
 type o = {
   i : int;
   s : string;
   b : bool;
   opt : bool option;
-  a : int list;
+  a : Namespace.int_alias list;
 }
 [@@deriving schema ~jsoo]
 
