@@ -252,8 +252,33 @@ let specs_empty =
     minimum = None;
   }
 
-let expand_type ~loc t =
-  let expand_record fields =
+module type Expansion = sig
+  type closed
+
+  type expanded
+
+  val close :
+    loc:location ->
+    type_declaration ->
+    (core_type * variance) list ->
+    expanded ->
+    closed
+
+  val combine : loc:location -> closed list -> structure_item_desc
+
+  val expand_abstract_type : loc:location -> core_type -> expanded
+
+  val expand_record : loc:location -> label_declaration list -> expanded
+
+  val expand_variant : loc:location -> constructor_declaration list -> expanded
+end
+
+module Type : Expansion = struct
+  type closed = value_binding * bool
+
+  type expanded = expression * bool
+
+  let expand_record ~loc fields =
     let schema =
       let expand_fields fields =
         let expand_field = function
@@ -400,8 +425,9 @@ let expand_type ~loc t =
         ppat_attributes = [];
       }
     in
-    combinator ~loc fields field_name constructed deconstructed schema
-  and expand_variant options =
+    (combinator ~loc fields field_name constructed deconstructed schema, true)
+
+  let expand_variant ~loc options =
     let f
         {
           pcd_name = { txt; loc = _ };
@@ -526,54 +552,34 @@ let expand_type ~loc t =
             decoder = [%e destruct];
           }]
     in
-    [%expr Union [%e expr_list ~loc (List.map ~f options)]]
-  in
-  let body, recursive =
-    match t.ptype_kind with
-    | Ptype_record fields -> (expand_record fields, true)
-    | Ptype_abstract -> (
-      match t.ptype_manifest with
-      | Some t -> ([%expr [%e encode_type ~loc t].descriptor], false)
-      | None -> failwith "no manifest on abstract type" )
-    | Ptype_open -> failwith "unsupported Ptype_open"
-    | Ptype_variant options -> (expand_variant options, true)
-  and wrap arg exp =
-    match arg with
-    | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, Invariant ->
-      [%expr fun [%p pattern_id ~loc (schema_name name)] -> [%e exp]]
-    | t, _ ->
-      Ppxlib.Location.raise_errorf ~loc
-        "schematic-ppx: non supported type parameter %a" Pprintast.core_type t
-  in
-  let body =
-    [%expr
-      {
-        id = Some [%e expr_string ~loc (rename t.ptype_name.txt)];
-        descriptor = [%e body];
-      }]
-  in
-  (List.fold_right ~f:wrap ~init:body t.ptype_params, recursive)
+    ([%expr Union [%e expr_list ~loc (List.map ~f options)]], true)
 
-let expand ~loc ~path:_ ~inside (_, types) =
-  let f t =
-    let name = schema_name t.ptype_name.txt in
-    let pattern = pattern_id ~loc:t.ptype_name.loc name in
-    let body, recursive = expand_type ~loc t in
+  let expand_abstract_type ~loc t =
+    ([%expr [%e encode_type ~loc t].descriptor], false)
+
+  let close ~loc t params (body, recursive) =
+    let init =
+      [%expr
+        {
+          id = Some [%e expr_string ~loc (rename t.ptype_name.txt)];
+          descriptor = [%e body];
+        }]
+    and wrap arg exp =
+      match arg with
+      | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, Invariant ->
+        [%expr fun [%p pattern_id ~loc (schema_name name)] -> [%e exp]]
+      | t, _ ->
+        Ppxlib.Location.raise_errorf ~loc
+          "schematic-ppx: non supported type parameter %a" Pprintast.core_type t
+    in
+    let body = List.fold_right ~f:wrap ~init params in
     let body =
       [%expr
         let _ = unit_schema in
         [%e body]]
     in
-    let body =
-      if inside then
-        [%expr
-          let open Schema in
-          [%e body]]
-      else
-        [%expr
-          let open Schematic.Schema in
-          [%e body]]
-    in
+    let name = schema_name t.ptype_name.txt in
+    let pattern = pattern_id ~loc:t.ptype_name.loc name in
     let body =
       if recursive then
         [%expr
@@ -582,22 +588,54 @@ let expand ~loc ~path:_ ~inside (_, types) =
       else
         body
     in
-    ( recursive,
+    let body =
       { pvb_pat = pattern; pvb_expr = body; pvb_loc = loc; pvb_attributes = [] }
-    )
-  in
-  let schemas = List.map ~f types in
-  [
-    {
-      pstr_desc =
-        Pstr_value
-          ( ( if List.exists ~f:fst schemas then
-              Recursive
-            else
-              Nonrecursive ),
-            List.map ~f:snd schemas );
-      pstr_loc = loc;
-    };
-  ]
+    in
+    (body, recursive)
 
-(* let rec [%p pattern] = [%str let [%p pattern] = [%e body]] *)
+  let combine ~loc:_ expanded =
+    Pstr_value
+      ( ( if List.exists ~f:snd expanded then
+          Recursive
+        else
+          Nonrecursive ),
+        List.map ~f:fst expanded )
+end
+
+module Expander (Expansion : Expansion) = struct
+  let expand ~loc t =
+    let f t =
+      let body =
+        match t.ptype_kind with
+        | Ptype_record fields -> Expansion.expand_record ~loc fields
+        | Ptype_abstract -> (
+          match t.ptype_manifest with
+          | Some t -> Expansion.expand_abstract_type ~loc t
+          | None -> failwith "no manifest on abstract type" )
+        | Ptype_open -> failwith "unsupported Ptype_open"
+        | Ptype_variant options -> Expansion.expand_variant ~loc options
+      in
+      Expansion.close ~loc t t.ptype_params body
+    in
+    let expanded = List.map ~f t in
+    Expansion.combine ~loc expanded
+end
+
+module Type_expander = Expander (Type)
+
+let expand ~loc ~path:_ ~inside (_, types) =
+  let contents =
+    [ { pstr_desc = Type_expander.expand ~loc types; pstr_loc = loc } ]
+  and namespace =
+    if inside then
+      [%stri open Schema]
+    else
+      [%stri open Schematic.Schema]
+  in
+  namespace :: contents
+
+let add inside =
+  let str_type_decl =
+    Deriving.Generator.make_noarg ~attributes:[] (expand ~inside)
+  in
+  Deriving.add ~str_type_decl "schema"
