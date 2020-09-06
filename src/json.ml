@@ -28,6 +28,8 @@ module Make (Impl : Impl) = struct
         map f tl >>= fun tl -> Monad.return (hd :: tl)
   end
 
+  type date_tuple = int * int * int [@@deriving schema]
+
   let decode schema =
     let rec decode_field :
         type t r.
@@ -65,6 +67,7 @@ module Make (Impl : Impl) = struct
       | Any, v -> Result.return v
       | Bool, `Bool b -> Result.return b
       | Bool, _ -> type_error "boolean"
+      | Date, json -> decode date_tuple_schema.descriptor json
       | End, `O _ -> Result.return ()
       | End, `A _ -> Result.return ()
       | End, _ -> failwith "end not on an object or tuple"
@@ -162,6 +165,7 @@ module Make (Impl : Impl) = struct
       match schema with
       | Any -> v
       | Bool -> `Bool v
+      | Date -> encode date_tuple_schema.descriptor v
       | End -> `Null
       | Int -> `Float (Float.of_int v)
       | List items_schema -> `A (List.map ~f:(encode items_schema.descriptor) v)

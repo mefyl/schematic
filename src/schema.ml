@@ -12,6 +12,7 @@ let rec pp_descriptor : type t. t descriptor -> _ Pp.t =
   | Any -> text "any"
   | Bool -> text "bool"
   | End -> nop
+  | Date -> text "date"
   | Int -> text "int"
   | List schema ->
     box ~indent

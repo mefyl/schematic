@@ -1,4 +1,8 @@
+module Impl_js = Json.Impl_js
+open Base
 open Js_of_ocaml
+
+let ( == ) = Caml.( == )
 
 type bool_js = bool Js.t
 

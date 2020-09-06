@@ -14,6 +14,7 @@ type _ case =
 and _ descriptor =
   | Any : Ezjsonm.value descriptor
   | Bool : bool descriptor
+  | Date : Ptime.date descriptor
   | End : unit descriptor
   | Int : int descriptor
   | List : 'a schema -> 'a list descriptor

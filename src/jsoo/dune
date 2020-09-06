@@ -1,6 +1,6 @@
 (library
  (name schematic_jsoo)
  (public_name schematic.schematic_jsoo)
- (libraries js_of_ocaml schematic)
+ (libraries base js_of_ocaml schematic)
  (preprocess
   (pps js_of_ocaml-ppx)))

@@ -23,9 +23,7 @@ module Ptime = struct
 
   let local_schema = { Schema.id = None; descriptor = Time_local }
 
-  type date_alias = int * int * int [@@deriving schema]
-
-  let date_schema = date_alias_schema
+  let date_schema = { Schema.id = None; descriptor = Date }
 end
 
 include Schemas

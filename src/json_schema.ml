@@ -183,6 +183,8 @@ let json_schema_empty =
 
 type ids = (string, String.comparator_witness) Set.t
 
+type date_tuple = int * int * int [@@deriving schema]
+
 let of_schema schema =
   let id_name s = "#" ^ s in
   let rec of_schema : type t. ids -> t Schema.schema -> ids * json_schema =
@@ -203,6 +205,7 @@ let of_schema schema =
     let rec validation : type t. t Schema.descriptor -> validation = function
       | Schema.Any -> validation_empty
       | Schema.Bool -> { validation_empty with type_ = Some Boolean }
+      | Schema.Date -> validation date_tuple_schema.descriptor
       | Schema.End -> failwith "unexpected End in schema"
       | Schema.Int -> { validation_empty with type_ = Some Integer }
       | Schema.List _ -> { validation_empty with type_ = Some Array }
@@ -222,6 +225,7 @@ let of_schema schema =
      fun marks -> function
       | Schema.Any -> (marks, Some applicator_empty)
       | Schema.Bool -> (marks, Some applicator_empty)
+      | Schema.Date -> applicator marks date_tuple_schema.descriptor
       | Schema.End -> (marks, None)
       | Schema.Int -> (marks, Some applicator_empty)
       | Schema.List schema ->
@@ -305,6 +309,7 @@ let of_schema schema =
               (marks, Some (fields @ Option.value_exn applicator.properties)) )
           | Schema.Any -> (marks, None)
           | Schema.Bool -> (marks, None)
+          | Schema.Date -> (marks, None)
           | Schema.Int -> (marks, None)
           | Schema.List _ -> (marks, None)
           | Schema.Mapping _ -> (marks, None)
