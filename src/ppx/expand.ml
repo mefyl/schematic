@@ -646,10 +646,24 @@ module Jsoo_type : Expansion = struct
       ptyp_loc_stack = [];
     }
 
-  (* [%type: < i : int Js.readonly_prop > Js_of_ocaml.Js.t] *)
-
-  let expand_variant ~loc _options =
-    Ppxlib.Location.raise_errorf ~loc "schematic-ppx: variant are unsupported"
+  let expand_variant ~loc (options : constructor_declaration list) =
+    if
+      Option.is_some
+      @@ List.find
+           ~f:(function
+             | { pcd_args = Pcstr_tuple []; _ } -> false
+             | _ -> true)
+           options
+    then
+      Ppxlib.Location.raise_errorf ~loc
+        "schematic-ppx: variants with arguments are unsupported"
+    else
+      {
+        ptyp_desc = Ptyp_constr ({ txt = Lident "string_js"; loc }, []);
+        ptyp_loc = loc;
+        ptyp_loc_stack = [];
+        ptyp_attributes = [];
+      }
 
   let expand_abstract_type ~loc:_ t = expand_type t
 
