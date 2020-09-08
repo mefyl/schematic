@@ -30,6 +30,9 @@ module Make (Impl : Impl) = struct
 
   type date_tuple = int * int * int [@@deriving schema]
 
+  type ('t, 'kind) object_descriptor = ('t, 'kind) descriptor
+    constraint 'kind = [> `Object ]
+
   let decode schema =
     let rec decode_field :
         type t r.
@@ -54,7 +57,9 @@ module Make (Impl : Impl) = struct
         | Some `Null -> Result.return None
         | Some v -> Result.map ~f:Option.return @@ decode schema.descriptor v
         | None -> Result.return None )
-    and decode : type t. t descriptor -> Ezjsonm.value -> (t, 'error) Result.t =
+    and decode :
+        type t kind.
+        (t, kind) descriptor -> Ezjsonm.value -> (t, 'error) Result.t =
      fun schema json ->
       let module List = List_monad (Result) in
       let type_error expected =
@@ -84,9 +89,11 @@ module Make (Impl : Impl) = struct
       | Mapping _, _ -> type_error "mapping"
       | Null, `Null -> Result.return ()
       | Null, _ -> type_error "null"
-      | Object _, (`O fields as o) ->
-        let rec decode_object : type t. t descriptor -> (t, [> ]) Result.t =
-          function
+      | Object descriptor, (`O fields as o) ->
+        let rec decode_object :
+            type t.
+            (t, [ `Object ]) object_descriptor ->
+            (t, [> decode_error ]) Result.t = function
           | Null -> Result.return ()
           | Object { field; requirement; schema; rest; inline; _ } ->
             let value =
@@ -98,9 +105,8 @@ module Make (Impl : Impl) = struct
             Result.Let_syntax.Let_syntax.both
               (decode_field field schema requirement value)
               (decode_object rest)
-          | _ -> failwith "invalid object schema"
         in
-        decode_object schema
+        decode_object (Object descriptor)
       | Object _, _ -> type_error "object"
       | String, `String s -> Result.return s
       | String, _ -> type_error "string"
@@ -163,7 +169,7 @@ module Make (Impl : Impl) = struct
     | Optional -> Fn.id
 
   let encode schema =
-    let rec encode : type t. t descriptor -> t -> Ezjsonm.value =
+    let rec encode : type t kind. (t, kind) descriptor -> t -> Ezjsonm.value =
      fun schema v ->
       match schema with
       | Any -> v
@@ -178,33 +184,41 @@ module Make (Impl : Impl) = struct
           (List.map
              ~f:(fun (name, v) -> (name, encode fields_schema.descriptor v))
              v)
-      | Object { field; requirement; schema; rest; inline; _ } -> (
-        let hd, tl = v in
-        let rest =
-          match encode rest tl with
-          | `Null -> []
-          | `O rest -> rest
-          | _ -> failwith "object schema chained with a non-object schema"
+      | Object descriptor ->
+        let rec encode_object :
+            type t.
+            t -> (t, [ `Object ]) descriptor -> (string * Ezjsonm.value) list =
+         fun v -> function
+          | Null -> []
+          | Object { field; requirement; schema; rest; inline; _ } -> (
+            let hd, tl = v in
+            let tl = encode_object tl rest in
+            match encode_field requirement hd with
+            | Some hd ->
+              if inline then
+                match schema.descriptor with
+                | Null -> []
+                | Object descriptor -> encode_object hd (Object descriptor) @ tl
+                | Map (_, f, Object descriptor) ->
+                  encode_object (f hd) (Object descriptor) @ tl
+                | _ -> failwith "invalid object schema"
+              else
+                let encoded = encode schema.descriptor hd in
+                (field, encoded) :: tl
+            | None -> tl )
         in
-        match encode_field requirement hd with
-        | Some hd ->
-          let encoded = encode schema.descriptor hd in
-          if inline then
-            match encoded with
-            | `O fields -> `O (List.concat [ fields; rest ])
-            | _ -> `O ((field, encoded) :: rest)
-          else
-            `O ((field, encoded) :: rest)
-        | None -> `O rest )
-      | Tuple { schema; rest } ->
-        let hd, tl = v in
-        let rest =
-          match encode rest tl with
-          | `Null -> []
-          | `A rest -> rest
-          | _ -> failwith "tuple schema chained with a non-tuple schema"
+        `O (encode_object v (Object descriptor))
+      | Tuple descriptor ->
+        let rec encode_tuple :
+            type t. t -> (t, [ `Tuple ]) descriptor -> Ezjsonm.value list =
+         fun v -> function
+          | Null -> []
+          | Tuple { schema; rest } ->
+            let hd, tl = v in
+            let hd = encode schema.descriptor hd in
+            hd :: encode_tuple tl rest
         in
-        `A (encode schema.descriptor hd :: rest)
+        `A (encode_tuple v (Tuple descriptor))
       | String -> `String v
       | String_const v -> `String v
       | Time -> `String (Ptime.to_rfc3339 v)

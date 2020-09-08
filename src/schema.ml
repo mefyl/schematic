@@ -4,7 +4,7 @@ include Schema_intf
 let map cons decons { descriptor; _ } =
   { id = None; descriptor = Map (cons, decons, descriptor) }
 
-let rec pp_descriptor : type t. t descriptor -> _ Pp.t =
+let rec pp_descriptor : type t kind. (t, kind) descriptor -> _ Pp.t =
   let open Pp in
   let open Pp.O in
   let indent = 2 in

@@ -3,6 +3,12 @@ type (_, _) field_requirement =
   | Default : 'a -> ('a, 'a) field_requirement
   | Optional : ('a, 'a option) field_requirement
 
+type kinds =
+  [ `Object
+  | `Tuple
+  | `Value
+  ]
+
 type _ case =
   | Case : {
       schema : 'a schema;
@@ -11,19 +17,21 @@ type _ case =
     }
       -> 't case
 
-and _ descriptor =
-  | Any : Ezjsonm.value descriptor
-  | Bool : bool descriptor
-  | Date : Ptime.date descriptor
-  | Int : int descriptor
-  | List : 'a schema -> 'a list descriptor
-  | Map : ('a -> 'b) * ('b -> 'a) * 'a descriptor -> 'b descriptor
-  | Mapping : 'a schema -> (string * 'a) list descriptor
-  | Null : unit descriptor
-  | String : string descriptor
-  | String_const : string -> unit descriptor
-  | Time : Ptime.t descriptor
-  | Time_local : (Ptime.t * Ptime.tz_offset_s) descriptor
+and ('t, 'kind) descriptor =
+  | Any : (Ezjsonm.value, [< `Value ]) descriptor
+  | Bool : (bool, [< `Value ]) descriptor
+  | Date : (Ptime.date, [< `Value ]) descriptor
+  | Int : (int, [< `Value ]) descriptor
+  | List : 'a schema -> ('a list, [< `Value ]) descriptor
+  | Map :
+      ('a -> 'b) * ('b -> 'a) * ('a, [ `Value ]) descriptor
+      -> ('b, [< `Value ]) descriptor
+  | Mapping : 'a schema -> ((string * 'a) list, [< `Value ]) descriptor
+  | Null : (unit, [< kinds ]) descriptor
+  | String : (string, [< `Value ]) descriptor
+  | String_const : string -> (unit, [< `Value ]) descriptor
+  | Time : (Ptime.t, [< `Value ]) descriptor
+  | Time_local : (Ptime.t * Ptime.tz_offset_s, [< `Value ]) descriptor
   | Object : {
       description : string option;
       examples : 'a list;
@@ -32,19 +40,19 @@ and _ descriptor =
       maximum : int option;
       minimum : int option;
       requirement : ('a, 'req) field_requirement;
-      rest : 'b descriptor;
+      rest : ('b, [ `Object ]) descriptor;
       schema : 'a schema;
       title : string option;
     }
-      -> ('req * 'b) descriptor
+      -> ('req * 'b, [< `Object | `Value ]) descriptor
   | Tuple : {
       schema : 'a schema;
-      rest : 'b descriptor;
+      rest : ('b, [ `Tuple ]) descriptor;
     }
-      -> ('a * 'b) descriptor
-  | Union : 't case list -> 't descriptor
+      -> ('a * 'b, [< `Tuple | `Value ]) descriptor
+  | Union : 't case list -> ('t, [< `Value ]) descriptor
 
 and 't schema = {
   id : string option;
-  descriptor : 't descriptor;
+  descriptor : ('t, [ `Value ]) descriptor;
 }

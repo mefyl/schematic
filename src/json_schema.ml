@@ -200,9 +200,11 @@ let of_schema schema =
       let marks = Set.add marks id in
       let marks, schema = of_descriptor marks descriptor in
       (marks, { schema with core = { schema.core with id = Some (id_name id) } })
-  and of_descriptor : type t. ids -> t Schema.descriptor -> ids * json_schema =
+  and of_descriptor :
+      type t. ids -> (t, _) Schema.descriptor -> ids * json_schema =
    fun marks schema ->
-    let rec validation : type t. t Schema.descriptor -> validation = function
+    let rec validation : type t. (t, _) Schema.descriptor -> validation =
+      function
       | Schema.Any -> validation_empty
       | Schema.Bool -> { validation_empty with type_ = Some Boolean }
       | Schema.Date -> validation date_tuple_schema.descriptor
@@ -220,7 +222,8 @@ let of_schema schema =
       | Schema.Tuple _ -> { validation_empty with type_ = Some Array }
       | Schema.Union _ -> validation_empty
     and applicator :
-        type t. ids -> t Schema.descriptor -> ids * applicator option =
+        type t kind.
+        ids -> (t, kind) Schema.descriptor -> ids * applicator option =
      fun marks -> function
       | Schema.Any -> (marks, Some applicator_empty)
       | Schema.Bool -> (marks, Some applicator_empty)
@@ -246,9 +249,9 @@ let of_schema schema =
       | Schema.Time_local -> (marks, Some applicator_empty)
       | Schema.Object _ as o ->
         let rec get_fields :
-            type t.
+            type t kind.
             ids ->
-            t Schema.descriptor ->
+            (t, kind) Schema.descriptor ->
             ids * (string * json_schema) list option =
          fun marks -> function
           | Schema.Null -> (marks, None)
