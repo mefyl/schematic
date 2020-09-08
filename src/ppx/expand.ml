@@ -184,7 +184,7 @@ let rec encode_type ~loc = function
 
 and tuple_schema ~loc types =
   let args = List.map ~f:(encode_type ~loc) types in
-  let init = [%expr End] in
+  let init = [%expr Null] in
   let f r l = [%expr Tuple { schema = [%e r]; rest = [%e l] }] in
   List.fold_right ~f ~init args
 
@@ -375,7 +375,7 @@ module Schema : Expansion = struct
         in
         List.map ~f:expand_field fields
       in
-      let init = [%expr End] in
+      let init = [%expr Null] in
       let f (requirement, field, schema, inline, specs) rest =
         [%expr
           Object

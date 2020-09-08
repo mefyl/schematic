@@ -206,7 +206,6 @@ let of_schema schema =
       | Schema.Any -> validation_empty
       | Schema.Bool -> { validation_empty with type_ = Some Boolean }
       | Schema.Date -> validation date_tuple_schema.descriptor
-      | Schema.End -> failwith "unexpected End in schema"
       | Schema.Int -> { validation_empty with type_ = Some Integer }
       | Schema.List _ -> { validation_empty with type_ = Some Array }
       | Schema.Map (_, _, schema) -> validation schema
@@ -226,7 +225,6 @@ let of_schema schema =
       | Schema.Any -> (marks, Some applicator_empty)
       | Schema.Bool -> (marks, Some applicator_empty)
       | Schema.Date -> applicator marks date_tuple_schema.descriptor
-      | Schema.End -> (marks, None)
       | Schema.Int -> (marks, Some applicator_empty)
       | Schema.List schema ->
         let marks, schema = of_schema marks schema in
@@ -253,7 +251,7 @@ let of_schema schema =
             t Schema.descriptor ->
             ids * (string * json_schema) list option =
          fun marks -> function
-          | Schema.End -> (marks, Some [])
+          | Schema.Null -> (marks, None)
           | Schema.Map (_, _, d) -> get_fields marks d
           | Schema.Object
               {
@@ -306,14 +304,15 @@ let of_schema schema =
             match applicator marks rest with
             | marks, None -> (marks, Some fields)
             | marks, Some applicator ->
-              (marks, Some (fields @ Option.value_exn applicator.properties)) )
+              ( marks,
+                Some (fields @ Option.value ~default:[] applicator.properties)
+              ) )
           | Schema.Any -> (marks, None)
           | Schema.Bool -> (marks, None)
           | Schema.Date -> (marks, None)
           | Schema.Int -> (marks, None)
           | Schema.List _ -> (marks, None)
           | Schema.Mapping _ -> (marks, None)
-          | Schema.Null -> (marks, None)
           | Schema.String -> (marks, None)
           | Schema.Time -> (marks, None)
           | Schema.Time_local -> (marks, None)
@@ -346,9 +345,11 @@ let of_schema schema =
                     (Tuple_schema
                        ( field
                        ::
-                       ( match Option.value_exn applicator.items with
-                       | Tuple_schema l -> l
-                       | Items_schema _ -> failwith "mixed list and tuple" ) ));
+                       ( match applicator.items with
+                       | None -> []
+                       | Some (Tuple_schema l) -> l
+                       | Some (Items_schema _) ->
+                         failwith "mixed list and tuple" ) ));
               } ) )
       | Schema.Union cases ->
         let f (Schema.Case { schema; _ }) (marks, l) =

@@ -42,7 +42,6 @@ let decode schema =
     | Schematic.Schema.Bool -> Result.return @@ Js.to_bool (Js.Unsafe.coerce js)
     | Schematic.Schema.Date ->
       Result.return @@ date_of_js @@ Js.Unsafe.coerce js
-    | Schematic.Schema.End -> Result.return ()
     | Schematic.Schema.Int ->
       Result.return @@ Int.of_float @@ Js.float_of_number @@ Js.Unsafe.coerce js
     | Schematic.Schema.List items_schema ->
@@ -134,7 +133,6 @@ let encode schema =
     | Schematic.Schema.Any -> Js.Unsafe.coerce @@ Impl_js.to_js v
     | Schematic.Schema.Bool -> Js.Unsafe.coerce @@ Js.bool v
     | Schematic.Schema.Date -> Js.Unsafe.coerce @@ js_of_date v
-    | Schematic.Schema.End -> Js.Unsafe.coerce @@ Js.Unsafe.pure_js_expr "null"
     | Schematic.Schema.Int ->
       Js.Unsafe.coerce @@ Js.number_of_float @@ Float.of_int v
     | Schematic.Schema.List items_schema ->
@@ -158,7 +156,7 @@ let encode schema =
         in
         fun into schema v ->
           match schema with
-          | Schematic.Schema.End -> ()
+          | Schematic.Schema.Null -> ()
           | Schematic.Schema.Object
               { field; requirement; schema; rest; inline; _ } ->
             let () =
@@ -182,7 +180,7 @@ let encode schema =
       let rec encode_tuple : type t. t -> t Schematic.Schema.descriptor -> unit
           =
        fun v -> function
-        | Schematic.Schema.End -> ()
+        | Schematic.Schema.Null -> ()
         | Schematic.Schema.Tuple { schema; rest } ->
           let _ = res##push (encode schema.descriptor (fst v)) in
           encode_tuple (snd v) rest

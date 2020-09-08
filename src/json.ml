@@ -68,9 +68,6 @@ module Make (Impl : Impl) = struct
       | Bool, `Bool b -> Result.return b
       | Bool, _ -> type_error "boolean"
       | Date, json -> decode date_tuple_schema.descriptor json
-      | End, `O _ -> Result.return ()
-      | End, `A _ -> Result.return ()
-      | End, _ -> failwith "end not on an object or tuple"
       | Int, `Float f -> Result.return @@ Float.to_int f
       | Int, _ -> type_error "float"
       | List items_schema, `A items ->
@@ -87,17 +84,23 @@ module Make (Impl : Impl) = struct
       | Mapping _, _ -> type_error "mapping"
       | Null, `Null -> Result.return ()
       | Null, _ -> type_error "null"
-      | Object { field; requirement; schema; rest; inline; _ }, (`O fields as o)
-        ->
-        let value =
-          if inline then
-            Some o
-          else
-            List.Assoc.find ~equal:( = ) fields field
+      | Object _, (`O fields as o) ->
+        let rec decode_object : type t. t descriptor -> (t, [> ]) Result.t =
+          function
+          | Null -> Result.return ()
+          | Object { field; requirement; schema; rest; inline; _ } ->
+            let value =
+              if inline then
+                Some o
+              else
+                List.Assoc.find ~equal:( = ) fields field
+            in
+            Result.Let_syntax.Let_syntax.both
+              (decode_field field schema requirement value)
+              (decode_object rest)
+          | _ -> failwith "invalid object schema"
         in
-        Result.Let_syntax.Let_syntax.both
-          (decode_field field schema requirement value)
-          (decode rest json)
+        decode_object schema
       | Object _, _ -> type_error "object"
       | String, `String s -> Result.return s
       | String, _ -> type_error "string"
@@ -166,7 +169,6 @@ module Make (Impl : Impl) = struct
       | Any -> v
       | Bool -> `Bool v
       | Date -> encode date_tuple_schema.descriptor v
-      | End -> `Null
       | Int -> `Float (Float.of_int v)
       | List items_schema -> `A (List.map ~f:(encode items_schema.descriptor) v)
       | Map (_, decons, schema) -> encode schema @@ decons v

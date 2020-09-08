@@ -15,7 +15,6 @@ and _ descriptor =
   | Any : Ezjsonm.value descriptor
   | Bool : bool descriptor
   | Date : Ptime.date descriptor
-  | End : unit descriptor
   | Int : int descriptor
   | List : 'a schema -> 'a list descriptor
   | Map : ('a -> 'b) * ('b -> 'a) * 'a descriptor -> 'b descriptor
