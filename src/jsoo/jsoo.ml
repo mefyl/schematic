@@ -1,6 +1,7 @@
 module Impl_js = Json.Impl_js
 open Base
 open Js_of_ocaml
+open Poly
 
 let ( == ) = Caml.( == )
 
@@ -121,3 +122,86 @@ let decode schema =
       | None -> Result.return None )
   in
   decode schema.Schematic.Schema.descriptor
+
+let js_of_date (y, m, d) = new%js Js.date_day y (m - 1) d
+
+let js_of_ptime t = new%js Js.date_fromTimeValue (Ptime.to_float_s t *. 1000.)
+
+let encode schema =
+  let rec encode : type t. t Schematic.Schema.descriptor -> t -> Js.Unsafe.any =
+   fun schema v ->
+    match schema with
+    | Schematic.Schema.Any -> Js.Unsafe.coerce @@ Impl_js.to_js v
+    | Schematic.Schema.Bool -> Js.Unsafe.coerce @@ Js.bool v
+    | Schematic.Schema.Date -> Js.Unsafe.coerce @@ js_of_date v
+    | Schematic.Schema.End -> Js.Unsafe.coerce @@ Js.Unsafe.pure_js_expr "null"
+    | Schematic.Schema.Int ->
+      Js.Unsafe.coerce @@ Js.number_of_float @@ Float.of_int v
+    | Schematic.Schema.List items_schema ->
+      Js.Unsafe.coerce @@ Js.array @@ Array.of_list
+      @@ List.map ~f:(encode items_schema.descriptor) v
+    | Schematic.Schema.Map (_, decons, schema) -> encode schema @@ decons v
+    | Schematic.Schema.Null -> Js.Unsafe.coerce @@ Js.Unsafe.pure_js_expr "null"
+    | Schematic.Schema.Mapping _ -> failwith "FIXME"
+    | Schematic.Schema.Object _ ->
+      let rec encode_object :
+          type t. Js.Unsafe.any -> t Schematic.Schema.descriptor -> t -> unit =
+        let encode_field :
+            type t r. (t, r) Schematic.Schema.field_requirement -> r -> t option
+            = function
+          | Schematic.Schema.Required -> Option.some
+          | Schematic.Schema.Default default -> (
+            function
+            | v when v = default -> None
+            | v -> Some v )
+          | Schematic.Schema.Optional -> Fn.id
+        in
+        fun into schema v ->
+          match schema with
+          | Schematic.Schema.End -> ()
+          | Schematic.Schema.Object
+              { field; requirement; schema; rest; inline; _ } ->
+            let () =
+              match encode_field requirement (fst v) with
+              | None -> ()
+              | Some v ->
+                if inline then
+                  encode_object into schema.descriptor v
+                else
+                  Js.Unsafe.set into (Js.string field)
+                    (encode schema.descriptor v)
+            in
+            encode_object into rest (snd v)
+          | _ -> failwith "invalid object schema"
+      in
+      let o = Js.Unsafe.coerce (object%js end) in
+      let () = encode_object o schema v in
+      o
+    | Schematic.Schema.Tuple _ ->
+      let res = new%js Js.array_empty in
+      let rec encode_tuple : type t. t -> t Schematic.Schema.descriptor -> unit
+          =
+       fun v -> function
+        | Schematic.Schema.End -> ()
+        | Schematic.Schema.Tuple { schema; rest } ->
+          let _ = res##push (encode schema.descriptor (fst v)) in
+          encode_tuple (snd v) rest
+        | _ -> failwith "invalid tuple schema"
+      in
+      let () = encode_tuple v schema in
+      Js.Unsafe.coerce res
+    | Schematic.Schema.String -> Js.Unsafe.coerce @@ Js.string v
+    | Schematic.Schema.String_const v -> Js.Unsafe.coerce @@ Js.string v
+    | Schematic.Schema.Time -> Js.Unsafe.coerce @@ js_of_ptime v
+    | Schematic.Schema.Time_local -> Js.Unsafe.coerce @@ js_of_ptime (fst v)
+    | Schematic.Schema.Union cases -> (
+      let conv (Schematic.Schema.Case { schema; encoder; _ }) =
+        match encoder v with
+        | Some v -> Some (encode schema.descriptor v)
+        | None -> None
+      in
+      match List.find_map ~f:conv cases with
+      | Some res -> res
+      | None -> failwith "unmatched variant schema case" )
+  in
+  encode schema.Schematic.Schema.descriptor

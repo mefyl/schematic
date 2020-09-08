@@ -4,7 +4,7 @@ const assert = require('assert');
 
 const { ofString, toString } = require('./test.bc.js');
 
-const value = { i : 42, s : 'enyleme', b: true, opt: null, a: [0, 1, 2] }
+const value = { i : 42, s : 'enyleme', b: true, a: [0, 1, 2] }
 
 assert.deepEqual(
   ofString('{ "i" : 42, "s": "enyleme", "b": true, "opt": null, "a": [0, 1, 2] }'),
