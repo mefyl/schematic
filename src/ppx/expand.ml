@@ -266,7 +266,7 @@ module type Expansion = sig
     expanded ->
     closed
 
-  val combine : loc:location -> closed list -> structure_item_desc
+  val combine : loc:location -> closed list -> structure_item list
 
   val expand_abstract_type : loc:location -> core_type -> expanded
 
@@ -590,13 +590,19 @@ module Schema : Expansion = struct
     in
     (body, recursive)
 
-  let combine ~loc:_ expanded =
-    Pstr_value
-      ( ( if List.exists ~f:snd expanded then
-          Recursive
-        else
-          Nonrecursive ),
-        List.map ~f:fst expanded )
+  let combine ~loc expanded =
+    [
+      {
+        pstr_desc =
+          Pstr_value
+            ( ( if List.exists ~f:snd expanded then
+                Recursive
+              else
+                Nonrecursive ),
+              List.map ~f:fst expanded );
+        pstr_loc = loc;
+      };
+    ]
 end
 
 module Jsoo_type : Expansion = struct
@@ -679,7 +685,59 @@ module Jsoo_type : Expansion = struct
       ptype_attributes = [];
     }
 
-  let combine ~loc:_ items = Pstr_type (Recursive, items)
+  let combine ~loc items =
+    let converters { ptype_name = { txt; _ }; _ } =
+      let name s =
+        let prefix = String.sub ~pos:0 ~len:(String.length txt - 2) txt in
+        prefix ^ s
+      in
+      let fname n =
+        {
+          ppat_attributes = [];
+          ppat_desc = Ppat_var { txt = name n; loc };
+          ppat_loc = loc;
+          ppat_loc_stack = [];
+        }
+      and schema =
+        {
+          pexp_attributes = [];
+          pexp_desc = Pexp_ident { txt = Lident (name "schema"); loc };
+          pexp_loc = loc;
+          pexp_loc_stack = [];
+        }
+      and js =
+        {
+          ptyp_attributes = [];
+          ptyp_desc = Ptyp_constr ({ txt = Lident (name "js"); loc }, []);
+          ptyp_loc = loc;
+          ptyp_loc_stack = [];
+        }
+      in
+      [%stri
+        let [%p fname "to_js"], [%p fname "of_js"], [%p fname "of_js_exn"] =
+          let to_js v =
+            ( Js.Unsafe.coerce @@ Schematic_jsoo.Jsoo.encode [%e schema] v
+              : [%t js] )
+          and of_js (js : [%t js]) =
+            Schematic_jsoo.Jsoo.decode [%e schema] (Js.Unsafe.coerce js)
+          in
+          let of_js_exn (js : [%t js]) =
+            match of_js js with
+            | Result.Ok v -> v
+            | Result.Error (`Js_decode m) ->
+              Js.raise_js_error
+                ((fun (type res t0)
+                      (t1 : (t0 -> res Js_of_ocaml.Js.t) Js_of_ocaml.Js.constr)
+                      (t0 : t0) (_ : unit) ->
+                   ( Js_of_ocaml.Js.Unsafe.new_obj t1
+                       [| Js_of_ocaml.Js.Unsafe.inject t0 |]
+                     : res Js_of_ocaml.Js.t ))
+                   Js.error_constr (Js.string m) ())
+          in
+          (to_js, of_js, of_js_exn)]
+    in
+    { pstr_desc = Pstr_type (Recursive, items); pstr_loc = loc }
+    :: List.map ~f:converters items
 end
 
 module Expander (Expansion : Expansion) = struct
@@ -708,11 +766,11 @@ let expand ~loc ~path:_ ~inside (_, types) jsoo =
   let contents =
     let jsoo =
       if jsoo then
-        [ { pstr_desc = Jsoo_type_expander.expand ~loc types; pstr_loc = loc } ]
+        Jsoo_type_expander.expand ~loc types
       else
         []
     in
-    { pstr_desc = Schema_expander.expand ~loc types; pstr_loc = loc } :: jsoo
+    Schema_expander.expand ~loc types @ jsoo
   and namespace =
     if inside then
       [%str

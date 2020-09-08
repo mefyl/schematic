@@ -7,7 +7,7 @@ let ( == ) = Caml.( == )
 
 type bool_js = bool Js.t
 
-type int_js = int
+type int_js = Js.number Js.t
 
 module Ptime = struct
   include Schematic.Schema.Ptime
