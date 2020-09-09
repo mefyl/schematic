@@ -33,6 +33,11 @@ let rec pp_descriptor : type t kind. (t, kind) descriptor -> _ Pp.t =
   | Time_local -> text "local-time"
   | Object { field; schema; _ } ->
     (* FIXME: other fields *)
+    let schema =
+      match schema with
+      | Inline schema -> schema
+      | Outline schema -> schema
+    in
     hvbox ~indent
     @@ text "{" ++ space
        ++ box (escape field ++ space ++ char ':' ++ space ++ pp_schema schema)
@@ -47,3 +52,7 @@ and pp_schema : type t. t schema -> _ Pp.t = function
 let pp fmt schema =
   let pp = pp_schema schema in
   Format.fprintf fmt "%a@." Pp.to_fmt pp
+
+let extract_field_schema = function
+  | Inline schema -> (true, schema)
+  | Outline schema -> (false, schema)

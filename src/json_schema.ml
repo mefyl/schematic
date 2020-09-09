@@ -261,7 +261,6 @@ let of_schema schema =
                 description;
                 examples;
                 field;
-                inline;
                 maximum;
                 minimum;
                 requirement;
@@ -269,6 +268,7 @@ let of_schema schema =
                 schema;
                 title;
               } -> (
+            let inline, schema = Schema.extract_field_schema schema in
             let marks, fields =
               if inline then
                 let marks, fields = get_fields marks schema.descriptor in

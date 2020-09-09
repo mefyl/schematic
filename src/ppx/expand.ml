@@ -367,23 +367,24 @@ module Schema : Expansion = struct
                   ([%expr Default [%e default]], encode_type ~loc t)
                 | None -> ([%expr Required], encode_type ~loc t) )
             in
-            ( requirement,
-              expr_string ~loc (rename txt),
-              schema,
-              expr_bool ~loc inline,
-              specs )
+            (requirement, expr_string ~loc (rename txt), schema, inline, specs)
         in
         List.map ~f:expand_field fields
       in
       let init = [%expr Null] in
       let f (requirement, field, schema, inline, specs) rest =
+        let schema =
+          if inline then
+            [%expr Inline [%e schema]]
+          else
+            [%expr Outline [%e schema]]
+        in
         [%expr
           Object
             {
               description = [%e expr_option ~loc expr_string specs.description];
               examples = [%e expr_list ~loc specs.examples];
               field = [%e field];
-              inline = [%e inline];
               maximum = [%e expr_option ~loc expr_int specs.maximum];
               minimum = [%e expr_option ~loc expr_int specs.minimum];
               requirement = [%e requirement];

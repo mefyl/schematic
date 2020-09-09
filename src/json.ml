@@ -95,7 +95,8 @@ module Make (Impl : Impl) = struct
             (t, [ `Object ]) object_descriptor ->
             (t, [> decode_error ]) Result.t = function
           | Null -> Result.return ()
-          | Object { field; requirement; schema; rest; inline; _ } ->
+          | Object { field; requirement; schema; rest; _ } ->
+            let inline, schema = extract_field_schema schema in
             let value =
               if inline then
                 Some o
@@ -190,8 +191,9 @@ module Make (Impl : Impl) = struct
             t -> (t, [ `Object ]) descriptor -> (string * Ezjsonm.value) list =
          fun v -> function
           | Null -> []
-          | Object { field; requirement; schema; rest; inline; _ } -> (
-            let hd, tl = v in
+          | Object { field; requirement; schema; rest; _ } -> (
+            let inline, schema = extract_field_schema schema
+            and hd, tl = v in
             let tl = encode_object tl rest in
             match encode_field requirement hd with
             | Some hd ->

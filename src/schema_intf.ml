@@ -17,6 +17,10 @@ type _ case =
     }
       -> 't case
 
+and 'a field_schema =
+  | Outline of 'a schema
+  | Inline of 'a schema
+
 and ('t, 'kind) descriptor =
   | Any : (Ezjsonm.value, [< `Value ]) descriptor
   | Bool : (bool, [< `Value ]) descriptor
@@ -36,12 +40,11 @@ and ('t, 'kind) descriptor =
       description : string option;
       examples : 'a list;
       field : string;
-      inline : bool;
       maximum : int option;
       minimum : int option;
       requirement : ('a, 'req) field_requirement;
       rest : ('b, [ `Object ]) descriptor;
-      schema : 'a schema;
+      schema : 'a field_schema;
       title : string option;
     }
       -> ('req * 'b, [< `Object | `Value ]) descriptor

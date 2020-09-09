@@ -58,7 +58,8 @@ let decode schema =
       let rec decode_object :
           type t. (t, [ `Object ]) descriptor -> (t, [> decode_error ]) Result.t
           = function
-        | Object { field; requirement; schema; rest; inline; _ } ->
+        | Object { field; requirement; schema; rest; _ } ->
+          let inline, schema = extract_field_schema schema in
           let value =
             if inline then
               Some js
@@ -160,7 +161,8 @@ let encode schema =
         fun into schema v ->
           match schema with
           | Null -> ()
-          | Object { field; requirement; schema; rest; inline; _ } ->
+          | Object { field; requirement; schema; rest; _ } ->
+            let inline, schema = extract_field_schema schema in
             let () =
               match encode_field requirement (fst v) with
               | None -> ()
