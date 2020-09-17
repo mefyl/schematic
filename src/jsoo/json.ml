@@ -43,7 +43,7 @@ module Impl_js = struct
     try
       let json = Js._JSON##parse (Js.string s) in
       Result.return @@ of_js json
-    with Failure s -> Result.fail @@ `Parse ("JSON parse error: " ^ s)
+    with _ -> Result.fail @@ `Parse "JSON parse error"
 
   let to_string t = to_js t |> Js_of_ocaml.Json.output |> Js.to_string
 end
