@@ -12,6 +12,8 @@ type bool_js = bool Js.t
 
 type int_js = Js.number Js.t
 
+type any_js = Js.Unsafe.any
+
 module Ptime = struct
   include Ptime
 

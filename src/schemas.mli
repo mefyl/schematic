@@ -14,6 +14,10 @@ val string_const_schema : string -> unit schema
 
 val unit_schema : unit schema
 
+type any = Ezjsonm.value
+
+val any_schema : any schema
+
 module Ptime : sig
   include module type of Ptime with type t = Ptime.t
 

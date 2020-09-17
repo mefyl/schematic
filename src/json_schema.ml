@@ -1,10 +1,7 @@
 open Base
+open Schemas
 
 let ( % ) = Fn.compose
-
-type any = Ezjsonm.value
-
-let any_schema = { Schema.id = None; descriptor = Any }
 
 type uri_reference = string
 

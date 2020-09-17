@@ -14,6 +14,10 @@ module Schemas = struct
   let mapping_schema schema = { Schema.id = None; descriptor = Mapping schema }
 end
 
+type any = Ezjsonm.value
+
+let any_schema = { Schema.id = None; descriptor = Any }
+
 module Ptime = struct
   include Ptime
 
