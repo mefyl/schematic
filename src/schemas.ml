@@ -26,4 +26,14 @@ module Ptime = struct
   let date_schema = { Schema.id = None; descriptor = Date }
 end
 
+module Uri = struct
+  include Uri
+
+  let schema =
+    {
+      Schema.id = None;
+      descriptor = Map (Uri.of_string, Uri.to_string, String);
+    }
+end
+
 include Schemas

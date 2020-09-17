@@ -20,6 +20,12 @@ module Ptime = struct
   type date_js = Js.date Js.t
 end
 
+module Uri = struct
+  include Uri
+
+  type js = Js.js_string Js.t
+end
+
 type 'a list_js = 'a Js.js_array Js.t
 
 type 'a option_js = 'a Js.opt

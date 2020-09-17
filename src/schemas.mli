@@ -27,3 +27,9 @@ module Ptime : sig
 
   val date_schema : date Schema.schema
 end
+
+module Uri : sig
+  include module type of Uri
+
+  val schema : Uri.t Schema.schema
+end
