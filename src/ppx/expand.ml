@@ -261,6 +261,7 @@ module type Expansion = sig
 
   val close :
     loc:location ->
+    name:string option ->
     type_declaration ->
     (core_type * variance) list ->
     expanded ->
@@ -565,11 +566,15 @@ module Schema : Expansion = struct
   let expand_abstract_type ~loc t =
     ([%expr [%e encode_type ~loc t].descriptor], false)
 
-  let close ~loc t params (body, recursive) =
+  let close ~loc ~name t params (body, recursive) =
     let init =
       [%expr
         {
-          id = Some [%e expr_string ~loc (rename t.ptype_name.txt)];
+          id =
+            Some
+              [%e
+                expr_string ~loc
+                  (Option.value ~default:(rename t.ptype_name.txt) name)];
           descriptor = [%e body];
         }]
     and wrap arg exp =
@@ -638,7 +643,7 @@ module Jsoo_type : Expansion = struct
   let expand_record ~loc fields =
     let f { pld_name; pld_type; pld_loc; _ } : object_field =
       let t = expand_type pld_type in
-      let t = [%type: [%t t] Js.readonly_prop] in
+      let t = [%type: [%t t] Js_of_ocaml.Js.readonly_prop] in
       { pof_desc = Otag (pld_name, t); pof_loc = pld_loc; pof_attributes = [] }
     in
     {
@@ -679,7 +684,7 @@ module Jsoo_type : Expansion = struct
 
   let expand_abstract_type ~loc:_ t = expand_type t
 
-  let close ~loc { ptype_name = { loc = name_loc; txt }; _ } params js =
+  let close ~loc ~name:_ { ptype_name = { loc = name_loc; txt }; _ } params js =
     {
       ptype_name = { loc = name_loc; txt = name "js" txt };
       ptype_params = params;
@@ -722,23 +727,25 @@ module Jsoo_type : Expansion = struct
       [%stri
         let [%p fname "to_js"], [%p fname "of_js"], [%p fname "of_js_exn"] =
           let to_js v =
-            ( Js.Unsafe.coerce @@ Schematic_jsoo.Jsoo.encode [%e schema] v
+            ( Js_of_ocaml.Js.Unsafe.coerce
+              @@ Schematic_jsoo.Jsoo.encode [%e schema] v
               : [%t js] )
           and of_js (js : [%t js]) =
-            Schematic_jsoo.Jsoo.decode [%e schema] (Js.Unsafe.coerce js)
+            Schematic_jsoo.Jsoo.decode [%e schema]
+              (Js_of_ocaml.Js.Unsafe.coerce js)
           in
           let of_js_exn (js : [%t js]) =
             match of_js js with
             | Result.Ok v -> v
             | Result.Error (`Js_decode m) ->
-              Js.raise_js_error
+              Js_of_ocaml.Js.raise_js_error
                 ((fun (type res t0)
                       (t1 : (t0 -> res Js_of_ocaml.Js.t) Js_of_ocaml.Js.constr)
                       (t0 : t0) (_ : unit) ->
                    ( Js_of_ocaml.Js.Unsafe.new_obj t1
                        [| Js_of_ocaml.Js.Unsafe.inject t0 |]
                      : res Js_of_ocaml.Js.t ))
-                   Js.error_constr (Js.string m) ())
+                   Js_of_ocaml.Js.error_constr (Js_of_ocaml.Js.string m) ())
           in
           (to_js, of_js, of_js_exn)]
     in
@@ -749,6 +756,25 @@ end
 module Expander (Expansion : Expansion) = struct
   let expand ~loc t =
     let f t =
+      let name =
+        let rec extract_attributes = function
+          | { attr_name = { txt = name; _ }; attr_loc = loc; attr_payload }
+            :: attrs -> (
+            match name with
+            | "schematic.name" -> (
+              match extract_attributes attrs with
+              | None -> Some (expect_string_constant ~loc attr_payload)
+              | Some _ ->
+                Ppxlib.Location.raise_errorf ~loc
+                  "schematic-ppx: duplicate schematic.name annotation on schema"
+              )
+            | _ ->
+              let () = check_unknown_attribute ~loc name in
+              extract_attributes attrs )
+          | [] -> None
+        in
+        extract_attributes t.ptype_attributes
+      in
       let body =
         match t.ptype_kind with
         | Ptype_record fields -> Expansion.expand_record ~loc fields
@@ -759,7 +785,7 @@ module Expander (Expansion : Expansion) = struct
         | Ptype_open -> failwith "unsupported Ptype_open"
         | Ptype_variant options -> Expansion.expand_variant ~loc options
       in
-      Expansion.close ~loc t t.ptype_params body
+      Expansion.close ~loc ~name t t.ptype_params body
     in
     let expanded = List.map ~f t in
     Expansion.combine ~loc expanded
