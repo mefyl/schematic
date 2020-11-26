@@ -41,3 +41,4 @@ module Uri = struct
 end
 
 include Schemas
+include Schemas_intf

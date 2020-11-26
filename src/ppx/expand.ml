@@ -616,6 +616,94 @@ module Schema : Expansion = struct
     ]
 end
 
+module Monadic : Expansion = struct
+  type closed = type_declaration
+
+  type expanded = type_kind * core_type option
+
+  let rec expand_type t : core_type =
+    let ptyp_desc =
+      match t.ptyp_desc with
+      | Ptyp_constr (idt, params) ->
+        let monadize idt =
+          match idt.txt with
+          | Lident name -> Ldot (Lapply (Lident "Monadic", Lident "M"), name)
+          | Ldot (left, name) ->
+            Ldot (Lapply (Ldot (left, "Monadic"), Lident "M"), name)
+          | _ ->
+            Ppxlib.Location.raise_errorf ~loc:t.ptyp_loc
+              "Functor application found as a type"
+        in
+        Ptyp_constr ({ idt with txt = monadize idt }, params)
+      | Ptyp_tuple types -> Ptyp_tuple (List.map ~f:expand_type types)
+      | _ ->
+        Ppxlib.Location.raise_errorf ~loc:t.ptyp_loc
+          "schematic-ppx: unsupported type"
+    in
+    { t with ptyp_desc }
+
+  (* match t.ptyp_desc with
+   * | Ptyp_constr (name, args) ->
+   *   {
+   *     t with
+   *     ptyp_desc =
+   *       Ptyp_constr
+   *         ( { name with txt = expand_ident name.txt },
+   *           List.map ~f:expand_type args );
+   *   }
+   * | _ ->
+   *   Ppxlib.Location.raise_errorf ~loc:t.ptyp_loc
+   *     "schematic-ppx: unsupported type" *)
+
+  let expand_record ~loc:_ fields =
+    let f ({ pld_type; _ } as field) =
+      { field with pld_type = expand_type pld_type }
+    in
+    let kind = Ptype_record (List.map ~f fields) in
+    (kind, None)
+
+  let expand_variant ~loc:_ (options : constructor_declaration list) =
+    let f option =
+      let pcd_args =
+        match option.pcd_args with
+        | Pcstr_tuple types -> Pcstr_tuple (List.map ~f:expand_type types)
+        | Pcstr_record labels ->
+          let f ({ pld_type; _ } as l) =
+            { l with pld_type = expand_type pld_type }
+          in
+          Pcstr_record (List.map ~f labels)
+      in
+      { option with pcd_args }
+    in
+    (Ptype_variant (List.map ~f options), None)
+
+  let expand_abstract_type ~loc:_ t = (Ptype_abstract, Some (expand_type t))
+
+  let close ~loc ~name:_ { ptype_name; _ } params (kind, manifest) =
+    {
+      ptype_name;
+      ptype_params = params;
+      ptype_cstrs = [];
+      ptype_kind = kind;
+      ptype_private = Public;
+      ptype_manifest = manifest;
+      ptype_loc = loc;
+      ptype_attributes = [];
+    }
+
+  let combine ~loc types =
+    let m =
+      {
+        pmod_loc = loc;
+        pmod_attributes = [];
+        pmod_desc =
+          Pmod_structure
+            [ { pstr_loc = loc; pstr_desc = Pstr_type (Recursive, types) } ];
+      }
+    in
+    [%str module Monadic (M : Base.Monad.S) = [%m m]]
+end
+
 module Jsoo_type : Expansion = struct
   type closed = type_declaration
 
@@ -792,18 +880,25 @@ module Expander (Expansion : Expansion) = struct
     Expansion.combine ~loc expanded
 end
 
-module Schema_expander = Expander (Schema)
 module Jsoo_type_expander = Expander (Jsoo_type)
+module Monadic_expander = Expander (Monadic)
+module Schema_expander = Expander (Schema)
 
-let expand ~loc ~path:_ ~inside (_, types) jsoo =
+let expand ~loc ~path:_ ~inside (_, types) jsoo monadic =
   let contents =
-    let jsoo =
+    let contents =
       if jsoo then
         Jsoo_type_expander.expand ~loc types
       else
         []
     in
-    Schema_expander.expand ~loc types @ jsoo
+    let contents =
+      if monadic then
+        Monadic_expander.expand ~loc types @ contents
+      else
+        contents
+    in
+    Schema_expander.expand ~loc types @ contents
   and namespace =
     if inside then
       [%str
@@ -831,8 +926,9 @@ let add inside =
   let str_type_decl =
     let open Deriving.Args in
     let arg =
-      let jsoo = flag "jsoo" in
-      empty +> jsoo
+      let jsoo = flag "jsoo"
+      and monadic = flag "monadic" in
+      empty +> jsoo +> monadic
     in
     Deriving.Generator.make ~attributes:[] arg (expand ~inside)
   in

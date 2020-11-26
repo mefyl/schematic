@@ -12,6 +12,18 @@
   (run ./test.exe)))
 
 (executable
+ (name monadic)
+ (modules monadic)
+ (preprocess
+  (pps schematic_ppx))
+ (libraries alcotest base schematic))
+
+(rule
+ (alias runtest)
+ (action
+  (run ./monadic.exe)))
+
+(executable
  (name json)
  (modules json)
  (preprocess

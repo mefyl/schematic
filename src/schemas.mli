@@ -37,3 +37,5 @@ module Uri : sig
 
   val schema : Uri.t Schema.schema
 end
+
+include module type of Schemas_intf
