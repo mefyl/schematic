@@ -642,19 +642,6 @@ module Monadic : Expansion = struct
     in
     { t with ptyp_desc }
 
-  (* match t.ptyp_desc with
-   * | Ptyp_constr (name, args) ->
-   *   {
-   *     t with
-   *     ptyp_desc =
-   *       Ptyp_constr
-   *         ( { name with txt = expand_ident name.txt },
-   *           List.map ~f:expand_type args );
-   *   }
-   * | _ ->
-   *   Ppxlib.Location.raise_errorf ~loc:t.ptyp_loc
-   *     "schematic-ppx: unsupported type" *)
-
   let expand_record ~loc:_ fields =
     let f ({ pld_type; _ } as field) =
       { field with pld_type = expand_type pld_type }
