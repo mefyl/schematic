@@ -92,6 +92,10 @@ let alias () =
 
 (* Tuple *)
 
+type version_tuple = int * int * int [@@deriving schema]
+
+let version (major, minor, subminor) = { major; minor; subminor }
+
 type range = version * version * int [@@deriving schema]
 
 let pp_range fmt (l, r, i) =
@@ -326,11 +330,6 @@ module Metadata = struct
   }
   [@@deriving schema]
 
-  let pp_description fmt { field_a; field_b } =
-    fprintf fmt "(%i, %i)" field_a field_b
-
-  let test_description = Alcotest.testable pp_description ( = )
-
   let description () =
     test_schema description_schema
       {|{
@@ -400,34 +399,102 @@ module Metadata = struct
       {| { "a": 395, "b": "---" } |}
 end
 
+module Comparison = struct
+  open Alcotest
+  open Schematic.Schema
+
+  let check name schema e l r =
+    check int name e (Schematic.Schema.compare schema l r)
+
+  let bool () =
+    let check = check "bool" bool_schema in
+    let () = check 0 true true in
+    let () = check 0 false false in
+    let () = check 1 true false in
+    let () = check (-1) false true in
+    ()
+
+  let int () =
+    let check = check "int" int_schema in
+    let () = check 0 0 0 in
+    let () = check (-1) 0 1 in
+    let () = check 1 1 0 in
+    ()
+
+  let string () =
+    let check = check "string" string_schema in
+    let () = check 0 "a" "a" in
+    let () = check (-1) "a" "b" in
+    let () = check 1 "b" "a" in
+    let () = check 1 "aa" "a" in
+    let () = check (-1) "a" "aa" in
+    ()
+
+  let versions check f =
+    let v012 = (0, 1, 2)
+    and v013 = (0, 1, 3)
+    and v022 = (0, 2, 2) in
+    let tests =
+      [
+        (0, v012, v012);
+        (-1, v012, v013);
+        (1, v013, v012);
+        (-1, v012, v022);
+        (1, v022, v012);
+      ]
+    in
+    List.iter ~f:(fun (exp, l, r) -> check exp (f l) (f r)) tests
+
+  let record () =
+    let check = check "version" version_schema in
+    versions check version
+
+  let tuple () =
+    let check = check "version" version_tuple_schema in
+    versions check Fn.id
+
+  let variant () =
+    let check = check "variant" expectation_schema
+    and v = { major = 1; minor = 2; subminor = 3 } in
+    let () = check 0 (Exact v) (Exact v)
+    and () = check (-1) (Exact v) Nothing
+    and () = check 1 Nothing (Exact v) in
+    ()
+end
+
 (* Driver *)
 
 let () =
   let open Alcotest in
   run "Schematic.Schema"
     [
-      ( "atoms",
+      ( "coding",
         [
-          test_case "int" `Quick atom_int; test_case "string" `Quick atom_string;
-        ] );
-      ("record", [ test_case "record" `Quick record ]);
-      ("tuple", [ test_case "tuple" `Quick tuple ]);
-      ("variant", [ test_case "variant" `Quick variant ]);
-      ("alias", [ test_case "alias" `Quick alias ]);
-      ("list", [ test_case "list" `Quick list_test ]);
-      ("parametric_type", [ test_case "parametric_type" `Quick parametric_type ]);
-      ("escape", [ test_case "escape" `Quick escape ]);
-      ( "recursive",
-        [
+          test_case "int" `Quick atom_int;
+          test_case "string" `Quick atom_string;
+          test_case "record" `Quick record;
+          test_case "tuple" `Quick tuple;
+          test_case "variant" `Quick variant;
+          test_case "alias" `Quick alias;
+          test_case "list" `Quick list_test;
+          test_case "parametric_type" `Quick parametric_type;
+          test_case "escape" `Quick escape;
           test_case "recursive" `Quick recursive;
           test_case "mutually recursive" `Quick mutually;
+          test_case "inline" `Quick inline;
+          test_case "time" `Quick time;
+          test_case "json-schema-metadata-description" `Quick
+            Metadata.description;
+          test_case "json-schema-metadata-default" `Quick Metadata.default;
+          test_case "failure" `Quick failure;
         ] );
-      ("inline", [ test_case "inline" `Quick inline ]);
-      ("time", [ test_case "time" `Quick time ]);
-      ( "json-schema-metadata",
+      ( "comparison",
         [
-          test_case "description" `Quick Metadata.description;
-          test_case "default" `Quick Metadata.default;
+          test_case "bool" `Quick Comparison.bool;
+          test_case "int" `Quick Comparison.int;
+          test_case "string" `Quick Comparison.string;
+          test_case "record" `Quick Comparison.record;
+          test_case "tuple" `Quick Comparison.tuple;
+          test_case "variant" `Quick Comparison.variant;
         ] );
-      ("failure", [ test_case "failure" `Quick failure ]);
     ]
