@@ -776,6 +776,7 @@ module Expander (Expansion : Expansion) = struct
         extract_attributes t.ptype_attributes
       in
       let body =
+        let loc = t.ptype_loc in
         match t.ptype_kind with
         | Ptype_record fields -> Expansion.expand_record ~loc fields
         | Ptype_abstract -> (
