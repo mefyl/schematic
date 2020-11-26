@@ -96,13 +96,7 @@ let compare schema =
     | Date -> Base.Poly.compare
     | Int -> Base.Poly.compare
     | List schema -> Base.List.compare (compare schema.descriptor)
-    | Map (_, map, v) ->
-      let f
-          (type u) (f : t -> u) (d : (u, [ `Value ]) descriptor) (l : t) (r : t)
-          =
-        compare d (f l) (f r)
-      in
-      f map v
+    | Map (_, map, v) -> fun l r -> compare v (map l) (map r)
     | Mapping schema -> assoc_compare (compare schema.descriptor)
     | Null -> fun () () -> 0
     | String -> String.compare
@@ -114,15 +108,15 @@ let compare schema =
         | 0 -> Ptime.compare l r
         | v -> v )
     | Object { schema; requirement; rest; _ } ->
+      let _, schema = extract_field_schema schema in
       let f
           (type field req)
-          (schema : field field_schema)
-          (req : (field, req) field_requirement)
+          (schema : field schema)
+          (requirement : (field, req) field_requirement)
           ((l : req), lr)
           ((r : req), rr) =
-        let _, schema = extract_field_schema schema in
         let c =
-          match req with
+          match requirement with
           | Required -> compare schema.descriptor l r
           | Default _ -> compare schema.descriptor l r
           | Optional -> Option.compare (compare schema.descriptor) l r
@@ -132,13 +126,11 @@ let compare schema =
         | v -> v
       in
       f schema requirement
-    | Tuple { schema; rest } ->
-      let f (type field) (schema : field schema) (l, lr) (r, rr) =
+    | Tuple { schema; rest } -> (
+      fun (l, lr) (r, rr) ->
         match compare schema.descriptor l r with
         | 0 -> compare rest lr rr
-        | v -> v
-      in
-      f schema
+        | v -> v )
     | Union cases ->
       fun l r ->
         let f (Case { schema; encoder; _ }) =
