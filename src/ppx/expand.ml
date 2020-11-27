@@ -778,7 +778,7 @@ module Monadic : Expansion = struct
 
   type expanded = type_kind * core_type option
 
-  let rec expand_type ~(names : string list) t =
+  let rec expand_type ~names t =
     let ptyp_desc =
       match t.ptyp_desc with
       | Ptyp_constr (idt, params) -> (
@@ -837,6 +837,12 @@ module Monadic : Expansion = struct
   let combine ~loc types =
     let local_name = "Monadic_" ^ Int.to_string loc.loc_start.pos_lnum in
     let def =
+      let funct =
+        [%str
+          module Monadics (M : Base.Monad.S) = struct
+            [%%i { pstr_loc = loc; pstr_desc = Pstr_type (Recursive, types) }]
+          end]
+      in
       {
         pstr_desc =
           Pstr_module
@@ -844,37 +850,31 @@ module Monadic : Expansion = struct
               pmb_name = { txt = local_name; loc };
               pmb_expr =
                 {
-                  pmod_desc =
-                    Pmod_functor
-                      ( { txt = "M"; loc },
-                        Some
-                          {
-                            pmty_desc =
-                              Pmty_ident
-                                {
-                                  txt = Ldot (Ldot (Lident "Base", "Monad"), "S");
-                                  loc;
-                                };
-                            pmty_loc = loc;
-                            pmty_attributes = [];
-                          },
-                        {
-                          pmod_desc =
-                            Pmod_structure
-                              [
-                                {
-                                  pstr_loc = loc;
-                                  pstr_desc = Pstr_type (Recursive, types);
-                                };
-                              ];
-                          pmod_loc = loc;
-                          pmod_attributes = [];
-                        } );
+                  pmod_desc = Pmod_structure funct;
                   pmod_loc = loc;
                   pmod_attributes = [];
                 };
               pmb_attributes = [];
               pmb_loc = loc;
+            };
+        pstr_loc = loc;
+      }
+    and open_def =
+      let m =
+        {
+          pmod_desc = Pmod_ident { txt = Lident local_name; loc };
+          pmod_loc = loc;
+          pmod_attributes = [];
+        }
+      in
+      {
+        pstr_desc =
+          Pstr_open
+            {
+              popen_expr = m;
+              popen_override = Fresh;
+              popen_loc = loc;
+              popen_attributes = [];
             };
         pstr_loc = loc;
       }
@@ -908,27 +908,7 @@ module Monadic : Expansion = struct
                           pmod_desc =
                             Pmod_structure
                               [%str
-                                module Monadic =
-                                [%m
-                                {
-                                  pmod_desc =
-                                    Pmod_apply
-                                      ( {
-                                          pmod_desc =
-                                            Pmod_ident
-                                              { txt = Lident local_name; loc };
-                                          pmod_loc = loc;
-                                          pmod_attributes = [];
-                                        },
-                                        {
-                                          pmod_desc =
-                                            Pmod_ident { txt = Lident "M"; loc };
-                                          pmod_loc = loc;
-                                          pmod_attributes = [];
-                                        } );
-                                  pmod_loc = loc;
-                                  pmod_attributes = [];
-                                }]
+                                module Monadic = Monadics (M)
 
                                 type t =
                                   [%t
@@ -938,9 +918,7 @@ module Monadic : Expansion = struct
                                           ( {
                                               txt =
                                                 Ldot
-                                                  ( Lapply
-                                                      ( Lident local_name,
-                                                        Lident "M" ),
+                                                  ( Lident "Monadic",
                                                     ptype_name.txt );
                                               loc;
                                             },
@@ -961,7 +939,7 @@ module Monadic : Expansion = struct
         pstr_loc = loc;
       }
     in
-    def :: List.map ~f types
+    def :: open_def :: List.map ~f types
 end
 
 module Jsoo_type : Expansion = struct
