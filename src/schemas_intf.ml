@@ -1,9 +1,15 @@
-module Monadic (M : Base.Monad.S) = struct
-  type nonrec 'a list = 'a M.t list M.t
+module Bool_monadic (M : Base.Monad.S) = struct
+  type nonrec t = bool M.t
+end
 
-  type nonrec bool = bool M.t
+module Int_monadic (M : Base.Monad.S) = struct
+  type nonrec t = int M.t
+end
 
-  type nonrec int = int M.t
+module List_monadic (M : Base.Monad.S) = struct
+  type nonrec 'a t = 'a M.t list M.t
+end
 
-  type nonrec string = string M.t
+module String_monadic (M : Base.Monad.S) = struct
+  type nonrec t = string M.t
 end
