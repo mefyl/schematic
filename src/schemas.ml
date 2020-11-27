@@ -1,3 +1,5 @@
+open Base
+
 module Schemas = struct
   let unit_schema = { Schema.id = None; descriptor = Null }
 
@@ -42,3 +44,23 @@ end
 
 include Schemas
 include Schemas_intf
+
+let bool_diff l r = Option.some_if (not @@ Bool.equal l r) r
+
+let int_diff l r = Option.some_if (not @@ Int.equal l r) r
+
+let list_diff f l r =
+  let res, diff =
+    Sequence.zip (Sequence.of_list l) (Sequence.of_list r)
+    |> Sequence.map ~f:(fun (l, r) -> f l r)
+    |> Sequence.fold ~init:([], false) ~f:(fun (res, diff) r ->
+           (r :: res, diff || Option.is_some r))
+  in
+  if diff then
+    Some res
+  else
+    None
+
+let string_diff l r = Option.some_if (not @@ String.equal l r) r
+
+let unit_diff () () = None

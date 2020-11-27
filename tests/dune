@@ -24,6 +24,18 @@
   (run ./monadic.exe)))
 
 (executable
+ (name diff)
+ (modules diff)
+ (preprocess
+  (pps schematic_ppx))
+ (libraries alcotest base schematic))
+
+(rule
+ (alias runtest)
+ (action
+  (run ./diff.exe)))
+
+(executable
  (name json)
  (modules json)
  (preprocess

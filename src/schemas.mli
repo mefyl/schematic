@@ -39,3 +39,14 @@ module Uri : sig
 end
 
 include module type of Schemas_intf
+
+val bool_diff : bool -> bool -> bool option
+
+val int_diff : int -> int -> int option
+
+val list_diff :
+  ('a -> 'a -> 'c option) -> 'a list -> 'a list -> 'c option list option
+
+val string_diff : string -> string -> string option
+
+val unit_diff : unit -> unit -> unit option
