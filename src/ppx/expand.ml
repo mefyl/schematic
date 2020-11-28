@@ -1030,7 +1030,7 @@ module Monadic : Expansion = struct
         pstr_desc =
           Pstr_module
             {
-              pmb_name = { txt = local_name; loc };
+              pmb_name = { txt = Some local_name; loc };
               pmb_expr =
                 {
                   pmod_desc = Pmod_structure funct;
@@ -1069,24 +1069,25 @@ module Monadic : Expansion = struct
               pmb_name =
                 {
                   ptype_name with
-                  txt = String.capitalize @@ name "monadic" ptype_name.txt;
+                  txt = Some (String.capitalize @@ name "monadic" ptype_name.txt);
                 };
               pmb_expr =
                 {
                   pmod_desc =
                     Pmod_functor
-                      ( { txt = "M"; loc },
-                        Some
-                          {
-                            pmty_desc =
-                              Pmty_ident
-                                {
-                                  txt = Ldot (Ldot (Lident "Base", "Monad"), "S");
-                                  loc;
-                                };
-                            pmty_loc = loc;
-                            pmty_attributes = [];
-                          },
+                      ( Named
+                          ( { txt = Some "M"; loc },
+                            {
+                              pmty_desc =
+                                Pmty_ident
+                                  {
+                                    txt =
+                                      Ldot (Ldot (Lident "Base", "Monad"), "S");
+                                    loc;
+                                  };
+                              pmty_loc = loc;
+                              pmty_attributes = [];
+                            } ),
                         {
                           pmod_desc =
                             Pmod_structure
