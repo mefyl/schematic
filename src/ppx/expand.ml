@@ -22,6 +22,8 @@ end
 
 (* Helpers *)
 
+let longident_of_string { txt; loc } = { txt = Lident txt; loc }
+
 let pexp ~loc ~desc =
   {
     pexp_desc = desc;
@@ -64,13 +66,16 @@ module Expr = struct
       pexp_attributes = [];
     }
 
-  let tuple ~loc exps =
-    {
-      pexp_desc = Pexp_tuple exps;
-      pexp_loc = loc;
-      pexp_loc_stack = [];
-      pexp_attributes = [];
-    }
+  let tuple ~loc = function
+    | [] -> [%expr ()]
+    | [ v ] -> v
+    | exps ->
+      {
+        pexp_desc = Pexp_tuple exps;
+        pexp_loc = loc;
+        pexp_loc_stack = [];
+        pexp_attributes = [];
+      }
 
   let apply ~loc f = function
     | [] -> f
@@ -92,13 +97,16 @@ module Pattern = struct
       ppat_attributes = [];
     }
 
-  let tuple ~loc patterns =
-    {
-      ppat_desc = Ppat_tuple patterns;
-      ppat_loc = loc;
-      ppat_loc_stack = [];
-      ppat_attributes = [];
-    }
+  let tuple ~loc = function
+    | [] -> [%pat? ()]
+    | [ v ] -> v
+    | patterns ->
+      {
+        ppat_desc = Ppat_tuple patterns;
+        ppat_loc = loc;
+        ppat_loc_stack = [];
+        ppat_attributes = [];
+      }
 end
 
 module Warning = struct
@@ -125,6 +133,26 @@ module Warning = struct
     }
 end
 
+let record_deconstruct ~loc (fields : label_declaration list) =
+  let names = List.map ~f:(fun f -> f.pld_name) fields in
+  let patterns =
+    List.map
+      ~f:(fun v ->
+        ({ txt = Lident v.txt; loc = v.loc }, ppat ~loc:v.loc ~desc:(Ppat_var v)))
+      names
+  and values =
+    List.map
+      ~f:(fun v ->
+        ( { txt = Lident v.txt; loc = v.loc },
+          pexp ~loc:v.loc ~desc:(Pexp_ident { txt = Lident v.txt; loc = v.loc })
+        ))
+      names
+  in
+  ( ppat ~loc ~desc:(Ppat_record (patterns, Closed)),
+    pexp ~loc ~desc:(Pexp_record (values, None)),
+    List.map ~f:snd patterns,
+    List.map ~f:snd values )
+
 (* Caml variant constructor of the form [Foo of int * int] surprisingly do not
    have one tuple argument, but two individual int arguments, while [Foo of (int
    * int)] has a single tuple argument. Map the first case to the second and
@@ -133,23 +161,34 @@ end
    While we're at it, map constructor record arguments to tuple too, to
    streamline constructors arguments handling. *)
 
-let constructor_arguments_to_type ~loc = function
+let constructor_arguments_normalize ~loc prefix = function
   | Pcstr_tuple [] -> None
-  | Pcstr_tuple [ t ] -> Some t
-  | Pcstr_tuple types -> Some (ptyp ~loc ~desc:(Ptyp_tuple types))
-  | Pcstr_record types ->
-    let f { pld_type; _ } = pld_type in
-    Some (ptyp ~loc ~desc:(Ptyp_tuple (List.map ~f types)))
-
-let constructor_arguments_to_pattern ~loc prefix = function
-  | Pcstr_tuple [] -> None
-  | Pcstr_tuple [ _ ] -> Some (Pattern.id ~loc prefix)
+  | Pcstr_tuple [ t ] ->
+    let p = Pattern.id ~loc prefix
+    and v = Expr.id ~loc prefix in
+    Some (t, p, v, p, [ v ])
   | Pcstr_tuple types ->
-    let f i _ = Pattern.id ~loc (prefix ^ Int.to_string i) in
-    Some (Pattern.tuple ~loc (List.mapi ~f types))
-  | Pcstr_record types ->
-    let f i _ = Pattern.id ~loc (prefix ^ Int.to_string i) in
-    Some (Pattern.tuple ~loc (List.mapi ~f types))
+    let t = ptyp ~loc ~desc:(Ptyp_tuple types)
+    and patterns =
+      let f i _ = Pattern.id ~loc (prefix ^ Int.to_string i) in
+      List.mapi ~f types
+    and values =
+      let f i _ = Expr.id ~loc (prefix ^ Int.to_string i) in
+      List.mapi ~f types
+    in
+    Some
+      ( t,
+        Pattern.tuple ~loc patterns,
+        Expr.tuple ~loc values,
+        Pattern.tuple ~loc patterns,
+        values )
+  | Pcstr_record fields ->
+    let r_pat, r_val, patterns, values = record_deconstruct ~loc fields
+    and t =
+      let f { pld_type; _ } = pld_type in
+      ptyp ~loc ~desc:(Ptyp_tuple (List.map ~f fields))
+    in
+    Some (t, r_pat, r_val, Pattern.tuple ~loc patterns, values)
 
 let pattern_id ~loc txt =
   {
@@ -241,6 +280,16 @@ let name suffix s =
     s ^ "_" ^ suffix
 
 let schema_name = name "schema"
+
+let map_id ~f { txt; loc } =
+  let txt =
+    match txt with
+    | Lident n -> Lident (f n)
+    | Ldot (q, n) -> Ldot (q, f n)
+    | Lapply (_, _) ->
+      Ppxlib.Location.raise_errorf ~loc "Functor application found as a type"
+  in
+  { txt; loc }
 
 let suffix_id ~loc suffix = function
   | Lident n -> Lident (name suffix n)
@@ -763,84 +812,218 @@ module Schema : Expansion = struct
     ]
 end
 
-let monadize ~loc monad idt =
+let monadize ~loc monad field idt =
   match idt.txt with
   | Lident n ->
-    Ldot (Lapply (Lident (String.capitalize @@ name "monadic" n), monad), "t")
+    Ldot (Lapply (Lident (String.capitalize @@ name "monadic" n), monad), field)
   | Ldot (left, n) ->
     Ldot
-      ( Lapply (Ldot (left, String.capitalize @@ name "monadic" n), Lident "M"),
-        "t" )
+      (Lapply (Ldot (left, String.capitalize @@ name "monadic" n), monad), field)
   | _ -> Ppxlib.Location.raise_errorf ~loc "Functor application found as a type"
 
 module Monadic : Expansion = struct
-  type closed = type_declaration
+  type closed = type_declaration * expression
 
-  type expanded = type_kind * core_type option
+  type expanded = type_kind * core_type option * expression
 
-  let rec expand_type ~names t =
-    let ptyp_desc =
+  let rec expand_type ~names ({ ptyp_loc = loc; _ } as t) =
+    let ptyp_desc, return =
       match t.ptyp_desc with
       | Ptyp_constr (idt, params) -> (
         match idt.txt with
-        | Lident name when List.mem ~equal:String.equal names name ->
-          Ptyp_constr ({ txt = Ldot (Lident "M", "t"); loc = t.ptyp_loc }, [ t ])
+        | Lident n when List.mem ~equal:String.equal names n ->
+          let t = Ptyp_constr ({ txt = Ldot (Lident "M", "t"); loc }, [ t ])
+          and return = Expr.id ~loc @@ name "return" n in
+          (t, return)
         | _ ->
-          Ptyp_constr
-            ( { idt with txt = monadize ~loc:t.ptyp_loc (Lident "M") idt },
-              params ) )
-      | Ptyp_tuple types -> Ptyp_tuple (List.map ~f:(expand_type ~names) types)
+          let t =
+            Ptyp_constr
+              ({ idt with txt = monadize ~loc (Lident "M") "t" idt }, params)
+          and return =
+            let m =
+              {
+                pmod_desc =
+                  Pmod_apply
+                    ( {
+                        pmod_desc =
+                          Pmod_ident
+                            (map_id
+                               ~f:(fun n ->
+                                 String.capitalize @@ name "monadic" n)
+                               idt);
+                        pmod_loc = loc;
+                        pmod_attributes = [];
+                      },
+                      {
+                        pmod_desc = Pmod_ident { txt = Lident "M"; loc };
+                        pmod_loc = loc;
+                        pmod_attributes = [];
+                      } );
+                pmod_loc = loc;
+                pmod_attributes = [];
+              }
+            in
+            [%expr
+              let module M = [%m m] in
+              M.return]
+          in
+          (t, return) )
+      | Ptyp_tuple types ->
+        let recd = List.map ~f:(expand_type ~names) types in
+        let t = Ptyp_tuple (List.map ~f:fst recd)
+        and return =
+          let patterns =
+            Pattern.tuple ~loc
+            @@ List.mapi
+                 ~f:(fun i t ->
+                   Pattern.id ~loc:t.ptyp_loc ("e" ^ Int.to_string i))
+                 types
+          and values =
+            let f i (_, f) =
+              [%expr
+                [%e f] [%e Expr.id ~loc:t.ptyp_loc ("e" ^ Int.to_string i)]]
+            in
+            Expr.tuple ~loc @@ List.mapi ~f recd
+          in
+          [%expr fun [%p patterns] -> [%e values]]
+        in
+        (t, return)
       | _ ->
         Ppxlib.Location.raise_errorf ~loc:t.ptyp_loc
           "schematic-ppx: unsupported type"
     in
-    { t with ptyp_desc }
+    ({ t with ptyp_desc }, return)
 
-  let expand_record ~loc:_ ~names ~name:_ fields =
-    let f ({ pld_type; _ } as field) =
-      { field with pld_type = expand_type ~names pld_type }
+  let expand_record ~loc ~names ~name:_ fields =
+    let recd =
+      List.map
+        ~f:(fun f ->
+          let t, r = expand_type ~names f.pld_type in
+          (f, t, r))
+        fields
     in
-    let kind = Ptype_record (List.map ~f fields) in
-    (kind, None)
-
-  let expand_variant ~loc:_ ~names (options : constructor_declaration list) =
-    let f option =
-      let pcd_args =
-        match option.pcd_args with
-        | Pcstr_tuple types ->
-          Pcstr_tuple (List.map ~f:(expand_type ~names) types)
-        | Pcstr_record labels ->
-          let f ({ pld_type; _ } as l) =
-            { l with pld_type = expand_type ~names pld_type }
-          in
-          Pcstr_record (List.map ~f labels)
+    let t =
+      let f (field, pld_type, _) = { field with pld_type } in
+      Ptype_record (List.map ~f recd)
+    and return =
+      let p_rec, v_rec, p_tup, _ = record_deconstruct ~loc fields in
+      let v_tup =
+        let f ({ pld_name; _ }, _, return) =
+          [%expr [%e return] [%e Expr.id ~loc:pld_name.loc pld_name.txt]]
+        in
+        Expr.tuple ~loc (List.map ~f recd)
       in
-      { option with pcd_args }
+      [%expr
+        fun [%p p_rec] ->
+          let [%p Pattern.tuple ~loc p_tup] = [%e v_tup] in
+          let open Types in
+          [%e v_rec]]
     in
-    (Ptype_variant (List.map ~f options), None)
+    (t, None, return)
+
+  let expand_variant ~loc ~names options =
+    let t =
+      let f option =
+        let pcd_args =
+          match option.pcd_args with
+          | Pcstr_tuple types ->
+            Pcstr_tuple
+              (List.map ~f:(fun t -> expand_type ~names t |> fst) types)
+          | Pcstr_record labels ->
+            let f ({ pld_type; _ } as l) =
+              { l with pld_type = expand_type ~names pld_type |> fst }
+            in
+            Pcstr_record (List.map ~f labels)
+        in
+        { option with pcd_args }
+      in
+      Ptype_variant (List.map ~f options)
+    and return =
+      let f option =
+        let loc = option.pcd_loc
+        and ident = longident_of_string option.pcd_name in
+        let pattern, value =
+          match constructor_arguments_normalize ~loc "e" option.pcd_args with
+          | None ->
+            ( None,
+              [%expr
+                let open Types in
+                M.return [%e pexp ~loc ~desc:(Pexp_construct (ident, None))]] )
+          | Some (t, pattern, value, patterns, values) ->
+            let _, return = expand_type ~names t in
+            let value =
+              [%expr
+                let [%p patterns] = [%e return] [%e Expr.tuple ~loc values] in
+                let open Types in
+                M.return
+                  [%e pexp ~loc ~desc:(Pexp_construct (ident, Some value))]]
+            in
+            (Some pattern, value)
+        in
+        {
+          pc_lhs =
+            {
+              ppat_desc = Ppat_construct (ident, pattern);
+              ppat_loc = loc;
+              ppat_loc_stack = [];
+              ppat_attributes = [];
+            };
+          pc_guard = None;
+          pc_rhs = value;
+        }
+      in
+      pexp ~loc ~desc:(Pexp_function (List.map ~f options))
+    in
+    (t, None, return)
 
   let expand_abstract_type ~loc:_ ~names t =
-    (Ptype_abstract, Some (expand_type ~names t))
+    let t, return = expand_type ~names t in
+    (Ptype_abstract, Some t, return)
 
-  let close ~loc ~name:_ { ptype_name; _ } params (kind, manifest) =
-    {
-      ptype_name;
-      ptype_params = params;
-      ptype_cstrs = [];
-      ptype_kind = kind;
-      ptype_private = Public;
-      ptype_manifest = manifest;
-      ptype_loc = loc;
-      ptype_attributes = [];
-    }
+  let close ~loc ~name:_ { ptype_name; _ } params (kind, manifest, return) =
+    ( {
+        ptype_name;
+        ptype_params = params;
+        ptype_cstrs = [];
+        ptype_kind = kind;
+        ptype_private = Public;
+        ptype_manifest = manifest;
+        ptype_loc = loc;
+        ptype_attributes = [];
+      },
+      return )
 
-  let combine ~loc types =
+  let combine ~loc closed =
+    let types = List.map ~f:fst closed
+    and returns =
+      let f (t, return) =
+        {
+          pvb_pat =
+            {
+              ppat_desc = Ppat_var { txt = name "return" t.ptype_name.txt; loc };
+              ppat_loc = loc;
+              ppat_loc_stack = [];
+              ppat_attributes = [];
+            };
+          pvb_expr = return;
+          pvb_attributes = [ Warning.unused_rec ~loc ];
+          pvb_loc = loc;
+        }
+      in
+      { pstr_desc = Pstr_value (Recursive, List.map ~f closed); pstr_loc = loc }
+    in
     let local_name = "Monadic_" ^ Int.to_string loc.loc_start.pos_lnum in
     let def =
       let funct =
         [%str
           module Monadics (M : Base.Monad.S) = struct
-            [%%i { pstr_loc = loc; pstr_desc = Pstr_type (Recursive, types) }]
+            module Types = struct
+              [%%i { pstr_loc = loc; pstr_desc = Pstr_type (Recursive, types) }]
+            end
+
+            [%%i returns]
+
+            include Types
           end]
       in
       {
@@ -909,6 +1092,7 @@ module Monadic : Expansion = struct
                             Pmod_structure
                               [%str
                                 module Monadic = Monadics (M)
+                                include Monadic
 
                                 type t =
                                   [%t
@@ -926,7 +1110,21 @@ module Monadic : Expansion = struct
                                       ptyp_loc = loc;
                                       ptyp_loc_stack = [];
                                       ptyp_attributes = [];
-                                    }]];
+                                    }]
+
+                                let return =
+                                  [%e
+                                    pexp ~loc
+                                      ~desc:
+                                        (Pexp_ident
+                                           {
+                                             txt =
+                                               Ldot
+                                                 ( Lident "Monadic",
+                                                   name "return" ptype_name.txt
+                                                 );
+                                             loc;
+                                           })]];
                           pmod_loc = loc;
                           pmod_attributes = [];
                         } );
