@@ -17,6 +17,8 @@ and variant =
 
 and tuple = bool * string [@@deriving schema ~monadic]
 
+type 'a parametric = 'a list [@@deriving schema ~monadic]
+
 type option = O_monadic(Base.Option).t
 
 let pp_variant fmt =

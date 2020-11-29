@@ -86,6 +86,10 @@ module Expr = struct
         pexp_loc_stack = [];
         pexp_attributes = [];
       }
+
+  let fun_ ~loc args body =
+    let f body arg = pexp ~loc ~desc:(Pexp_fun (Nolabel, None, arg, body)) in
+    List.fold ~init:body ~f args
 end
 
 module Pattern = struct
@@ -1077,7 +1081,7 @@ module Monadic = struct
             };
         pstr_loc = loc;
       }
-    and f { ptype_name; ptype_loc = loc; _ } =
+    and f { ptype_name; ptype_loc = loc; ptype_params; _ } =
       {
         pstr_desc =
           Pstr_module
@@ -1111,24 +1115,44 @@ module Monadic = struct
                                 module Monadic = Monadics (M)
                                 include Monadic
 
-                                type t =
-                                  [%t
-                                    {
-                                      ptyp_desc =
-                                        Ptyp_constr
-                                          ( {
-                                              txt =
-                                                Ldot
-                                                  ( Lident "Monadic",
-                                                    ptype_name.txt );
-                                              loc;
-                                            },
-                                            [] );
-                                      ptyp_loc = loc;
-                                      ptyp_loc_stack = [];
-                                      ptyp_attributes = [];
-                                    }]
-                                [@@warning "-34"]
+                                [%%i
+                                {
+                                  pstr_desc =
+                                    Pstr_type
+                                      ( Recursive,
+                                        [
+                                          {
+                                            ptype_name = { txt = "t"; loc };
+                                            ptype_params;
+                                            ptype_cstrs = [];
+                                            ptype_kind = Ptype_abstract;
+                                            ptype_private = Public;
+                                            ptype_manifest =
+                                              Some
+                                                {
+                                                  ptyp_desc =
+                                                    Ptyp_constr
+                                                      ( {
+                                                          txt =
+                                                            Ldot
+                                                              ( Lident "Monadic",
+                                                                ptype_name.txt
+                                                              );
+                                                          loc;
+                                                        },
+                                                        List.map ~f:fst
+                                                          ptype_params );
+                                                  ptyp_loc = loc;
+                                                  ptyp_loc_stack = [];
+                                                  ptyp_attributes = [];
+                                                };
+                                            ptype_attributes =
+                                              [ Warning.unused_type ~loc ];
+                                            ptype_loc = loc;
+                                          };
+                                        ] );
+                                  pstr_loc = loc;
+                                }]
 
                                 let return =
                                   [%e
@@ -1335,6 +1359,7 @@ module Diff : Expansion = struct
           match [%e body] with
           | [%p nones] -> None
           | v -> Some v]
+    | Ptyp_var name -> pexp ~loc ~desc:(Pexp_ident { txt = Lident name; loc })
     | _ ->
       Ppxlib.Location.raise_errorf ~loc:t.ptyp_loc
         "schematic-ppx: unsupported type"
@@ -1436,8 +1461,18 @@ module Diff : Expansion = struct
 
   let expand_abstract_type ~loc:_ ~names t = expand_type ~names t
 
-  let close ~loc ~name:_ { ptype_name = n; _ } _ f =
-    (Pattern.id ~loc @@ name "diff" n.txt, f)
+  let close ~loc ~name:_ { ptype_name = n; ptype_params = params; _ } _ f =
+    let args =
+      let f (t, _) =
+        match t.ptyp_desc with
+        | Ptyp_var name -> ppat ~loc ~desc:(Ppat_var { txt = name; loc })
+        | _ ->
+          Ppxlib.Location.raise_errorf ~loc
+            "schematic-ppx: unsupported type parameter"
+      in
+      List.map ~f params
+    in
+    (Pattern.id ~loc @@ name "diff" n.txt, Expr.fun_ ~loc args f)
 
   let combine ~loc decls =
     let f (name, f) =

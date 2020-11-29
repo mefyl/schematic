@@ -17,6 +17,8 @@ and variant =
 
 and tuple = bool * string [@@deriving schema ~diff]
 
+type 'a parametric = 'a list [@@deriving schema ~diff]
+
 let pp_variant fmt =
   let module M = O_monadic (Option) in
   let open M in
@@ -83,6 +85,19 @@ module Diff = struct
         @@ tuple_diff (true, "false") (true, "fals"))
     in
     ()
+
+  let parametric () =
+    let module M = Tuple_monadic (Option) in
+    let () =
+      Alcotest.(
+        check (option (list (option int))) "same" None
+        @@ parametric_diff Schematic.Schema.int_diff [ 1 ] [ 1 ])
+    and () =
+      Alcotest.(
+        check (option (list (option int))) "diff" (Some [ Some 2 ])
+        @@ parametric_diff Schematic.Schema.int_diff [ 1 ] [ 2; 3 ])
+    in
+    ()
 end
 
 let () =
@@ -94,5 +109,6 @@ let () =
           test_case "nested" `Quick Diff.nested;
           test_case "record" `Quick Diff.record;
           test_case "tuple" `Quick Diff.tuple;
+          test_case "parametric" `Quick Diff.parametric;
         ] );
     ]
