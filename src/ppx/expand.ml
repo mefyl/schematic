@@ -838,34 +838,40 @@ module Schema : Expansion = struct
     ]
 end
 
-let monadize ~loc monad field idt =
-  match idt.txt with
-  | Lident n ->
-    Ldot (Lapply (Lident (String.capitalize @@ name "monadic" n), monad), field)
-  | Ldot (left, n) ->
-    Ldot
-      (Lapply (Ldot (left, String.capitalize @@ name "monadic" n), monad), field)
-  | _ -> Ppxlib.Location.raise_errorf ~loc "Functor application found as a type"
+let monadize ~loc monad ?field idt =
+  let m =
+    match idt.txt with
+    | Lident n -> Lapply (Lident (String.capitalize @@ name "monadic" n), monad)
+    | Ldot (left, n) ->
+      Lapply (Ldot (left, String.capitalize @@ name "monadic" n), monad)
+    | _ ->
+      Ppxlib.Location.raise_errorf ~loc "Functor application found as a type"
+  in
+  match field with
+  | None -> m
+  | Some field -> Ldot (m, field)
 
 module Monadic = struct
-  type closed = type_declaration * expression
+  type closed = type_declaration * expression * expression
 
-  type expanded = type_kind * core_type option * expression
+  type expanded = type_kind * core_type option * expression * expression
 
   let rec expand_type ~names ({ ptyp_loc = loc; _ } as t) =
-    let ptyp_desc, return =
+    let ptyp_desc, return, bind =
       match t.ptyp_desc with
       | Ptyp_constr (idt, params) -> (
         match idt.txt with
         | Lident n when List.mem ~equal:String.equal names n ->
           let t = Ptyp_constr ({ txt = Ldot (Lident "M", "t"); loc }, [ t ])
-          and return = Expr.id ~loc @@ name "return" n in
-          (t, return)
+          and return = Expr.id ~loc @@ name "return" n
+          and bind = Expr.id ~loc @@ name "bind" n in
+          (t, return, bind)
         | _ ->
           let t =
             Ptyp_constr
-              ({ idt with txt = monadize ~loc (Lident "M") "t" idt }, params)
-          and return =
+              ( { idt with txt = monadize ~loc (Lident "M") ~field:"t" idt },
+                params )
+          and return, bind =
             let m =
               {
                 pmod_desc =
@@ -889,14 +895,21 @@ module Monadic = struct
                 pmod_attributes = [];
               }
             in
-            [%expr
-              let module M = [%m m] in
-              M.return]
+            ( [%expr
+                fun v ->
+                  (let module M = [%m m] in
+                  M.return)
+                    v],
+              [%expr
+                fun v ~f ->
+                  (let module M = [%m m] in
+                  M.bind)
+                    v ~f] )
           in
-          (t, return) )
+          (t, return, bind) )
       | Ptyp_tuple types ->
         let recd = List.map ~f:(expand_type ~names) types in
-        let t = Ptyp_tuple (List.map ~f:fst recd)
+        let t = Ptyp_tuple (List.map ~f:(fun (t, _, _) -> t) recd)
         and return =
           let patterns =
             Pattern.tuple ~loc
@@ -905,36 +918,55 @@ module Monadic = struct
                    Pattern.id ~loc:t.ptyp_loc ("e" ^ Int.to_string i))
                  types
           and values =
-            let f i (_, f) =
+            let f i (_, f, _) =
               [%expr
                 [%e f] [%e Expr.id ~loc:t.ptyp_loc ("e" ^ Int.to_string i)]]
             in
             Expr.tuple ~loc @@ List.mapi ~f recd
           in
           [%expr fun [%p patterns] -> [%e values]]
+        and bind =
+          let patterns =
+            Pattern.tuple ~loc
+            @@ List.mapi
+                 ~f:(fun i t ->
+                   Pattern.id ~loc:t.ptyp_loc ("e" ^ Int.to_string i))
+                 types
+          and values =
+            let v i = Expr.id ~loc:t.ptyp_loc ("e" ^ Int.to_string i)
+            and p i = Pattern.id ~loc:t.ptyp_loc ("e" ^ Int.to_string i) in
+            let init =
+              let f i _ = [%expr [%e v i]] in
+              [%expr f__ [%e Expr.tuple ~loc @@ List.mapi ~f recd]]
+            and f body i =
+              [%expr M.bind [%e v i] ~f:(fun [%p p i] -> [%e body])]
+            in
+            List.fold ~init ~f (List.init ~f:Fn.id (List.length types))
+          in
+          [%expr fun v ~f:f__ -> M.bind v ~f:(fun [%p patterns] -> [%e values])]
         in
-        (t, return)
+        (t, return, bind)
       | _ ->
         Ppxlib.Location.raise_errorf ~loc:t.ptyp_loc
           "schematic-ppx: unsupported type"
     in
-    ({ t with ptyp_desc }, return)
+    ({ t with ptyp_desc }, return, bind)
 
   let expand_record ~loc ~names ~name:_ fields =
     let recd =
       List.map
         ~f:(fun f ->
-          let t, r = expand_type ~names f.pld_type in
-          (f, t, r))
+          let t, r, b = expand_type ~names f.pld_type in
+          (f, t, r, b))
         fields
     in
     let t =
-      let f (field, pld_type, _) = { field with pld_type } in
+      let f (field, pld_type, _, _) = { field with pld_type } in
       Ptype_record (List.map ~f recd)
     and return =
       let p_rec, v_rec, p_tup, _ = record_deconstruct ~loc fields in
       let v_tup =
-        let f ({ pld_name; _ }, _, return) =
+        let f ({ pld_name; _ }, _, return, _) =
           [%expr [%e return] [%e Expr.id ~loc:pld_name.loc pld_name.txt]]
         in
         Expr.tuple ~loc (List.map ~f recd)
@@ -944,8 +976,20 @@ module Monadic = struct
           let [%p Pattern.tuple ~loc p_tup] = [%e v_tup] in
           let open Types in
           [%e v_rec]]
+    and bind =
+      let pattern, value, patterns, values = record_deconstruct ~loc fields in
+      let body =
+        let f body ((p, v), (_, _, _, bind)) =
+          [%expr [%e bind] [%e v] ~f:(fun [%p p] -> [%e body])]
+        in
+        List.fold
+          ~init:[%expr f__ [%e value]]
+          ~f
+          (List.zip_exn (List.zip_exn patterns values) recd)
+      in
+      [%expr fun v ~f:f__ -> M.map v ~f:(fun Types.([%p pattern]) -> [%e body])]
     in
-    (t, None, return)
+    (t, None, return, bind)
 
   let expand_variant ~loc ~names _ options =
     let t =
@@ -954,63 +998,109 @@ module Monadic = struct
           match option.pcd_args with
           | Pcstr_tuple types ->
             Pcstr_tuple
-              (List.map ~f:(fun t -> expand_type ~names t |> fst) types)
+              (List.map
+                 ~f:(fun t -> expand_type ~names t |> fun (t, _, _) -> t)
+                 types)
           | Pcstr_record labels ->
             let f ({ pld_type; _ } as l) =
-              { l with pld_type = expand_type ~names pld_type |> fst }
+              {
+                l with
+                pld_type = (expand_type ~names pld_type |> fun (t, _, _) -> t);
+              }
             in
             Pcstr_record (List.map ~f labels)
         in
         { option with pcd_args }
       in
       Ptype_variant (List.map ~f options)
-    and return =
+    and return, bind =
       let f option =
         let loc = option.pcd_loc
         and ident = longident_of_string option.pcd_name in
-        let pattern, value =
+        let pattern_return, value_return, pattern_bind, value_bind =
           match constructor_arguments_normalize ~loc option.pcd_args with
           | None ->
             ( None,
               [%expr
                 let open Types in
+                M.return [%e pexp ~loc ~desc:(Pexp_construct (ident, None))]],
+              None,
+              [%expr
                 M.return [%e pexp ~loc ~desc:(Pexp_construct (ident, None))]] )
-          | Some (_, _, pattern, value) ->
-            let pattern =
+          | Some (t, l, pattern, value) ->
+            let pattern_return =
               pattern (fun i -> Pattern.id ~loc ("e" ^ Int.to_string i))
-            and value =
+            and value_return =
               let f i t =
-                let _, return = expand_type ~names t in
+                let _, return, _ = expand_type ~names t in
                 [%expr [%e return] [%e Expr.id ~loc ("e" ^ Int.to_string i)]]
               in
               [%expr
                 let open Types in
                 M.return
                   [%e pexp ~loc ~desc:(Pexp_construct (ident, Some (value f)))]]
+            and pattern_bind =
+              pattern (fun i -> Pattern.id ~loc ("e" ^ Int.to_string i))
+            and value_bind =
+              let _, _, bind = expand_type ~names t in
+              let init =
+                [%expr
+                  f__
+                    [%e
+                      pexp ~loc
+                        ~desc:
+                          (Pexp_construct
+                             ( ident,
+                               Some
+                                 (value (fun i _ ->
+                                      Expr.id ~loc ("e" ^ Int.to_string i))) ))]]
+              and f body i =
+                [%expr
+                  [%e bind]
+                    [%e Expr.id ~loc ("e" ^ Int.to_string i)]
+                    ~f:(fun [%p Pattern.id ~loc ("e" ^ Int.to_string i)] ->
+                      [%e body])]
+              in
+              List.fold ~init ~f (List.init ~f:Fn.id l)
             in
-            (Some pattern, value)
+
+            (Some pattern_return, value_return, Some pattern_bind, value_bind)
         in
-        {
-          pc_lhs =
-            {
-              ppat_desc = Ppat_construct (ident, pattern);
-              ppat_loc = loc;
-              ppat_loc_stack = [];
-              ppat_attributes = [];
-            };
-          pc_guard = None;
-          pc_rhs = value;
-        }
+        ( {
+            pc_lhs = ppat ~loc ~desc:(Ppat_construct (ident, pattern_return));
+            pc_guard = None;
+            pc_rhs = value_return;
+          },
+          {
+            pc_lhs =
+              ppat ~loc
+                ~desc:
+                  (Ppat_construct
+                     ( {
+                         ident with
+                         txt = Ldot (Lident "Types", option.pcd_name.txt);
+                       },
+                       pattern_bind ));
+            pc_guard = None;
+            pc_rhs = value_bind;
+          } )
       in
-      pexp ~loc ~desc:(Pexp_function (List.map ~f options))
+      let cases = List.map ~f options in
+      ( pexp ~loc ~desc:(Pexp_function (List.map ~f:fst cases)),
+        [%expr
+          fun v ~f:f__ ->
+            M.bind v
+              ~f:[%e pexp ~loc ~desc:(Pexp_function (List.map ~f:snd cases))]]
+      )
     in
-    (t, None, return)
+    (t, None, return, bind)
 
   let expand_abstract_type ~loc:_ ~names ~name:_ t =
-    let t, return = expand_type ~names t in
-    (Ptype_abstract, Some t, return)
+    let t, return, bind = expand_type ~names t in
+    (Ptype_abstract, Some t, return, bind)
 
-  let close ~loc ~name:_ { ptype_name; _ } params (kind, manifest, return) =
+  let close ~loc ~name:_ { ptype_name; _ } params (kind, manifest, return, bind)
+      =
     ( {
         ptype_name;
         ptype_params = params;
@@ -1021,12 +1111,13 @@ module Monadic = struct
         ptype_loc = loc;
         ptype_attributes = [];
       },
-      return )
+      return,
+      bind )
 
   let combine ~loc closed =
-    let types = List.map ~f:fst closed
+    let types = List.map ~f:(fun (t, _, _) -> t) closed
     and returns =
-      let f (t, return) =
+      let f (t, return, _) =
         {
           pvb_pat =
             {
@@ -1036,6 +1127,22 @@ module Monadic = struct
               ppat_attributes = [];
             };
           pvb_expr = return;
+          pvb_attributes = [ Warning.unused_rec ~loc ];
+          pvb_loc = loc;
+        }
+      in
+      { pstr_desc = Pstr_value (Recursive, List.map ~f closed); pstr_loc = loc }
+    and binds =
+      let f (t, _, bind) =
+        {
+          pvb_pat =
+            {
+              ppat_desc = Ppat_var { txt = name "bind" t.ptype_name.txt; loc };
+              ppat_loc = loc;
+              ppat_loc_stack = [];
+              ppat_attributes = [];
+            };
+          pvb_expr = bind;
           pvb_attributes = [ Warning.unused_rec ~loc ];
           pvb_loc = loc;
         }
@@ -1052,6 +1159,8 @@ module Monadic = struct
             end
 
             [%%i returns]
+
+            [%%i binds]
 
             include Types
           end]
@@ -1175,6 +1284,19 @@ module Monadic = struct
                                                  ( Lident "Monadic",
                                                    name "return" ptype_name.txt
                                                  );
+                                             loc;
+                                           })]
+
+                                let bind =
+                                  [%e
+                                    pexp ~loc
+                                      ~desc:
+                                        (Pexp_ident
+                                           {
+                                             txt =
+                                               Ldot
+                                                 ( Lident "Monadic",
+                                                   name "bind" ptype_name.txt );
                                              loc;
                                            })]];
                           pmod_loc = loc;
@@ -1344,7 +1466,11 @@ module type FUNCTION_EXPANSION = sig
     loc:location ->
     name:string ->
     ( constructor_declaration
-    * (expression * int * ((int -> pattern) -> pattern) * 'a) option )
+    * ( expression
+      * int
+      * ((int -> pattern) -> pattern)
+      * ((int -> expression -> expression) -> expression) )
+      option )
     list ->
     expression
 end
@@ -1450,7 +1576,7 @@ module Diff : FUNCTION_EXPANSION = struct
           }
       and fallback =
         let v =
-          let _, return =
+          let _, return, _ =
             Monadic.expand_type ~names:[]
               (ptyp ~loc ~desc:(Ptyp_constr ({ txt = Lident name; loc }, [])))
           in
@@ -1464,6 +1590,98 @@ module Diff : FUNCTION_EXPANSION = struct
         ~desc:(Pexp_match ([%expr l, r], List.map ~f ctors @ [ fallback ]))
     in
     [%expr fun l r -> [%e body]]
+end
+
+module Patch : FUNCTION_EXPANSION = struct
+  let name = "patch"
+
+  let expand_composite ~loc ~name ~kind pattern value =
+    let body =
+      let f i f =
+        let loc = f.pexp_loc in
+        let patch = Expr.id ~loc ("p" ^ Int.to_string i)
+        and value = Expr.id ~loc ("v" ^ Int.to_string i) in
+        [%expr
+          Base.Option.(
+            value ~default:[%e value]
+              (map ~f:(fun p -> [%e f] p [%e value]) [%e patch]))]
+      in
+      value f
+    and pattern_patch =
+      let pattern =
+        pattern (fun i -> Pattern.id ~loc ("p" ^ Int.to_string i))
+      in
+      if Poly.equal kind Ptype_abstract then
+        pattern
+      else
+        ppat ~loc
+          ~desc:
+            (Ppat_open
+               ( {
+                   txt =
+                     monadize ~loc
+                       (Ldot (Lident "Base", "Option"))
+                       { txt = Lident name; loc };
+                   loc;
+                 },
+                 pattern ))
+    and pattern_value =
+      pattern (fun i -> Pattern.id ~loc ("v" ^ Int.to_string i))
+    in
+    [%expr fun [%p pattern_patch] [%p pattern_value] -> [%e body]]
+
+  let expand_variant ~loc ~name ctors =
+    let body =
+      let f = function
+        | { pcd_name = name; _ }, Some (_, _, pattern, value) ->
+          let name = longident_of_string name in
+          let lpat = pattern (fun i -> Pattern.id ~loc ("p" ^ Int.to_string i))
+          and rpat = pattern (fun i -> Pattern.id ~loc ("v" ^ Int.to_string i))
+          and v i t =
+            let p = Expr.id ~loc ("p" ^ Int.to_string i)
+            and v = Expr.id ~loc ("v" ^ Int.to_string i) in
+            [%expr
+              Base.Option.(
+                value ~default:[%e v] (map ~f:(fun p -> [%e t] p [%e v]) [%e p]))]
+          in
+          {
+            pc_lhs =
+              Pattern.tuple ~loc
+                [
+                  ppat ~loc ~desc:(Ppat_construct (name, Some lpat));
+                  ppat ~loc ~desc:(Ppat_construct (name, Some rpat));
+                ];
+            pc_guard = None;
+            pc_rhs = pexp ~loc ~desc:(Pexp_construct (name, Some (value v)));
+          }
+        | name, None ->
+          let name = longident_of_string name.pcd_name in
+          {
+            pc_lhs =
+              Pattern.tuple ~loc
+                [
+                  ppat ~loc ~desc:(Ppat_construct (name, None));
+                  ppat ~loc ~desc:(Ppat_construct (name, None));
+                ];
+            pc_guard = None;
+            pc_rhs = pexp ~loc ~desc:(Pexp_construct (name, None));
+          }
+      and fallback =
+        let v =
+          let _, _, bind =
+            Monadic.expand_type ~names:[]
+              (ptyp ~loc ~desc:(Ptyp_constr ({ txt = Lident name; loc }, [])))
+          in
+          [%expr
+            let module M = Base.Option in
+            Base.Option.(value_exn ([%e bind] (Some p) ~f:return))]
+        in
+        { pc_lhs = [%pat? _]; pc_guard = None; pc_rhs = v }
+      in
+      pexp ~loc
+        ~desc:(Pexp_match ([%expr p, v], List.map ~f ctors @ [ fallback ]))
+    in
+    [%expr fun p v -> [%e body]]
 end
 
 module FunctionExpansion (F : FUNCTION_EXPANSION) : Expansion = struct
@@ -1521,6 +1739,7 @@ module FunctionExpansion (F : FUNCTION_EXPANSION) : Expansion = struct
         match constructor_arguments_normalize ~loc pcd_args with
         | None -> None
         | Some (t, l, pattern, value) ->
+          let value f = value (fun i t -> f i (expand_type ~names ~name t)) in
           Some (expand_type ~names ~name t, l, pattern, value)
       in
       (ctor, pld)
@@ -1540,7 +1759,7 @@ module FunctionExpansion (F : FUNCTION_EXPANSION) : Expansion = struct
       in
       List.map ~f params
     in
-    (Pattern.id ~loc @@ name "diff" n.txt, Expr.fun_ ~loc args f)
+    (Pattern.id ~loc @@ suffix F.name n.txt, Expr.fun_ ~loc args f)
 
   let combine ~loc decls =
     let f (name, f) =
@@ -1607,6 +1826,7 @@ module Expander (Expansion : Expansion) = struct
 end
 
 module Diff_expander = Expander (FunctionExpansion (Diff))
+module Patch_expander = Expander (FunctionExpansion (Patch))
 module Jsoo_type_expander = Expander (Jsoo_type)
 module Monadic_expander = Expander (Monadic)
 module Schema_expander = Expander (Schema)
@@ -1623,7 +1843,9 @@ let expand ~loc ~path:_ ~inside (r, types) jsoo monadic diff =
     in
     let contents =
       if diff then
-        contents @ Diff_expander.expand ~loc r types
+        contents
+        @ Diff_expander.expand ~loc r types
+        @ Patch_expander.expand ~loc r types
       else
         contents
     in
