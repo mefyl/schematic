@@ -1,4 +1,4 @@
-(lang dune 2.2)
+(lang dune 2.7)
 
 (name schematic)
 
@@ -27,6 +27,8 @@
      :dev)))
   (base
    (>= 0.13.1))
+  (dune
+    (>= 2.7))
   (ezjsonm
    (>= 1.1.0))
   (js_of_ocaml
@@ -36,7 +38,7 @@
   (merlin :dev)
   (ocamlformat
    (and
-    (= 0.14.1)
+    (= 0.15.0)
     :dev))
   (pp
    (= 1.0.1))
