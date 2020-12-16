@@ -180,6 +180,7 @@ let encode schema =
                   | Null -> ()
                   | Object descriptor ->
                     encode_object into (Object descriptor) v
+                  | Map (_, f, Object d) -> encode_object into (Object d) (f v)
                   | _ -> failwith "invalid object schema"
                 else
                   Js.Unsafe.set into (Js.string field)
