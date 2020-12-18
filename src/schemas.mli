@@ -18,6 +18,12 @@ type any = Ezjsonm.value
 
 val any_schema : any schema
 
+module Either : sig
+  include module type of Base.Either
+
+  val schema : 'a schema -> 'b schema -> ('a, 'b) t schema
+end
+
 module Ptime : sig
   include module type of Ptime with type t = Ptime.t
 

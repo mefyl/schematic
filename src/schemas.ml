@@ -79,3 +79,34 @@ let list_patch f p l =
 let string_patch v _ = v
 
 let unit_patch () () = ()
+
+module Either = struct
+  include Base.Either
+
+  let schema first second =
+    {
+      Schema.id = None;
+      descriptor =
+        Union
+          [
+            Case
+              {
+                schema = first;
+                encoder =
+                  (function
+                  | First x -> Some x
+                  | Second _ -> None);
+                decoder = Either.first;
+              };
+            Case
+              {
+                schema = second;
+                encoder =
+                  (function
+                  | Second x -> Some x
+                  | First _ -> None);
+                decoder = Either.second;
+              };
+          ];
+    }
+end

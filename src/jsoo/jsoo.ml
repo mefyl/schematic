@@ -14,6 +14,12 @@ type int_js = Js.number Js.t
 
 type any_js = Js.Unsafe.any
 
+module Either = struct
+  include Either
+
+  type (_, _) js = Js.Unsafe.any
+end
+
 module Ptime = struct
   include Ptime
 
