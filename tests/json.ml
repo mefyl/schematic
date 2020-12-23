@@ -15,10 +15,12 @@ let () =
         check bool "error" true (Result.is_error @@ f ()))
   in
   run "Schematic.Json"
-    [ ( "parse_error"
-      , [ error_case "empty" Parse_error.empty
+    [
+      ( "parse_error",
+        [
+          error_case "empty" Parse_error.empty
           (* FIXME *)
-          (* ; error_case "trailing garbage" Parse_error.trailing_garbage *)
-        ; error_case "missing quotes" Parse_error.missing_quotes
-        ] )
+          (* ; error_case "trailing garbage" Parse_error.trailing_garbage *);
+          error_case "missing quotes" Parse_error.missing_quotes;
+        ] );
     ]

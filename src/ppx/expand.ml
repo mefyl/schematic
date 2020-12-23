@@ -1424,10 +1424,9 @@ module Jsoo_type : Expansion = struct
       in
       [%stri
         let [%p fname "to_js"], [%p fname "of_js"], [%p fname "of_js_exn"] =
-          let to_js v =
-            ( Js_of_ocaml.Js.Unsafe.coerce
-              @@ Schematic_jsoo.Jsoo.encode [%e schema] v
-              : [%t js] )
+          let to_js v : [%t js] =
+            Js_of_ocaml.Js.Unsafe.coerce
+            @@ Schematic_jsoo.Jsoo.encode [%e schema] v
           and of_js (js : [%t js]) =
             Schematic_jsoo.Jsoo.decode [%e schema]
               (Js_of_ocaml.Js.Unsafe.coerce js)
@@ -1439,10 +1438,9 @@ module Jsoo_type : Expansion = struct
               Js_of_ocaml.Js.raise_js_error
                 ((fun (type res t0)
                       (t1 : (t0 -> res Js_of_ocaml.Js.t) Js_of_ocaml.Js.constr)
-                      (t0 : t0) (_ : unit) ->
-                   ( Js_of_ocaml.Js.Unsafe.new_obj t1
-                       [| Js_of_ocaml.Js.Unsafe.inject t0 |]
-                     : res Js_of_ocaml.Js.t ))
+                      (t0 : t0) (_ : unit) : res Js_of_ocaml.Js.t ->
+                   Js_of_ocaml.Js.Unsafe.new_obj t1
+                     [| Js_of_ocaml.Js.Unsafe.inject t0 |])
                    Js_of_ocaml.Js.error_constr (Js_of_ocaml.Js.string m) ())
           in
           (to_js, of_js, of_js_exn)]
