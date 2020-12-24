@@ -15,7 +15,7 @@ depends: [
   "js_of_ocaml-ppx" {>= "3.6.0"}
   "merlin" {dev}
   "ocamlformat" {= "0.15.0" & dev}
-  "pp" {= "1.0.1"}
+  "fmt"
   "ppxlib" {>= "0.14.0"}
   "ptime" {>= "0.8.5"}
   "uri"

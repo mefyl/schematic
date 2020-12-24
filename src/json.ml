@@ -1,12 +1,7 @@
 open Base
 open Poly
-open Utils
 include Json_intf
 open Schema
-
-(* FIXME: Base complains that Caml.format is deprecated, but does not provide
-   Base.Printf.fprintf *)
-let fprintf = Caml.Format.fprintf
 
 module Make (Impl : Impl) = struct
   let type_name = function
@@ -250,37 +245,33 @@ module Make (Impl : Impl) = struct
 
   let to_string t = Impl.to_string t
 
-  let rec pp =
-    let open Pp in
-    let open Pp.O in
-    let indent = 2 in
-    function
-    | `Bool b -> textf "%b" b
-    | `Float f -> textf "%f" f
-    | `String s -> escape s
-    | `Null -> text "null"
-    | `A elements ->
-      hvbox ~indent
-      @@ text "[" ++ space
-         ++ concat
-              ~sep:(text "," ++ space)
-              (List.map ~f:(Fn.compose box pp) elements)
-         ++ break ~nspaces:1 ~shift:(-indent)
-         ++ text "]"
-    | `O elements ->
-      hvbox ~indent
-      @@
-      let pp_field (name, value) =
-        box (escape name ++ space ++ char ':' ++ space ++ pp value)
-      in
-      text "{" ++ space
-      ++ hvbox (concat ~sep:(text "," ++ space) (List.map ~f:pp_field elements))
-      ++ break ~nspaces:1 ~shift:(-indent)
-      ++ text "}"
-
-  let pp fmt json =
-    let pp = pp json in
-    fprintf fmt "%a@." Pp.to_fmt pp
+  let rec pp f json =
+    let pp =
+      let open Fmt in
+      let indent = 2 in
+      match json with
+      | `Bool b -> const bool b
+      | `Float f -> const float f
+      | `String s -> const Dump.string s
+      | `Null -> const string "null"
+      | `A elements ->
+        box
+        @@ const string "["
+           ++ (hvbox ~indent @@ (cut ++ const (list ~sep:comma pp) elements))
+           ++ cut ++ const string "]"
+      | `O elements ->
+        box
+        @@ const string "{"
+           ++ ( hvbox ~indent
+              @@ cut
+                 ++ const
+                      (list ~sep:comma
+                         ( box ~indent
+                         @@ pair ~sep:(const string ":" ++ sp) Dump.string pp ))
+                      elements )
+           ++ cut ++ const string "}"
+    in
+    pp f ()
 
   let to_ezjsonm v = v
 end

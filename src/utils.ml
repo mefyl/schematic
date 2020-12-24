@@ -10,7 +10,6 @@ module Let_syntax (Monad : Monad) = struct
   let ( >>= ) = Monad.bind
 end
 
-let escape str =
-  let open Pp in
-  let open Pp.O in
-  text "\"" ++ verbatim (String.escaped str) ++ text "\""
+let escape s =
+  let open Fmt in
+  const Dump.string s
