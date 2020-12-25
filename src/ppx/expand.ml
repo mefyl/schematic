@@ -1325,7 +1325,7 @@ module Jsoo_type : Expansion = struct
     | Ptyp_variant (fields, _, _) ->
       expand_polymorphic_variant ~loc ~names:[] "" fields
     (* I don't know of any way to properly type this, so any it is *)
-    | Ptyp_tuple _ -> [%type: Js.Unsafe.any]
+    | Ptyp_tuple _ -> [%type: Js_of_ocaml.Js.Unsafe.any]
     | _ ->
       Ppxlib.Location.raise_errorf ~loc:t.ptyp_loc
         "schematic-ppx: unsupported type"
@@ -1386,7 +1386,7 @@ module Jsoo_type : Expansion = struct
              | _ -> true)
            options
     then
-      [%type: Js.Unsafe.any]
+      [%type: Js_of_ocaml.Js.Unsafe.any]
     else
       {
         ptyp_desc = Ptyp_constr ({ txt = Lident "string_js"; loc }, []);
