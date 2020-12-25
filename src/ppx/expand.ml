@@ -1410,7 +1410,7 @@ module Jsoo_type : Expansion = struct
     }
 
   let combine ~loc items =
-    let converters { ptype_name = { txt; _ }; _ } =
+    let converters { ptype_name = { txt; _ }; ptype_params; _ } =
       let name s =
         let prefix = String.sub ~pos:0 ~len:(String.length txt - 2) txt in
         prefix ^ s
@@ -1432,32 +1432,88 @@ module Jsoo_type : Expansion = struct
       and js =
         {
           ptyp_attributes = [];
-          ptyp_desc = Ptyp_constr ({ txt = Lident (name "js"); loc }, []);
+          ptyp_desc =
+            Ptyp_constr
+              ( { txt = Lident (name "js"); loc },
+                List.map
+                  ~f:(fun _ ->
+                    {
+                      ptyp_desc = Ptyp_any;
+                      ptyp_loc = loc;
+                      ptyp_loc_stack = [];
+                      ptyp_attributes = [];
+                    })
+                  ptype_params );
           ptyp_loc = loc;
           ptyp_loc_stack = [];
         }
       in
+      let apply, parametrize =
+        let params =
+          let f ({ ptyp_desc; ptyp_loc = loc; _ }, _) =
+            match ptyp_desc with
+            | Ptyp_any -> None
+            | Ptyp_var n -> Some (loc, Fmt.str "%s_schema" n)
+            | _ ->
+              Ppxlib.Location.raise_errorf ~loc
+                "schematic-ppx: unsupported type parameter"
+          in
+          List.filter_map ~f ptype_params
+        in
+        let apply e =
+          let args =
+            let f (loc, name) = Expr.id ~loc name in
+            List.map ~f params
+          in
+          Expr.apply ~loc e args
+        and parametrize e =
+          let f (loc, name) f =
+            let pattern = Pattern.id ~loc name in
+            [%expr fun [%p pattern] -> [%e f]]
+          in
+          List.fold_right ~init:e ~f params
+        in
+        (apply, parametrize)
+      in
+      let to_js =
+        let body =
+          [%expr
+            fun v : [%t js] ->
+              Js_of_ocaml.Js.Unsafe.coerce
+              @@ Schematic_jsoo.Jsoo.encode [%e apply schema] v]
+        in
+        parametrize body
+      and of_js =
+        let body =
+          [%expr
+            fun (js : [%t js]) ->
+              Schematic_jsoo.Jsoo.decode [%e apply schema]
+                (Js_of_ocaml.Js.Unsafe.coerce js)]
+        in
+        parametrize body
+      and of_js_exn =
+        let body =
+          [%expr
+            fun (js : [%t js]) ->
+              match [%e apply [%expr of_js]] js with
+              | Result.Ok v -> v
+              | Result.Error (`Js_decode m) ->
+                Js_of_ocaml.Js.raise_js_error
+                  ((fun (type res t0)
+                        (t1 :
+                          (t0 -> res Js_of_ocaml.Js.t) Js_of_ocaml.Js.constr)
+                        (t0 : t0) (_ : unit) : res Js_of_ocaml.Js.t ->
+                     Js_of_ocaml.Js.Unsafe.new_obj t1
+                       [| Js_of_ocaml.Js.Unsafe.inject t0 |])
+                     Js_of_ocaml.Js.error_constr (Js_of_ocaml.Js.string m) ())]
+        in
+        parametrize body
+      in
       [%stri
         let [%p fname "to_js"], [%p fname "of_js"], [%p fname "of_js_exn"] =
-          let to_js v : [%t js] =
-            Js_of_ocaml.Js.Unsafe.coerce
-            @@ Schematic_jsoo.Jsoo.encode [%e schema] v
-          and of_js (js : [%t js]) =
-            Schematic_jsoo.Jsoo.decode [%e schema]
-              (Js_of_ocaml.Js.Unsafe.coerce js)
-          in
-          let of_js_exn (js : [%t js]) =
-            match of_js js with
-            | Result.Ok v -> v
-            | Result.Error (`Js_decode m) ->
-              Js_of_ocaml.Js.raise_js_error
-                ((fun (type res t0)
-                      (t1 : (t0 -> res Js_of_ocaml.Js.t) Js_of_ocaml.Js.constr)
-                      (t0 : t0) (_ : unit) : res Js_of_ocaml.Js.t ->
-                   Js_of_ocaml.Js.Unsafe.new_obj t1
-                     [| Js_of_ocaml.Js.Unsafe.inject t0 |])
-                   Js_of_ocaml.Js.error_constr (Js_of_ocaml.Js.string m) ())
-          in
+          let to_js = [%e to_js]
+          and of_js = [%e of_js] in
+          let of_js_exn = [%e of_js_exn] in
           (to_js, of_js, of_js_exn)]
     in
     { pstr_desc = Pstr_type (Recursive, items); pstr_loc = loc }
