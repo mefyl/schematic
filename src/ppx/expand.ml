@@ -667,113 +667,70 @@ module Schema : Expansion = struct
           pcd_attributes = attrs;
           _;
         } =
-      let schema =
-        match pcd_args with
-        | Pcstr_tuple [] ->
-          let alias =
-            let f alias = function
-              | {
-                  attr_name = { txt = "schematic.as"; _ };
-                  attr_loc = loc;
-                  attr_payload;
-                } ->
-                if Option.is_some alias then
-                  Ppxlib.Location.raise_errorf ~loc
-                    "schematic-ppx: duplicate schematic.as annotation"
-                else
-                  Some (expect_string_constant ~loc attr_payload)
-              | { attr_name = { txt = name; _ }; attr_loc = loc; _ } ->
-                let () = check_unknown_attribute ~loc name in
-                alias
+      let schema, pattern, value =
+        match constructor_arguments_normalize ~loc pcd_args with
+        | None ->
+          let schema =
+            let alias =
+              let f alias = function
+                | {
+                    attr_name = { txt = "schematic.as"; _ };
+                    attr_loc = loc;
+                    attr_payload;
+                  } ->
+                  if Option.is_some alias then
+                    Ppxlib.Location.raise_errorf ~loc
+                      "schematic-ppx: duplicate schematic.as annotation"
+                  else
+                    Some (expect_string_constant ~loc attr_payload)
+                | { attr_name = { txt = name; _ }; attr_loc = loc; _ } ->
+                  let () = check_unknown_attribute ~loc name in
+                  alias
+              in
+              List.fold_left ~init:None ~f attrs
             in
-            List.fold_left ~init:None ~f attrs
+            [%expr
+              {
+                id = None;
+                descriptor =
+                  String_const
+                    [%e
+                      expr_string ~loc
+                        (Option.value ~default:(String.lowercase txt) alias)];
+              }]
           in
-          [%expr
-            {
-              id = None;
-              descriptor =
-                String_const
-                  [%e
-                    expr_string ~loc
-                      (Option.value ~default:(String.lowercase txt) alias)];
-            }]
-        | Pcstr_tuple [ field ] -> encode_type ~loc field
-        | Pcstr_tuple fields -> tuple_schema ~loc fields
-        | Pcstr_record _ -> failwith "not implemented"
-      and construct =
-        match pcd_args with
-        | Pcstr_tuple [] ->
-          let pattern =
-            {
-              ppat_desc = Ppat_construct ({ txt = Lident txt; loc }, None);
-              ppat_loc = loc;
-              ppat_loc_stack = [];
-              ppat_attributes = [];
-            }
-          in
-          [%expr
-            function
-            | [%p pattern] -> Some ()
-            | _ -> None]
-        | Pcstr_tuple _ ->
-          let pattern =
-            {
-              ppat_desc =
-                Ppat_construct
-                  ( { txt = Lident txt; loc },
-                    Some
-                      {
-                        ppat_desc = Ppat_var { txt = "x"; loc };
-                        ppat_loc = loc;
-                        ppat_loc_stack = [];
-                        ppat_attributes = [];
-                      } );
-              ppat_loc = loc;
-              ppat_loc_stack = [];
-              ppat_attributes = [];
-            }
-          in
-          [%expr
-            function
-            | [%p pattern] -> Some x
-            | _ -> None]
-        | Pcstr_record _ -> failwith "not implemented"
+          (schema, None, None)
+        | Some (t, _, pattern, value) ->
+          let schema = encode_type ~loc t
+          and pattern = pattern (fun i -> Pattern.id ~loc (Fmt.str "f%i" i))
+          and value = value (fun i _ -> Expr.id ~loc (Fmt.str "f%i" i)) in
+          (schema, Some pattern, Some value)
+      in
+      let construct =
+        let pattern =
+          {
+            ppat_desc = Ppat_construct ({ txt = Lident txt; loc }, pattern);
+            ppat_loc = loc;
+            ppat_loc_stack = [];
+            ppat_attributes = [];
+          }
+        and value = Option.value ~default:[%expr ()] value in
+        [%expr
+          function
+          | [%p pattern] -> Some [%e value]
+          | _ -> None]
       and destruct =
-        match pcd_args with
-        | Pcstr_tuple [] ->
-          let value =
-            {
-              pexp_desc = Pexp_construct ({ txt = Lident txt; loc }, None);
-              pexp_loc = loc;
-              pexp_loc_stack = [];
-              pexp_attributes = [];
-            }
-          in
-          [%expr
-            function
-            | () -> [%e value]]
-        | Pcstr_tuple _ ->
-          let value =
-            {
-              pexp_desc =
-                Pexp_construct
-                  ( { txt = Lident txt; loc },
-                    Some
-                      {
-                        pexp_desc = Pexp_ident { txt = Lident "x"; loc };
-                        pexp_loc = loc;
-                        pexp_loc_stack = [];
-                        pexp_attributes = [];
-                      } );
-              pexp_loc = loc;
-              pexp_loc_stack = [];
-              pexp_attributes = [];
-            }
-          in
-          [%expr
-            function
-            | x -> [%e value]]
-        | Pcstr_record _ -> failwith "not implemented"
+        let value =
+          {
+            pexp_desc = Pexp_construct ({ txt = Lident txt; loc }, value);
+            pexp_loc = loc;
+            pexp_loc_stack = [];
+            pexp_attributes = [];
+          }
+        and pattern = Option.value ~default:[%pat? ()] pattern in
+        [%expr
+          function
+          | [%p pattern] -> [%e value]]
       in
       [%expr
         Case
