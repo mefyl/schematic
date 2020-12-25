@@ -43,6 +43,7 @@
   fmt
   (ppxlib
    (>= 0.14.0))
+  (ppx_deriving :with-test)
   (ptime
    (>= 0.8.5))
   uri))
