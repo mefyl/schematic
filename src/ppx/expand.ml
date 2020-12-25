@@ -339,115 +339,6 @@ let expr_option ~loc expr = function
   | None -> [%expr None]
   | Some e -> [%expr Some [%e expr ~loc e]]
 
-let rec encode_type ~loc = function
-  (* Mapping *)
-  | [%type: (string * [%t? t]) list] ->
-    [%expr { id = None; descriptor = Mapping [%e encode_type ~loc t] }]
-  (* Plain type *)
-  | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
-    expr_id ~loc (schema_id ~loc txt)
-  (* Parametric type *)
-  | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } -> (
-    match (txt, args) with
-    | Lident "list", [ arg ] ->
-      [%expr { id = None; descriptor = List [%e encode_type ~loc arg] }]
-    | _ ->
-      let schema = expr_id ~loc (schema_id ~loc txt)
-      and f t = (Nolabel, encode_type ~loc t) in
-      {
-        pexp_desc = Pexp_apply (schema, List.map ~f args);
-        pexp_loc = loc;
-        pexp_loc_stack = [];
-        pexp_attributes = [];
-      } )
-  (* Tuple *)
-  | { ptyp_desc = Ptyp_tuple types; _ } ->
-    let field_name i { ptyp_loc = loc; _ } = (loc, "e" ^ Int.to_string i)
-    and constructed =
-      let f i _ = expr_id ~loc (Lident ("e" ^ Int.to_string i)) in
-      {
-        pexp_desc = Pexp_tuple (List.mapi ~f types);
-        pexp_loc = loc;
-        pexp_loc_stack = [];
-        pexp_attributes = [];
-      }
-    and deconstructed =
-      let f i _ = pattern_id ~loc ("e" ^ Int.to_string i) in
-      {
-        ppat_desc = Ppat_tuple (List.mapi ~f types);
-        ppat_loc = loc;
-        ppat_loc_stack = [];
-        ppat_attributes = [];
-      }
-    in
-    let body =
-      combinator ~loc types field_name constructed deconstructed
-        (tuple_schema ~loc types)
-    in
-    [%expr { id = None; descriptor = [%e body] }]
-  (* Type variable *)
-  | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ } ->
-    [%expr [%e expr_id ~loc (schema_id ~loc (Lident name))]]
-  (* Unsupported *)
-  | core_type ->
-    Ppxlib.Location.raise_errorf ~loc "schematic-ppx: non supported type %a"
-      Pprintast.core_type core_type
-
-and tuple_schema ~loc types =
-  let args = List.map ~f:(encode_type ~loc) types in
-  let init = [%expr Null] in
-  let f r l = [%expr Tuple { schema = [%e r]; rest = [%e l] }] in
-  List.fold_right ~f ~init args
-
-and combinator :
-    type f.
-    loc:location ->
-    f list ->
-    (int -> f -> location * label) ->
-    expression ->
-    pattern ->
-    expression ->
-    expression =
- fun ~loc fields field_name constructed deconstructed obj ->
-  let construct =
-    let pattern =
-      let pattern i f =
-        let loc, name = field_name i f in
-        pattern_id ~loc name
-      in
-      let f i tl field =
-        let pattern = pattern i field in
-        [%pat? [%p pattern], [%p tl]]
-      in
-      List.fold_righti ~f ~init:[%pat? ()] fields
-    in
-    {
-      pexp_desc = Pexp_fun (Nolabel, None, pattern, constructed);
-      pexp_loc = loc;
-      pexp_loc_stack = [];
-      pexp_attributes = [];
-    }
-  and deconstruct =
-    let value =
-      let expr i f =
-        let loc, name = field_name i f in
-        expr_id ~loc (Lident name)
-      in
-      let f i tl field =
-        let expr = expr i field in
-        [%expr [%e expr], [%e tl]]
-      in
-      List.fold_righti ~f ~init:[%expr ()] fields
-    in
-    {
-      pexp_desc = Pexp_fun (Nolabel, None, deconstructed, value);
-      pexp_loc = loc;
-      pexp_loc_stack = [];
-      pexp_attributes = [];
-    }
-  in
-  [%expr Map ([%e construct], [%e deconstruct], [%e obj])]
-
 type specs = {
   default : expression option;
   description : string option;
@@ -503,7 +394,116 @@ module Schema : Expansion = struct
 
   type expanded = expression * bool
 
-  let expand_record ~loc ~names:_ ~name:_ fields =
+  let rec encode_type ~loc = function
+    (* Mapping *)
+    | [%type: (string * [%t? t]) list] ->
+      [%expr { id = None; descriptor = Mapping [%e encode_type ~loc t] }]
+    (* Plain type *)
+    | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
+      expr_id ~loc (schema_id ~loc txt)
+    (* Parametric type *)
+    | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } -> (
+      match (txt, args) with
+      | Lident "list", [ arg ] ->
+        [%expr { id = None; descriptor = List [%e encode_type ~loc arg] }]
+      | _ ->
+        let schema = expr_id ~loc (schema_id ~loc txt)
+        and f t = (Nolabel, encode_type ~loc t) in
+        {
+          pexp_desc = Pexp_apply (schema, List.map ~f args);
+          pexp_loc = loc;
+          pexp_loc_stack = [];
+          pexp_attributes = [];
+        } )
+    (* Tuple *)
+    | { ptyp_desc = Ptyp_tuple types; _ } ->
+      let field_name i { ptyp_loc = loc; _ } = (loc, "e" ^ Int.to_string i)
+      and constructed =
+        let f i _ = expr_id ~loc (Lident ("e" ^ Int.to_string i)) in
+        {
+          pexp_desc = Pexp_tuple (List.mapi ~f types);
+          pexp_loc = loc;
+          pexp_loc_stack = [];
+          pexp_attributes = [];
+        }
+      and deconstructed =
+        let f i _ = pattern_id ~loc ("e" ^ Int.to_string i) in
+        {
+          ppat_desc = Ppat_tuple (List.mapi ~f types);
+          ppat_loc = loc;
+          ppat_loc_stack = [];
+          ppat_attributes = [];
+        }
+      in
+      let body =
+        combinator ~loc types field_name constructed deconstructed
+          (tuple_schema ~loc types)
+      in
+      [%expr { id = None; descriptor = [%e body] }]
+    (* Type variable *)
+    | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ } ->
+      [%expr [%e expr_id ~loc (schema_id ~loc (Lident name))]]
+    (* Unsupported *)
+    | core_type ->
+      Ppxlib.Location.raise_errorf ~loc "schematic-ppx: non supported type %a"
+        Pprintast.core_type core_type
+
+  and tuple_schema ~loc types =
+    let args = List.map ~f:(encode_type ~loc) types in
+    let init = [%expr Null] in
+    let f r l = [%expr Tuple { schema = [%e r]; rest = [%e l] }] in
+    List.fold_right ~f ~init args
+
+  and combinator :
+      type f.
+      loc:location ->
+      f list ->
+      (int -> f -> location * label) ->
+      expression ->
+      pattern ->
+      expression ->
+      expression =
+   fun ~loc fields field_name constructed deconstructed obj ->
+    let construct =
+      let pattern =
+        let pattern i f =
+          let loc, name = field_name i f in
+          pattern_id ~loc name
+        in
+        let f i tl field =
+          let pattern = pattern i field in
+          [%pat? [%p pattern], [%p tl]]
+        in
+        List.fold_righti ~f ~init:[%pat? ()] fields
+      in
+      {
+        pexp_desc = Pexp_fun (Nolabel, None, pattern, constructed);
+        pexp_loc = loc;
+        pexp_loc_stack = [];
+        pexp_attributes = [];
+      }
+    and deconstruct =
+      let value =
+        let expr i f =
+          let loc, name = field_name i f in
+          expr_id ~loc (Lident name)
+        in
+        let f i tl field =
+          let expr = expr i field in
+          [%expr [%e expr], [%e tl]]
+        in
+        List.fold_righti ~f ~init:[%expr ()] fields
+      in
+      {
+        pexp_desc = Pexp_fun (Nolabel, None, deconstructed, value);
+        pexp_loc = loc;
+        pexp_loc_stack = [];
+        pexp_attributes = [];
+      }
+    in
+    [%expr Map ([%e construct], [%e deconstruct], [%e obj])]
+
+  and expand_record ~loc ~names:_ ~name:_ fields =
     let schema =
       let expand_fields fields =
         let expand_field = function
@@ -658,7 +658,7 @@ module Schema : Expansion = struct
     in
     (combinator ~loc fields field_name constructed deconstructed schema, true)
 
-  let expand_variant ~loc ~names:_ _ options =
+  and expand_variant ~loc ~names:_ _ options =
     let f
         {
           pcd_name = { txt; loc = _ };
