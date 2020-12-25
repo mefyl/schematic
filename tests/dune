@@ -2,7 +2,7 @@
  (name test)
  (modules test)
  (preprocess
-  (pps schematic_ppx))
+  (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
  (libraries alcotest schematic))
 
 (rule
@@ -15,7 +15,7 @@
  (name monadic)
  (modules monadic)
  (preprocess
-  (pps schematic_ppx))
+  (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
  (libraries alcotest base schematic))
 
 (rule
@@ -27,7 +27,7 @@
  (name diff)
  (modules diff)
  (preprocess
-  (pps schematic_ppx))
+  (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
  (libraries alcotest base schematic))
 
 (rule
@@ -39,7 +39,7 @@
  (name json)
  (modules json)
  (preprocess
-  (pps schematic_ppx))
+  (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
  (libraries alcotest schematic))
 
 (rule

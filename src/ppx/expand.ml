@@ -443,6 +443,10 @@ module Schema : Expansion = struct
     (* Type variable *)
     | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ } ->
       [%expr [%e expr_id ~loc (schema_id ~loc (Lident name))]]
+    (* Polymorphic variant *)
+    | { ptyp_desc = Ptyp_variant (fields, _, _); ptyp_loc = loc; _ } ->
+      let desc, _ = expand_polymorphic_variant ~loc ~names:[] "" fields in
+      [%expr { id = None; descriptor = [%e desc] }]
     (* Unsupported *)
     | core_type ->
       Ppxlib.Location.raise_errorf ~loc "schematic-ppx: non supported type %a"
@@ -667,6 +671,23 @@ module Schema : Expansion = struct
           pcd_attributes = attrs;
           _;
         } =
+      (txt, pcd_args, loc, attrs)
+    in
+    expand_any_variant ~loc false @@ List.map ~f options
+
+  and expand_polymorphic_variant ~loc ~names:_ _ options =
+    let f { prf_desc; prf_loc; prf_attributes } =
+      match prf_desc with
+      | Rtag ({ txt; _ }, _, types) ->
+        (txt, Pcstr_tuple types, prf_loc, prf_attributes)
+      | Rinherit { ptyp_loc = loc; _ } ->
+        Ppxlib.Location.raise_errorf ~loc
+          "schematic-ppx: inheriting polymorphic variants not supported"
+    in
+    expand_any_variant ~loc true @@ List.map ~f options
+
+  and expand_any_variant ~loc poly options =
+    let f (txt, pcd_args, loc, attrs) =
       let schema, pattern, value =
         match constructor_arguments_normalize ~loc pcd_args with
         | None ->
@@ -709,7 +730,11 @@ module Schema : Expansion = struct
       let construct =
         let pattern =
           {
-            ppat_desc = Ppat_construct ({ txt = Lident txt; loc }, pattern);
+            ppat_desc =
+              ( if poly then
+                Ppat_variant (txt, pattern)
+              else
+                Ppat_construct ({ txt = Lident txt; loc }, pattern) );
             ppat_loc = loc;
             ppat_loc_stack = [];
             ppat_attributes = [];
@@ -722,7 +747,11 @@ module Schema : Expansion = struct
       and destruct =
         let value =
           {
-            pexp_desc = Pexp_construct ({ txt = Lident txt; loc }, value);
+            pexp_desc =
+              ( if poly then
+                Pexp_variant (txt, value)
+              else
+                Pexp_construct ({ txt = Lident txt; loc }, value) );
             pexp_loc = loc;
             pexp_loc_stack = [];
             pexp_attributes = [];

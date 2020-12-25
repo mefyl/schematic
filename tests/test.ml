@@ -139,6 +139,29 @@ let variant () =
   test "variant" test_expectation expectation_schema Nothing "\"nothing\"";
   test "variant" test_expectation expectation_schema Aliased "\"aktually\""
 
+(* Polymorphic variant *)
+
+type day =
+  [ `Mon
+  | `Tue [@schematic.as "tuesday"]
+  | `Wed of int
+  | `Thu of bool * bool
+  | `Fri
+  | `Sat
+  | `Sun
+  ]
+[@@deriving eq, schema, show]
+
+let test_day = Alcotest.testable pp_day equal_day
+
+let polymorphic_variant () =
+  test "polymorphic variant" test_day day_schema `Mon {|"mon"|};
+  test "polymorphic variant alias" test_day day_schema `Tue {|"tuesday"|};
+  test "polymorphic variant payload" test_day day_schema (`Wed 160) {|160|};
+  test "polymorphic variant composite payload" test_day day_schema
+    (`Thu (true, false))
+    {|[true, false]|}
+
 (* List *)
 
 let list_test () =
@@ -475,6 +498,7 @@ let () =
           test_case "record" `Quick record;
           test_case "tuple" `Quick tuple;
           test_case "variant" `Quick variant;
+          test_case "polymorphic variant" `Quick polymorphic_variant;
           test_case "alias" `Quick alias;
           test_case "list" `Quick list_test;
           test_case "parametric_type" `Quick parametric_type;
