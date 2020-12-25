@@ -12,5 +12,5 @@ end
 
 module Schema = struct
   include Schema
-  include Schemas
+  module Schemas = Schemas
 end

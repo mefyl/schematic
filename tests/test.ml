@@ -1,5 +1,6 @@
 open Base
 open Poly
+open Schematic.Schema.Schemas
 
 let root = Caml.Filename.dirname @@ Caml.Sys.executable_name
 
@@ -34,7 +35,6 @@ let test name test schema value j =
 (* Failure *)
 
 let failure () =
-  let open Schematic.Schema in
   if
     try
       test "int atom" Alcotest.int int_schema 28 "29";
@@ -45,12 +45,9 @@ let failure () =
 
 (* Atoms *)
 
-let atom_int () =
-  let open Schematic.Schema in
-  test "int atom" Alcotest.int int_schema 28 "28"
+let atom_int () = test "int atom" Alcotest.int int_schema 28 "28"
 
 let atom_string () =
-  let open Schematic.Schema in
   test "int atom" Alcotest.string string_schema "trente trois"
     "\"trente trois\""
 
@@ -165,18 +162,15 @@ let polymorphic_variant () =
 (* List *)
 
 let list_test () =
+  test "list" (Alcotest.list test_version) (list_schema version_schema) [] "[]";
   test "list"
     (Alcotest.list test_version)
-    (Schematic.Schema.list_schema version_schema)
-    [] "[]";
-  test "list"
-    (Alcotest.list test_version)
-    (Schematic.Schema.list_schema version_schema)
+    (list_schema version_schema)
     [ { major = 0; minor = 1; subminor = 2 } ]
     "[{\"major\": 0.000000, \"minor\": 1.000000, \"subminor\": 2.000000}].";
   test "list"
     (Alcotest.list test_version)
-    (Schematic.Schema.list_schema version_schema)
+    (list_schema version_schema)
     [
       { major = 0; minor = 1; subminor = 2 };
       { major = 3; minor = 4; subminor = 5 };
@@ -289,8 +283,8 @@ type event = {
 }
 
 and event_local = {
-  start_local : Schematic.Schema.Ptime.local;
-  end_local : Schematic.Schema.Ptime.local;
+  start_local : Ptime.local;
+  end_local : Ptime.local;
 }
 [@@deriving schema]
 
@@ -424,7 +418,6 @@ end
 
 module Comparison = struct
   open Alcotest
-  open Schematic.Schema
 
   let check name schema e l r =
     check int name e (Schematic.Schema.compare schema l r)

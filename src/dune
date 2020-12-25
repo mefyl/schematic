@@ -3,4 +3,4 @@
  (public_name schematic)
  (libraries base ezjsonm fmt ptime stdio uri)
  (preprocess
-  (pps schematic_ppx_inside)))
+  (pps schematic_ppx_inside ppx_here)))

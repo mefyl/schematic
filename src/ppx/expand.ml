@@ -397,7 +397,7 @@ module Schema : Expansion = struct
   let rec encode_type ~loc = function
     (* Mapping *)
     | [%type: (string * [%t? t]) list] ->
-      [%expr { id = None; descriptor = Mapping [%e encode_type ~loc t] }]
+      [%expr { Schema.id = None; descriptor = Mapping [%e encode_type ~loc t] }]
     (* Plain type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
       expr_id ~loc (schema_id ~loc txt)
@@ -405,7 +405,8 @@ module Schema : Expansion = struct
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } -> (
       match (txt, args) with
       | Lident "list", [ arg ] ->
-        [%expr { id = None; descriptor = List [%e encode_type ~loc arg] }]
+        [%expr
+          { Schema.id = None; descriptor = List [%e encode_type ~loc arg] }]
       | _ ->
         let schema = expr_id ~loc (schema_id ~loc txt)
         and f t = (Nolabel, encode_type ~loc t) in
@@ -439,14 +440,14 @@ module Schema : Expansion = struct
         combinator ~loc types field_name constructed deconstructed
           (tuple_schema ~loc types)
       in
-      [%expr { id = None; descriptor = [%e body] }]
+      [%expr { Schema.id = None; descriptor = [%e body] }]
     (* Type variable *)
     | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ } ->
       [%expr [%e expr_id ~loc (schema_id ~loc (Lident name))]]
     (* Polymorphic variant *)
     | { ptyp_desc = Ptyp_variant (fields, _, _); ptyp_loc = loc; _ } ->
       let desc, _ = expand_polymorphic_variant ~loc ~names:[] "" fields in
-      [%expr { id = None; descriptor = [%e desc] }]
+      [%expr { Schema.id = None; descriptor = [%e desc] }]
     (* Unsupported *)
     | core_type ->
       Ppxlib.Location.raise_errorf ~loc "schematic-ppx: non supported type %a"
@@ -712,7 +713,7 @@ module Schema : Expansion = struct
             in
             [%expr
               {
-                id = None;
+                Schema.id = None;
                 descriptor =
                   String_const
                     [%e
@@ -762,14 +763,14 @@ module Schema : Expansion = struct
           | [%p pattern] -> [%e value]]
       in
       [%expr
-        Case
+        Schema.Case
           {
             schema = [%e schema];
             encoder = [%e construct];
             decoder = [%e destruct];
           }]
     in
-    ([%expr Union [%e expr_list ~loc (List.map ~f options)]], true)
+    ([%expr Schema.Union [%e expr_list ~loc (List.map ~f options)]], true)
 
   let expand_abstract_type ~loc ~names:_ ~name:_ t =
     ([%expr [%e encode_type ~loc t].descriptor], false)
@@ -778,7 +779,7 @@ module Schema : Expansion = struct
     let init =
       [%expr
         {
-          id =
+          Schema.id =
             Some
               [%e
                 expr_string ~loc
@@ -1871,13 +1872,13 @@ let expand ~loc ~path:_ ~inside (r, types) jsoo monadic diff =
   and namespace =
     if inside then
       [%str
-        open Schema
         open Schemas
 
         let _ = unit_schema]
     else
       [%str
-        open Schematic.Schema
+        module Schema = Schematic.Schema
+        open Schematic.Schema.Schemas
 
         let _ = unit_schema]
   and jsoo =

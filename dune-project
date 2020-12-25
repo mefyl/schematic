@@ -44,6 +44,7 @@
   (ppxlib
    (>= 0.14.0))
   (ppx_deriving :with-test)
+  ppx_here
   (ptime
    (>= 0.8.5))
   uri))

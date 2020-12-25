@@ -91,11 +91,11 @@ module Diff = struct
     let () =
       Alcotest.(
         check (option (list (option int))) "same" None
-        @@ parametric_diff Schematic.Schema.int_diff [ 1 ] [ 1 ])
+        @@ parametric_diff Schematic.Schema.Schemas.int_diff [ 1 ] [ 1 ])
     and () =
       Alcotest.(
         check (option (list (option int))) "diff" (Some [ Some 2 ])
-        @@ parametric_diff Schematic.Schema.int_diff [ 1 ] [ 2; 3 ])
+        @@ parametric_diff Schematic.Schema.Schemas.int_diff [ 1 ] [ 2; 3 ])
     in
     ()
 end
