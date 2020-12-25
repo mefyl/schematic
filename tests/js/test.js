@@ -4,15 +4,15 @@ const assert = require('assert');
 
 const { ofString, toString } = require('./test.bc.js');
 
-const value = { i : 42, s : 'enyleme', b: true, a: [0, 1, 2] }
+const value = { i : 42, s : 'enyleme', b: true, a: [0, 1, 2], pair: [true, false] }
 
 assert.deepEqual(
-  ofString('{ "i" : 42, "s": "enyleme", "b": true, "opt": null, "a": [0, 1, 2] }'),
+  ofString('{ "i" : 42, "s": "enyleme", "b": true, "opt": null, "a": [0, 1, 2], "pair": [true, false] }'),
   value)
 
 // Missing optional values are interpreted as None
 assert.deepEqual(
-  ofString('{ "i" : 42, "s": "enyleme", "b": true, "a": [0, 1, 2] }'),
+  ofString('{ "i" : 42, "s": "enyleme", "b": true, "a": [0, 1, 2], "pair": [true, false] }'),
   value)
 
 delete value['opt']

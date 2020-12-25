@@ -11,6 +11,7 @@ type o = {
   b : bool;
   opt : bool option;
   a : Namespace.int_alias list;
+  pair : bool * bool;
 }
 
 and variant =
