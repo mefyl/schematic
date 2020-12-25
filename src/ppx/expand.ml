@@ -1385,8 +1385,7 @@ module Jsoo_type : Expansion = struct
              | _ -> true)
            options
     then
-      Ppxlib.Location.raise_errorf ~loc
-        "schematic-ppx: variants with arguments are unsupported"
+      [%type: Js.Unsafe.any]
     else
       {
         ptyp_desc = Ptyp_constr ({ txt = Lident "string_js"; loc }, []);

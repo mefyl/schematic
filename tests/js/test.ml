@@ -16,7 +16,7 @@ type o = {
 
 and variant =
   | This
-  | That
+  | That of int
 
 and poly =
   [ `This
@@ -30,6 +30,7 @@ let of_result = function
   | Result.Ok v -> v
   | Result.Error (`Parse e) -> fail ("parse error: " ^ e)
   | Result.Error (`Json_decode e) -> fail ("decode error: " ^ e)
+  | Result.Error (`Js_decode e) -> fail ("decode error: " ^ e)
 
 let () =
   Js.export_all
@@ -45,4 +46,10 @@ let () =
          o_of_js_exn o
          |> Schematic.Json.encode o_schema
          |> Schematic_jsoo.Json.to_string |> Js.string
+
+       method variantRoundtrip (js : variant_js) =
+         of_result
+         @@
+         let open Result in
+         Schematic_jsoo.Jsoo.decode variant_schema js >>| variant_to_js
     end)

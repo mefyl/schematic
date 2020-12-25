@@ -2,7 +2,7 @@
 
 const assert = require('assert');
 
-const { ofString, toString } = require('./test.bc.js');
+const { ofString, toString, variantRoundtrip } = require('./test.bc.js');
 
 const value = { i : 42, s : 'enyleme', b: true, a: [0, 1, 2], pair: [true, false] }
 
@@ -20,3 +20,7 @@ delete value['opt']
 assert.deepEqual(
   JSON.parse(toString(value)),
   value);
+
+assert.deepEqual(variantRoundtrip(24), 24)
+assert.deepEqual(variantRoundtrip("this"), "this")
+assert.throws(() => variantRoundtrip("that"))
