@@ -41,7 +41,7 @@ module Ptime : sig
 end
 
 module Uri : sig
-  include module type of Uri
+  include module type of Uri with type t = Uri.t
 
   val schema : Uri.t Schema.schema
 end
