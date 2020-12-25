@@ -59,7 +59,10 @@ let decode schema =
     | Bool -> Result.return @@ Js.to_bool (Js.Unsafe.coerce js)
     | Date -> Result.return @@ date_of_js @@ Js.Unsafe.coerce js
     | Int ->
-      Result.return @@ Int.of_float @@ Js.float_of_number @@ Js.Unsafe.coerce js
+      if Js.typeof js == Js.string "number" then
+        Result.return (Js.Unsafe.coerce js |> Js.float_of_number |> Int.of_float)
+      else
+        Result.fail (`Js_decode "invalid integer")
     | List items_schema ->
       Js.Unsafe.coerce js |> Js.to_array
       |> Array.map ~f:(decode items_schema.descriptor)
