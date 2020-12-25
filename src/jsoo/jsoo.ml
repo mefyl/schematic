@@ -3,6 +3,7 @@ open Base
 open Js_of_ocaml
 open Poly
 open Schematic.Schema
+open Schematic.Schema.Schemas
 
 let ( == ) = Caml.( == )
 
@@ -26,6 +27,8 @@ module Ptime = struct
   type js = Js.date Js.t
 
   type date_js = Js.date Js.t
+
+  type span_js = int Js.t
 end
 
 module Uri = struct
