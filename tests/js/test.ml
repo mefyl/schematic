@@ -12,6 +12,15 @@ type o = {
   opt : bool option;
   a : Namespace.int_alias list;
 }
+
+and variant =
+  | This
+  | That
+
+and poly =
+  [ `This
+  | `That
+  ]
 [@@deriving schema ~jsoo]
 
 let fail s = Js.raise_js_error @@ new%js Js.error_constr (Js.string s)

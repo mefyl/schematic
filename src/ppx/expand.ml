@@ -1310,7 +1310,7 @@ module Jsoo_type : Expansion = struct
     | Ldot (ident, m) -> Ldot (ident, name "js" m)
     | Lapply _ -> failwith "Lapply"
 
-  let rec expand_type t =
+  let rec expand_type ~loc t =
     match t.ptyp_desc with
     | Ptyp_constr (name, args) ->
       {
@@ -1318,15 +1318,18 @@ module Jsoo_type : Expansion = struct
         ptyp_desc =
           Ptyp_constr
             ( { name with txt = expand_ident name.txt },
-              List.map ~f:expand_type args );
+              List.map ~f:(expand_type ~loc) args );
       }
+    (* Polymorphic variant *)
+    | Ptyp_variant (fields, _, _) ->
+      expand_polymorphic_variant ~loc ~names:[] "" fields
     | _ ->
       Ppxlib.Location.raise_errorf ~loc:t.ptyp_loc
         "schematic-ppx: unsupported type"
 
-  let expand_record ~loc ~names:_ ~name:_ fields =
+  and expand_record ~loc ~names:_ ~name:_ fields =
     let f { pld_name; pld_type; pld_loc; _ } : object_field =
-      let t = expand_type pld_type in
+      let t = expand_type ~loc pld_type in
       let t = [%type: [%t t] Js_of_ocaml.Js.readonly_prop] in
       { pof_desc = Otag (pld_name, t); pof_loc = pld_loc; pof_attributes = [] }
     in
@@ -1347,12 +1350,36 @@ module Jsoo_type : Expansion = struct
       ptyp_loc_stack = [];
     }
 
-  let expand_variant ~loc ~names:_ _ (options : constructor_declaration list) =
+  and expand_variant ~loc ~names:_ _ options =
+    let f
+        {
+          pcd_name = { txt; loc = _ };
+          pcd_args;
+          pcd_loc = loc;
+          pcd_attributes = attrs;
+          _;
+        } =
+      (txt, pcd_args, loc, attrs)
+    in
+    expand_any_variant ~loc false @@ List.map ~f options
+
+  and expand_polymorphic_variant ~loc ~names:_ _ options =
+    let f { prf_desc; prf_loc; prf_attributes } =
+      match prf_desc with
+      | Rtag ({ txt; _ }, _, types) ->
+        (txt, Pcstr_tuple types, prf_loc, prf_attributes)
+      | Rinherit { ptyp_loc = loc; _ } ->
+        Ppxlib.Location.raise_errorf ~loc
+          "schematic-ppx: inheriting polymorphic variants not supported"
+    in
+    expand_any_variant ~loc true @@ List.map ~f options
+
+  and expand_any_variant ~loc _ options =
     if
       Option.is_some
       @@ List.find
            ~f:(function
-             | { pcd_args = Pcstr_tuple []; _ } -> false
+             | _, Pcstr_tuple [], _, _ -> false
              | _ -> true)
            options
     then
@@ -1366,7 +1393,7 @@ module Jsoo_type : Expansion = struct
         ptyp_attributes = [];
       }
 
-  let expand_abstract_type ~loc:_ ~names:_ ~name:_ t = expand_type t
+  let expand_abstract_type ~loc ~names:_ ~name:_ t = expand_type ~loc t
 
   let close ~loc ~name:_ { ptype_name = { loc = name_loc; txt }; _ } params js =
     {
