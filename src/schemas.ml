@@ -30,6 +30,16 @@ module Ptime = struct
   let local_schema = { Schema.id = None; descriptor = Time_local }
 
   let date_schema = { Schema.id = None; descriptor = Date }
+
+  let span_schema =
+    {
+      Schema.id = Some "duration";
+      descriptor =
+        Map
+          ( Span.of_int_s,
+            (fun span -> Option.value_exn ~here:[%here] (Span.to_int_s span)),
+            Int );
+    }
 end
 
 module Uri = struct

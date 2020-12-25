@@ -25,7 +25,7 @@ module Either : sig
 end
 
 module Ptime : sig
-  include module type of Ptime with type t = Ptime.t
+  include module type of Ptime with type t = Ptime.t and type span = Ptime.span
 
   val schema : Ptime.t Schema.schema
 
@@ -36,6 +36,8 @@ module Ptime : sig
   val local_schema : local Schema.schema
 
   val date_schema : date Schema.schema
+
+  val span_schema : span Schema.schema
 end
 
 module Uri : sig
