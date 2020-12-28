@@ -297,6 +297,12 @@ module Attributes = struct
     | [] -> { alias = None; name = None }
 end
 
+type context = {
+  attributes : Attributes.t;
+  type_ : string;
+  types : string list;
+}
+
 let map_id ~f { txt; loc } =
   let txt =
     match txt with
@@ -347,14 +353,14 @@ let specs_empty =
     minimum = None;
   }
 
-module type Expansion = sig
+module type EXPANSION = sig
   type closed
 
   type expanded
 
   val close :
     loc:location ->
-    name:string option ->
+    context:context ->
     type_declaration ->
     (core_type * variance) list ->
     expanded ->
@@ -363,32 +369,28 @@ module type Expansion = sig
   val combine : loc:location -> closed list -> structure_item list
 
   val expand_abstract_type :
-    loc:location -> names:string list -> name:string -> core_type -> expanded
+    loc:location -> context:context -> core_type -> expanded
 
   val expand_record :
-    loc:location ->
-    names:string list ->
-    name:string ->
-    label_declaration list ->
-    expanded
+    loc:location -> context:context -> label_declaration list -> expanded
 
   val expand_variant :
-    loc:location ->
-    names:string list ->
-    string ->
-    constructor_declaration list ->
-    expanded
+    loc:location -> context:context -> constructor_declaration list -> expanded
 end
 
-module Schema : Expansion = struct
+module Schema : EXPANSION = struct
   type closed = value_binding * bool
 
   type expanded = expression * bool
 
-  let rec encode_type ~loc = function
+  let rec encode_type ~loc ~context = function
     (* Mapping *)
     | [%type: (string * [%t? t]) list] ->
-      [%expr { Schema.id = None; descriptor = Mapping [%e encode_type ~loc t] }]
+      [%expr
+        {
+          Schema.id = None;
+          descriptor = Mapping [%e encode_type ~loc ~context t];
+        }]
     (* Plain type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
       expr_id ~loc (schema_id ~loc txt)
@@ -397,10 +399,13 @@ module Schema : Expansion = struct
       match (txt, args) with
       | Lident "list", [ arg ] ->
         [%expr
-          { Schema.id = None; descriptor = List [%e encode_type ~loc arg] }]
+          {
+            Schema.id = None;
+            descriptor = List [%e encode_type ~loc ~context arg];
+          }]
       | _ ->
         let schema = expr_id ~loc (schema_id ~loc txt)
-        and f t = (Nolabel, encode_type ~loc t) in
+        and f t = (Nolabel, encode_type ~loc ~context t) in
         {
           pexp_desc = Pexp_apply (schema, List.map ~f args);
           pexp_loc = loc;
@@ -429,7 +434,7 @@ module Schema : Expansion = struct
       in
       let body =
         combinator ~loc types field_name constructed deconstructed
-          (tuple_schema ~loc types)
+          (tuple_schema ~loc ~context types)
       in
       [%expr { Schema.id = None; descriptor = [%e body] }]
     (* Type variable *)
@@ -437,15 +442,15 @@ module Schema : Expansion = struct
       [%expr [%e expr_id ~loc (schema_id ~loc (Lident name))]]
     (* Polymorphic variant *)
     | { ptyp_desc = Ptyp_variant (fields, _, _); ptyp_loc = loc; _ } ->
-      let desc, _ = expand_polymorphic_variant ~loc ~names:[] "" fields in
+      let desc, _ = expand_polymorphic_variant ~loc ~context fields in
       [%expr { Schema.id = None; descriptor = [%e desc] }]
     (* Unsupported *)
     | core_type ->
       Ppxlib.Location.raise_errorf ~loc "schematic-ppx: unsupported type %a"
         Pprintast.core_type core_type
 
-  and tuple_schema ~loc types =
-    let args = List.map ~f:(encode_type ~loc) types in
+  and tuple_schema ~loc ~context types =
+    let args = List.map ~f:(encode_type ~loc ~context) types in
     let init = [%expr Null] in
     let f r l = [%expr Tuple { schema = [%e r]; rest = [%e l] }] in
     List.fold_right ~f ~init args
@@ -499,7 +504,7 @@ module Schema : Expansion = struct
     in
     [%expr Map ([%e construct], [%e deconstruct], [%e obj])]
 
-  and expand_record ~loc ~names:_ ~name:_ fields =
+  and expand_record ~loc ~context fields =
     let schema =
       let expand_fields fields =
         let expand_field = function
@@ -579,12 +584,12 @@ module Schema : Expansion = struct
                ptyp_desc = Ptyp_constr ({ txt = Lident "option"; _ }, [ t ]);
                _;
               } ->
-                ([%expr Optional], encode_type ~loc t)
+                ([%expr Optional], encode_type ~loc ~context t)
               | t -> (
                 match specs.default with
                 | Some default ->
-                  ([%expr Default [%e default]], encode_type ~loc t)
-                | None -> ([%expr Required], encode_type ~loc t) )
+                  ([%expr Default [%e default]], encode_type ~loc ~context t)
+                | None -> ([%expr Required], encode_type ~loc ~context t) )
             in
             ( loc,
               requirement,
@@ -654,7 +659,7 @@ module Schema : Expansion = struct
     in
     (combinator ~loc fields field_name constructed deconstructed schema, true)
 
-  and expand_variant ~loc ~names:_ _ options =
+  and expand_variant ~loc ~context options =
     let f
         {
           pcd_name = { txt; loc = _ };
@@ -665,9 +670,9 @@ module Schema : Expansion = struct
         } =
       (txt, pcd_args, loc, attrs)
     in
-    expand_any_variant ~loc false @@ List.map ~f options
+    expand_any_variant ~loc ~context false @@ List.map ~f options
 
-  and expand_polymorphic_variant ~loc ~names:_ _ options =
+  and expand_polymorphic_variant ~loc ~context options =
     let f { prf_desc; prf_loc; prf_attributes } =
       match prf_desc with
       | Rtag ({ txt; _ }, _, types) ->
@@ -676,9 +681,9 @@ module Schema : Expansion = struct
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: inheriting polymorphic variants not supported"
     in
-    expand_any_variant ~loc true @@ List.map ~f options
+    expand_any_variant ~loc ~context true @@ List.map ~f options
 
-  and expand_any_variant ~loc poly options =
+  and expand_any_variant ~loc ~context poly options =
     let f (txt, pcd_args, loc, attrs) =
       let schema, pattern, value =
         match constructor_arguments_normalize ~loc pcd_args with
@@ -699,7 +704,7 @@ module Schema : Expansion = struct
           in
           (schema, None, None)
         | Some (t, _, pattern, value) ->
-          let schema = encode_type ~loc t
+          let schema = encode_type ~loc ~context t
           and pattern = pattern (fun i -> Pattern.id ~loc (Fmt.str "f%i" i))
           and value = value (fun i _ -> Expr.id ~loc (Fmt.str "f%i" i)) in
           (schema, Some pattern, Some value)
@@ -748,10 +753,10 @@ module Schema : Expansion = struct
     in
     ([%expr Schema.Union [%e expr_list ~loc (List.map ~f options)]], true)
 
-  let expand_abstract_type ~loc ~names:_ ~name:_ t =
-    ([%expr [%e encode_type ~loc t].descriptor], false)
+  let expand_abstract_type ~loc ~context t =
+    ([%expr [%e encode_type ~loc ~context t].descriptor], false)
 
-  let close ~loc ~name t params (body, recursive) =
+  let close ~loc ~context t params (body, recursive) =
     let init =
       [%expr
         {
@@ -759,7 +764,8 @@ module Schema : Expansion = struct
             Some
               [%e
                 expr_string ~loc
-                  (Option.value ~default:(rename t.ptype_name.txt) name)];
+                  (Option.value ~default:(rename t.ptype_name.txt)
+                     context.attributes.name)];
           descriptor = [%e body];
         }]
     and wrap arg exp =
@@ -916,11 +922,11 @@ module Monadic = struct
     in
     ({ t with ptyp_desc }, return, bind)
 
-  let expand_record ~loc ~names ~name:_ fields =
+  let expand_record ~loc ~context fields =
     let recd =
       List.map
         ~f:(fun f ->
-          let t, r, b = expand_type ~names f.pld_type in
+          let t, r, b = expand_type ~names:context.types f.pld_type in
           (f, t, r, b))
         fields
     in
@@ -955,7 +961,7 @@ module Monadic = struct
     in
     (t, None, return, bind)
 
-  let expand_variant ~loc ~names _ options =
+  let expand_variant ~loc ~context options =
     let t =
       let f option =
         let pcd_args =
@@ -963,13 +969,16 @@ module Monadic = struct
           | Pcstr_tuple types ->
             Pcstr_tuple
               (List.map
-                 ~f:(fun t -> expand_type ~names t |> fun (t, _, _) -> t)
+                 ~f:(fun t ->
+                   expand_type ~names:context.types t |> fun (t, _, _) -> t)
                  types)
           | Pcstr_record labels ->
             let f ({ pld_type; _ } as l) =
               {
                 l with
-                pld_type = (expand_type ~names pld_type |> fun (t, _, _) -> t);
+                pld_type =
+                  ( expand_type ~names:context.types pld_type |> fun (t, _, _) ->
+                    t );
               }
             in
             Pcstr_record (List.map ~f labels)
@@ -996,7 +1005,7 @@ module Monadic = struct
               pattern (fun i -> Pattern.id ~loc ("e" ^ Int.to_string i))
             and value_return =
               let f i t =
-                let _, return, _ = expand_type ~names t in
+                let _, return, _ = expand_type ~names:context.types t in
                 [%expr [%e return] [%e Expr.id ~loc ("e" ^ Int.to_string i)]]
               in
               [%expr
@@ -1006,7 +1015,7 @@ module Monadic = struct
             and pattern_bind =
               pattern (fun i -> Pattern.id ~loc ("e" ^ Int.to_string i))
             and value_bind =
-              let _, _, bind = expand_type ~names t in
+              let _, _, bind = expand_type ~names:context.types t in
               let init =
                 [%expr
                   f__
@@ -1059,12 +1068,12 @@ module Monadic = struct
     in
     (t, None, return, bind)
 
-  let expand_abstract_type ~loc:_ ~names ~name:_ t =
-    let t, return, bind = expand_type ~names t in
+  let expand_abstract_type ~loc:_ ~context t =
+    let t, return, bind = expand_type ~names:context.types t in
     (Ptype_abstract, Some t, return, bind)
 
-  let close ~loc ~name:_ { ptype_name; _ } params (kind, manifest, return, bind)
-      =
+  let close
+      ~loc ~context:_ { ptype_name; _ } params (kind, manifest, return, bind) =
     ( {
         ptype_name;
         ptype_params = params;
@@ -1278,7 +1287,7 @@ module Monadic = struct
     def :: open_def :: List.map ~f types
 end
 
-module Jsoo_type : Expansion = struct
+module Jsoo_type : EXPANSION = struct
   type closed = type_declaration
 
   type expanded = core_type
@@ -1288,7 +1297,7 @@ module Jsoo_type : Expansion = struct
     | Ldot (ident, m) -> Ldot (ident, name "js" m)
     | Lapply _ -> failwith "Lapply"
 
-  let rec expand_type ~loc t =
+  let rec expand_type ~loc ~context t =
     match t.ptyp_desc with
     | Ptyp_constr (name, args) ->
       {
@@ -1296,20 +1305,20 @@ module Jsoo_type : Expansion = struct
         ptyp_desc =
           Ptyp_constr
             ( { name with txt = expand_ident name.txt },
-              List.map ~f:(expand_type ~loc) args );
+              List.map ~f:(expand_type ~loc ~context) args );
       }
     (* Polymorphic variant *)
     | Ptyp_variant (fields, _, _) ->
-      expand_polymorphic_variant ~loc ~names:[] "" fields
+      expand_polymorphic_variant ~loc ~context fields
     (* I don't know of any way to properly type this, so any it is *)
     | Ptyp_tuple _ -> [%type: Js_of_ocaml.Js.Unsafe.any]
     | _ ->
       Ppxlib.Location.raise_errorf ~loc:t.ptyp_loc
         "schematic-ppx: unsupported type"
 
-  and expand_record ~loc ~names:_ ~name:_ fields =
+  and expand_record ~loc ~context fields =
     let f { pld_name; pld_type; pld_loc; _ } : object_field =
-      let t = expand_type ~loc pld_type in
+      let t = expand_type ~loc ~context pld_type in
       let t = [%type: [%t t] Js_of_ocaml.Js.readonly_prop] in
       { pof_desc = Otag (pld_name, t); pof_loc = pld_loc; pof_attributes = [] }
     in
@@ -1330,7 +1339,7 @@ module Jsoo_type : Expansion = struct
       ptyp_loc_stack = [];
     }
 
-  and expand_variant ~loc ~names:_ _ options =
+  and expand_variant ~loc ~context options =
     let f
         {
           pcd_name = { txt; loc = _ };
@@ -1341,9 +1350,9 @@ module Jsoo_type : Expansion = struct
         } =
       (txt, pcd_args, loc, attrs)
     in
-    expand_any_variant ~loc false @@ List.map ~f options
+    expand_any_variant ~loc ~context false @@ List.map ~f options
 
-  and expand_polymorphic_variant ~loc ~names:_ _ options =
+  and expand_polymorphic_variant ~loc ~context options =
     let f { prf_desc; prf_loc; prf_attributes } =
       match prf_desc with
       | Rtag ({ txt; _ }, _, types) ->
@@ -1352,9 +1361,9 @@ module Jsoo_type : Expansion = struct
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: inheriting polymorphic variants not supported"
     in
-    expand_any_variant ~loc true @@ List.map ~f options
+    expand_any_variant ~loc ~context true @@ List.map ~f options
 
-  and expand_any_variant ~loc _ options =
+  and expand_any_variant ~loc ~context:_ _ options =
     if
       Option.is_some
       @@ List.find
@@ -1372,9 +1381,10 @@ module Jsoo_type : Expansion = struct
         ptyp_attributes = [];
       }
 
-  let expand_abstract_type ~loc ~names:_ ~name:_ t = expand_type ~loc t
+  let expand_abstract_type ~loc ~context t = expand_type ~loc ~context t
 
-  let close ~loc ~name:_ { ptype_name = { loc = name_loc; txt }; _ } params js =
+  let close
+      ~loc ~context:_ { ptype_name = { loc = name_loc; txt }; _ } params js =
     {
       ptype_name = { loc = name_loc; txt = name "js" txt };
       ptype_params = params;
@@ -1730,33 +1740,33 @@ module Patch : FUNCTION_EXPANSION = struct
     [%expr fun p v -> [%e body]]
 end
 
-module FunctionExpansion (F : FUNCTION_EXPANSION) : Expansion = struct
+module FunctionExpansion (F : FUNCTION_EXPANSION) : EXPANSION = struct
   type closed = pattern * expression
 
   type expanded = expression
 
-  let rec expand_type ~names ~name t =
+  let rec expand_type ~context t =
     let loc = t.ptyp_loc in
     match t.ptyp_desc with
     | Ptyp_constr (idt, params) ->
-      let params = List.map ~f:(expand_type ~names ~name) params
+      let params = List.map ~f:(expand_type ~context) params
       and f = pexp ~loc ~desc:(Pexp_ident (suffix_id_loc F.name idt)) in
       Expr.apply ~loc f params
     | Ptyp_tuple types ->
-      let fs = List.map ~f:(expand_type ~names ~name) types in
+      let fs = List.map ~f:(expand_type ~context) types in
       let pattern f = Pattern.tuple ~loc (List.mapi ~f:(fun i _ -> f i) fs)
       and value f = Expr.tuple ~loc (List.mapi ~f fs) in
-      F.expand_composite ~loc ~name ~kind:Ptype_abstract pattern value
+      F.expand_composite ~loc ~name:context.type_ ~kind:Ptype_abstract pattern
+        value
     | Ptyp_var name -> pexp ~loc ~desc:(Pexp_ident { txt = Lident name; loc })
     | _ ->
       Ppxlib.Location.raise_errorf ~loc:t.ptyp_loc
         "schematic-ppx: unsupported type"
 
-  let expand_record ~loc ~names ~name fields =
+  let expand_record ~loc ~context fields =
     let fs =
       List.map
-        ~f:(fun ({ pld_type; _ } as f) ->
-          (f, expand_type ~names ~name pld_type))
+        ~f:(fun ({ pld_type; _ } as f) -> (f, expand_type ~context pld_type))
         fields
     in
     let pattern f =
@@ -1777,24 +1787,25 @@ module FunctionExpansion (F : FUNCTION_EXPANSION) : Expansion = struct
                  fs,
                None ))
     in
-    F.expand_composite ~loc ~name ~kind:(Ptype_record []) pattern value
+    F.expand_composite ~loc ~name:context.type_ ~kind:(Ptype_record []) pattern
+      value
 
-  let expand_variant ~loc ~names name constructors =
+  let expand_variant ~loc ~context constructors =
     let f ({ pcd_args; _ } as ctor) =
       let pld =
         match constructor_arguments_normalize ~loc pcd_args with
         | None -> None
         | Some (t, l, pattern, value) ->
-          let value f = value (fun i t -> f i (expand_type ~names ~name t)) in
-          Some (expand_type ~names ~name t, l, pattern, value)
+          let value f = value (fun i t -> f i (expand_type ~context t)) in
+          Some (expand_type ~context t, l, pattern, value)
       in
       (ctor, pld)
     in
-    F.expand_variant ~loc ~name (List.map ~f constructors)
+    F.expand_variant ~loc ~name:context.type_ (List.map ~f constructors)
 
-  let expand_abstract_type ~loc:_ ~names ~name t = expand_type ~names ~name t
+  let expand_abstract_type ~loc:_ ~context t = expand_type ~context t
 
-  let close ~loc ~name:_ { ptype_name = n; ptype_params = params; _ } _ f =
+  let close ~loc ~context:_ { ptype_name = n; ptype_params = params; _ } _ f =
     let args =
       let f (t, _) =
         match t.ptyp_desc with
@@ -1821,7 +1832,7 @@ module FunctionExpansion (F : FUNCTION_EXPANSION) : Expansion = struct
     ]
 end
 
-module Expander (Expansion : Expansion) = struct
+module Expander (Expansion : EXPANSION) = struct
   let expand ~loc recursive t =
     let names =
       let f { ptype_name; _ } = ptype_name.txt in
@@ -1831,25 +1842,27 @@ module Expander (Expansion : Expansion) = struct
         []
     in
     let f t =
-      let Attributes.{ name; _ } =
-        Attributes.extract ~name:true t.ptype_attributes
+      let context =
+        {
+          attributes = Attributes.extract ~name:true t.ptype_attributes;
+          type_ = t.ptype_name.txt;
+          types = names;
+        }
       in
       let body =
         let loc = t.ptype_loc in
         match t.ptype_kind with
-        | Ptype_record fields ->
-          Expansion.expand_record ~loc ~names ~name:t.ptype_name.txt fields
+        | Ptype_record fields -> Expansion.expand_record ~loc ~context fields
         | Ptype_abstract -> (
           match t.ptype_manifest with
           | Some core_type ->
-            Expansion.expand_abstract_type ~loc ~names ~name:t.ptype_name.txt
-              core_type
+            Expansion.expand_abstract_type ~loc ~context core_type
           | None -> failwith "no manifest on abstract type" )
         | Ptype_open -> failwith "unsupported Ptype_open"
         | Ptype_variant options ->
-          Expansion.expand_variant ~loc ~names t.ptype_name.txt options
+          Expansion.expand_variant ~loc ~context options
       in
-      Expansion.close ~loc ~name t t.ptype_params body
+      Expansion.close ~loc ~context t t.ptype_params body
     in
     let expanded = List.map ~f t in
     Expansion.combine ~loc expanded
