@@ -450,7 +450,7 @@ module Schema : Expansion = struct
       [%expr { Schema.id = None; descriptor = [%e desc] }]
     (* Unsupported *)
     | core_type ->
-      Ppxlib.Location.raise_errorf ~loc "schematic-ppx: non supported type %a"
+      Ppxlib.Location.raise_errorf ~loc "schematic-ppx: unsupported type %a"
         Pprintast.core_type core_type
 
   and tuple_schema ~loc types =
@@ -790,9 +790,10 @@ module Schema : Expansion = struct
       match arg with
       | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, Invariant ->
         [%expr fun [%p pattern_id ~loc (schema_name name)] -> [%e exp]]
+      | { ptyp_desc = Ptyp_any; _ }, Invariant -> [%expr fun _ -> [%e exp]]
       | t, _ ->
         Ppxlib.Location.raise_errorf ~loc
-          "schematic-ppx: non supported type parameter %a" Pprintast.core_type t
+          "schematic-ppx: unsupported type parameter %a" Pprintast.core_type t
     in
     let body = List.fold_right ~f:wrap ~init params in
     let name = schema_name t.ptype_name.txt in

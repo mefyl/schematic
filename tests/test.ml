@@ -478,6 +478,12 @@ module Comparison = struct
     ()
 end
 
+(* Phantom types *)
+
+type _ id = string [@@deriving schema]
+
+type some_id = int id [@@deriving schema]
+
 (* Driver *)
 
 let () =
