@@ -2,11 +2,6 @@ open Base
 open Poly
 open Ppxlib
 
-let check_unknown_attribute ~loc name =
-  if String.is_prefix ~prefix:"schematic." name then
-    Ppxlib.Location.raise_errorf ~loc
-      "schematic-ppx: unknown schematic annotation %s" name
-
 module List = struct
   include List
 
@@ -266,6 +261,41 @@ let name suffix s =
     s ^ "_" ^ suffix
 
 let schema_name = name "schema"
+
+module Attributes = struct
+  type t = {
+    alias : string option;
+    name : string option;
+  }
+
+  let check_unknown_attribute ~loc name =
+    if String.is_prefix ~prefix:"schematic." name then
+      Ppxlib.Location.raise_errorf ~loc
+        "schematic-ppx: unknown schematic annotation %s" name
+
+  let rec extract ?(alias = false) ?(name = false) = function
+    | { attr_name = { txt; _ }; attr_loc = loc; attr_payload } :: attrs -> (
+      let attrs = extract attrs in
+      match txt with
+      | "schematic.as" when alias -> (
+        match attrs with
+        | { alias = None; _ } ->
+          { attrs with alias = Some (expect_string_constant ~loc attr_payload) }
+        | _ ->
+          Ppxlib.Location.raise_errorf ~loc
+            "schematic-ppx: duplicate schematic.as annotation on schema" )
+      | "schematic.name" when name -> (
+        match attrs with
+        | { name = None; _ } ->
+          { attrs with name = Some (expect_string_constant ~loc attr_payload) }
+        | _ ->
+          Ppxlib.Location.raise_errorf ~loc
+            "schematic-ppx: duplicate schematic.name annotation on schema" )
+      | _ ->
+        let () = check_unknown_attribute ~loc txt in
+        attrs )
+    | [] -> { alias = None; name = None }
+end
 
 let map_id ~f { txt; loc } =
   let txt =
@@ -536,7 +566,7 @@ module Schema : Expansion = struct
                   Ppxlib.Location.raise_errorf ~loc
                     "schematic-ppx: no payload expected" )
               | name ->
-                let () = check_unknown_attribute ~loc name in
+                let () = Attributes.check_unknown_attribute ~loc name in
                 (txt, inline, specs)
             in
             let txt, inline, specs =
@@ -654,23 +684,8 @@ module Schema : Expansion = struct
         match constructor_arguments_normalize ~loc pcd_args with
         | None ->
           let schema =
-            let alias =
-              let f alias = function
-                | {
-                    attr_name = { txt = "schematic.as"; _ };
-                    attr_loc = loc;
-                    attr_payload;
-                  } ->
-                  if Option.is_some alias then
-                    Ppxlib.Location.raise_errorf ~loc
-                      "schematic-ppx: duplicate schematic.as annotation"
-                  else
-                    Some (expect_string_constant ~loc attr_payload)
-                | { attr_name = { txt = name; _ }; attr_loc = loc; _ } ->
-                  let () = check_unknown_attribute ~loc name in
-                  alias
-              in
-              List.fold_left ~init:None ~f attrs
+            let Attributes.{ alias; _ } =
+              Attributes.extract ~alias:true attrs
             in
             [%expr
               {
@@ -1816,24 +1831,8 @@ module Expander (Expansion : Expansion) = struct
         []
     in
     let f t =
-      let name =
-        let rec extract_attributes = function
-          | { attr_name = { txt = name; _ }; attr_loc = loc; attr_payload }
-            :: attrs -> (
-            match name with
-            | "schematic.name" -> (
-              match extract_attributes attrs with
-              | None -> Some (expect_string_constant ~loc attr_payload)
-              | Some _ ->
-                Ppxlib.Location.raise_errorf ~loc
-                  "schematic-ppx: duplicate schematic.name annotation on schema"
-              )
-            | _ ->
-              let () = check_unknown_attribute ~loc name in
-              extract_attributes attrs )
-          | [] -> None
-        in
-        extract_attributes t.ptype_attributes
+      let Attributes.{ name; _ } =
+        Attributes.extract ~name:true t.ptype_attributes
       in
       let body =
         let loc = t.ptype_loc in
