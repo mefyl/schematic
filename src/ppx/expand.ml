@@ -57,15 +57,6 @@ module Expr = struct
       pexp_attributes = [];
     }
 
-  let record ~loc fields =
-    let f (name, value) = ({ txt = Lident name; loc }, value) in
-    {
-      pexp_desc = Pexp_record (List.map ~f fields, None);
-      pexp_loc = loc;
-      pexp_loc_stack = [];
-      pexp_attributes = [];
-    }
-
   let tuple ~loc = function
     | [] -> [%expr ()]
     | [ v ] -> v
@@ -216,25 +207,9 @@ let pattern_id ~loc txt =
     ppat_attributes = [];
   }
 
-let pattern_string ~loc txt =
-  {
-    ppat_desc = Ppat_constant (Pconst_string (txt, None));
-    ppat_loc = loc;
-    ppat_loc_stack = [];
-    ppat_attributes = [];
-  }
-
 let expr_id ~loc txt =
   {
     pexp_desc = Pexp_ident { txt; loc };
-    pexp_loc = loc;
-    pexp_loc_stack = [];
-    pexp_attributes = [];
-  }
-
-let expr_apply ~loc f args =
-  {
-    pexp_desc = Pexp_apply (f, args);
     pexp_loc = loc;
     pexp_loc_stack = [];
     pexp_attributes = [];
@@ -244,20 +219,6 @@ let expr_list ~loc list =
   let f m l = [%expr [%e m] :: [%e l]]
   and init = [%expr []] in
   List.fold_right ~f ~init list
-
-let expr_array ~loc list =
-  {
-    pexp_desc = Pexp_array list;
-    pexp_loc = loc;
-    pexp_loc_stack = [];
-    pexp_attributes = [];
-  }
-
-let expr_bool ~loc b =
-  if b then
-    [%expr true]
-  else
-    [%expr false]
 
 let expr_int ~loc i =
   {
