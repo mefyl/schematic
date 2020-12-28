@@ -484,6 +484,9 @@ type _ id = string [@@deriving schema]
 
 type some_id = int id [@@deriving schema]
 
+type identified = { id : identified id [@schematic.schema id_schema ()] }
+[@@deriving schema]
+
 (* Driver *)
 
 let () =

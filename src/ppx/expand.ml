@@ -515,81 +515,96 @@ module Schema : EXPANSION = struct
               pld_type;
               _;
             } ->
-            let read_attribute
-                (txt, inline, specs) { attr_name; attr_loc = loc; attr_payload }
-                =
-              match attr_name.txt with
-              | "schematic.properties" -> (
-                match attr_payload with
-                | PStr
-                    [%str
-                      [%e?
-                        {
-                          pexp_desc = Pexp_record (properties, None);
-                          pexp_loc = loc;
-                          _;
-                        }]] ->
-                  let prop specs = function
-                    | ( { txt = Lident name; _ },
-                        ({ pexp_desc = value; pexp_loc = loc; _ } as desc) )
-                      -> (
-                      match name with
-                      | "description" ->
-                        {
-                          specs with
-                          description = Some (expect_string ~loc value);
-                        }
-                      | "default" -> { specs with default = Some desc }
-                      | "example" -> { specs with examples = [ desc ] }
-                      | "minimum" ->
-                        { specs with maximum = Some (expect_int ~loc value) }
-                      | "maximum" ->
-                        { specs with minimum = Some (expect_int ~loc value) }
-                      | "unique" -> specs
+            let schema, txt, inline, specs =
+              let read_attribute
+                  (schema, txt, inline, specs)
+                  { attr_name; attr_loc = loc; attr_payload } =
+                match attr_name.txt with
+                | "schematic.schema" -> (
+                  match attr_payload with
+                  | PStr [%str [%e? exp]] -> (Some exp, txt, inline, specs)
+                  | _ ->
+                    Ppxlib.Location.raise_errorf ~loc
+                      "schematic-ppx: expression payload expected" )
+                | "schematic.properties" -> (
+                  match attr_payload with
+                  | PStr
+                      [%str
+                        [%e?
+                          {
+                            pexp_desc = Pexp_record (properties, None);
+                            pexp_loc = loc;
+                            _;
+                          }]] ->
+                    let prop specs = function
+                      | ( { txt = Lident name; _ },
+                          ({ pexp_desc = value; pexp_loc = loc; _ } as desc) )
+                        -> (
+                        match name with
+                        | "description" ->
+                          {
+                            specs with
+                            description = Some (expect_string ~loc value);
+                          }
+                        | "default" -> { specs with default = Some desc }
+                        | "example" -> { specs with examples = [ desc ] }
+                        | "minimum" ->
+                          { specs with maximum = Some (expect_int ~loc value) }
+                        | "maximum" ->
+                          { specs with minimum = Some (expect_int ~loc value) }
+                        | "unique" -> specs
+                        | _ ->
+                          Ppxlib.Location.raise_errorf ~loc
+                            "schematic-ppx: unrecognized property %S" name )
                       | _ ->
                         Ppxlib.Location.raise_errorf ~loc
-                          "schematic-ppx: unrecognized property %S" name )
-                    | _ ->
-                      Ppxlib.Location.raise_errorf ~loc
-                        "schematic-ppx: unrecognized property"
-                  in
-                  (txt, inline, List.fold ~init:specs_empty ~f:prop properties)
-                | _ ->
-                  Ppxlib.Location.raise_errorf ~loc
-                    "schematic-ppx: record payload expected" )
-              | "schematic.as" ->
-                (expect_string_constant ~loc attr_payload, inline, specs)
-              | "schematic.inline" -> (
-                match attr_payload with
-                | PStr [] ->
-                  if not inline then
-                    (txt, true, specs)
-                  else
+                          "schematic-ppx: unrecognized property"
+                    in
+                    ( schema,
+                      txt,
+                      inline,
+                      List.fold ~init:specs_empty ~f:prop properties )
+                  | _ ->
                     Ppxlib.Location.raise_errorf ~loc
-                      "schematic-ppx: inline specified multiple times"
-                | _ ->
-                  Ppxlib.Location.raise_errorf ~loc
-                    "schematic-ppx: no payload expected" )
-              | name ->
-                let () = Attributes.check_unknown_attribute ~loc name in
-                (txt, inline, specs)
-            in
-            let txt, inline, specs =
-              List.fold_left ~f:read_attribute ~init:(txt, false, specs_empty)
+                      "schematic-ppx: record payload expected" )
+                | "schematic.as" ->
+                  ( schema,
+                    expect_string_constant ~loc attr_payload,
+                    inline,
+                    specs )
+                | "schematic.inline" -> (
+                  match attr_payload with
+                  | PStr [] ->
+                    if not inline then
+                      (schema, txt, true, specs)
+                    else
+                      Ppxlib.Location.raise_errorf ~loc
+                        "schematic-ppx: inline specified multiple times"
+                  | _ ->
+                    Ppxlib.Location.raise_errorf ~loc
+                      "schematic-ppx: no payload expected" )
+                | name ->
+                  let () = Attributes.check_unknown_attribute ~loc name in
+                  (schema, txt, inline, specs)
+              in
+              List.fold_left ~f:read_attribute
+                ~init:(None, txt, false, specs_empty)
                 pld_attributes
             in
-            let requirement, schema =
+            let requirement, t =
               match pld_type with
               | {
                ptyp_desc = Ptyp_constr ({ txt = Lident "option"; _ }, [ t ]);
                _;
               } ->
-                ([%expr Optional], encode_type ~loc ~context t)
+                ([%expr Optional], t)
               | t -> (
                 match specs.default with
-                | Some default ->
-                  ([%expr Default [%e default]], encode_type ~loc ~context t)
-                | None -> ([%expr Required], encode_type ~loc ~context t) )
+                | Some default -> ([%expr Default [%e default]], t)
+                | None -> ([%expr Required], t) )
+            in
+            let schema =
+              Option.value ~default:(encode_type ~loc ~context t) schema
             in
             ( loc,
               requirement,
