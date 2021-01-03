@@ -6,6 +6,8 @@ val int_schema : int schema
 
 val list_schema : 'a schema -> 'a list schema
 
+val option_schema : 'a schema -> 'a option schema
+
 val mapping_schema : 'a schema -> (string * 'a) list schema
 
 val string_schema : string schema

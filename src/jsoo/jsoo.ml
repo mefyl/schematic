@@ -74,6 +74,10 @@ let decode schema =
       decode schema js >>= fun value -> Result.return @@ cons value
     | Mapping _ -> failwith "FIXME"
     | Null -> Result.return ()
+    | Nullable s ->
+      Js.Opt.case (Js.Opt.return js)
+        (fun () -> Result.return None)
+        (fun v -> decode s.descriptor v |> Result.map ~f:Option.return)
     | Object descriptor ->
       let rec decode_object :
           type t. (t, [ `Object ]) descriptor -> (t, [> decode_error ]) Result.t
@@ -84,7 +88,7 @@ let decode schema =
             if inline then
               Some js
             else
-              Js.Unsafe.get js (Js.string field) |> Js.Opt.to_option
+              Js.Unsafe.get js (Js.string field) |> Js.Optdef.to_option
           in
           let field = decode_field field schema requirement value in
           Result.Let_syntax.Let_syntax.both field (decode_object rest)
@@ -141,7 +145,10 @@ let decode schema =
       function
       | Some v ->
         if v == Js.Unsafe.pure_js_expr "null" then
-          Result.return None
+          match schema.descriptor with
+          | Null -> Result.return (Some ())
+          | Nullable _ -> Result.return (Some None)
+          | _ -> Result.return None
         else
           Result.map ~f:Option.return @@ decode schema.descriptor v
       | None -> Result.return None )
@@ -165,6 +172,10 @@ let encode schema =
       @@ List.map ~f:(encode items_schema.descriptor) v
     | Map (_, decons, schema) -> encode schema @@ decons v
     | Null -> Js.Unsafe.coerce @@ Js.Unsafe.pure_js_expr "null"
+    | Nullable s -> (
+      match v with
+      | None -> Js.Unsafe.pure_js_expr "null"
+      | Some v -> encode s.descriptor v )
     | Mapping _ -> failwith "FIXME"
     | Object descriptor ->
       let rec encode_object :

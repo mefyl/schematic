@@ -2,21 +2,37 @@
 
 const assert = require('assert');
 
-const { ofString, toString, variantRoundtrip } = require('./test.bc.js');
+const { toJs, ofJs, ofString, toString, variantRoundtrip } = require('./test.bc.js');
 
 const value = { i : 42, s : 'enyleme', b: true, a: [0, 1, 2], pair: [true, false] }
 
+// Optional missing
 assert.deepEqual(
-  ofString('{ "i" : 42, "s": "enyleme", "b": true, "opt": null, "a": [0, 1, 2], "pair": [true, false] }'),
+  ofJs({ "i" : 42, "s": "enyleme", "b": true, "a": [0, 1, 2], "pair": [true, false] }),
   value)
-
-// Missing optional values are interpreted as None
 assert.deepEqual(
   ofString('{ "i" : 42, "s": "enyleme", "b": true, "a": [0, 1, 2], "pair": [true, false] }'),
   value)
 
-delete value['opt']
+// Optional as null
+assert.deepEqual(
+  ofString('{ "i" : 42, "s": "enyleme", "b": true, "opt": null, "opt_nullable": null, "a": [0, 1, 2], "pair": [true, false] }'),
+  Object.assign({}, value, { opt_nullable: null }))
+assert.deepEqual(
+  ofJs({ "i" : 42, "s": "enyleme", "b": true, "opt": null, "opt_nullable": null, "a": [0, 1, 2], "pair": [true, false] }),
+  Object.assign({}, value, { opt_nullable: null }))
 
+// Optional filled
+assert.deepEqual(
+  ofString('{ "i" : 42, "s": "enyleme", "b": true, "opt": true, "opt_nullable": false, "a": [0, 1, 2], "pair": [true, false] }'),
+  Object.assign({}, value, { opt: true, opt_nullable: false }))
+assert.deepEqual(
+  ofJs({ "i" : 42, "s": "enyleme", "b": true, "opt": true, "opt_nullable": false, "a": [0, 1, 2], "pair": [true, false] }),
+  Object.assign({}, value, { opt: true, opt_nullable: false }))
+
+assert.deepEqual(
+  toJs(value),
+  value);
 assert.deepEqual(
   JSON.parse(toString(value)),
   value);

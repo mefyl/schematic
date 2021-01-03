@@ -10,6 +10,7 @@ type o = {
   s : string;
   b : bool;
   opt : bool option;
+  opt_nullable : bool option option;
   a : Namespace.int_alias list;
   pair : bool * bool;
 }
@@ -42,10 +43,18 @@ let () =
          Schematic_jsoo.Json.of_string (Js.to_string s) >>= fun json ->
          Schematic.Json.decode o_schema json >>| o_to_js
 
+       method ofJs v =
+         of_result
+         @@
+         let open Result in
+         Schematic_jsoo.Jsoo.decode o_schema v >>| o_to_js
+
        method toString o =
          o_of_js_exn o
          |> Schematic.Json.encode o_schema
          |> Schematic_jsoo.Json.to_string |> Js.string
+
+       method toJs o = o_of_js_exn o |> Schematic_jsoo.Jsoo.encode o_schema
 
        method variantRoundtrip (js : variant_js) =
          of_result

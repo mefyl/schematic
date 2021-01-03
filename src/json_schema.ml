@@ -7,7 +7,18 @@ type uri_reference = string
 
 and uri = string
 
-and core = {
+and type_ =
+  | Array
+  | Boolean
+  | Integer
+  | Null
+  | Number
+  | Object
+  | String
+  | OneOf of type_ list
+[@@deriving schema]
+
+type core = {
   id : uri_reference option; [@schematic.as "$id"]
   schema : uri option; [@schematic.as "$schema"]
   anchor : string option; [@schematic.as "$anchor"]
@@ -19,16 +30,6 @@ and core = {
   defs : (string * json_schema) list option;
       [@schematic.as "$defs"] [@schematic.properties { default = [] }]
 }
-
-and type_ =
-  | Array
-  | Boolean
-  | Integer
-  | Null
-  | Number
-  | Object
-  | String
-  | OneOf of type_ list
 
 and additional_properties =
   | Properties_schema of json_schema
@@ -80,7 +81,7 @@ and validation = {
   dependentRequired : (string * string list) list option;
   const : any option;
   enum : any list option;
-  type_ : type_ option;
+  type_ : (type_, type_ list) Either.t option;
 }
 
 and metadata = {
@@ -203,20 +204,47 @@ let of_schema schema =
     let rec validation : type t. (t, _) Schema.descriptor -> validation =
       function
       | Schema.Any -> validation_empty
-      | Schema.Bool -> { validation_empty with type_ = Some Boolean }
+      | Schema.Bool ->
+        { validation_empty with type_ = Some (Either.first Boolean) }
       | Schema.Date -> validation date_tuple_schema.descriptor
-      | Schema.Int -> { validation_empty with type_ = Some Integer }
-      | Schema.List _ -> { validation_empty with type_ = Some Array }
+      | Schema.Int ->
+        { validation_empty with type_ = Some (Either.first Integer) }
+      | Schema.List _ ->
+        { validation_empty with type_ = Some (Either.first Array) }
       | Schema.Map (_, _, schema) -> validation schema
       | Schema.Mapping _ -> validation_empty
-      | Schema.Null -> { validation_empty with type_ = Some Null }
-      | Schema.String -> { validation_empty with type_ = Some String }
+      | Schema.Null ->
+        { validation_empty with type_ = Some (Either.first Null) }
+      | Schema.Nullable s -> (
+        let next = validation s.descriptor in
+        match next.type_ with
+        | None -> { next with type_ = Some (Either.first Null) }
+        | Some (Either.First t) ->
+          { next with type_ = Some (Either.second [ t; Null ]) }
+        | Some (Either.Second types) ->
+          {
+            next with
+            type_ =
+              Some
+                (Either.second
+                   (List.dedup_and_sort ~compare:Poly.compare (Null :: types)));
+          } )
+      | Schema.String ->
+        { validation_empty with type_ = Some (Either.first String) }
       | Schema.String_const v ->
-        { validation_empty with type_ = Some String; const = Some (`String v) }
-      | Schema.Time -> { validation_empty with type_ = Some String }
-      | Schema.Time_local -> { validation_empty with type_ = Some String }
-      | Schema.Object _ -> { validation_empty with type_ = Some Object }
-      | Schema.Tuple _ -> { validation_empty with type_ = Some Array }
+        {
+          validation_empty with
+          type_ = Some (Either.first String);
+          const = Some (`String v);
+        }
+      | Schema.Time ->
+        { validation_empty with type_ = Some (Either.first String) }
+      | Schema.Time_local ->
+        { validation_empty with type_ = Some (Either.first String) }
+      | Schema.Object _ ->
+        { validation_empty with type_ = Some (Either.first Object) }
+      | Schema.Tuple _ ->
+        { validation_empty with type_ = Some (Either.first Array) }
       | Schema.Union _ -> validation_empty
     and applicator :
         type t kind.
@@ -240,6 +268,7 @@ let of_schema schema =
               additionalProperties = Some (Properties_schema schema);
             } )
       | Schema.Null -> (marks, Some applicator_empty)
+      | Schema.Nullable s -> applicator marks s.descriptor
       | Schema.String -> (marks, Some applicator_empty)
       | Schema.String_const _ -> (marks, Some applicator_empty)
       | Schema.Time -> (marks, Some applicator_empty)
@@ -252,6 +281,7 @@ let of_schema schema =
             ids * (string * json_schema) list option =
          fun marks -> function
           | Schema.Null -> (marks, None)
+          | Schema.Nullable s -> get_fields marks s.descriptor
           | Schema.Map (_, _, d) -> get_fields marks d
           | Schema.Object
               {

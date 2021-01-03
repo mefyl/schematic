@@ -32,6 +32,7 @@ and ('t, 'kind) descriptor =
       -> ('b, [< `Value ]) descriptor
   | Mapping : 'a schema -> ((string * 'a) list, [< `Value ]) descriptor
   | Null : (unit, [< kinds ]) descriptor
+  | Nullable : 'a schema -> ('a option, [< `Value ]) descriptor
   | String : (string, [< `Value ]) descriptor
   | String_const : string -> (unit, [< `Value ]) descriptor
   | Time : (Ptime.t, [< `Value ]) descriptor

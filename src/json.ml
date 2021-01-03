@@ -49,7 +49,10 @@ module Make (Impl : Impl) = struct
         | None -> Result.return default )
       | Optional -> (
         function
-        | Some `Null -> Result.return None
+        | Some `Null -> (
+          match decode schema.descriptor `Null with
+          | Result.Ok v -> Result.return (Some v)
+          | Result.Error _ -> Result.return None )
         | Some v -> Result.map ~f:Option.return @@ decode schema.descriptor v
         | None -> Result.return None )
     and decode :
@@ -84,6 +87,8 @@ module Make (Impl : Impl) = struct
       | Mapping _, _ -> type_error "mapping"
       | Null, `Null -> Result.return ()
       | Null, _ -> type_error "null"
+      | Nullable _, `Null -> Result.return None
+      | Nullable s, v -> decode s.descriptor v |> Result.map ~f:Option.return
       | Object descriptor, (`O fields as o) ->
         let rec decode_object :
             type t.
@@ -175,6 +180,10 @@ module Make (Impl : Impl) = struct
       | List items_schema -> `A (List.map ~f:(encode items_schema.descriptor) v)
       | Map (_, decons, schema) -> encode schema @@ decons v
       | Null -> `Null
+      | Nullable s -> (
+        match v with
+        | None -> `Null
+        | Some v -> encode s.descriptor v )
       | Mapping fields_schema ->
         `O
           (List.map

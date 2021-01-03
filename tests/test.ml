@@ -51,6 +51,34 @@ let atom_string () =
   test "int atom" Alcotest.string string_schema "trente trois"
     "\"trente trois\""
 
+(* Option *)
+
+let options () =
+  let () =
+    test "some int"
+      Alcotest.(option int)
+      (option_schema int_schema) (Some 28) "28"
+  and () =
+    test "none int" Alcotest.(option int) (option_schema int_schema) None "null"
+  in
+  ()
+
+type nullable_option = { no : int option option } [@@deriving schema, eq, show]
+
+let nullable_option = Alcotest.testable pp_nullable_option equal_nullable_option
+
+let nullable_option () =
+  let () =
+    test "omitted" nullable_option nullable_option_schema { no = None } "{}"
+  and () =
+    test "null" nullable_option nullable_option_schema { no = Some None }
+      {|{ "no" : null }|}
+  and () =
+    test "specified" nullable_option nullable_option_schema
+      { no = Some (Some 74) } {|{ "no" : 74 }|}
+  in
+  ()
+
 (* Record *)
 
 type version = {
@@ -497,6 +525,8 @@ let () =
         [
           test_case "int" `Quick atom_int;
           test_case "string" `Quick atom_string;
+          test_case "option" `Quick options;
+          test_case "nullable option" `Quick nullable_option;
           test_case "record" `Quick record;
           test_case "tuple" `Quick tuple;
           test_case "variant" `Quick variant;

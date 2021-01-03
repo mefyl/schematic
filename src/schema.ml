@@ -23,6 +23,10 @@ let rec pp_descriptor : type t kind. (t, kind) descriptor Fmt.t =
     | Map (_, _, d) -> const pp_descriptor d
     | Mapping schema -> const pp schema
     | Null -> const string "()"
+    | Nullable s ->
+      const string "Nullable ("
+      ++ const pp_descriptor s.descriptor
+      ++ const string ")"
     | String -> const string "string"
     | String_const v -> escape v
     | Time -> const string "time"
@@ -81,6 +85,7 @@ let compare schema =
     | Map (_, map, v) -> fun l r -> compare v (map l) (map r)
     | Mapping schema -> assoc_compare (compare schema.descriptor)
     | Null -> fun () () -> 0
+    | Nullable s -> fun l r -> Base.Option.compare (compare s.descriptor) l r
     | String -> String.compare
     | String_const _ -> fun () () -> 0
     | Time -> Ptime.compare
