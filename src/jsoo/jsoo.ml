@@ -55,74 +55,84 @@ let decode schema =
   let rec decode :
       type t kind. (t, kind) descriptor -> Js.Unsafe.any -> (t, 'error) Result.t
       =
-   fun schema js ->
     let open Result in
-    match schema with
-    | Any -> Result.return @@ Impl_js.of_js js
-    | Bool -> Result.return @@ Js.to_bool (Js.Unsafe.coerce js)
-    | Date -> Result.return @@ date_of_js @@ Js.Unsafe.coerce js
-    | Int ->
-      if Js.typeof js == Js.string "number" then
-        Result.return (Js.Unsafe.coerce js |> Js.float_of_number |> Int.of_float)
-      else
-        Result.fail (`Js_decode "invalid integer")
-    | List items_schema ->
-      Js.Unsafe.coerce js |> Js.to_array
-      |> Array.map ~f:(decode items_schema.descriptor)
-      |> Array.to_list |> Result.all
-    | Map (cons, _, schema) ->
-      decode schema js >>= fun value -> Result.return @@ cons value
-    | Mapping _ -> failwith "FIXME"
-    | Null -> Result.return ()
-    | Nullable s ->
-      Js.Opt.case (Js.Opt.return js)
-        (fun () -> Result.return None)
-        (fun v -> decode s.descriptor v |> Result.map ~f:Option.return)
-    | Object descriptor ->
-      let rec decode_object :
-          type t. (t, [ `Object ]) descriptor -> (t, [> decode_error ]) Result.t
-          = function
-        | Object { field; requirement; schema; rest; _ } ->
-          let inline, schema = extract_field_schema schema in
-          let value =
-            if inline then
-              Some js
-            else
-              Js.Unsafe.get js (Js.string field) |> Js.Optdef.to_option
-          in
-          let field = decode_field field schema requirement value in
-          Result.Let_syntax.Let_syntax.both field (decode_object rest)
-        | Null -> Result.return ()
-      in
-      decode_object (Object descriptor)
-    | String -> Result.return @@ Js.to_string @@ Js.Unsafe.coerce js
-    | String_const s ->
-      if Js.Unsafe.coerce js == Js.string s then
-        Result.return ()
-      else
-        Result.fail @@ `Js_decode "mismatched constant string"
-    | Time -> Result.return @@ ptime_of_js @@ Js.Unsafe.coerce js
-    | Time_local -> Result.return @@ (ptime_of_js @@ Js.Unsafe.coerce js, 0)
-    | Tuple descriptor ->
-      let rec decode_tuple :
-          type t. int -> (t, [ `Tuple ]) descriptor -> (t, 'error) Result.t =
-       fun i -> function
-        | Tuple { schema; rest } ->
-          decode schema.descriptor @@ Js.Unsafe.get (Js.Unsafe.coerce js) i
-          >>= fun hd ->
-          decode_tuple (i + 1) rest >>= fun tl -> Result.return (hd, tl)
-        | Null -> Result.return ()
-      in
-      decode_tuple 0 (Tuple descriptor)
-    | Union cases -> (
-      let conv (Case { schema; decoder; _ }) =
-        match decode schema.descriptor js with
-        | Result.Ok v -> Some (decoder v)
-        | Result.Error _ -> None
-      in
-      match List.find_map ~f:conv cases with
-      | Some res -> Result.return res
-      | None -> Result.fail (`Js_decode "no union case was matched") )
+    let fail fmt =
+      let f s = Result.fail (`Js_decode s) in
+      Fmt.kstr f fmt
+    in
+    fun schema js ->
+      match schema with
+      | Any -> Result.return @@ Impl_js.of_js js
+      | Bool -> Result.return @@ Js.to_bool (Js.Unsafe.coerce js)
+      | Date ->
+        if Js.instanceof js Js.Unsafe.global##._Date then
+          Result.return @@ date_of_js @@ Js.Unsafe.coerce js
+        else
+          fail "invalid date: %s" (Js._JSON##stringify js |> Js.to_string)
+      | Int ->
+        if Js.typeof js == Js.string "number" then
+          Result.return
+            (Js.Unsafe.coerce js |> Js.float_of_number |> Int.of_float)
+        else
+          Result.fail (`Js_decode "invalid integer")
+      | List items_schema ->
+        Js.Unsafe.coerce js |> Js.to_array
+        |> Array.map ~f:(decode items_schema.descriptor)
+        |> Array.to_list |> Result.all
+      | Map (cons, _, schema) ->
+        decode schema js >>= fun value -> Result.return @@ cons value
+      | Mapping _ -> failwith "FIXME"
+      | Null -> Result.return ()
+      | Nullable s ->
+        Js.Opt.case (Js.Opt.return js)
+          (fun () -> Result.return None)
+          (fun v -> decode s.descriptor v |> Result.map ~f:Option.return)
+      | Object descriptor ->
+        let rec decode_object :
+            type t.
+            (t, [ `Object ]) descriptor -> (t, [> decode_error ]) Result.t =
+          function
+          | Object { field; requirement; schema; rest; _ } ->
+            let inline, schema = extract_field_schema schema in
+            let value =
+              if inline then
+                Some js
+              else
+                Js.Unsafe.get js (Js.string field) |> Js.Optdef.to_option
+            in
+            let field = decode_field field schema requirement value in
+            Result.Let_syntax.Let_syntax.both field (decode_object rest)
+          | Null -> Result.return ()
+        in
+        decode_object (Object descriptor)
+      | String -> Result.return @@ Js.to_string @@ Js.Unsafe.coerce js
+      | String_const s ->
+        if Js.Unsafe.coerce js == Js.string s then
+          Result.return ()
+        else
+          Result.fail @@ `Js_decode "mismatched constant string"
+      | Time -> Result.return @@ ptime_of_js @@ Js.Unsafe.coerce js
+      | Time_local -> Result.return @@ (ptime_of_js @@ Js.Unsafe.coerce js, 0)
+      | Tuple descriptor ->
+        let rec decode_tuple :
+            type t. int -> (t, [ `Tuple ]) descriptor -> (t, 'error) Result.t =
+         fun i -> function
+          | Tuple { schema; rest } ->
+            decode schema.descriptor @@ Js.Unsafe.get (Js.Unsafe.coerce js) i
+            >>= fun hd ->
+            decode_tuple (i + 1) rest >>= fun tl -> Result.return (hd, tl)
+          | Null -> Result.return ()
+        in
+        decode_tuple 0 (Tuple descriptor)
+      | Union cases -> (
+        let conv (Case { schema; decoder; _ }) =
+          match decode schema.descriptor js with
+          | Result.Ok v -> Some (decoder v)
+          | Result.Error _ -> None
+        in
+        match List.find_map ~f:conv cases with
+        | Some res -> Result.return res
+        | None -> Result.fail (`Js_decode "no union case was matched") )
   and decode_field :
       type t r.
       string ->
