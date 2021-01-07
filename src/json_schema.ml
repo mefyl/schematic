@@ -207,6 +207,8 @@ let of_schema schema =
       | Schema.Bool ->
         { validation_empty with type_ = Some (Either.first Boolean) }
       | Schema.Date -> validation date_tuple_schema.descriptor
+      | Schema.Float ->
+        { validation_empty with type_ = Some (Either.first Number) }
       | Schema.Int ->
         { validation_empty with type_ = Some (Either.first Integer) }
       | Schema.List _ ->
@@ -253,7 +255,9 @@ let of_schema schema =
       | Schema.Any -> (marks, Some applicator_empty)
       | Schema.Bool -> (marks, Some applicator_empty)
       | Schema.Date -> applicator marks date_tuple_schema.descriptor
-      | Schema.Int -> (marks, Some applicator_empty)
+      | Schema.Float
+      | Schema.Int ->
+        (marks, Some applicator_empty)
       | Schema.List schema ->
         let marks, schema = of_schema marks schema in
         ( marks,
@@ -337,9 +341,11 @@ let of_schema schema =
               ( marks,
                 Some (fields @ Option.value ~default:[] applicator.properties)
               ) )
-          | Schema.Any -> (marks, None)
-          | Schema.Bool -> (marks, None)
+          | Schema.Any
+          | Schema.Bool ->
+            (marks, None)
           | Schema.Date -> (marks, None)
+          | Schema.Float -> (marks, None)
           | Schema.Int -> (marks, None)
           | Schema.List _ -> (marks, None)
           | Schema.Mapping _ -> (marks, None)

@@ -25,6 +25,7 @@ and ('t, 'kind) descriptor =
   | Any : (Ezjsonm.value, [< `Value ]) descriptor
   | Bool : (bool, [< `Value ]) descriptor
   | Date : (Ptime.date, [< `Value ]) descriptor
+  | Float : (float, [< `Value ]) descriptor
   | Int : (int, [< `Value ]) descriptor
   | List : 'a schema -> ('a list, [< `Value ]) descriptor
   | Map :

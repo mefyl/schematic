@@ -5,6 +5,8 @@ module Schemas = struct
 
   let int_schema = { Schema.id = None; descriptor = Int }
 
+  let float_schema = { Schema.id = None; descriptor = Float }
+
   let option_schema s = { Schema.id = None; descriptor = Nullable s }
 
   let string_schema = { Schema.id = None; descriptor = String }

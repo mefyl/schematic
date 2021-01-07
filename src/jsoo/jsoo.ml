@@ -69,6 +69,11 @@ let decode schema =
           Result.return @@ date_of_js @@ Js.Unsafe.coerce js
         else
           fail "invalid date: %s" (Js._JSON##stringify js |> Js.to_string)
+      | Float ->
+        if Js.typeof js == Js.string "number" then
+          Result.return (Js.Unsafe.coerce js |> Js.float_of_number)
+        else
+          Result.fail (`Js_decode "invalid number")
       | Int ->
         if Js.typeof js == Js.string "number" then
           Result.return
@@ -176,6 +181,7 @@ let encode schema =
     | Any -> Js.Unsafe.coerce @@ Impl_js.to_js v
     | Bool -> Js.Unsafe.coerce @@ Js.bool v
     | Date -> Js.Unsafe.coerce @@ js_of_date v
+    | Float -> Js.Unsafe.coerce @@ Js.number_of_float v
     | Int -> Js.Unsafe.coerce @@ Js.number_of_float @@ Float.of_int v
     | List items_schema ->
       Js.Unsafe.coerce @@ Js.array @@ Array.of_list

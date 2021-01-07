@@ -4,6 +4,8 @@ val bool_schema : bool schema
 
 val int_schema : int schema
 
+val float_schema : float schema
+
 val list_schema : 'a schema -> 'a list schema
 
 val option_schema : 'a schema -> 'a option schema

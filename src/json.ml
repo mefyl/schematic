@@ -71,8 +71,11 @@ module Make (Impl : Impl) = struct
       | Bool, `Bool b -> Result.return b
       | Bool, _ -> type_error "boolean"
       | Date, json -> decode date_tuple_schema.descriptor json
+      | Float, `Float f -> Result.return f
       | Int, `Float f -> Result.return @@ Float.to_int f
-      | Int, _ -> type_error "float"
+      | Float, _
+      | Int, _ ->
+        type_error "float"
       | List items_schema, `A items ->
         List.map (decode items_schema.descriptor) items
       | List _, _ -> type_error "list"
@@ -176,6 +179,7 @@ module Make (Impl : Impl) = struct
       | Any -> v
       | Bool -> `Bool v
       | Date -> encode date_tuple_schema.descriptor v
+      | Float -> `Float v
       | Int -> `Float (Float.of_int v)
       | List items_schema -> `A (List.map ~f:(encode items_schema.descriptor) v)
       | Map (_, decons, schema) -> encode schema @@ decons v
