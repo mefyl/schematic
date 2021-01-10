@@ -1327,9 +1327,11 @@ module Jsoo_type : EXPANSION = struct
       expand_polymorphic_variant ~loc ~context fields
     (* I don't know of any way to properly type this, so any it is *)
     | Ptyp_tuple _ -> [%type: Js_of_ocaml.Js.Unsafe.any]
+    (* Type variable *)
+    | Ptyp_var _ -> t
     | _ ->
       Ppxlib.Location.raise_errorf ~loc:t.ptyp_loc
-        "schematic-ppx: unsupported type"
+        "schematic-ppx: unsupported type %a" Pprintast.core_type t
 
   and expand_record ~loc ~context fields =
     let f { pld_name; pld_type; pld_loc; _ } : object_field =
