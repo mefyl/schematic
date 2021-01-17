@@ -53,15 +53,18 @@ let ptime_of_js (date : Js.date Js.t) =
 
 let decode schema =
   let rec decode :
-      type t kind. (t, kind) descriptor -> Js.Unsafe.any -> (t, 'error) Result.t
-      =
+      type t kind.
+      string option ->
+      (t, kind) descriptor ->
+      Js.Unsafe.any ->
+      (t, 'error) Result.t =
     let open Result in
     let fail fmt =
       let f s = Result.fail (`Js_decode s) in
       Fmt.kstr f fmt
     in
-    fun schema js ->
-      match schema with
+    fun id descriptor js ->
+      match descriptor with
       | Any -> Result.return @@ Impl_js.of_js js
       | Bool -> Result.return @@ Js.to_bool (Js.Unsafe.coerce js)
       | Date ->
@@ -82,16 +85,16 @@ let decode schema =
           Result.fail (`Js_decode "invalid integer")
       | List items_schema ->
         Js.Unsafe.coerce js |> Js.to_array
-        |> Array.map ~f:(decode items_schema.descriptor)
+        |> Array.map ~f:(decode items_schema.id items_schema.descriptor)
         |> Array.to_list |> Result.all
       | Map (cons, _, schema) ->
-        decode schema js >>= fun value -> Result.return @@ cons value
+        decode id schema js >>= fun value -> Result.return @@ cons value
       | Mapping _ -> failwith "FIXME"
       | Null -> Result.return ()
       | Nullable s ->
         Js.Opt.case (Js.Opt.return js)
           (fun () -> Result.return None)
-          (fun v -> decode s.descriptor v |> Result.map ~f:Option.return)
+          (fun v -> decode s.id s.descriptor v |> Result.map ~f:Option.return)
       | Object descriptor ->
         let rec decode_object :
             type t.
@@ -105,7 +108,7 @@ let decode schema =
               else
                 Js.Unsafe.get js (Js.string field) |> Js.Optdef.to_option
             in
-            let field = decode_field field schema requirement value in
+            let field = decode_field id field schema requirement value in
             Result.Let_syntax.Let_syntax.both field (decode_object rest)
           | Null -> Result.return ()
         in
@@ -123,7 +126,8 @@ let decode schema =
             type t. int -> (t, [ `Tuple ]) descriptor -> (t, 'error) Result.t =
          fun i -> function
           | Tuple { schema; rest } ->
-            decode schema.descriptor @@ Js.Unsafe.get (Js.Unsafe.coerce js) i
+            decode schema.id schema.descriptor
+            @@ Js.Unsafe.get (Js.Unsafe.coerce js) i
             >>= fun hd ->
             decode_tuple (i + 1) rest >>= fun tl -> Result.return (hd, tl)
           | Null -> Result.return ()
@@ -131,7 +135,7 @@ let decode schema =
         decode_tuple 0 (Tuple descriptor)
       | Union cases -> (
         let conv (Case { schema; decoder; _ }) =
-          match decode schema.descriptor js with
+          match decode schema.id schema.descriptor js with
           | Result.Ok v -> Some (decoder v)
           | Result.Error _ -> None
         in
@@ -140,21 +144,29 @@ let decode schema =
         | None -> Result.fail (`Js_decode "no union case was matched") )
   and decode_field :
       type t r.
+      string option ->
       string ->
       t schema ->
       (t, r) field_requirement ->
       Js.Unsafe.any option ->
       (r, 'error) Result.t =
-   fun field schema -> function
+   fun id field schema -> function
     | Required -> (
       function
-      | Some v -> decode schema.descriptor v
-      | None ->
-        Result.fail
-          (`Js_decode (Printf.sprintf "missing required field %s" field)) )
+      | Some v -> decode schema.id schema.descriptor v
+      | None -> (
+        match id with
+        | None ->
+          Result.fail
+            (`Js_decode (Printf.sprintf "missing required field %S" field))
+        | Some id ->
+          Result.fail
+            (`Js_decode
+              (Printf.sprintf "missing required field %S for schema %S" field
+                 id)) ) )
     | Default default -> (
       function
-      | Some v -> decode schema.descriptor v
+      | Some v -> decode schema.id schema.descriptor v
       | None -> Result.return default )
     | Optional -> (
       function
@@ -165,10 +177,10 @@ let decode schema =
           | Nullable _ -> Result.return (Some None)
           | _ -> Result.return None
         else
-          Result.map ~f:Option.return @@ decode schema.descriptor v
+          Result.map ~f:Option.return @@ decode schema.id schema.descriptor v
       | None -> Result.return None )
   in
-  decode schema.descriptor
+  decode schema.id schema.descriptor
 
 let js_of_date (y, m, d) = new%js Js.date_day y (m - 1) d
 
