@@ -16,6 +16,7 @@ let rec pp_descriptor : type t kind. (t, kind) descriptor Fmt.t =
     | Date -> const string "date"
     | Float -> const string "int"
     | Int -> const string "int"
+    | Int64 -> const string "int64"
     | List schema ->
       box ~indent
       @@ const string "[" ++ sp
@@ -82,7 +83,9 @@ let compare schema =
     | Bool -> Base.Bool.compare
     | Date -> Base.Poly.compare
     | Float -> Base.Poly.compare
-    | Int -> Base.Poly.compare
+    | Int
+    | Int64 ->
+      Base.Poly.compare
     | List schema -> Base.List.compare (compare schema.descriptor)
     | Map (_, map, v) -> fun l r -> compare v (map l) (map r)
     | Mapping schema -> assoc_compare (compare schema.descriptor)

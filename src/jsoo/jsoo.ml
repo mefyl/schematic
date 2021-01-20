@@ -83,6 +83,12 @@ let decode schema =
             (Js.Unsafe.coerce js |> Js.float_of_number |> Int.of_float)
         else
           Result.fail (`Js_decode "invalid integer")
+      | Int64 ->
+        if Js.typeof js == Js.string "number" then
+          Result.return
+            (Js.Unsafe.coerce js |> Js.float_of_number |> Int64.of_float)
+        else
+          Result.fail (`Js_decode "invalid integer")
       | List items_schema ->
         Js.Unsafe.coerce js |> Js.to_array
         |> Array.map ~f:(decode items_schema.id items_schema.descriptor)
@@ -195,6 +201,7 @@ let encode schema =
     | Date -> Js.Unsafe.coerce @@ js_of_date v
     | Float -> Js.Unsafe.coerce @@ Js.number_of_float v
     | Int -> Js.Unsafe.coerce @@ Js.number_of_float @@ Float.of_int v
+    | Int64 -> Js.Unsafe.coerce @@ Js.number_of_float @@ Float.of_int64 v
     | List items_schema ->
       Js.Unsafe.coerce @@ Js.array @@ Array.of_list
       @@ List.map ~f:(encode items_schema.descriptor) v

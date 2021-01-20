@@ -27,6 +27,7 @@ and ('t, 'kind) descriptor =
   | Date : (Ptime.date, [< `Value ]) descriptor
   | Float : (float, [< `Value ]) descriptor
   | Int : (int, [< `Value ]) descriptor
+  | Int64 : (int64, [< `Value ]) descriptor
   | List : 'a schema -> ('a list, [< `Value ]) descriptor
   | Map :
       ('a -> 'b) * ('b -> 'a) * ('a, [ `Value ]) descriptor
