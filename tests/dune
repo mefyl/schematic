@@ -46,3 +46,10 @@
  (alias runtest)
  (action
   (run ./json.exe)))
+
+(test
+ (name typescript)
+ (modules typescript)
+ (preprocess
+  (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
+ (libraries alcotest schematic))

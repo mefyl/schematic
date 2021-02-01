@@ -14,3 +14,5 @@ module Schema = struct
   include Schema
   module Schemas = Schemas
 end
+
+module Typescript = Typescript
