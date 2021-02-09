@@ -157,21 +157,34 @@ let record_deconstruct ~loc ?prefix (fields : label_declaration list) =
    While we're at it, map constructor record arguments to tuple too, to
    streamline constructors arguments handling. *)
 
+type normalized_ctor = {
+  count : int;
+  ctor_pattern : (int -> pattern) -> pattern;
+  ctor_value : (int -> core_type -> expression) -> expression;
+  type_ : core_type;
+}
+
 let constructor_arguments_normalize ~loc = function
   | Pcstr_tuple [] -> None
-  | Pcstr_tuple [ t ] ->
+  | Pcstr_tuple [ type_ ] ->
     let pattern f = f 0
-    and value f = f 0 t in
-    Some (t, 1, pattern, value)
+    and value f = f 0 type_ in
+    Some { type_; count = 1; ctor_pattern = pattern; ctor_value = value }
   | Pcstr_tuple types ->
-    let t = ptyp ~loc ~desc:(Ptyp_tuple types)
+    let type_ = ptyp ~loc ~desc:(Ptyp_tuple types)
     and pattern f =
       let f i _ = f i in
       Pattern.tuple ~loc (List.mapi ~f types)
     and value f = Expr.tuple ~loc (List.mapi ~f types) in
-    Some (t, List.length types, pattern, value)
+    Some
+      {
+        type_;
+        count = List.length types;
+        ctor_pattern = pattern;
+        ctor_value = value;
+      }
   | Pcstr_record fields ->
-    let t =
+    let type_ =
       let f { pld_type; _ } = pld_type in
       ptyp ~loc ~desc:(Ptyp_tuple (List.map ~f fields))
     and pattern f =
@@ -192,7 +205,13 @@ let constructor_arguments_normalize ~loc = function
                  fields,
                None ))
     in
-    Some (t, List.length fields, pattern, value)
+    Some
+      {
+        type_;
+        count = List.length fields;
+        ctor_pattern = pattern;
+        ctor_value = value;
+      }
 
 let pattern_id ~loc txt =
   {
@@ -718,7 +737,7 @@ module Schema : EXPANSION = struct
               }]
           in
           (schema, None, None)
-        | Some (t, _, pattern, value) ->
+        | Some { type_ = t; ctor_pattern = pattern; ctor_value = value; _ } ->
           let schema = encode_type ~loc ~context t
           and pattern = pattern (fun i -> Pattern.id ~loc (Fmt.str "f%i" i))
           and value = value (fun i _ -> Expr.id ~loc (Fmt.str "f%i" i)) in
@@ -1015,7 +1034,13 @@ module Monadic = struct
               None,
               [%expr
                 M.return [%e pexp ~loc ~desc:(Pexp_construct (ident, None))]] )
-          | Some (t, l, pattern, value) ->
+          | Some
+              {
+                type_ = t;
+                count = l;
+                ctor_pattern = pattern;
+                ctor_value = value;
+              } ->
             let pattern_return =
               pattern (fun i -> Pattern.id ~loc ("e" ^ Int.to_string i))
             and value_return =
@@ -1812,7 +1837,9 @@ module FunctionExpansion (F : FUNCTION_EXPANSION) : EXPANSION = struct
       let pld =
         match constructor_arguments_normalize ~loc pcd_args with
         | None -> None
-        | Some (t, l, pattern, value) ->
+        | Some
+            { type_ = t; count = l; ctor_pattern = pattern; ctor_value = value }
+          ->
           let value f = value (fun i t -> f i (expand_type ~context t)) in
           Some (expand_type ~context t, l, pattern, value)
       in
