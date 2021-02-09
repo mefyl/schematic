@@ -161,15 +161,27 @@ type normalized_ctor = {
   count : int;
   ctor_pattern : (int -> pattern) -> pattern;
   ctor_value : (int -> core_type -> expression) -> expression;
+  pattern : (int -> pattern) -> pattern;
+  value : (int -> core_type -> expression) -> expression;
   type_ : core_type;
 }
 
 let constructor_arguments_normalize ~loc = function
-  | Pcstr_tuple [] -> None
+  | Pcstr_tuple []
+  | Pcstr_record [] ->
+    None
   | Pcstr_tuple [ type_ ] ->
     let pattern f = f 0
     and value f = f 0 type_ in
-    Some { type_; count = 1; ctor_pattern = pattern; ctor_value = value }
+    Some
+      {
+        count = 1;
+        ctor_pattern = pattern;
+        ctor_value = value;
+        pattern;
+        type_;
+        value;
+      }
   | Pcstr_tuple types ->
     let type_ = ptyp ~loc ~desc:(Ptyp_tuple types)
     and pattern f =
@@ -178,16 +190,18 @@ let constructor_arguments_normalize ~loc = function
     and value f = Expr.tuple ~loc (List.mapi ~f types) in
     Some
       {
-        type_;
         count = List.length types;
         ctor_pattern = pattern;
         ctor_value = value;
+        pattern;
+        type_;
+        value;
       }
   | Pcstr_record fields ->
-    let type_ =
+    let types =
       let f { pld_type; _ } = pld_type in
-      ptyp ~loc ~desc:(Ptyp_tuple (List.map ~f fields))
-    and pattern f =
+      List.map ~f fields
+    and ctor_pattern f =
       ppat ~loc
         ~desc:
           (Ppat_record
@@ -195,7 +209,7 @@ let constructor_arguments_normalize ~loc = function
                  ~f:(fun i v -> ({ txt = Lident v.pld_name.txt; loc }, f i))
                  fields,
                Closed ))
-    and value f =
+    and ctor_value f =
       pexp ~loc
         ~desc:
           (Pexp_record
@@ -205,12 +219,27 @@ let constructor_arguments_normalize ~loc = function
                  fields,
                None ))
     in
+    let type_, pattern, value =
+      match types with
+      | [ type_ ] ->
+        let pattern f = f 0
+        and value f = f 0 type_ in
+        (type_, pattern, value)
+      | types ->
+        let pattern f =
+          let f i _ = f i in
+          Pattern.tuple ~loc (List.mapi ~f types)
+        and value f = Expr.tuple ~loc (List.mapi ~f types) in
+        (ptyp ~loc ~desc:(Ptyp_tuple types), pattern, value)
+    in
     Some
       {
-        type_;
         count = List.length fields;
-        ctor_pattern = pattern;
-        ctor_value = value;
+        ctor_pattern;
+        ctor_value;
+        pattern;
+        type_;
+        value;
       }
 
 let pattern_id ~loc txt =
@@ -719,7 +748,7 @@ module Schema : EXPANSION = struct
 
   and expand_any_variant ~loc ~context poly options =
     let f (txt, pcd_args, loc, attrs) =
-      let schema, pattern, value =
+      let schema, ctor_pattern, ctor_value, pattern, value =
         match constructor_arguments_normalize ~loc pcd_args with
         | None ->
           let schema =
@@ -736,12 +765,16 @@ module Schema : EXPANSION = struct
                         (Option.value ~default:(String.lowercase txt) alias)];
               }]
           in
-          (schema, None, None)
-        | Some { type_ = t; ctor_pattern = pattern; ctor_value = value; _ } ->
-          let schema = encode_type ~loc ~context t
-          and pattern = pattern (fun i -> Pattern.id ~loc (Fmt.str "f%i" i))
-          and value = value (fun i _ -> Expr.id ~loc (Fmt.str "f%i" i)) in
-          (schema, Some pattern, Some value)
+          (schema, None, None, None, None)
+        | Some { ctor_pattern; ctor_value; pattern; type_; value; _ } ->
+          let p i = Pattern.id ~loc (Fmt.str "f%i" i)
+          and v i _ = Expr.id ~loc (Fmt.str "f%i" i) in
+          let schema = encode_type ~loc ~context type_ in
+          ( schema,
+            Some (ctor_pattern p),
+            Some (ctor_value v),
+            Some (pattern p),
+            Some (value v) )
       in
       let construct =
         let pattern =
@@ -750,7 +783,7 @@ module Schema : EXPANSION = struct
               ( if poly then
                 Ppat_variant (txt, pattern)
               else
-                Ppat_construct ({ txt = Lident txt; loc }, pattern) );
+                Ppat_construct ({ txt = Lident txt; loc }, ctor_pattern) );
             ppat_loc = loc;
             ppat_loc_stack = [];
             ppat_attributes = [];
@@ -767,7 +800,7 @@ module Schema : EXPANSION = struct
               ( if poly then
                 Pexp_variant (txt, value)
               else
-                Pexp_construct ({ txt = Lident txt; loc }, value) );
+                Pexp_construct ({ txt = Lident txt; loc }, ctor_value) );
             pexp_loc = loc;
             pexp_loc_stack = [];
             pexp_attributes = [];
@@ -1036,10 +1069,11 @@ module Monadic = struct
                 M.return [%e pexp ~loc ~desc:(Pexp_construct (ident, None))]] )
           | Some
               {
-                type_ = t;
                 count = l;
                 ctor_pattern = pattern;
                 ctor_value = value;
+                type_ = t;
+                _;
               } ->
             let pattern_return =
               pattern (fun i -> Pattern.id ~loc ("e" ^ Int.to_string i))
@@ -1838,8 +1872,13 @@ module FunctionExpansion (F : FUNCTION_EXPANSION) : EXPANSION = struct
         match constructor_arguments_normalize ~loc pcd_args with
         | None -> None
         | Some
-            { type_ = t; count = l; ctor_pattern = pattern; ctor_value = value }
-          ->
+            {
+              count = l;
+              ctor_pattern = pattern;
+              ctor_value = value;
+              type_ = t;
+              _;
+            } ->
           let value f = value (fun i t -> f i (expand_type ~context t)) in
           Some (expand_type ~context t, l, pattern, value)
       in
