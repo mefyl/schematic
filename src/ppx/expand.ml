@@ -553,6 +553,9 @@ module Schema : EXPANSION = struct
     [%expr Map ([%e construct], [%e deconstruct], [%e obj])]
 
   and expand_record ~loc ~context fields =
+    _expand_record false ~loc ~context fields
+
+  and _expand_record as_tuple ~loc ~context fields =
     let schema =
       let expand_fields fields =
         let expand_field = function
@@ -697,12 +700,23 @@ module Schema : EXPANSION = struct
             pexp_attributes = [];
           } )
       in
-      {
-        pexp_desc = Pexp_record (List.map ~f fields, None);
-        pexp_loc = loc;
-        pexp_loc_stack = [];
-        pexp_attributes = [];
-      }
+      if as_tuple then
+        match fields with
+        | [ field ] -> f field |> snd
+        | _ ->
+          {
+            pexp_desc = Pexp_tuple (List.map ~f:(fun x -> f x |> snd) fields);
+            pexp_loc = loc;
+            pexp_loc_stack = [];
+            pexp_attributes = [];
+          }
+      else
+        {
+          pexp_desc = Pexp_record (List.map ~f fields, None);
+          pexp_loc = loc;
+          pexp_loc_stack = [];
+          pexp_attributes = [];
+        }
     and deconstructed =
       let f { pld_name = { txt; loc }; _ } =
         ( { txt = Lident txt; loc },
@@ -713,12 +727,23 @@ module Schema : EXPANSION = struct
             ppat_attributes = [];
           } )
       in
-      {
-        ppat_desc = Ppat_record (List.map ~f fields, Closed);
-        ppat_loc = loc;
-        ppat_loc_stack = [];
-        ppat_attributes = [];
-      }
+      if as_tuple then
+        match fields with
+        | [ field ] -> f field |> snd
+        | _ ->
+          {
+            ppat_desc = Ppat_tuple (List.map ~f:(fun x -> f x |> snd) fields);
+            ppat_loc = loc;
+            ppat_loc_stack = [];
+            ppat_attributes = [];
+          }
+      else
+        {
+          ppat_desc = Ppat_record (List.map ~f fields, Closed);
+          ppat_loc = loc;
+          ppat_loc_stack = [];
+          ppat_attributes = [];
+        }
     in
     (combinator ~loc fields field_name constructed deconstructed schema, true)
 
@@ -769,7 +794,17 @@ module Schema : EXPANSION = struct
         | Some { ctor_pattern; ctor_value; pattern; type_; value; _ } ->
           let p i = Pattern.id ~loc (Fmt.str "f%i" i)
           and v i _ = Expr.id ~loc (Fmt.str "f%i" i) in
-          let schema = encode_type ~loc ~context type_ in
+          let schema =
+            match pcd_args with
+            | Pcstr_record fields ->
+              [%expr
+                {
+                  Schema.id = None;
+                  descriptor =
+                    [%e _expand_record true ~loc ~context fields |> fst];
+                }]
+            | _ -> encode_type ~loc ~context type_
+          in
           ( schema,
             Some (ctor_pattern p),
             Some (ctor_value v),
