@@ -31,34 +31,46 @@ module Make (Impl : Impl) = struct
   let decode schema =
     let rec decode_field :
         type t r.
+        string option ->
         string ->
         t schema ->
         (t, r) field_requirement ->
         Ezjsonm.value option ->
         (r, 'error) Result.t =
-     fun field schema -> function
+     fun id field schema -> function
       | Required -> (
         function
-        | Some v -> decode schema.descriptor v
-        | None ->
-          Result.fail
-            (`Json_decode (Printf.sprintf "missing required field %s" field)) )
+        | Some v -> decode schema.id schema.descriptor v
+        | None -> (
+          match id with
+          | None ->
+            Result.fail
+              (`Json_decode (Printf.sprintf "missing required field %S" field))
+          | Some id ->
+            Result.fail
+              (`Json_decode
+                (Printf.sprintf "missing required field %S in schema %S" field
+                   id)) ) )
       | Default default -> (
         function
-        | Some v -> decode schema.descriptor v
+        | Some v -> decode schema.id schema.descriptor v
         | None -> Result.return default )
       | Optional -> (
         function
         | Some `Null -> (
-          match decode schema.descriptor `Null with
+          match decode schema.id schema.descriptor `Null with
           | Result.Ok v -> Result.return (Some v)
           | Result.Error _ -> Result.return None )
-        | Some v -> Result.map ~f:Option.return @@ decode schema.descriptor v
+        | Some v ->
+          Result.map ~f:Option.return @@ decode schema.id schema.descriptor v
         | None -> Result.return None )
     and decode :
         type t kind.
-        (t, kind) descriptor -> Ezjsonm.value -> (t, 'error) Result.t =
-     fun schema json ->
+        string option ->
+        (t, kind) descriptor ->
+        Ezjsonm.value ->
+        (t, 'error) Result.t =
+     fun id schema json ->
       let module List = List_monad (Result) in
       let type_error expected =
         Result.fail
@@ -70,7 +82,7 @@ module Make (Impl : Impl) = struct
       | Any, v -> Result.return v
       | Bool, `Bool b -> Result.return b
       | Bool, _ -> type_error "boolean"
-      | Date, json -> decode date_tuple_schema.descriptor json
+      | Date, json -> decode None date_tuple_schema.descriptor json
       | Float, `Float f -> Result.return f
       | Int, `Float f -> Result.return @@ Float.to_int f
       | Int64, `Float f -> Result.return @@ Float.to_int64 f
@@ -79,21 +91,22 @@ module Make (Impl : Impl) = struct
       | Int64, _ ->
         type_error "float"
       | List items_schema, `A items ->
-        List.map (decode items_schema.descriptor) items
+        List.map (decode None items_schema.descriptor) items
       | List _, _ -> type_error "list"
       | Map (cons, _, schema), _ ->
-        decode schema json >>= fun value -> Result.return @@ cons value
+        decode id schema json >>= fun value -> Result.return @@ cons value
       | Mapping fields_schema, `O fields ->
         let f (name, value) =
-          decode fields_schema.descriptor value >>= fun value ->
-          Result.return (name, value)
+          decode fields_schema.id fields_schema.descriptor value
+          >>= fun value -> Result.return (name, value)
         in
         List.map f fields
       | Mapping _, _ -> type_error "mapping"
       | Null, `Null -> Result.return ()
       | Null, _ -> type_error "null"
       | Nullable _, `Null -> Result.return None
-      | Nullable s, v -> decode s.descriptor v |> Result.map ~f:Option.return
+      | Nullable s, v ->
+        decode s.id s.descriptor v |> Result.map ~f:Option.return
       | Object descriptor, (`O fields as o) ->
         let rec decode_object :
             type t.
@@ -109,7 +122,7 @@ module Make (Impl : Impl) = struct
                 List.Assoc.find ~equal:( = ) fields field
             in
             Result.Let_syntax.Let_syntax.both
-              (decode_field field schema requirement value)
+              (decode_field id field schema requirement value)
               (decode_object rest)
         in
         decode_object (Object descriptor)
@@ -144,18 +157,19 @@ module Make (Impl : Impl) = struct
       | Time, _ -> type_error "time"
       | Time_local, _ -> type_error "time"
       | Tuple { schema; rest = Null }, `A [ hd ] ->
-        decode schema.descriptor hd >>= fun hd -> Result.return (hd, ())
+        decode schema.id schema.descriptor hd >>= fun hd ->
+        Result.return (hd, ())
       | Tuple { schema = _; rest = Null }, `A [] ->
         Result.fail (`Json_decode "not enough tuple elements")
       | Tuple { schema = _; rest = Null }, `A _ ->
         Result.fail (`Json_decode "too many tuple elements")
       | Tuple { schema; rest }, `A (hd :: tl) ->
-        decode schema.descriptor hd >>= fun hd ->
-        decode rest (`A tl) >>= fun tl -> Result.return (hd, tl)
+        decode schema.id schema.descriptor hd >>= fun hd ->
+        decode id rest (`A tl) >>= fun tl -> Result.return (hd, tl)
       | Tuple _, _ -> type_error "tuple"
       | Union cases, _ -> (
         let conv (Case { schema; decoder; _ }) =
-          match decode schema.descriptor json with
+          match decode schema.id schema.descriptor json with
           | Result.Ok v -> Some (decoder v)
           | Result.Error _ -> None
         in
@@ -163,7 +177,7 @@ module Make (Impl : Impl) = struct
         | Some res -> Result.return res
         | None -> Result.fail (`Json_decode "no union case was matched") )
     in
-    decode schema.descriptor
+    decode schema.id schema.descriptor
 
   let encode_field : type t r. (t, r) field_requirement -> r -> t option =
     function

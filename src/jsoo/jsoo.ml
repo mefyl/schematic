@@ -168,8 +168,8 @@ let decode schema =
         | Some id ->
           Result.fail
             (`Js_decode
-              (Printf.sprintf "missing required field %S for schema %S" field
-                 id)) ) )
+              (Printf.sprintf "missing required field %S in schema %S" field id))
+        ) )
     | Default default -> (
       function
       | Some v -> decode schema.id schema.descriptor v
