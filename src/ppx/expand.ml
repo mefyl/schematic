@@ -110,7 +110,7 @@ module Warning = struct
               pstr_desc =
                 Pstr_eval
                   ( {
-                      pexp_desc = Pexp_constant (Pconst_string (n, None));
+                      pexp_desc = Pexp_constant (Pconst_string (n, loc, None));
                       pexp_loc = loc;
                       pexp_loc_stack = [];
                       pexp_attributes = [];
@@ -272,12 +272,12 @@ let expr_int ~loc i =
   }
 
 let expect_string ~loc = function
-  | Pexp_constant (Pconst_string (value, None)) -> value
+  | Pexp_constant (Pconst_string (value, _, _)) -> value
   | _ -> Ppxlib.Location.raise_errorf ~loc "schematic-ppx: string expected"
 
 let expect_string_constant ~loc = function
   | PStr
-      [%str [%e? { pexp_desc = Pexp_constant (Pconst_string (txt, None)); _ }]]
+      [%str [%e? { pexp_desc = Pexp_constant (Pconst_string (txt, _, _)); _ }]]
     ->
     txt
   | _ ->
@@ -331,17 +331,17 @@ module Attributes = struct
           { attrs with alias = Some (expect_string_constant ~loc attr_payload) }
         | _ ->
           Ppxlib.Location.raise_errorf ~loc
-            "schematic-ppx: duplicate schematic.as annotation on schema" )
+            "schematic-ppx: duplicate schematic.as annotation on schema")
       | "schematic.name" when name -> (
         match attrs with
         | { name = None; _ } ->
           { attrs with name = Some (expect_string_constant ~loc attr_payload) }
         | _ ->
           Ppxlib.Location.raise_errorf ~loc
-            "schematic-ppx: duplicate schematic.name annotation on schema" )
+            "schematic-ppx: duplicate schematic.name annotation on schema")
       | _ ->
         let () = check_unknown_attribute ~loc txt in
-        attrs )
+        attrs)
     | [] -> { alias = None; name = None }
 end
 
@@ -374,7 +374,7 @@ let schema_id ~loc = suffix_id ~loc "schema"
 
 let expr_string ~loc txt =
   {
-    pexp_desc = Pexp_constant (Pconst_string (txt, None));
+    pexp_desc = Pexp_constant (Pconst_string (txt, loc, None));
     pexp_loc = loc;
     pexp_loc_stack = [];
     pexp_attributes = [];
@@ -410,7 +410,7 @@ module type EXPANSION = sig
     loc:location ->
     context:context ->
     type_declaration ->
-    (core_type * variance) list ->
+    (core_type * (variance * injectivity)) list ->
     expanded ->
     closed
 
@@ -459,7 +459,7 @@ module Schema : EXPANSION = struct
           pexp_loc = loc;
           pexp_loc_stack = [];
           pexp_attributes = [];
-        } )
+        })
     (* Tuple *)
     | { ptyp_desc = Ptyp_tuple types; _ } ->
       let field_name i { ptyp_loc = loc; _ } = (loc, "e" ^ Int.to_string i)
@@ -576,7 +576,7 @@ module Schema : EXPANSION = struct
                   | PStr [%str [%e? exp]] -> (Some exp, txt, inline, specs)
                   | _ ->
                     Ppxlib.Location.raise_errorf ~loc
-                      "schematic-ppx: expression payload expected" )
+                      "schematic-ppx: expression payload expected")
                 | "schematic.properties" -> (
                   match attr_payload with
                   | PStr
@@ -588,7 +588,7 @@ module Schema : EXPANSION = struct
                             _;
                           }]] ->
                     let prop specs = function
-                      | ( { txt = Lident name; _ },
+                      | ( { txt = Lident name; loc = loc_name; _ },
                           ({ pexp_desc = value; pexp_loc = loc; _ } as desc) )
                         -> (
                         match name with
@@ -605,8 +605,8 @@ module Schema : EXPANSION = struct
                           { specs with minimum = Some (expect_int ~loc value) }
                         | "unique" -> specs
                         | _ ->
-                          Ppxlib.Location.raise_errorf ~loc
-                            "schematic-ppx: unrecognized property %S" name )
+                          Ppxlib.Location.raise_errorf ~loc:loc_name
+                            "schematic-ppx: unrecognized property %S" name)
                       | _ ->
                         Ppxlib.Location.raise_errorf ~loc
                           "schematic-ppx: unrecognized property"
@@ -617,7 +617,7 @@ module Schema : EXPANSION = struct
                       List.fold ~init:specs_empty ~f:prop properties )
                   | _ ->
                     Ppxlib.Location.raise_errorf ~loc
-                      "schematic-ppx: record payload expected" )
+                      "schematic-ppx: record payload expected")
                 | "schematic.as" ->
                   ( schema,
                     expect_string_constant ~loc attr_payload,
@@ -633,7 +633,7 @@ module Schema : EXPANSION = struct
                         "schematic-ppx: inline specified multiple times"
                   | _ ->
                     Ppxlib.Location.raise_errorf ~loc
-                      "schematic-ppx: no payload expected" )
+                      "schematic-ppx: no payload expected")
                 | name ->
                   let () = Attributes.check_unknown_attribute ~loc name in
                   (schema, txt, inline, specs)
@@ -815,10 +815,10 @@ module Schema : EXPANSION = struct
         let pattern =
           {
             ppat_desc =
-              ( if poly then
+              (if poly then
                 Ppat_variant (txt, pattern)
               else
-                Ppat_construct ({ txt = Lident txt; loc }, ctor_pattern) );
+                Ppat_construct ({ txt = Lident txt; loc }, ctor_pattern));
             ppat_loc = loc;
             ppat_loc_stack = [];
             ppat_attributes = [];
@@ -832,10 +832,10 @@ module Schema : EXPANSION = struct
         let value =
           {
             pexp_desc =
-              ( if poly then
+              (if poly then
                 Pexp_variant (txt, value)
               else
-                Pexp_construct ({ txt = Lident txt; loc }, ctor_value) );
+                Pexp_construct ({ txt = Lident txt; loc }, ctor_value));
             pexp_loc = loc;
             pexp_loc_stack = [];
             pexp_attributes = [];
@@ -872,9 +872,9 @@ module Schema : EXPANSION = struct
         }]
     and wrap arg exp =
       match arg with
-      | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, Invariant ->
+      | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
         [%expr fun [%p pattern_id ~loc (schema_name name)] -> [%e exp]]
-      | { ptyp_desc = Ptyp_any; _ }, Invariant -> [%expr fun _ -> [%e exp]]
+      | { ptyp_desc = Ptyp_any; _ }, _ -> [%expr fun _ -> [%e exp]]
       | t, _ ->
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: unsupported type parameter %a" Pprintast.core_type t
@@ -900,10 +900,10 @@ module Schema : EXPANSION = struct
       {
         pstr_desc =
           Pstr_value
-            ( ( if List.exists ~f:snd expanded then
+            ( (if List.exists ~f:snd expanded then
                 Recursive
               else
-                Nonrecursive ),
+                Nonrecursive),
               List.map ~f:fst expanded );
         pstr_loc = loc;
       };
@@ -978,7 +978,7 @@ module Monadic = struct
                   M.bind)
                     v ~f] )
           in
-          (t, return, bind) )
+          (t, return, bind))
       | Ptyp_tuple types ->
         let recd = List.map ~f:(expand_type ~names) types in
         let t = Ptyp_tuple (List.map ~f:(fun (t, _, _) -> t) recd)
@@ -1632,12 +1632,12 @@ module type FUNCTION_EXPANSION = sig
   val expand_variant :
     loc:location ->
     name:string ->
-    ( constructor_declaration
-    * ( expression
+    (constructor_declaration
+    * (expression
       * int
       * ((int -> pattern) -> pattern)
-      * ((int -> expression -> expression) -> expression) )
-      option )
+      * ((int -> expression -> expression) -> expression))
+      option)
     list ->
     expression
 end
@@ -1975,7 +1975,7 @@ module Expander (Expansion : EXPANSION) = struct
           match t.ptype_manifest with
           | Some core_type ->
             Expansion.expand_abstract_type ~loc ~context core_type
-          | None -> failwith "no manifest on abstract type" )
+          | None -> failwith "no manifest on abstract type")
         | Ptype_open -> failwith "unsupported Ptype_open"
         | Ptype_variant options ->
           Expansion.expand_variant ~loc ~context options
