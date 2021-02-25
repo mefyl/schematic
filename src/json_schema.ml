@@ -28,7 +28,7 @@ type core = {
   vocabulary : (uri * bool) list option; [@schematic.as "$vocabulary"]
   comment : string option; [@schematic.as "$comment"]
   defs : (string * json_schema) list option;
-      [@schematic.as "$defs"] [@schematic.properties { default = [] }]
+      [@schematic.as "$defs"] [@schematic.default []]
 }
 
 and additional_properties =
@@ -66,18 +66,19 @@ and validation = {
   minimum : int option;
   exclusiveMinimum : int option;
   maxLength : int option; [@schematic.properties { minimum = 0 }]
-  minLength : int option; [@schematic.properties { default = 0; minimum = 0 }]
+  minLength : int option;
+      [@schematic.default 0] [@schematic.properties { minimum = 0 }]
   pattern : string option;
   maxItems : int option; [@schematic.properties { minimum = 0 }]
-  minItems : int option; [@schematic.properties { default = 0; minimum = 0 }]
-  uniqueItems : bool option; [@schematic.properties { default = false }]
+  minItems : int option; [@default 0] [@schematic.properties { minimum = 0 }]
+  uniqueItems : bool option; [@schematic.default false]
   maxContains : int option; [@schematic.properties { minimum = 0 }]
-  minContains : int option; [@schematic.properties { default = 0; minimum = 1 }]
+  minContains : int option; [@default 0] [@schematic.properties { minimum = 1 }]
   maxProperties : int option; [@schematic.properties { minimum = 0 }]
   minProperties : int option;
-      [@schematic.properties { default = 0; minimum = 0 }]
+      [@schematic.properties { minimum = 0 }] [@default 0]
   required : string list option;
-      [@schematic.properties { default = []; unique = true }]
+      [@schematic.properties { unique = true }] [@default []]
   dependentRequired : (string * string list) list option;
   const : any option;
   enum : any list option;
@@ -88,10 +89,10 @@ and metadata = {
   title : string option;
   description : string option;
   default : any option;
-  deprecated : bool; [@schematic.properties { default = false }]
-  readOnly : bool; [@schematic.properties { default = false }]
-  writeOnly : bool; [@schematic.properties { default = false }]
-  examples : any list; [@schematic.properties { default = [] }]
+  deprecated : bool; [@schematic.default false]
+  readOnly : bool; [@schematic.default false]
+  writeOnly : bool; [@schematic.default false]
+  examples : any list; [@schematic.default []]
 }
 
 and json_schema = {
@@ -231,7 +232,7 @@ let of_schema schema =
               Some
                 (Either.second
                    (List.dedup_and_sort ~compare:Poly.compare (Null :: types)));
-          } )
+          })
       | Schema.String ->
         { validation_empty with type_ = Some (Either.first String) }
       | Schema.String_const v ->
@@ -322,9 +323,9 @@ let of_schema schema =
                           {
                             json_schema.metadata with
                             default =
-                              ( match requirement with
+                              (match requirement with
                               | Schema.Default v -> Some (to_json v)
-                              | _ -> None );
+                              | _ -> None);
                             description;
                             title =
                               Option.return
@@ -342,7 +343,7 @@ let of_schema schema =
             | marks, Some applicator ->
               ( marks,
                 Some (fields @ Option.value ~default:[] applicator.properties)
-              ) )
+              ))
           | Schema.Any
           | Schema.Bool ->
             (marks, None)
@@ -383,14 +384,14 @@ let of_schema schema =
                 items =
                   Some
                     (Tuple_schema
-                       ( field
-                       ::
-                       ( match applicator.items with
-                       | None -> []
-                       | Some (Tuple_schema l) -> l
-                       | Some (Items_schema _) ->
-                         failwith "mixed list and tuple" ) ));
-              } ) )
+                       (field
+                        ::
+                        (match applicator.items with
+                        | None -> []
+                        | Some (Tuple_schema l) -> l
+                        | Some (Items_schema _) ->
+                          failwith "mixed list and tuple")));
+              } ))
       | Schema.Union cases ->
         let f (Schema.Case { schema; _ }) (marks, l) =
           let marks, schema = of_schema marks schema in
