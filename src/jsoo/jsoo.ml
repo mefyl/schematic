@@ -15,6 +15,8 @@ type int_js = Js.number Js.t
 
 type any_js = Js.Unsafe.any
 
+type unit_js = Js.Unsafe.any Js.Opt.t
+
 module Either = struct
   include Either
 
