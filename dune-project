@@ -38,11 +38,11 @@
   (merlin :dev)
   (ocamlformat
    (and
-    (= 0.15.0)
+    (= 0.17.0)
     :dev))
   fmt
-  (ppxlib
-   (>= 0.14.0))
+  logs
+  ppxlib
   (ppx_deriving :with-test)
   ppx_here
   (ptime

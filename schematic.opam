@@ -14,9 +14,10 @@ depends: [
   "js_of_ocaml" {>= "3.6.0"}
   "js_of_ocaml-ppx" {>= "3.6.0"}
   "merlin" {dev}
-  "ocamlformat" {= "0.15.0" & dev}
+  "ocamlformat" {= "0.17.0" & dev}
   "fmt"
-  "ppxlib" {>= "0.14.0"}
+  "logs"
+  "ppxlib"
   "ppx_deriving" {with-test}
   "ppx_here"
   "ptime" {>= "0.8.5"}
