@@ -25,7 +25,7 @@ module List_monadic (M : Base.Monad.S) = struct
     let rec f = function
       | [] -> M.return []
       | h :: t ->
-        M.bind h ~f:(fun h -> M.bind (f t) ~f:(fun t -> M.return @@ (h :: t)))
+        M.bind h ~f:(fun h -> M.bind (f t) ~f:(fun t -> M.return @@ h :: t))
     in
     M.bind l ~f:(fun l -> M.bind (f l) ~f:(fun l -> f_ l))
 end

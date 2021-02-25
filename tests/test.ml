@@ -39,7 +39,8 @@ let failure () =
     try
       test "int atom" Alcotest.int int_schema 28 "29";
       true
-    with _ -> false
+    with
+    | _ -> false
   then
     Alcotest.fail "failure test failed"
 

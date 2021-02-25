@@ -53,7 +53,7 @@ let assoc_compare compare l r =
     | Some r -> (
       match compare l r with
       | 0 -> None
-      | v -> Some v )
+      | v -> Some v)
   in
   Option.value ~default:0 @@ List.find_map ~f l
 
@@ -98,7 +98,7 @@ let compare schema =
       fun (l, lz) (r, rz) ->
         match Int.compare lz rz with
         | 0 -> Ptime.compare l r
-        | v -> v )
+        | v -> v)
     | Object { schema; requirement; rest; _ } ->
       let _, schema = extract_field_schema schema in
       let f
@@ -122,7 +122,7 @@ let compare schema =
       fun (l, lr) (r, rr) ->
         match compare schema.descriptor l r with
         | 0 -> compare rest lr rr
-        | v -> v )
+        | v -> v)
     | Union cases ->
       fun l r ->
         let f (Case { schema; encoder; _ }) =

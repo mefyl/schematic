@@ -149,7 +149,7 @@ let decode schema =
         in
         match List.find_map ~f:conv cases with
         | Some res -> Result.return res
-        | None -> Result.fail (`Js_decode "no union case was matched") )
+        | None -> Result.fail (`Js_decode "no union case was matched"))
   and decode_field :
       type t r.
       string option ->
@@ -171,11 +171,11 @@ let decode schema =
           Result.fail
             (`Js_decode
               (Printf.sprintf "missing required field %S in schema %S" field id))
-        ) )
+        ))
     | Default default -> (
       function
       | Some v -> decode schema.id schema.descriptor v
-      | None -> Result.return default )
+      | None -> Result.return default)
     | Optional -> (
       function
       | Some v ->
@@ -186,7 +186,7 @@ let decode schema =
           | _ -> Result.return None
         else
           Result.map ~f:Option.return @@ decode schema.id schema.descriptor v
-      | None -> Result.return None )
+      | None -> Result.return None)
   in
   decode schema.id schema.descriptor
 
@@ -212,7 +212,7 @@ let encode schema =
     | Nullable s -> (
       match v with
       | None -> Js.Unsafe.pure_js_expr "null"
-      | Some v -> encode s.descriptor v )
+      | Some v -> encode s.descriptor v)
     | Mapping _ -> failwith "FIXME"
     | Object descriptor ->
       let rec encode_object :
@@ -223,7 +223,7 @@ let encode schema =
           | Default default -> (
             function
             | v when v = default -> None
-            | v -> Some v )
+            | v -> Some v)
           | Optional -> Fn.id
         in
         fun into schema v ->
@@ -274,6 +274,6 @@ let encode schema =
       in
       match List.find_map ~f:conv cases with
       | Some res -> res
-      | None -> failwith "unmatched variant schema case" )
+      | None -> failwith "unmatched variant schema case")
   in
   encode schema.descriptor

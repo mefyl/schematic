@@ -50,20 +50,20 @@ module Make (Impl : Impl) = struct
             Result.fail
               (`Json_decode
                 (Printf.sprintf "missing required field %S in schema %S" field
-                   id)) ) )
+                   id))))
       | Default default -> (
         function
         | Some v -> decode schema.id schema.descriptor v
-        | None -> Result.return default )
+        | None -> Result.return default)
       | Optional -> (
         function
         | Some `Null -> (
           match decode schema.id schema.descriptor `Null with
           | Result.Ok v -> Result.return (Some v)
-          | Result.Error _ -> Result.return None )
+          | Result.Error _ -> Result.return None)
         | Some v ->
           Result.map ~f:Option.return @@ decode schema.id schema.descriptor v
-        | None -> Result.return None )
+        | None -> Result.return None)
     and decode :
         type t kind.
         string option ->
@@ -153,7 +153,7 @@ module Make (Impl : Impl) = struct
         Ptime.of_rfc3339 ~strict:true s |> Result.map_error ~f:error
         >>= function
         | t, Some tz, _ -> Result.return (t, tz)
-        | _, None, _ -> Result.fail (`Json_decode "missing timezone") )
+        | _, None, _ -> Result.fail (`Json_decode "missing timezone"))
       | Time, _ -> type_error "time"
       | Time_local, _ -> type_error "time"
       | Tuple { schema; rest = Null }, `A [ hd ] ->
@@ -175,7 +175,7 @@ module Make (Impl : Impl) = struct
         in
         match List.find_map ~f:conv cases with
         | Some res -> Result.return res
-        | None -> Result.fail (`Json_decode "no union case was matched") )
+        | None -> Result.fail (`Json_decode "no union case was matched"))
     in
     decode schema.id schema.descriptor
 
@@ -185,7 +185,7 @@ module Make (Impl : Impl) = struct
     | Default default -> (
       function
       | v when v = default -> None
-      | v -> Some v )
+      | v -> Some v)
     | Optional -> Fn.id
 
   let encode schema =
@@ -204,7 +204,7 @@ module Make (Impl : Impl) = struct
       | Nullable s -> (
         match v with
         | None -> `Null
-        | Some v -> encode s.descriptor v )
+        | Some v -> encode s.descriptor v)
       | Mapping fields_schema ->
         `O
           (List.map
@@ -232,7 +232,7 @@ module Make (Impl : Impl) = struct
               else
                 let encoded = encode schema.descriptor hd in
                 (field, encoded) :: tl
-            | None -> tl )
+            | None -> tl)
         in
         `O (encode_object v (Object descriptor))
       | Tuple descriptor ->
@@ -260,7 +260,7 @@ module Make (Impl : Impl) = struct
         in
         match List.find_map ~f:conv cases with
         | Some res -> res
-        | None -> failwith "unmatched variant schema case" )
+        | None -> failwith "unmatched variant schema case")
     in
     encode schema.descriptor
 
@@ -292,13 +292,13 @@ module Make (Impl : Impl) = struct
       | `O elements ->
         box
         @@ const string "{"
-           ++ ( hvbox ~indent
+           ++ (hvbox ~indent
               @@ cut
                  ++ const
                       (list ~sep:comma
-                         ( box ~indent
-                         @@ pair ~sep:(const string ":" ++ sp) Dump.string pp ))
-                      elements )
+                         (box ~indent
+                         @@ pair ~sep:(const string ":" ++ sp) Dump.string pp))
+                      elements)
            ++ cut ++ const string "}"
     in
     pp f ()
