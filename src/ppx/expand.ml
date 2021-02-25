@@ -384,8 +384,34 @@ let expr_option ~loc expr = function
   | None -> [%expr None]
   | Some e -> [%expr Some [%e expr ~loc e]]
 
+module Source = struct
+  (** Where a configuration item came from: generic attributes versus schematic
+      specific (eg. @default vs @schematic.default) *)
+  type 'a t =
+    | Generic of 'a
+    | Schematic of 'a
+
+  let value = function
+    | Generic v
+    | Schematic v ->
+      v
+
+  let generic v = Generic v
+
+  let schematic v = Schematic v
+
+  let merge ~loc name l r =
+    match (l, r) with
+    | None, v -> v
+    | Some (Generic _), (Schematic _ as v) -> v
+    | Some (Schematic _ as v), Generic _ -> v
+    | _ ->
+      Ppxlib.Location.raise_errorf ~loc
+        "schematic-ppx: duplicate value for attribute %S" name
+end
+
 type specs = {
-  default : expression option;
+  default : expression Source.t option;
   description : string option;
   examples : expression list;
   maximum : int option;
@@ -570,6 +596,29 @@ module Schema : EXPANSION = struct
               let read_attribute
                   (schema, txt, inline, specs)
                   { attr_name; attr_loc = loc; attr_payload } =
+                let default f req =
+                  match attr_payload with
+                  | PStr [%str [%e? exp]] ->
+                    let default =
+                      if req then
+                        [%expr Some [%e exp]]
+                      else
+                        exp
+                    in
+                    ( schema,
+                      txt,
+                      inline,
+                      {
+                        specs with
+                        default =
+                          Some
+                            (Source.merge ~loc "default" specs.default
+                               (f default));
+                      } )
+                  | _ ->
+                    Ppxlib.Location.raise_errorf ~loc
+                      "schematic-ppx: expression payload expected"
+                in
                 match attr_name.txt with
                 | "schematic.schema" -> (
                   match attr_payload with
@@ -577,6 +626,9 @@ module Schema : EXPANSION = struct
                   | _ ->
                     Ppxlib.Location.raise_errorf ~loc
                       "schematic-ppx: expression payload expected")
+                | "default" -> default Source.generic true
+                | "schematic.default" -> default Source.schematic true
+                | "schematic.default_opt" -> default Source.schematic false
                 | "schematic.properties" -> (
                   match attr_payload with
                   | PStr
@@ -597,7 +649,20 @@ module Schema : EXPANSION = struct
                             specs with
                             description = Some (expect_string ~loc value);
                           }
-                        | "default" -> { specs with default = Some desc }
+                        | "default" ->
+                          let () =
+                            Fmt.epr
+                              "%a Warning: deprecated, use @schematic.default\n"
+                              Ppxlib.Location.print loc_name
+                          in
+                          {
+                            specs with
+                            default =
+                              Some
+                                (Source.merge ~loc:loc_name "default"
+                                   specs.default
+                                   (Source.schematic [%expr Some [%e desc]]));
+                          }
                         | "example" -> { specs with examples = [ desc ] }
                         | "minimum" ->
                           { specs with maximum = Some (expect_int ~loc value) }
@@ -614,7 +679,7 @@ module Schema : EXPANSION = struct
                     ( schema,
                       txt,
                       inline,
-                      List.fold ~init:specs_empty ~f:prop properties )
+                      List.fold ~init:specs ~f:prop properties )
                   | _ ->
                     Ppxlib.Location.raise_errorf ~loc
                       "schematic-ppx: record payload expected")
@@ -651,8 +716,13 @@ module Schema : EXPANSION = struct
                 ([%expr Optional], t)
               | t -> (
                 match specs.default with
-                | Some default -> ([%expr Default [%e default]], t)
-                | None -> ([%expr Required], t) )
+                | Some default ->
+                  ( [%expr
+                      match [%e Source.value default] with
+                      | Some default -> Default default
+                      | None -> Required],
+                    t )
+                | None -> ([%expr Required], t))
             in
             let schema =
               Option.value ~default:(encode_type ~loc ~context t) schema
