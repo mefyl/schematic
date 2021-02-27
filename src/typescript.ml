@@ -30,7 +30,7 @@ let rec of_descriptor :
   | Int64
   | Float ->
     Atom "number"
-  | List s -> Template { name = "List"; args = [ of_schema s ] }
+  | List s -> Template { name = "Array"; args = [ of_schema s ] }
   | Map (_, _, d) -> of_descriptor name d
   | Mapping s ->
     Template { name = "Record"; args = [ Atom "string"; of_schema s ] }
