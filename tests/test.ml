@@ -403,8 +403,8 @@ module Metadata = struct
       }|}
 
   type default = {
-    a : int; [@schematic.properties { default = 358 }]
-    b : string; [@schematic.properties { default = "359" }]
+    a : int; [@schematic.default 358]
+    b : string; [@schematic.default "359"]
   }
   [@@deriving schema]
 
