@@ -52,6 +52,12 @@ module Expr = struct
       pexp_attributes = [];
     }
 
+  let bool ~loc v =
+    if v then
+      [%expr true]
+    else
+      [%expr false]
+
   let tuple ~loc = function
     | [] -> [%expr ()]
     | [ v ] -> v
@@ -416,6 +422,7 @@ type specs = {
   examples : expression list;
   maximum : int option;
   minimum : int option;
+  omit : bool;
 }
 
 let specs_empty =
@@ -425,6 +432,7 @@ let specs_empty =
     examples = [];
     maximum = None;
     minimum = None;
+    omit = false;
   }
 
 module type EXPANSION = sig
@@ -596,7 +604,7 @@ module Schema : EXPANSION = struct
               let read_attribute
                   (schema, txt, inline, specs)
                   { attr_name; attr_loc = loc; attr_payload } =
-                let default f req =
+                let default f req omit =
                   match attr_payload with
                   | PStr [%str [%e? exp]] ->
                     let default =
@@ -614,6 +622,7 @@ module Schema : EXPANSION = struct
                           Some
                             (Source.merge ~loc "default" specs.default
                                (f default));
+                        omit;
                       } )
                   | _ ->
                     Ppxlib.Location.raise_errorf ~loc
@@ -626,9 +635,12 @@ module Schema : EXPANSION = struct
                   | _ ->
                     Ppxlib.Location.raise_errorf ~loc
                       "schematic-ppx: expression payload expected")
-                | "default" -> default Source.generic true
-                | "schematic.default" -> default Source.schematic true
-                | "schematic.default_opt" -> default Source.schematic false
+                | "default" -> default Source.generic true false
+                | "schematic.default" -> default Source.schematic true false
+                | "schematic.default_opt" ->
+                  default Source.schematic false false
+                | "schematic.omit" -> default Source.schematic true true
+                | "schematic.omit_opt" -> default Source.schematic false true
                 | "schematic.properties" -> (
                   match attr_payload with
                   | PStr
@@ -752,6 +764,7 @@ module Schema : EXPANSION = struct
               field = [%e field];
               maximum = [%e expr_option ~loc expr_int specs.maximum];
               minimum = [%e expr_option ~loc expr_int specs.minimum];
+              omit = [%e Expr.bool ~loc specs.omit];
               requirement = [%e requirement];
               rest = [%e rest];
               schema = [%e schema];

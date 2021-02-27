@@ -45,6 +45,7 @@ and ('t, 'kind) descriptor =
       field : string;
       maximum : int option;
       minimum : int option;
+      omit : bool;
       requirement : ('a, 'req) field_requirement;
       rest : ('b, [ `Object ]) descriptor;
       schema : 'a field_schema;

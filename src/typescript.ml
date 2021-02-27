@@ -51,8 +51,11 @@ and of_schema : type s. s schema -> t = function
 
 and of_object : type s. (s, [ `Object ]) descriptor -> (string * t * bool) list
     = function
-  | Object { field; schema = Outline schema; rest; requirement; _ } ->
-    (field, of_schema schema, Schema.required requirement) :: of_object rest
+  | Object { field; schema = Outline schema; rest; requirement; omit; _ } ->
+    if omit then
+      of_object rest
+    else
+      (field, of_schema schema, Schema.required requirement) :: of_object rest
   | Object { schema = Inline { descriptor = Object o; _ }; rest; _ } ->
     of_object (Object o) @ of_object rest
   | Object { schema = Inline { descriptor = Map (_, _, Object o); _ }; rest; _ }

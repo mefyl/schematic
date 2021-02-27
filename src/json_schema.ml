@@ -297,6 +297,7 @@ let of_schema schema =
                 field;
                 maximum;
                 minimum;
+                omit = (* FIXME *) _;
                 requirement;
                 rest;
                 schema;
