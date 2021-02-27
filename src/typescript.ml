@@ -1,6 +1,11 @@
 open Schema
 
-let name s = String.capitalize_ascii s
+let name s =
+  String.split_on_char '_' s
+  |> List.map (String.split_on_char '-')
+  |> List.concat
+  |> List.map String.capitalize_ascii
+  |> String.concat ""
 
 type t =
   | Atom of string
