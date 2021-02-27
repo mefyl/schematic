@@ -17,7 +17,7 @@ module Generate_types = struct
   let nullable () = test nullable_schema "boolean | null"
 
   let record () =
-    test record_schema {|{ "a": number; "b": number; "c": string }|}
+    test record_schema {|{ "a": number; "b"?: number; "c": string }|}
 
   let tuple () = test tuple_schema "[ string, number, null ]"
 end

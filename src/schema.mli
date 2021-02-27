@@ -1,5 +1,7 @@
 include module type of Schema_intf
 
+val required : (_, _) field_requirement -> bool
+
 val map : ('a -> 'b) -> ('b -> 'a) -> 'a schema -> 'b schema
 
 val pp : Format.formatter -> _ schema -> unit

@@ -11,7 +11,7 @@ type t =
   | Atom of string
   | Object of {
       name : string option;
-      fields : (string * t) list;
+      fields : (string * t * bool) list;
     }
   | Template of {
       name : string;
@@ -49,10 +49,10 @@ and of_schema : type s. s schema -> t = function
   | { id = None; descriptor } -> of_descriptor None descriptor
   | { id = Some id; _ } -> Atom (name id)
 
-and of_object : type s. (s, [ `Object ]) descriptor -> (string * t) list =
-  function
-  | Object { field; schema = Outline schema; rest; _ } ->
-    (field, of_schema schema) :: of_object rest
+and of_object : type s. (s, [ `Object ]) descriptor -> (string * t * bool) list
+    = function
+  | Object { field; schema = Outline schema; rest; requirement; _ } ->
+    (field, of_schema schema, Schema.required requirement) :: of_object rest
   | Object { schema = Inline { descriptor = Object o; _ }; rest; _ } ->
     of_object (Object o) @ of_object rest
   | Object { schema = Inline { descriptor = Map (_, _, Object o); _ }; rest; _ }
@@ -84,9 +84,20 @@ let pp ?(indent = 2) fmt ts =
         ++ (hvbox @@ list ~sep:comma (hvbox pp))
         ++ sp ++ const char ']'
       and object_ =
-        let field =
-          box ~indent
-          @@ Fmt.pair ~sep:(const char ':' ++ sp) Dump.string (hvbox pp)
+        let field f (name, v, required) =
+          let pp =
+            box ~indent
+            @@ Fmt.pair
+                 ~sep:
+                   (const string
+                      (if required then
+                        ":"
+                      else
+                        "?:")
+                   ++ sp)
+                 Dump.string (hvbox pp)
+          in
+          pp f (name, v)
         in
         const char '{' ++ break 1 indent
         ++ (hvbox @@ list ~sep:semi field)

@@ -2,6 +2,10 @@ open Base
 open Utils
 include Schema_intf
 
+let required : type a b. (a, b) field_requirement -> bool = function
+  | Required -> true
+  | _ -> false
+
 let map cons decons { descriptor; _ } =
   { id = None; descriptor = Map (cons, decons, descriptor) }
 
