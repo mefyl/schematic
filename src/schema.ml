@@ -127,7 +127,7 @@ let compare schema =
         match compare schema.descriptor l r with
         | 0 -> compare rest lr rr
         | v -> v)
-    | Union cases ->
+    | Union { cases; _ } ->
       fun l r ->
         let f (Case { schema; encoder; _ }) =
           match (encoder l, encoder r) with

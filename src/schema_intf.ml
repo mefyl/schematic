@@ -11,6 +11,7 @@ type kinds =
 
 type _ case =
   | Case : {
+      name : string;
       schema : 'a schema;
       encoder : 't -> 'a option;
       decoder : 'a -> 't;
@@ -57,7 +58,11 @@ and ('t, 'kind) descriptor =
       rest : ('b, [ `Tuple ]) descriptor;
     }
       -> ('a * 'b, [< `Tuple | `Value ]) descriptor
-  | Union : 't case list -> ('t, [< `Value ]) descriptor
+  | Union : {
+      key : string option;
+      cases : 't case list;
+    }
+      -> ('t, [< `Value ]) descriptor
 
 and 't schema = {
   id : string option;

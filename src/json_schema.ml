@@ -393,7 +393,7 @@ let of_schema schema =
                         | Some (Items_schema _) ->
                           failwith "mixed list and tuple")));
               } ))
-      | Schema.Union cases ->
+      | Schema.Union { cases; _ } ->
         let f (Schema.Case { schema; _ }) (marks, l) =
           let marks, schema = of_schema marks schema in
           (marks, schema :: l)

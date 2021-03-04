@@ -58,6 +58,14 @@ module Expr = struct
     else
       [%expr false]
 
+  let string ~loc txt =
+    {
+      pexp_desc = Pexp_constant (Pconst_string (txt, loc, None));
+      pexp_loc = loc;
+      pexp_loc_stack = [];
+      pexp_attributes = [];
+    }
+
   let tuple ~loc = function
     | [] -> [%expr ()]
     | [ v ] -> v
@@ -320,6 +328,7 @@ module Attributes = struct
   type t = {
     alias : string option;
     name : string option;
+    union_key : string option;
   }
 
   let check_unknown_attribute ~loc name =
@@ -327,7 +336,15 @@ module Attributes = struct
       Ppxlib.Location.raise_errorf ~loc
         "schematic-ppx: unknown schematic annotation %s" name
 
-  let rec extract ?(alias = false) ?(name = false) = function
+  let rec extract ?(alias = false) ?(name = false) ?(union_key = false) =
+    let merge name loc old v =
+      match old with
+      | None -> Some v
+      | Some _ ->
+        Ppxlib.Location.raise_errorf ~loc
+          "schematic-ppx: duplicate schematic.%s annotation on schema" name
+    in
+    function
     | { attr_name = { txt; _ }; attr_loc = loc; attr_payload } :: attrs -> (
       let attrs = extract attrs in
       match txt with
@@ -345,10 +362,17 @@ module Attributes = struct
         | _ ->
           Ppxlib.Location.raise_errorf ~loc
             "schematic-ppx: duplicate schematic.name annotation on schema")
+      | "schematic.union_key" when union_key ->
+        {
+          attrs with
+          union_key =
+            merge "union_key" loc attrs.union_key
+            @@ expect_string_constant ~loc attr_payload;
+        }
       | _ ->
         let () = check_unknown_attribute ~loc txt in
         attrs)
-    | [] -> { alias = None; name = None }
+    | [] -> { alias = None; name = None; union_key = None }
 end
 
 type context = {
@@ -377,14 +401,6 @@ let suffix_id_loc suffix ({ txt; loc } as id) =
   { id with txt = suffix_id ~loc suffix txt }
 
 let schema_id ~loc = suffix_id ~loc "schema"
-
-let expr_string ~loc txt =
-  {
-    pexp_desc = Pexp_constant (Pconst_string (txt, loc, None));
-    pexp_loc = loc;
-    pexp_loc_stack = [];
-    pexp_attributes = [];
-  }
 
 let expr_option ~loc expr = function
   | None -> [%expr None]
@@ -741,7 +757,7 @@ module Schema : EXPANSION = struct
             in
             ( loc,
               requirement,
-              expr_string ~loc (rename txt),
+              Expr.string ~loc (rename txt),
               schema,
               inline,
               specs )
@@ -759,7 +775,7 @@ module Schema : EXPANSION = struct
         [%expr
           Object
             {
-              description = [%e expr_option ~loc expr_string specs.description];
+              description = [%e expr_option ~loc Expr.string specs.description];
               examples = [%e expr_list ~loc specs.examples];
               field = [%e field];
               maximum = [%e expr_option ~loc expr_int specs.maximum];
@@ -830,6 +846,7 @@ module Schema : EXPANSION = struct
     in
     (combinator ~loc fields field_name constructed deconstructed schema, true)
 
+  (*here*)
   and expand_variant ~loc ~context options =
     let f
         {
@@ -856,6 +873,7 @@ module Schema : EXPANSION = struct
 
   and expand_any_variant ~loc ~context poly options =
     let f (txt, pcd_args, loc, attrs) =
+      let name = String.lowercase txt in
       let schema, ctor_pattern, ctor_value, pattern, value =
         match constructor_arguments_normalize ~loc pcd_args with
         | None ->
@@ -868,9 +886,7 @@ module Schema : EXPANSION = struct
                 Schema.id = None;
                 descriptor =
                   String_const
-                    [%e
-                      expr_string ~loc
-                        (Option.value ~default:(String.lowercase txt) alias)];
+                    [%e Expr.string ~loc (Option.value ~default:name alias)];
               }]
           in
           (schema, None, None, None, None)
@@ -880,12 +896,10 @@ module Schema : EXPANSION = struct
           let schema =
             match pcd_args with
             | Pcstr_record fields ->
-              [%expr
-                {
-                  Schema.id = None;
-                  descriptor =
-                    [%e _expand_record true ~loc ~context fields |> fst];
-                }]
+              let descriptor =
+                _expand_record true ~loc ~context fields |> fst
+              in
+              [%expr { Schema.id = None; descriptor = [%e descriptor] }]
             | _ -> encode_type ~loc ~context type_
           in
           ( schema,
@@ -931,12 +945,21 @@ module Schema : EXPANSION = struct
       [%expr
         Schema.Case
           {
+            name = [%e Expr.string ~loc name];
             schema = [%e schema];
             encoder = [%e construct];
             decoder = [%e destruct];
           }]
     in
-    ([%expr Schema.Union [%e expr_list ~loc (List.map ~f options)]], true)
+    let key =
+      match context.attributes.union_key with
+      | None -> [%expr None]
+      | Some name -> [%expr Some [%e Expr.string ~loc name]]
+    in
+    ( [%expr
+        Schema.Union
+          { cases = [%e expr_list ~loc (List.map ~f options)]; key = [%e key] }],
+      true )
 
   let expand_abstract_type ~loc ~context t =
     ([%expr [%e encode_type ~loc ~context t].descriptor], false)
@@ -948,7 +971,7 @@ module Schema : EXPANSION = struct
           Schema.id =
             Some
               [%e
-                expr_string ~loc
+                Expr.string ~loc
                   (Option.value ~default:(rename t.ptype_name.txt)
                      context.attributes.name)];
           descriptor = [%e body];
@@ -2045,10 +2068,20 @@ module Expander (Expansion : EXPANSION) = struct
     let f t =
       let context =
         {
-          attributes = Attributes.extract ~name:true t.ptype_attributes;
+          attributes =
+            Attributes.extract ~name:true ~union_key:true t.ptype_attributes;
           type_ = t.ptype_name.txt;
           types = names;
         }
+      in
+      let () =
+        match (context.attributes.union_key, t.ptype_kind) with
+        | None, _
+        | Some _, Ptype_variant _ ->
+          ()
+        | _ ->
+          Ppxlib.Location.raise_errorf ~loc:t.ptype_loc
+            "schematic-ppx: union_key is only valid on variants"
       in
       let body =
         let loc = t.ptype_loc in

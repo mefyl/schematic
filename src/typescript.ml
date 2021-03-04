@@ -9,10 +9,12 @@ let name s =
 
 type t =
   | Atom of string
+  | Intersection of t list
   | Object of {
       name : string option;
       fields : (string * t * bool) list;
     }
+  | String of string
   | Template of {
       name : string;
       args : t list;
@@ -43,7 +45,7 @@ let rec of_descriptor :
     Atom "Date"
   | Object o -> Object { name; fields = of_object (Object o) }
   | Tuple t -> Tuple (of_tuple (Tuple t))
-  | Union cases -> Union (List.map of_case cases)
+  | Union { cases; key } -> Union (List.map (of_case key) cases)
 
 and of_schema : type s. s schema -> t = function
   | { id = None; descriptor } -> of_descriptor None descriptor
@@ -69,7 +71,14 @@ and of_tuple : type s. (s, [ `Tuple ]) descriptor -> t list = function
   | Tuple { schema; rest } -> of_schema schema :: of_tuple rest
   | Null -> []
 
-and of_case : type s. s case -> t = fun (Case { schema; _ }) -> of_schema schema
+and of_case : type s. string option -> s case -> t =
+ fun key (Case { name; schema; _ }) ->
+  let schema = of_schema schema in
+  match key with
+  | None -> schema
+  | Some key ->
+    Intersection
+      [ schema; Object { name = None; fields = [ (key, String name, true) ] } ]
 
 let of_schema { id; descriptor } = of_descriptor id descriptor
 
@@ -108,7 +117,10 @@ let pp ?(indent = 2) fmt ts =
       and union = hvbox @@ list ~sep:(custom_break " | " " |") (hvbox pp) in
       match ts with
       | Atom s -> const string s
+      | Intersection types ->
+        const (list ~sep:(sp ++ const char '&' ++ sp) pp) types
       | Object { fields; _ } -> const object_ fields
+      | String s -> const Dump.string s
       | Template { name; args } ->
         hbox
         @@ const string name ++ const char '<'

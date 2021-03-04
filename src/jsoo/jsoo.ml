@@ -141,7 +141,7 @@ let decode schema =
           | Null -> Result.return ()
         in
         decode_tuple 0 (Tuple descriptor)
-      | Union cases -> (
+      | Union { cases; _ } -> (
         let conv (Case { schema; decoder; _ }) =
           match decode schema.id schema.descriptor js with
           | Result.Ok v -> Some (decoder v)
@@ -266,7 +266,7 @@ let encode schema =
     | String_const v -> Js.Unsafe.coerce @@ Js.string v
     | Time -> Js.Unsafe.coerce @@ js_of_ptime v
     | Time_local -> Js.Unsafe.coerce @@ js_of_ptime (fst v)
-    | Union cases -> (
+    | Union { cases; _ } -> (
       let conv (Case { schema; encoder; _ }) =
         match encoder v with
         | Some v -> Some (encode schema.descriptor v)

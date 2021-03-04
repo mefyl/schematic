@@ -167,7 +167,7 @@ module Make (Impl : Impl) = struct
         decode schema.id schema.descriptor hd >>= fun hd ->
         decode id rest (`A tl) >>= fun tl -> Result.return (hd, tl)
       | Tuple _, _ -> type_error "tuple"
-      | Union cases, _ -> (
+      | Union { cases; _ }, _ -> (
         let conv (Case { schema; decoder; _ }) =
           match decode schema.id schema.descriptor json with
           | Result.Ok v -> Some (decoder v)
@@ -252,7 +252,7 @@ module Make (Impl : Impl) = struct
       | Time_local ->
         let t, tz_offset_s = v in
         `String (Ptime.to_rfc3339 ~tz_offset_s t)
-      | Union cases -> (
+      | Union { cases; _ } -> (
         let conv (Case { schema; encoder; _ }) =
           match encoder v with
           | Some v -> Some (encode schema.descriptor v)

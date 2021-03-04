@@ -104,25 +104,31 @@ module Either = struct
       Schema.id = None;
       descriptor =
         Union
-          [
-            Case
-              {
-                schema = first;
-                encoder =
-                  (function
-                  | First x -> Some x
-                  | Second _ -> None);
-                decoder = Either.first;
-              };
-            Case
-              {
-                schema = second;
-                encoder =
-                  (function
-                  | Second x -> Some x
-                  | First _ -> None);
-                decoder = Either.second;
-              };
-          ];
+          {
+            cases =
+              [
+                Case
+                  {
+                    name = "first";
+                    schema = first;
+                    encoder =
+                      (function
+                      | First x -> Some x
+                      | Second _ -> None);
+                    decoder = Either.first;
+                  };
+                Case
+                  {
+                    name = "second";
+                    schema = second;
+                    encoder =
+                      (function
+                      | Second x -> Some x
+                      | First _ -> None);
+                    decoder = Either.second;
+                  };
+              ];
+            key = None;
+          };
     }
 end

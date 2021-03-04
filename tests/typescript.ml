@@ -6,7 +6,16 @@ type record = {
 
 and nullable = bool option
 
-and tuple = string * int64 * unit [@@deriving schema]
+and tuple = string * int64 * unit
+
+and variant =
+  | Record of record
+  | Otherwise of { i : int }
+
+and keyed_variant =
+  | KRecord of record
+  | KOtherwise of { i : int }
+[@@schematic.union_key "kind"] [@@deriving schema]
 
 module Generate_types = struct
   let test t expected =
@@ -20,6 +29,11 @@ module Generate_types = struct
     test record_schema {|{ "a": number; "b"?: number; "c": string }|}
 
   let tuple () = test tuple_schema "[ string, number, null ]"
+
+  let variant () =
+    test variant_schema {|Record | { "i": number }|};
+    test keyed_variant_schema
+      {|Record & { "kind": "krecord" } | { "i": number } & { "kind": "kotherwise" }|}
 end
 
 let () =
@@ -31,5 +45,6 @@ let () =
           test_case "nullable" `Quick Generate_types.nullable;
           test_case "record" `Quick Generate_types.record;
           test_case "tuple" `Quick Generate_types.tuple;
+          test_case "variant" `Quick Generate_types.variant;
         ] );
     ]
