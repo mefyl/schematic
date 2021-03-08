@@ -40,6 +40,8 @@
    (and
     (= 0.17.0)
     :dev))
+  (ocaml-base-compiler
+   (>= 4.12.0))
   fmt
   logs
   ppxlib
