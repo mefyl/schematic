@@ -167,11 +167,25 @@ module Make (Impl : Impl) = struct
         decode schema.id schema.descriptor hd >>= fun hd ->
         decode id rest (`A tl) >>= fun tl -> Result.return (hd, tl)
       | Tuple _, _ -> type_error "tuple"
-      | Union { cases; _ }, _ -> (
-        let conv (Case { schema; decoder; _ }) =
-          match decode schema.id schema.descriptor json with
-          | Result.Ok v -> Some (decoder v)
-          | Result.Error _ -> None
+      | Union { cases; key }, _ -> (
+        let conv (Case { decoder; name; schema; _ }) =
+          let key =
+            match key with
+            | None -> true
+            | Some key -> (
+              match json with
+              | `O fields -> (
+                match List.Assoc.find fields ~equal:String.equal key with
+                | Some (`String n) -> String.(n = name)
+                | _ -> false)
+              | _ -> false)
+          in
+          if key then
+            match decode schema.id schema.descriptor json with
+            | Result.Ok v -> Some (decoder v)
+            | Result.Error _ -> None
+          else
+            None
         in
         match List.find_map ~f:conv cases with
         | Some res -> Result.return res
@@ -252,10 +266,13 @@ module Make (Impl : Impl) = struct
       | Time_local ->
         let t, tz_offset_s = v in
         `String (Ptime.to_rfc3339 ~tz_offset_s t)
-      | Union { cases; _ } -> (
-        let conv (Case { schema; encoder; _ }) =
+      | Union { cases; key } -> (
+        let conv (Case { encoder; name; schema; _ }) =
           match encoder v with
-          | Some v -> Some (encode schema.descriptor v)
+          | Some v -> (
+            match (key, encode schema.descriptor v) with
+            | Some key, `O fields -> Some (`O ((key, `String name) :: fields))
+            | _, res -> Some res)
           | None -> None
         in
         match List.find_map ~f:conv cases with

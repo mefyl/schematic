@@ -141,11 +141,20 @@ let decode schema =
           | Null -> Result.return ()
         in
         decode_tuple 0 (Tuple descriptor)
-      | Union { cases; _ } -> (
-        let conv (Case { schema; decoder; _ }) =
-          match decode schema.id schema.descriptor js with
-          | Result.Ok v -> Some (decoder v)
-          | Result.Error _ -> None
+      | Union { cases; key } -> (
+        let conv (Case { decoder; name; schema; _ }) =
+          let key =
+            match key with
+            | None -> true
+            | Some key ->
+              phys_equal (Js.Unsafe.get js (Js.string key)) (Js.string name)
+          in
+          if key then
+            match decode schema.id schema.descriptor js with
+            | Result.Ok v -> Some (decoder v)
+            | Result.Error _ -> None
+          else
+            None
         in
         match List.find_map ~f:conv cases with
         | Some res -> Result.return res
@@ -266,10 +275,17 @@ let encode schema =
     | String_const v -> Js.Unsafe.coerce @@ Js.string v
     | Time -> Js.Unsafe.coerce @@ js_of_ptime v
     | Time_local -> Js.Unsafe.coerce @@ js_of_ptime (fst v)
-    | Union { cases; _ } -> (
-      let conv (Case { schema; encoder; _ }) =
+    | Union { cases; key } -> (
+      let conv (Case { encoder; name; schema; _ }) =
         match encoder v with
-        | Some v -> Some (encode schema.descriptor v)
+        | Some v ->
+          let res = encode schema.descriptor v in
+          let () =
+            match key with
+            | None -> ()
+            | Some key -> Js.Unsafe.set res (Js.string key) (Js.string name)
+          in
+          Some res
         | None -> None
       in
       match List.find_map ~f:conv cases with
