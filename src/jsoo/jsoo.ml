@@ -112,7 +112,12 @@ let decode schema =
       | Map (cons, _, schema) ->
         decode id ids schema js >>= fun value -> Result.return @@ cons value
       | Mapping _ -> failwith "FIXME"
-      | Null -> Result.return ()
+      | Null ->
+        if js == Js.Unsafe.pure_js_expr "null" then
+          Result.return ()
+        else
+          let constr = Js.Unsafe.global##._String in
+          fail "expected null, got %s" (new%js constr js |> Js.to_string)
       | Nullable s ->
         Js.Opt.case (Js.Opt.return js)
           (fun () -> Result.return None)
@@ -123,15 +128,17 @@ let decode schema =
             type t.
             (t, [ `Object ]) descriptor -> (t, [> decode_error ]) Result.t =
           function
-          | Object { field; requirement; schema; rest; _ } ->
-            let inline, schema = extract_field_schema schema in
-            let value =
-              if inline then
-                Some js
-              else
-                Js.Unsafe.get js (Js.string field) |> Js.Optdef.to_option
+          | Object { field; requirement; omit; schema; rest; _ } ->
+            let field =
+              let inline, schema = extract_field_schema schema in
+              let value =
+                if inline then
+                  Some js
+                else
+                  Js.Unsafe.get js (Js.string field) |> Js.Optdef.to_option
+              in
+              decode_field omit id ids field schema requirement value
             in
-            let field = decode_field id ids field schema requirement value in
             Result.Let_syntax.Let_syntax.both field (decode_object rest)
           | Null -> Result.return ()
         in
@@ -173,9 +180,10 @@ let decode schema =
         in
         match List.find_map ~f:conv cases with
         | Some res -> Result.return res
-        | None -> Result.fail (`Js_decode "no union case was matched"))
+        | None -> fail "no union case was matched")
   and decode_field :
       type t r.
+      bool ->
       string option ->
       string list ->
       string ->
@@ -183,7 +191,7 @@ let decode schema =
       (t, r) field_requirement ->
       Js.Unsafe.any option ->
       (r, 'error) Result.t =
-   fun id ids field schema ->
+   fun omit id ids field schema ->
     let ids = field :: ids in
     function
     | Required -> (
@@ -201,7 +209,11 @@ let decode schema =
         ))
     | Default default -> (
       function
-      | Some v -> decode schema.id ids schema.descriptor v
+      | Some v ->
+        if omit then
+          Result.return default
+        else
+          decode schema.id ids schema.descriptor v
       | None -> Result.return default)
     | Optional -> (
       function
