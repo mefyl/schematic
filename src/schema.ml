@@ -51,6 +51,11 @@ let extract_field_schema = function
   | Inline schema -> (true, schema)
   | Outline schema -> (false, schema)
 
+let rec object_fields : type t. (t, [ `Object ]) descriptor -> string list =
+  function
+  | Object { field; rest; _ } -> field :: object_fields rest
+  | Null -> []
+
 let assoc_compare compare l r =
   let f (key, l) =
     match List.Assoc.find ~equal:String.equal r key with

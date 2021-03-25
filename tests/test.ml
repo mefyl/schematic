@@ -359,6 +359,27 @@ let time () =
          "end_local" : "2020-05-08T23:48:47+02:00"
        } |}
 
+(* Optional inline *)
+
+type optional_inline = {
+  a : int;
+  b : int;
+}
+
+and optional_inline_wrapper = {
+  inline : optional_inline option; [@schematic.inline]
+  c : int;
+}
+[@@deriving schema, show]
+
+let optional_inline () =
+  let t = Alcotest.testable pp_optional_inline_wrapper ( = ) in
+  test "missing optional inline" t optional_inline_wrapper_schema
+    { inline = None; c = 377 } {|{"c":377}|};
+  test "filled optional inline" t optional_inline_wrapper_schema
+    { inline = Some { a = 375; b = 376 }; c = 377 }
+    {|{"a":375,"b":376,"c":377}|}
+
 (* JSON Schema metadata *)
 
 module Metadata = struct
@@ -544,6 +565,7 @@ let () =
             Metadata.description;
           test_case "json-schema-metadata-default" `Quick Metadata.default;
           test_case "failure" `Quick failure;
+          test_case "optional-inline" `Quick optional_inline;
         ] );
       ( "comparison",
         [
