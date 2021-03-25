@@ -3,7 +3,7 @@ open Base
 open Js_of_ocaml
 open Poly
 open Schematic.Schema
-open Schematic.Schema.Schemas
+include Schematic.Schema.Schemas
 
 let ( == ) = Caml.( == )
 
@@ -16,6 +16,8 @@ type int_js = Js.number Js.t
 type any_js = Js.Unsafe.any
 
 type unit_js = Js.Unsafe.any Js.Opt.t
+
+type ignore_js = Js.Unsafe.any
 
 module Either = struct
   include Either
@@ -79,6 +81,7 @@ let decode schema =
           Result.return (Js.Unsafe.coerce js |> Js.float_of_number)
         else
           Result.fail (`Js_decode "invalid number")
+      | Ignore -> Result.return ()
       | Int ->
         if Js.typeof js == Js.string "number" then
           Result.return
@@ -211,6 +214,7 @@ let encode schema =
     | Bool -> Js.Unsafe.coerce @@ Js.bool v
     | Date -> Js.Unsafe.coerce @@ js_of_date v
     | Float -> Js.Unsafe.coerce @@ Js.number_of_float v
+    | Ignore -> Js.Unsafe.coerce @@ Js.Unsafe.pure_js_expr "null"
     | Int -> Js.Unsafe.coerce @@ Js.number_of_float @@ Float.of_int v
     | Int64 -> Js.Unsafe.coerce @@ Js.number_of_float @@ Float.of_int64 v
     | List items_schema ->
@@ -238,6 +242,15 @@ let encode schema =
         fun into schema v ->
           match schema with
           | Null -> ()
+          | Object
+              {
+                schema =
+                  ( Outline { descriptor = Ignore; _ }
+                  | Inline { descriptor = Ignore; _ } );
+                rest;
+                _;
+              } ->
+            encode_object into rest (snd v)
           | Object { field; requirement; schema; rest; _ } ->
             let inline, schema = extract_field_schema schema in
             let () =

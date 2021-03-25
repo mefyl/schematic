@@ -24,6 +24,10 @@ type any = Ezjsonm.value
 
 val any_schema : any schema
 
+type ignore = unit
+
+val ignore_schema : ignore schema
+
 module Either : sig
   include module type of Base.Either
 

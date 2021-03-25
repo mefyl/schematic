@@ -28,6 +28,7 @@ let rec of_descriptor :
   | Any -> Atom "any"
   | Bool -> Atom "boolean"
   | Date -> Atom "Date"
+  | Ignore -> Atom "null"
   | Int
   | Int64
   | Float ->
@@ -53,6 +54,14 @@ and of_schema : type s. s schema -> t = function
 
 and of_object : type s. (s, [ `Object ]) descriptor -> (string * t * bool) list
     = function
+  | Object
+      {
+        schema =
+          Outline { descriptor = Ignore; _ } | Inline { descriptor = Ignore; _ };
+        rest;
+        _;
+      } ->
+    of_object rest
   | Object { field; schema = Outline schema; rest; requirement; omit; _ } ->
     if omit then
       of_object rest

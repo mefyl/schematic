@@ -19,6 +19,7 @@ let rec pp_descriptor : type t kind. (t, kind) descriptor Fmt.t =
     | Bool -> const string "bool"
     | Date -> const string "date"
     | Float -> const string "int"
+    | Ignore -> const string "ignore"
     | Int -> const string "int"
     | Int64 -> const string "int64"
     | List schema ->
@@ -87,6 +88,7 @@ let compare schema =
     | Bool -> Base.Bool.compare
     | Date -> Base.Poly.compare
     | Float -> Base.Poly.compare
+    | Ignore -> Base.Poly.compare
     | Int
     | Int64 ->
       Base.Poly.compare

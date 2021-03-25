@@ -3,6 +3,8 @@ open Base
 module Schemas = struct
   let unit_schema = { Schema.id = None; descriptor = Null }
 
+  let ignore_schema = { Schema.id = None; descriptor = Ignore }
+
   let int_schema = { Schema.id = None; descriptor = Int }
 
   let int64_schema = { Schema.id = None; descriptor = Int64 }
@@ -21,6 +23,8 @@ module Schemas = struct
 
   let mapping_schema schema = { Schema.id = None; descriptor = Mapping schema }
 end
+
+type ignore = unit
 
 type any = Ezjsonm.value
 
