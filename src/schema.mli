@@ -8,6 +8,6 @@ val pp : Format.formatter -> _ schema -> unit
 
 val extract_field_schema : 'a field_schema -> bool * 'a schema
 
-val object_fields : ('a, [ `Object ]) descriptor -> string list
+val descriptor_fields : ('a, [ `Value ]) descriptor -> string list
 
 val compare : 'a schema -> 'a -> 'a -> int

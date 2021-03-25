@@ -28,18 +28,6 @@ module Make (Impl : Impl) = struct
   type ('t, 'kind) object_descriptor = ('t, 'kind) descriptor
     constraint 'kind = [> `Object ]
 
-  let rec has_fields :
-      type t kind. (string * _) list -> (t, kind) descriptor -> bool =
-   fun effective -> function
-    | Map (_, _, d) -> has_fields effective d
-    | Object o ->
-      let expected = Schema.object_fields (Object o) in
-      Option.is_none
-      @@ List.find
-           ~f:(fun f -> not (List.Assoc.mem ~equal:String.equal effective f))
-           expected
-    | _ -> failwith "inline field is not an object"
-
   let decode schema =
     let rec decode_field :
         type t r.
@@ -129,7 +117,18 @@ module Make (Impl : Impl) = struct
           | Object { field; requirement; schema; rest; _ } ->
             let inline, schema = extract_field_schema schema in
             let field =
-              if inline && not (has_fields fields schema.descriptor) then
+              let missing =
+                if inline then
+                  let expected = Schema.descriptor_fields schema.descriptor in
+                  Option.is_some
+                  @@ List.find
+                       ~f:(fun f ->
+                         not (List.Assoc.mem ~equal:String.equal fields f))
+                       expected
+                else
+                  false
+              in
+              if missing then
                 decode_field id field schema requirement None
               else
                 let value =

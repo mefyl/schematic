@@ -128,19 +128,37 @@ let decode schema =
             type t.
             (t, [ `Object ]) descriptor -> (t, [> decode_error ]) Result.t =
           function
+          | Null -> Result.return ()
           | Object { field; requirement; omit; schema; rest; _ } ->
+            let inline, schema = extract_field_schema schema in
             let field =
-              let inline, schema = extract_field_schema schema in
-              let value =
+              let missing =
                 if inline then
-                  Some js
+                  let expected =
+                    Schematic.Schema.descriptor_fields schema.descriptor
+                  in
+                  Option.is_some
+                  @@ List.find
+                       ~f:(fun f ->
+                         not
+                           (Js.Unsafe.get js (Js.string f)
+                           == Js.Unsafe.pure_js_expr "undefined"))
+                       expected
                 else
-                  Js.Unsafe.get js (Js.string field) |> Js.Optdef.to_option
+                  false
               in
-              decode_field omit id ids field schema requirement value
+              if missing then
+                decode_field omit id ids field schema requirement None
+              else
+                let value =
+                  if inline then
+                    Some js
+                  else
+                    Js.Unsafe.get js (Js.string field) |> Js.Optdef.to_option
+                in
+                decode_field omit id ids field schema requirement value
             in
             Result.Let_syntax.Let_syntax.both field (decode_object rest)
-          | Null -> Result.return ()
         in
         decode_object (Object descriptor)
       | String -> Result.return @@ Js.to_string @@ Js.Unsafe.coerce js

@@ -62,7 +62,7 @@ let rec object_fields : type t. (t, [ `Object ]) descriptor -> string list =
 and descriptor_fields : type t. (t, _) descriptor -> string list = function
   | Map (_, _, d) -> descriptor_fields d
   | Object o -> object_fields (Object o)
-  | _ -> failwith "inline field is not an object"
+  | s -> Fmt.failwith "inline field is not an object: %a" pp_descriptor s
 
 let assoc_compare compare l r =
   let f (key, l) =
