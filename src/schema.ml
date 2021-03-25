@@ -53,8 +53,16 @@ let extract_field_schema = function
 
 let rec object_fields : type t. (t, [ `Object ]) descriptor -> string list =
   function
-  | Object { field; rest; _ } -> field :: object_fields rest
   | Null -> []
+  | Object { requirement = Default _ | Optional; rest; _ } -> object_fields rest
+  | Object { rest; schema = Inline schema; _ } ->
+    descriptor_fields schema.descriptor @ object_fields rest
+  | Object { field; rest; _ } -> field :: object_fields rest
+
+and descriptor_fields : type t. (t, _) descriptor -> string list = function
+  | Map (_, _, d) -> descriptor_fields d
+  | Object o -> object_fields (Object o)
+  | _ -> failwith "inline field is not an object"
 
 let assoc_compare compare l r =
   let f (key, l) =

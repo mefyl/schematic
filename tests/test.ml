@@ -361,9 +361,13 @@ let time () =
 
 (* Optional inline *)
 
-type optional_inline = {
+type optional_inline2 = { d : int }
+
+and optional_inline = {
   a : int;
   b : int;
+  inline2 : optional_inline2; [@schematic.inline]
+  missing : int option;
 }
 
 and optional_inline_wrapper = {
@@ -377,8 +381,11 @@ let optional_inline () =
   test "missing optional inline" t optional_inline_wrapper_schema
     { inline = None; c = 377 } {|{"c":377}|};
   test "filled optional inline" t optional_inline_wrapper_schema
-    { inline = Some { a = 375; b = 376 }; c = 377 }
-    {|{"a":375,"b":376,"c":377}|}
+    {
+      inline = Some { a = 375; b = 376; inline2 = { d = 378 }; missing = None };
+      c = 377;
+    }
+    {|{"a":375,"b":376,"d":378,"c":377}|}
 
 (* JSON Schema metadata *)
 
