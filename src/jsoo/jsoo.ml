@@ -56,6 +56,21 @@ let ptime_of_js (date : Js.date Js.t) =
   | None -> failwith ("invalid time: " ^ Float.to_string date##getTime)
 
 let decode schema =
+  let ( >>= ) = Result.( >>= ) in
+  let fail id ids fmt =
+    let schema = id in
+    let f s =
+      Result.fail
+        (`Js_decode
+          Fmt.(
+            str "schema %a%a: %s"
+              (list ~sep:(const char '.') string)
+              (List.rev ids)
+              (option (const string " (" ++ string ++ const string ")"))
+              schema s))
+    in
+    Fmt.kstr f fmt
+  in
   let rec decode :
       type t.
       string option ->
@@ -63,139 +78,123 @@ let decode schema =
       t descriptor ->
       Js.Unsafe.any ->
       (t, 'error) Result.t =
-    let open Result in
-    fun id ids descriptor js ->
-      let fail fmt =
-        let schema = id in
-        let f s =
-          Result.fail
-            (`Js_decode
-              Fmt.(
-                str "schema %a%a: %s"
-                  (list ~sep:(const char '.') string)
-                  (List.rev ids)
-                  (option (const string " (" ++ string ++ const string ")"))
-                  schema s))
-        in
-        Fmt.kstr f fmt
-      in
-      match descriptor with
-      | Any -> Result.return @@ Impl_js.of_js js
-      | Bool -> Result.return @@ Js.to_bool (Js.Unsafe.coerce js)
-      | Date ->
-        if Js.instanceof js Js.Unsafe.global##._Date then
-          Result.return @@ date_of_js @@ Js.Unsafe.coerce js
-        else
-          fail "invalid date: %s" (Js._JSON##stringify js |> Js.to_string)
-      | Float ->
-        if Js.typeof js == Js.string "number" then
-          Result.return (Js.Unsafe.coerce js |> Js.float_of_number)
-        else
-          fail "invalid number"
-      | Ignore -> Result.return ()
-      | Int ->
-        if Js.typeof js == Js.string "number" then
-          Result.return
-            (Js.Unsafe.coerce js |> Js.float_of_number |> Int.of_float)
-        else
-          fail "invalid integer"
-      | Int64 ->
-        if Js.typeof js == Js.string "number" then
-          Result.return
-            (Js.Unsafe.coerce js |> Js.float_of_number |> Int64.of_float)
-        else
-          fail "invalid integer"
-      | List items_schema ->
-        Js.Unsafe.coerce js |> Js.to_array
-        |> Array.map ~f:(decode items_schema.id ids items_schema.descriptor)
-        |> Array.to_list |> Result.all
-      | Map (cons, _, schema) ->
-        decode id ids schema js >>= fun value -> Result.return @@ cons value
-      | Mapping _ -> failwith "FIXME"
-      | Null ->
-        if js == Js.Unsafe.pure_js_expr "null" then
-          Result.return ()
-        else
-          let constr = Js.Unsafe.global##._String in
-          fail "expected null, got %s" (new%js constr js |> Js.to_string)
-      | Nullable s ->
-        Js.Opt.case (Js.Opt.return js)
-          (fun () -> Result.return None)
-          (fun v ->
-            decode s.id ids s.descriptor v |> Result.map ~f:Option.return)
-      | Object fields ->
-        let rec decode_object :
-            type t. t field -> (t, [> decode_error ]) Result.t = function
-          | FieldEnd -> Result.return ()
-          | Field { field; requirement; omit; schema; rest; _ } ->
-            let inline, schema = extract_field_schema schema in
-            let field =
-              let missing =
-                if inline then
-                  let expected =
-                    Schematic.Schema.descriptor_fields schema.descriptor
-                  in
-                  Option.is_some
-                  @@ List.find
-                       ~f:(fun f ->
-                         not
-                           (Js.Unsafe.get js (Js.string f)
-                           == Js.Unsafe.pure_js_expr "undefined"))
-                       expected
-                else
-                  false
-              in
-              if missing then
-                decode_field omit id ids field schema requirement None
-              else
-                let value =
-                  if inline then
-                    Some js
-                  else
-                    Js.Unsafe.get js (Js.string field) |> Js.Optdef.to_option
+   fun id ids descriptor js ->
+    let fail fmt = fail id ids fmt in
+    match descriptor with
+    | Any -> Result.return @@ Impl_js.of_js js
+    | Bool -> Result.return @@ Js.to_bool (Js.Unsafe.coerce js)
+    | Date ->
+      if Js.instanceof js Js.Unsafe.global##._Date then
+        Result.return @@ date_of_js @@ Js.Unsafe.coerce js
+      else
+        fail "invalid date: %s" (Js._JSON##stringify js |> Js.to_string)
+    | Float ->
+      if Js.typeof js == Js.string "number" then
+        Result.return (Js.Unsafe.coerce js |> Js.float_of_number)
+      else
+        fail "invalid number"
+    | Ignore -> Result.return ()
+    | Int ->
+      if Js.typeof js == Js.string "number" then
+        Result.return (Js.Unsafe.coerce js |> Js.float_of_number |> Int.of_float)
+      else
+        fail "invalid integer"
+    | Int64 ->
+      if Js.typeof js == Js.string "number" then
+        Result.return
+          (Js.Unsafe.coerce js |> Js.float_of_number |> Int64.of_float)
+      else
+        fail "invalid integer"
+    | List items_schema ->
+      Js.Unsafe.coerce js |> Js.to_array
+      |> Array.map ~f:(decode items_schema.id ids items_schema.descriptor)
+      |> Array.to_list |> Result.all
+    | Map (cons, _, schema) ->
+      decode id ids schema js >>= fun value -> Result.return @@ cons value
+    | Mapping _ -> failwith "FIXME"
+    | Null ->
+      if js == Js.Unsafe.pure_js_expr "null" then
+        Result.return ()
+      else
+        let constr = Js.Unsafe.global##._String in
+        fail "expected null, got %s" (new%js constr js |> Js.to_string)
+    | Nullable s ->
+      Js.Opt.case (Js.Opt.return js)
+        (fun () -> Result.return None)
+        (fun v -> decode s.id ids s.descriptor v |> Result.map ~f:Option.return)
+    | Object fields ->
+      let rec decode_object : type t. t field -> (t, [> decode_error ]) Result.t
+          = function
+        | FieldEnd -> Result.return ()
+        | Field { field; requirement; omit; schema; rest; _ } ->
+          let inline, schema = extract_field_schema schema in
+          let field =
+            let missing =
+              if inline then
+                let expected =
+                  Schematic.Schema.descriptor_fields schema.descriptor
                 in
-                decode_field omit id ids field schema requirement value
+                Option.is_some
+                @@ List.find
+                     ~f:(fun f ->
+                       not
+                         (Js.Unsafe.get js (Js.string f)
+                         == Js.Unsafe.pure_js_expr "undefined"))
+                     expected
+              else
+                false
             in
-            Result.Let_syntax.Let_syntax.both field (decode_object rest)
-        in
-        decode_object fields
-      | String -> Result.return @@ Js.to_string @@ Js.Unsafe.coerce js
-      | String_const s ->
-        if Js.Unsafe.coerce js == Js.string s then
-          Result.return ()
-        else
-          Result.fail @@ `Js_decode "mismatched constant string"
-      | Time -> Result.return @@ ptime_of_js @@ Js.Unsafe.coerce js
-      | Time_local -> Result.return @@ (ptime_of_js @@ Js.Unsafe.coerce js, 0)
-      | Tuple items ->
-        let rec decode_tuple : type t. int -> t tuple -> (t, 'error) Result.t =
-         fun i -> function
-          | Item { schema; rest } ->
-            decode schema.id (Int.to_string i :: ids) schema.descriptor
-            @@ Js.Unsafe.get (Js.Unsafe.coerce js) i
-            >>= fun hd ->
-            decode_tuple (i + 1) rest >>= fun tl -> Result.return (hd, tl)
-          | ItemEnd -> Result.return ()
-        in
-        decode_tuple 0 items
-      | Union { cases; key } -> (
-        let conv (Case { decoder; name; schema; _ }) =
-          let key =
-            match key with
-            | None -> true
-            | Some key ->
-              phys_equal (Js.Unsafe.get js (Js.string key)) (Js.string name)
+            if missing then
+              decode_field omit schema.id ids field schema requirement None
+            else
+              let value =
+                if inline then
+                  Some js
+                else
+                  Js.Unsafe.get js (Js.string field) |> Js.Optdef.to_option
+              in
+              decode_field omit schema.id ids field schema requirement value
           in
-          if key then
-            match decode schema.id ids schema.descriptor js with
-            | Result.Ok v -> Some (decoder v)
-            | Result.Error _ -> None
-          else
-            None
+          Result.Let_syntax.Let_syntax.both field (decode_object rest)
+      in
+      decode_object fields
+    | String -> Result.return @@ Js.to_string @@ Js.Unsafe.coerce js
+    | String_const s ->
+      if Js.Unsafe.coerce js == Js.string s then
+        Result.return ()
+      else
+        fail "mismatched constant string"
+    | Time -> Result.return @@ ptime_of_js @@ Js.Unsafe.coerce js
+    | Time_local -> Result.return @@ (ptime_of_js @@ Js.Unsafe.coerce js, 0)
+    | Tuple items ->
+      let rec decode_tuple : type t. int -> t tuple -> (t, 'error) Result.t =
+       fun i -> function
+        | Item { schema; rest } ->
+          decode schema.id (Int.to_string i :: ids) schema.descriptor
+          @@ Js.Unsafe.get (Js.Unsafe.coerce js) i
+          >>= fun hd ->
+          decode_tuple (i + 1) rest >>= fun tl -> Result.return (hd, tl)
+        | ItemEnd -> Result.return ()
+      in
+      decode_tuple 0 items
+    | Union { cases; key } -> (
+      let conv (Case { decoder; name; schema; _ }) =
+        let key =
+          match key with
+          | None -> true
+          | Some key ->
+            phys_equal (Js.Unsafe.get js (Js.string key)) (Js.string name)
         in
-        match List.find_map ~f:conv cases with
-        | Some res -> Result.return res
-        | None -> fail "no union case was matched")
+        if key then
+          match decode schema.id ids schema.descriptor js with
+          | Result.Ok v -> Some (decoder v)
+          | Result.Error _ -> None
+        else
+          None
+      in
+      match List.find_map ~f:conv cases with
+      | Some res -> Result.return res
+      | None -> fail "no union case was matched")
   and decode_field :
       type t r.
       bool ->
@@ -208,20 +207,15 @@ let decode schema =
       (r, 'error) Result.t =
    fun omit id ids field schema ->
     let ids = field :: ids in
+    let fail fmt = fail id ids fmt in
     function
     | Required -> (
       function
       | Some v -> decode schema.id ids schema.descriptor v
       | None -> (
         match id with
-        | None ->
-          Result.fail
-            (`Js_decode (Printf.sprintf "missing required field %S" field))
-        | Some id ->
-          Result.fail
-            (`Js_decode
-              (Printf.sprintf "missing required field %S in schema %S" field id))
-        ))
+        | None -> fail "missing required field %S" field
+        | Some id -> fail "missing required field %S in schema %S" field id))
     | Default default -> (
       function
       | Some v ->
