@@ -51,17 +51,16 @@ let extract_field_schema = function
   | Inline schema -> (true, schema)
   | Outline schema -> (false, schema)
 
-let rec object_fields : type t. (t, [ `Object ]) descriptor -> string list =
-  function
-  | Null -> []
-  | Object { requirement = Default _ | Optional; rest; _ } -> object_fields rest
-  | Object { rest; schema = Inline schema; _ } ->
+let rec object_fields : type t. t field -> string list = function
+  | End -> []
+  | Field { requirement = Default _ | Optional; rest; _ } -> object_fields rest
+  | Field { rest; schema = Inline schema; _ } ->
     descriptor_fields schema.descriptor @ object_fields rest
-  | Object { field; rest; _ } -> field :: object_fields rest
+  | Field { field; rest; _ } -> field :: object_fields rest
 
 and descriptor_fields : type t. (t, _) descriptor -> string list = function
   | Map (_, _, d) -> descriptor_fields d
-  | Object o -> object_fields (Object o)
+  | Object fields -> object_fields fields
   | s -> Fmt.failwith "inline field is not an object: %a" pp_descriptor s
 
 let assoc_compare compare l r =
@@ -118,25 +117,30 @@ let compare schema =
         match Int.compare lz rz with
         | 0 -> Ptime.compare l r
         | v -> v)
-    | Object { schema; requirement; rest; _ } ->
-      let _, schema = extract_field_schema schema in
-      let f
-          (type field req)
-          (schema : field schema)
-          (requirement : (field, req) field_requirement)
-          ((l : req), lr)
-          ((r : req), rr) =
-        let c =
-          match requirement with
-          | Required -> compare schema.descriptor l r
-          | Default _ -> compare schema.descriptor l r
-          | Optional -> Option.compare (compare schema.descriptor) l r
-        in
-        match c with
-        | 0 -> compare rest lr rr
-        | v -> v
+    | Object fields ->
+      let rec compare_fields : type t. t field -> t -> t -> int = function
+        | Field { schema; requirement; rest; _ } ->
+          let _, schema = extract_field_schema schema in
+          let f
+              (type field req)
+              (schema : field schema)
+              (requirement : (field, req) field_requirement)
+              ((l : req), lr)
+              ((r : req), rr) =
+            let c =
+              match requirement with
+              | Required -> compare schema.descriptor l r
+              | Default _ -> compare schema.descriptor l r
+              | Optional -> Option.compare (compare schema.descriptor) l r
+            in
+            match c with
+            | 0 -> compare_fields rest lr rr
+            | v -> v
+          in
+          f schema requirement
+        | End -> fun () () -> 0
       in
-      f schema requirement
+      compare_fields fields
     | Tuple { schema; rest } -> (
       fun (l, lr) (r, rr) ->
         match compare schema.descriptor l r with

@@ -606,7 +606,7 @@ module Schema : EXPANSION = struct
     _expand_record false ~loc ~context fields
 
   and _expand_record as_tuple ~loc ~context fields =
-    let schema =
+    let fields_schema =
       let expand_fields fields =
         let expand_field = function
           | {
@@ -764,7 +764,7 @@ module Schema : EXPANSION = struct
         in
         List.map ~f:expand_field fields
       in
-      let init = [%expr Null] in
+      let init = [%expr End] in
       let f (loc, requirement, field, schema, inline, specs) rest =
         let schema =
           if inline then
@@ -773,7 +773,7 @@ module Schema : EXPANSION = struct
             [%expr Outline [%e schema]]
         in
         [%expr
-          Object
+          Field
             {
               description = [%e expr_option ~loc Expr.string specs.description];
               examples = [%e expr_list ~loc specs.examples];
@@ -844,7 +844,9 @@ module Schema : EXPANSION = struct
           ppat_attributes = [];
         }
     in
-    (combinator ~loc fields field_name constructed deconstructed schema, true)
+    ( combinator ~loc fields field_name constructed deconstructed
+        [%expr Object [%e fields_schema]],
+      true )
 
   (*here*)
   and expand_variant ~loc ~context options =

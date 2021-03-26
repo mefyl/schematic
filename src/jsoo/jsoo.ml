@@ -123,13 +123,11 @@ let decode schema =
           (fun () -> Result.return None)
           (fun v ->
             decode s.id ids s.descriptor v |> Result.map ~f:Option.return)
-      | Object descriptor ->
+      | Object fields ->
         let rec decode_object :
-            type t.
-            (t, [ `Object ]) descriptor -> (t, [> decode_error ]) Result.t =
-          function
-          | Null -> Result.return ()
-          | Object { field; requirement; omit; schema; rest; _ } ->
+            type t. t field -> (t, [> decode_error ]) Result.t = function
+          | End -> Result.return ()
+          | Field { field; requirement; omit; schema; rest; _ } ->
             let inline, schema = extract_field_schema schema in
             let field =
               let missing =
@@ -160,7 +158,7 @@ let decode schema =
             in
             Result.Let_syntax.Let_syntax.both field (decode_object rest)
         in
-        decode_object (Object descriptor)
+        decode_object fields
       | String -> Result.return @@ Js.to_string @@ Js.Unsafe.coerce js
       | String_const s ->
         if Js.Unsafe.coerce js == Js.string s then
@@ -278,9 +276,8 @@ let encode schema =
       | None -> Js.Unsafe.pure_js_expr "null"
       | Some v -> encode s.descriptor v)
     | Mapping _ -> failwith "FIXME"
-    | Object descriptor ->
-      let rec encode_object :
-          type t. Js.Unsafe.any -> (t, [ `Object ]) descriptor -> t -> unit =
+    | Object fields ->
+      let rec encode_object : type t. Js.Unsafe.any -> t field -> t -> unit =
         let encode_field : type t r. (t, r) field_requirement -> r -> t option =
           function
           | Required -> Option.some
@@ -292,8 +289,8 @@ let encode schema =
         in
         fun into schema v ->
           match schema with
-          | Null -> ()
-          | Object
+          | End -> ()
+          | Field
               {
                 schema =
                   ( Outline { descriptor = Ignore; _ }
@@ -302,7 +299,7 @@ let encode schema =
                 _;
               } ->
             encode_object into rest (snd v)
-          | Object { field; requirement; schema; rest; _ } ->
+          | Field { field; requirement; schema; rest; _ } ->
             let inline, schema = extract_field_schema schema in
             let () =
               match encode_field requirement (fst v) with
@@ -311,9 +308,8 @@ let encode schema =
                 if inline then
                   match schema.descriptor with
                   | Null -> ()
-                  | Object descriptor ->
-                    encode_object into (Object descriptor) v
-                  | Map (_, f, Object d) -> encode_object into (Object d) (f v)
+                  | Object fields -> encode_object into fields v
+                  | Map (_, f, Object fields) -> encode_object into fields (f v)
                   | _ -> failwith "invalid object schema"
                 else
                   Js.Unsafe.set into (Js.string field)
@@ -322,7 +318,7 @@ let encode schema =
             encode_object into rest (snd v)
       in
       let o = Js.Unsafe.coerce (object%js end) in
-      let () = encode_object o (Object descriptor) v in
+      let () = encode_object o fields v in
       o
     | Tuple descriptor ->
       let res = new%js Js.array_empty in

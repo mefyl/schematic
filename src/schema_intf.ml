@@ -4,8 +4,7 @@ type (_, _) field_requirement =
   | Optional : ('a, 'a option) field_requirement
 
 type kinds =
-  [ `Object
-  | `Tuple
+  [ `Tuple
   | `Value
   ]
 
@@ -21,6 +20,22 @@ type _ case =
 and 'a field_schema =
   | Outline of 'a schema
   | Inline of 'a schema
+
+and _ field =
+  | Field : {
+      description : string option;
+      examples : 'a list;
+      field : string;
+      maximum : int option;
+      minimum : int option;
+      omit : bool;
+      requirement : ('a, 'req) field_requirement;
+      rest : 'rest field;
+      schema : 'a field_schema;
+      title : string option;
+    }
+      -> ('req * 'rest) field
+  | End : unit field
 
 and ('t, 'kind) descriptor =
   | Any : (Ezjsonm.value, [< `Value ]) descriptor
@@ -41,19 +56,7 @@ and ('t, 'kind) descriptor =
   | String_const : string -> (unit, [< `Value ]) descriptor
   | Time : (Ptime.t, [< `Value ]) descriptor
   | Time_local : (Ptime.t * Ptime.tz_offset_s, [< `Value ]) descriptor
-  | Object : {
-      description : string option;
-      examples : 'a list;
-      field : string;
-      maximum : int option;
-      minimum : int option;
-      omit : bool;
-      requirement : ('a, 'req) field_requirement;
-      rest : ('b, [ `Object ]) descriptor;
-      schema : 'a field_schema;
-      title : string option;
-    }
-      -> ('req * 'b, [< `Object | `Value ]) descriptor
+  | Object : 't field -> ('t, [< `Value ]) descriptor
   | Tuple : {
       schema : 'a schema;
       rest : ('b, [ `Tuple ]) descriptor;

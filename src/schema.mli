@@ -6,6 +6,8 @@ val map : ('a -> 'b) -> ('b -> 'a) -> 'a schema -> 'b schema
 
 val pp : Format.formatter -> _ schema -> unit
 
+val pp_descriptor : Format.formatter -> (_, _) descriptor -> unit
+
 val extract_field_schema : 'a field_schema -> bool * 'a schema
 
 val descriptor_fields : ('a, [ `Value ]) descriptor -> string list

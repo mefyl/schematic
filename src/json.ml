@@ -25,9 +25,6 @@ module Make (Impl : Impl) = struct
 
   type date_tuple = int * int * int [@@deriving schema]
 
-  type ('t, 'kind) object_descriptor = ('t, 'kind) descriptor
-    constraint 'kind = [> `Object ]
-
   let decode schema =
     let rec decode_field :
         type t r.
@@ -108,13 +105,11 @@ module Make (Impl : Impl) = struct
       | Nullable _, `Null -> Result.return None
       | Nullable s, v ->
         decode s.id s.descriptor v |> Result.map ~f:Option.return
-      | Object descriptor, (`O fields as o) ->
+      | Object fields_schema, (`O fields as o) ->
         let rec decode_object :
-            type t.
-            (t, [ `Object ]) object_descriptor ->
-            (t, [> decode_error ]) Result.t = function
-          | Null -> Result.return ()
-          | Object { field; requirement; schema; rest; _ } ->
+            type t. t field -> (t, [> decode_error ]) Result.t = function
+          | End -> Result.return ()
+          | Field { field; requirement; schema; rest; _ } ->
             let inline, schema = extract_field_schema schema in
             let field =
               let missing =
@@ -141,7 +136,7 @@ module Make (Impl : Impl) = struct
             in
             Result.Let_syntax.Let_syntax.both field (decode_object rest)
         in
-        decode_object (Object descriptor)
+        decode_object fields_schema
       | Object _, _ -> type_error "object"
       | String, `String s -> Result.return s
       | String, _ -> type_error "string"
@@ -241,13 +236,12 @@ module Make (Impl : Impl) = struct
           (List.map
              ~f:(fun (name, v) -> (name, encode fields_schema.descriptor v))
              v)
-      | Object descriptor ->
+      | Object fields ->
         let rec encode_object :
-            type t.
-            t -> (t, [ `Object ]) descriptor -> (string * Ezjsonm.value) list =
+            type t. t -> t field -> (string * Ezjsonm.value) list =
          fun v -> function
-          | Null -> []
-          | Object { field; requirement; schema; rest; _ } -> (
+          | End -> []
+          | Field { field; requirement; schema; rest; _ } -> (
             let inline, schema = extract_field_schema schema
             and hd, tl = v in
             let tl = encode_object tl rest in
@@ -256,16 +250,15 @@ module Make (Impl : Impl) = struct
               if inline then
                 match schema.descriptor with
                 | Null -> []
-                | Object descriptor -> encode_object hd (Object descriptor) @ tl
-                | Map (_, f, Object descriptor) ->
-                  encode_object (f hd) (Object descriptor) @ tl
-                | _ -> failwith "invalid object schema"
+                | Object fields -> encode_object hd fields @ tl
+                | Map (_, f, Object fields) -> encode_object (f hd) fields @ tl
+                | _ -> failwith "invalid inline schema"
               else
                 let encoded = encode schema.descriptor hd in
                 (field, encoded) :: tl
             | None -> tl)
         in
-        `O (encode_object v (Object descriptor))
+        `O (encode_object v fields)
       | Tuple descriptor ->
         let rec encode_tuple :
             type t. t -> (t, [ `Tuple ]) descriptor -> Ezjsonm.value list =

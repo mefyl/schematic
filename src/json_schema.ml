@@ -283,17 +283,13 @@ let of_schema schema =
       | Schema.String_const _ -> (marks, Some applicator_empty)
       | Schema.Time -> (marks, Some applicator_empty)
       | Schema.Time_local -> (marks, Some applicator_empty)
-      | Schema.Object _ as o ->
+      | Schema.Object o ->
         let rec get_fields :
-            type t kind.
-            ids ->
-            (t, kind) Schema.descriptor ->
-            ids * (string * json_schema) list option =
+            type t.
+            ids -> t Schema.field -> ids * (string * json_schema) list option =
          fun marks -> function
-          | Schema.Null -> (marks, None)
-          | Schema.Nullable s -> get_fields marks s.descriptor
-          | Schema.Map (_, _, d) -> get_fields marks d
-          | Schema.Object
+          | Schema.End -> (marks, None)
+          | Schema.Field
               {
                 description;
                 examples;
@@ -309,12 +305,10 @@ let of_schema schema =
             let inline, schema = Schema.extract_field_schema schema in
             let marks, fields =
               if inline then
-                let marks, fields = get_fields marks schema.descriptor in
-                match fields with
-                | Some fields -> (marks, fields)
-                | None ->
-                  let marks, schema = of_schema marks schema in
-                  (marks, [ (field, schema) ])
+                match applicator marks schema.descriptor with
+                | marks, Some applicator ->
+                  (marks, Option.value ~default:[] applicator.properties)
+                | marks, None -> (marks, [])
               else
                 let marks, json_schema = of_schema marks schema
                 and to_json v = Json.to_ezjsonm @@ Json.encode schema v in
@@ -342,29 +336,9 @@ let of_schema schema =
                       } );
                   ] )
             in
-            match applicator marks rest with
+            match get_fields marks rest with
             | marks, None -> (marks, Some fields)
-            | marks, Some applicator ->
-              ( marks,
-                Some (fields @ Option.value ~default:[] applicator.properties)
-              ))
-          | Schema.Any
-          | Schema.Bool ->
-            (marks, None)
-          | Schema.Date -> (marks, None)
-          | Schema.Float -> (marks, None)
-          | Schema.Ignore -> (marks, None)
-          | Schema.Int
-          | Schema.Int64 ->
-            (marks, None)
-          | Schema.List _ -> (marks, None)
-          | Schema.Mapping _ -> (marks, None)
-          | Schema.String -> (marks, None)
-          | Schema.Time -> (marks, None)
-          | Schema.Time_local -> (marks, None)
-          | Schema.String_const _ -> (marks, None)
-          | Schema.Tuple _ -> (marks, None)
-          | Schema.Union _ -> (marks, None)
+            | marks, Some rest -> (marks, Some (fields @ rest)))
         in
         let marks, fields = get_fields marks o in
         ( marks,

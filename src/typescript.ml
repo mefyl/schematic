@@ -44,7 +44,7 @@ let rec of_descriptor :
   | Time
   | Time_local ->
     Atom "Date"
-  | Object o -> Object { name; fields = of_object (Object o) }
+  | Object fields -> Object { name; fields = of_object fields }
   | Tuple t -> Tuple (of_tuple (Tuple t))
   | Union { cases; key } -> Union (List.map (of_case key) cases)
 
@@ -52,9 +52,8 @@ and of_schema : type s. s schema -> t = function
   | { id = None; descriptor } -> of_descriptor None descriptor
   | { id = Some id; _ } -> Atom (name id)
 
-and of_object : type s. (s, [ `Object ]) descriptor -> (string * t * bool) list
-    = function
-  | Object
+and of_object : type s. s field -> (string * t * bool) list = function
+  | Field
       {
         schema =
           Outline { descriptor = Ignore; _ } | Inline { descriptor = Ignore; _ };
@@ -62,19 +61,20 @@ and of_object : type s. (s, [ `Object ]) descriptor -> (string * t * bool) list
         _;
       } ->
     of_object rest
-  | Object { field; schema = Outline schema; rest; requirement; omit; _ } ->
+  | Field { field; schema = Outline schema; rest; requirement; omit; _ } ->
     if omit then
       of_object rest
     else
       (field, of_schema schema, Schema.required requirement) :: of_object rest
-  | Object { schema = Inline { descriptor = Object o; _ }; rest; _ } ->
-    of_object (Object o) @ of_object rest
-  | Object { schema = Inline { descriptor = Map (_, _, Object o); _ }; rest; _ }
+  | Field { schema = Inline { descriptor = Object fields; _ }; rest; _ } ->
+    of_object fields @ of_object rest
+  | Field
+      { schema = Inline { descriptor = Map (_, _, Object fields); _ }; rest; _ }
     ->
-    of_object (Object o) @ of_object rest
-  | Object { schema = Inline s; _ } ->
+    of_object fields @ of_object rest
+  | Field { schema = Inline s; _ } ->
     Fmt.failwith "invalid inline schema: %a" Schema.pp s
-  | Null -> []
+  | End -> []
 
 and of_tuple : type s. (s, [ `Tuple ]) descriptor -> t list = function
   | Tuple { schema; rest } -> of_schema schema :: of_tuple rest
