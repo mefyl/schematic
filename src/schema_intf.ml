@@ -3,10 +3,7 @@ type (_, _) field_requirement =
   | Default : 'a -> ('a, 'a) field_requirement
   | Optional : ('a, 'a option) field_requirement
 
-type kinds =
-  [ `Tuple
-  | `Value
-  ]
+type kinds = [ `Value ]
 
 type _ case =
   | Case : {
@@ -22,6 +19,7 @@ and 'a field_schema =
   | Inline of 'a schema
 
 and _ field =
+  | FieldEnd : unit field
   | Field : {
       description : string option;
       examples : 'a list;
@@ -35,7 +33,14 @@ and _ field =
       title : string option;
     }
       -> ('req * 'rest) field
-  | End : unit field
+
+and _ tuple =
+  | ItemEnd : unit tuple
+  | Item : {
+      schema : 'a schema;
+      rest : 'b tuple;
+    }
+      -> ('a * 'b) tuple
 
 and ('t, 'kind) descriptor =
   | Any : (Ezjsonm.value, [< `Value ]) descriptor
@@ -57,11 +62,7 @@ and ('t, 'kind) descriptor =
   | Time : (Ptime.t, [< `Value ]) descriptor
   | Time_local : (Ptime.t * Ptime.tz_offset_s, [< `Value ]) descriptor
   | Object : 't field -> ('t, [< `Value ]) descriptor
-  | Tuple : {
-      schema : 'a schema;
-      rest : ('b, [ `Tuple ]) descriptor;
-    }
-      -> ('a * 'b, [< `Tuple | `Value ]) descriptor
+  | Tuple : 't tuple -> ('t, [< `Value ]) descriptor
   | Union : {
       key : string option;
       cases : 't case list;

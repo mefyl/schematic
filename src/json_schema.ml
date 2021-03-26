@@ -288,7 +288,7 @@ let of_schema schema =
             type t.
             ids -> t Schema.field -> ids * (string * json_schema) list option =
          fun marks -> function
-          | Schema.End -> (marks, None)
+          | Schema.FieldEnd -> (marks, None)
           | Schema.Field
               {
                 description;
@@ -348,29 +348,19 @@ let of_schema schema =
               properties = fields;
               additionalProperties = Some (Allowed false);
             } )
-      | Schema.Tuple { schema; rest } -> (
-        let marks, field = of_schema marks schema in
-        match applicator marks rest with
-        | marks, None ->
-          ( marks,
-            Some { applicator_empty with items = Some (Tuple_schema [ field ]) }
-          )
-        | marks, Some applicator ->
-          ( marks,
-            Some
-              {
-                applicator with
-                items =
-                  Some
-                    (Tuple_schema
-                       (field
-                        ::
-                        (match applicator.items with
-                        | None -> []
-                        | Some (Tuple_schema l) -> l
-                        | Some (Items_schema _) ->
-                          failwith "mixed list and tuple")));
-              } ))
+      | Schema.Tuple items ->
+        let rec tuple_applicator :
+            type t. ids -> t Schema.tuple -> ids * json_schema list =
+         fun marks -> function
+          | Schema.ItemEnd -> (marks, [])
+          | Schema.Item { schema; rest } ->
+            let marks, head = of_schema marks schema in
+            let marks, tail = tuple_applicator marks rest in
+            (marks, head :: tail)
+        in
+        let marks, fields = tuple_applicator marks items in
+        ( marks,
+          Some { applicator_empty with items = Some (Tuple_schema fields) } )
       | Schema.Union { cases; _ } ->
         let f (Schema.Case { schema; _ }) (marks, l) =
           let marks, schema = of_schema marks schema in

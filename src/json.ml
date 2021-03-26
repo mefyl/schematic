@@ -108,7 +108,7 @@ module Make (Impl : Impl) = struct
       | Object fields_schema, (`O fields as o) ->
         let rec decode_object :
             type t. t field -> (t, [> decode_error ]) Result.t = function
-          | End -> Result.return ()
+          | FieldEnd -> Result.return ()
           | Field { field; requirement; schema; rest; _ } ->
             let inline, schema = extract_field_schema schema in
             let field =
@@ -167,16 +167,20 @@ module Make (Impl : Impl) = struct
         | _, None, _ -> Result.fail (`Json_decode "missing timezone"))
       | Time, _ -> type_error "time"
       | Time_local, _ -> type_error "time"
-      | Tuple { schema; rest = Null }, `A [ hd ] ->
-        decode schema.id schema.descriptor hd >>= fun hd ->
-        Result.return (hd, ())
-      | Tuple { schema = _; rest = Null }, `A [] ->
-        Result.fail (`Json_decode "not enough tuple elements")
-      | Tuple { schema = _; rest = Null }, `A _ ->
-        Result.fail (`Json_decode "too many tuple elements")
-      | Tuple { schema; rest }, `A (hd :: tl) ->
-        decode schema.id schema.descriptor hd >>= fun hd ->
-        decode id rest (`A tl) >>= fun tl -> Result.return (hd, tl)
+      | Tuple items, `A v ->
+        let rec decode_tuple :
+            type t.
+            t tuple -> Ezjsonm.value list -> (t, [> decode_error ]) Result.t =
+         fun t v ->
+          match (t, v) with
+          | Item { schema; rest }, hd :: tl ->
+            decode schema.id schema.descriptor hd >>= fun hd ->
+            decode_tuple rest tl >>= fun tl -> Result.return (hd, tl)
+          | ItemEnd, [] -> Result.return ()
+          | Item _, [] -> Result.fail (`Json_decode "not enough tuple elements")
+          | ItemEnd, _ -> Result.fail (`Json_decode "too many tuple elements")
+        in
+        decode_tuple items v
       | Tuple _, _ -> type_error "tuple"
       | Union { cases; key }, _ -> (
         let conv (Case { decoder; name; schema; _ }) =
@@ -240,7 +244,7 @@ module Make (Impl : Impl) = struct
         let rec encode_object :
             type t. t -> t field -> (string * Ezjsonm.value) list =
          fun v -> function
-          | End -> []
+          | FieldEnd -> []
           | Field { field; requirement; schema; rest; _ } -> (
             let inline, schema = extract_field_schema schema
             and hd, tl = v in
@@ -257,17 +261,16 @@ module Make (Impl : Impl) = struct
             | None -> tl)
         in
         `O (encode_object v fields)
-      | Tuple descriptor ->
-        let rec encode_tuple :
-            type t. t -> (t, [ `Tuple ]) descriptor -> Ezjsonm.value list =
+      | Tuple items ->
+        let rec encode_tuple : type t. t -> t tuple -> Ezjsonm.value list =
          fun v -> function
-          | Null -> []
-          | Tuple { schema; rest } ->
+          | ItemEnd -> []
+          | Item { schema; rest } ->
             let hd, tl = v in
             let hd = encode schema.descriptor hd in
             hd :: encode_tuple tl rest
         in
-        `A (encode_tuple v (Tuple descriptor))
+        `A (encode_tuple v items)
       | String -> `String v
       | String_const v -> `String v
       | Time -> `String (Ptime.to_rfc3339 v)

@@ -70,7 +70,7 @@ let rec inline_v : type t. (t, _) descriptor -> t -> 'res inline_v -> 'res =
   | s -> Fmt.failwith "inline field is not an object: %a" pp_descriptor s
 
 let rec object_fields : type t. t field -> string list = function
-  | End -> []
+  | FieldEnd -> []
   | Field { requirement = Default _ | Optional; rest; _ } -> object_fields rest
   | Field { rest; schema = Inline schema; _ } ->
     descriptor_fields schema.descriptor @ object_fields rest
@@ -154,14 +154,19 @@ let compare schema =
             | v -> v
           in
           f schema requirement
-        | End -> fun () () -> 0
+        | FieldEnd -> fun () () -> 0
       in
       compare_fields fields
-    | Tuple { schema; rest } -> (
-      fun (l, lr) (r, rr) ->
-        match compare schema.descriptor l r with
-        | 0 -> compare rest lr rr
-        | v -> v)
+    | Tuple items ->
+      let rec compare_items : type t. t tuple -> t -> t -> int = function
+        | ItemEnd -> fun () () -> 0
+        | Item { schema; rest } -> (
+          fun (l, lr) (r, rr) ->
+            match compare schema.descriptor l r with
+            | 0 -> compare_items rest lr rr
+            | v -> v)
+      in
+      compare_items items
     | Union { cases; _ } ->
       fun l r ->
         let f (Case { schema; encoder; _ }) =

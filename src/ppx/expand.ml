@@ -548,10 +548,13 @@ module Schema : EXPANSION = struct
         Pprintast.core_type core_type
 
   and tuple_schema ~loc ~context types =
-    let args = List.map ~f:(encode_type ~loc ~context) types in
-    let init = [%expr Null] in
-    let f r l = [%expr Tuple { schema = [%e r]; rest = [%e l] }] in
-    List.fold_right ~f ~init args
+    let items =
+      let args = List.map ~f:(encode_type ~loc ~context) types in
+      let init = [%expr ItemEnd] in
+      let f r l = [%expr Item { schema = [%e r]; rest = [%e l] }] in
+      List.fold_right ~f ~init args
+    in
+    [%expr Tuple [%e items]]
 
   and combinator :
       type f.
@@ -764,7 +767,7 @@ module Schema : EXPANSION = struct
         in
         List.map ~f:expand_field fields
       in
-      let init = [%expr End] in
+      let init = [%expr FieldEnd] in
       let f (loc, requirement, field, schema, inline, specs) rest =
         let schema =
           if inline then

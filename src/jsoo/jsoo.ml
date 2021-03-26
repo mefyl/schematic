@@ -126,7 +126,7 @@ let decode schema =
       | Object fields ->
         let rec decode_object :
             type t. t field -> (t, [> decode_error ]) Result.t = function
-          | End -> Result.return ()
+          | FieldEnd -> Result.return ()
           | Field { field; requirement; omit; schema; rest; _ } ->
             let inline, schema = extract_field_schema schema in
             let field =
@@ -167,18 +167,17 @@ let decode schema =
           Result.fail @@ `Js_decode "mismatched constant string"
       | Time -> Result.return @@ ptime_of_js @@ Js.Unsafe.coerce js
       | Time_local -> Result.return @@ (ptime_of_js @@ Js.Unsafe.coerce js, 0)
-      | Tuple descriptor ->
-        let rec decode_tuple :
-            type t. int -> (t, [ `Tuple ]) descriptor -> (t, 'error) Result.t =
+      | Tuple items ->
+        let rec decode_tuple : type t. int -> t tuple -> (t, 'error) Result.t =
          fun i -> function
-          | Tuple { schema; rest } ->
+          | Item { schema; rest } ->
             decode schema.id (Int.to_string i :: ids) schema.descriptor
             @@ Js.Unsafe.get (Js.Unsafe.coerce js) i
             >>= fun hd ->
             decode_tuple (i + 1) rest >>= fun tl -> Result.return (hd, tl)
-          | Null -> Result.return ()
+          | ItemEnd -> Result.return ()
         in
-        decode_tuple 0 (Tuple descriptor)
+        decode_tuple 0 items
       | Union { cases; key } -> (
         let conv (Case { decoder; name; schema; _ }) =
           let key =
@@ -289,7 +288,7 @@ let encode schema =
         in
         fun into schema v ->
           match schema with
-          | End -> ()
+          | FieldEnd -> ()
           | Field
               {
                 schema =
@@ -317,16 +316,16 @@ let encode schema =
       let o = Js.Unsafe.coerce (object%js end) in
       let () = encode_object o fields v in
       o
-    | Tuple descriptor ->
+    | Tuple items ->
       let res = new%js Js.array_empty in
-      let rec encode_tuple : type t. t -> (t, [ `Tuple ]) descriptor -> unit =
+      let rec encode_tuple : type t. t -> t tuple -> unit =
        fun v -> function
-        | Null -> ()
-        | Tuple { schema; rest } ->
+        | ItemEnd -> ()
+        | Item { schema; rest } ->
           let _ = res##push (encode schema.descriptor (fst v)) in
           encode_tuple (snd v) rest
       in
-      let () = encode_tuple v (Tuple descriptor) in
+      let () = encode_tuple v items in
       Js.Unsafe.coerce res
     | String -> Js.Unsafe.coerce @@ Js.string v
     | String_const v -> Js.Unsafe.coerce @@ Js.string v

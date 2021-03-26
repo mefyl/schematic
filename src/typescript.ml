@@ -45,7 +45,7 @@ let rec of_descriptor :
   | Time_local ->
     Atom "Date"
   | Object fields -> Object { name; fields = of_object fields }
-  | Tuple t -> Tuple (of_tuple (Tuple t))
+  | Tuple items -> Tuple (of_tuple items)
   | Union { cases; key } -> Union (List.map (of_case key) cases)
 
 and of_schema : type s. s schema -> t = function
@@ -69,11 +69,11 @@ and of_object : type s. s field -> (string * t * bool) list = function
   | Field { schema = Inline { descriptor; _ }; rest; _ } ->
     Schema.inline descriptor { f = (fun fields -> of_object fields) }
     @ of_object rest
-  | End -> []
+  | FieldEnd -> []
 
-and of_tuple : type s. (s, [ `Tuple ]) descriptor -> t list = function
-  | Tuple { schema; rest } -> of_schema schema :: of_tuple rest
-  | Null -> []
+and of_tuple : type s. s tuple -> t list = function
+  | Item { schema; rest } -> of_schema schema :: of_tuple rest
+  | ItemEnd -> []
 
 and of_case : type s. string option -> s case -> t =
  fun key (Case { name; schema; _ }) ->
