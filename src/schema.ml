@@ -76,10 +76,8 @@ let rec object_fields : type t. t field -> string list = function
     descriptor_fields schema.descriptor @ object_fields rest
   | Field { field; rest; _ } -> field :: object_fields rest
 
-and descriptor_fields : type t. (t, _) descriptor -> string list = function
-  | Map (_, _, d) -> descriptor_fields d
-  | Object fields -> object_fields fields
-  | s -> Fmt.failwith "inline field is not an object: %a" pp_descriptor s
+and descriptor_fields : type t. (t, _) descriptor -> string list =
+ fun d -> inline d { f = (fun fields -> object_fields fields) }
 
 let assoc_compare compare l r =
   let f (key, l) =
