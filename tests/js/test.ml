@@ -7,12 +7,16 @@ end
 
 type o = {
   i : int;
-  s : string;
-  b : bool;
+  inline : inline; [@schematic.inline]
   opt : bool option;
   opt_nullable : bool option option;
   a : Namespace.int_alias list;
   pair : bool * bool;
+}
+
+and inline = {
+  s : string;
+  b : bool;
 }
 
 and variant =

@@ -137,9 +137,8 @@ let decode schema =
                 Option.is_some
                 @@ List.find
                      ~f:(fun f ->
-                       not
-                         (Js.Unsafe.get js (Js.string f)
-                         == Js.Unsafe.pure_js_expr "undefined"))
+                       Js.Unsafe.get js (Js.string f)
+                       == Js.Unsafe.pure_js_expr "undefined")
                      expected
               else
                 false
