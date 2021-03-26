@@ -306,7 +306,7 @@ let encode schema =
               | None -> ()
               | Some v ->
                 if inline then
-                  Schematic.Schema.inline schema.descriptor v
+                  Schematic.Schema.inline_v schema.descriptor v
                     { f = (fun fields v -> encode_object into fields v) }
                 else
                   Js.Unsafe.set into (Js.string field)

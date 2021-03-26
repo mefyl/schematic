@@ -1,8 +1,10 @@
 type record = {
   a : int;
-  b : float option;
+  inline : inline; [@schematic.inline]
   c : string;
 }
+
+and inline = { b : float option }
 
 and nullable = bool option
 

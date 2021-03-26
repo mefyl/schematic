@@ -66,14 +66,9 @@ and of_object : type s. s field -> (string * t * bool) list = function
       of_object rest
     else
       (field, of_schema schema, Schema.required requirement) :: of_object rest
-  | Field { schema = Inline { descriptor = Object fields; _ }; rest; _ } ->
-    of_object fields @ of_object rest
-  | Field
-      { schema = Inline { descriptor = Map (_, _, Object fields); _ }; rest; _ }
-    ->
-    of_object fields @ of_object rest
-  | Field { schema = Inline s; _ } ->
-    Fmt.failwith "invalid inline schema: %a" Schema.pp s
+  | Field { schema = Inline { descriptor; _ }; rest; _ } ->
+    Schema.inline descriptor { f = (fun fields -> of_object fields) }
+    @ of_object rest
   | End -> []
 
 and of_tuple : type s. (s, [ `Tuple ]) descriptor -> t list = function

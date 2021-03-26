@@ -51,12 +51,21 @@ let extract_field_schema = function
   | Inline schema -> (true, schema)
   | Outline schema -> (false, schema)
 
-type 'res inline = { f : 't. 't field -> 't -> 'res }
+type 'res inline = { f : 't. 't field -> 'res }
 
-let rec inline : type t. (t, _) descriptor -> t -> 'res inline -> 'res =
+let rec inline : type t. (t, _) descriptor -> 'res inline -> 'res =
+ fun d f ->
+  match d with
+  | Map (_, _, d) -> inline d f
+  | Object o -> f.f o
+  | s -> Fmt.failwith "inline field is not an object: %a" pp_descriptor s
+
+type 'res inline_v = { f : 't. 't field -> 't -> 'res }
+
+let rec inline_v : type t. (t, _) descriptor -> t -> 'res inline_v -> 'res =
  fun d v f ->
   match d with
-  | Map (_, e, d) -> inline d (e v) f
+  | Map (_, e, d) -> inline_v d (e v) f
   | Object o -> f.f o v
   | s -> Fmt.failwith "inline field is not an object: %a" pp_descriptor s
 
