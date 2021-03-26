@@ -57,10 +57,10 @@ let ptime_of_js (date : Js.date Js.t) =
 
 let decode schema =
   let rec decode :
-      type t kind.
+      type t.
       string option ->
       string list ->
-      (t, kind) descriptor ->
+      t descriptor ->
       Js.Unsafe.any ->
       (t, 'error) Result.t =
     let open Result in
@@ -255,7 +255,7 @@ let js_of_date (y, m, d) = new%js Js.date_day y (m - 1) d
 let js_of_ptime t = new%js Js.date_fromTimeValue (Ptime.to_float_s t *. 1000.)
 
 let encode schema =
-  let rec encode : type t kind. (t, kind) descriptor -> t -> Js.Unsafe.any =
+  let rec encode : type t. t descriptor -> t -> Js.Unsafe.any =
    fun schema v ->
     match schema with
     | Any -> Js.Unsafe.coerce @@ Impl_js.to_js v

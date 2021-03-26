@@ -22,8 +22,7 @@ type t =
   | Tuple of t list
   | Union of t list
 
-let rec of_descriptor :
-    type s. string option -> (s, [> `Value ]) descriptor -> t =
+let rec of_descriptor : type s. string option -> s descriptor -> t =
  fun name -> function
   | Any -> Atom "any"
   | Bool -> Atom "boolean"

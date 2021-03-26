@@ -9,7 +9,7 @@ let required : type a b. (a, b) field_requirement -> bool = function
 let map cons decons { descriptor; _ } =
   { id = None; descriptor = Map (cons, decons, descriptor) }
 
-let rec pp_descriptor : type t kind. (t, kind) descriptor Fmt.t =
+let rec pp_descriptor : type t. t descriptor Fmt.t =
  fun f d ->
   let fmt =
     let open Fmt in
@@ -53,7 +53,7 @@ let extract_field_schema = function
 
 type 'res inline = { f : 't. 't field -> 'res }
 
-let rec inline : type t. (t, _) descriptor -> 'res inline -> 'res =
+let rec inline : type t. t descriptor -> 'res inline -> 'res =
  fun d f ->
   match d with
   | Map (_, _, d) -> inline d f
@@ -62,7 +62,7 @@ let rec inline : type t. (t, _) descriptor -> 'res inline -> 'res =
 
 type 'res inline_v = { f : 't. 't field -> 't -> 'res }
 
-let rec inline_v : type t. (t, _) descriptor -> t -> 'res inline_v -> 'res =
+let rec inline_v : type t. t descriptor -> t -> 'res inline_v -> 'res =
  fun d v f ->
   match d with
   | Map (_, e, d) -> inline_v d (e v) f
@@ -76,7 +76,7 @@ let rec object_fields : type t. t field -> string list = function
     descriptor_fields schema.descriptor @ object_fields rest
   | Field { field; rest; _ } -> field :: object_fields rest
 
-and descriptor_fields : type t. (t, _) descriptor -> string list =
+and descriptor_fields : type t. t descriptor -> string list =
  fun d -> inline d { f = (fun fields -> object_fields fields) }
 
 let assoc_compare compare l r =
@@ -110,8 +110,7 @@ let compare schema =
     | _, `A _ -> 1
     | `O l, `O r -> assoc_compare compare_json l r
   in
-  let rec compare : type t kind. (t, kind) descriptor -> t -> t -> int =
-    function
+  let rec compare : type t. t descriptor -> t -> t -> int = function
     | Any -> compare_json
     | Bool -> Base.Bool.compare
     | Date -> Base.Poly.compare

@@ -62,11 +62,8 @@ module Make (Impl : Impl) = struct
           Result.map ~f:Option.return @@ decode schema.id schema.descriptor v
         | None -> Result.return None)
     and decode :
-        type t kind.
-        string option ->
-        (t, kind) descriptor ->
-        Ezjsonm.value ->
-        (t, 'error) Result.t =
+        type t.
+        string option -> t descriptor -> Ezjsonm.value -> (t, 'error) Result.t =
      fun id schema json ->
       let module List = List_monad (Result) in
       let type_error expected =
@@ -218,7 +215,7 @@ module Make (Impl : Impl) = struct
     | Optional -> Fn.id
 
   let encode schema =
-    let rec encode : type t kind. (t, kind) descriptor -> t -> Ezjsonm.value =
+    let rec encode : type t. t descriptor -> t -> Ezjsonm.value =
      fun schema v ->
       match schema with
       | Any -> v
