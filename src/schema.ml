@@ -51,6 +51,15 @@ let extract_field_schema = function
   | Inline schema -> (true, schema)
   | Outline schema -> (false, schema)
 
+type 'res inline = { f : 't. 't field -> 't -> 'res }
+
+let rec inline : type t. (t, _) descriptor -> t -> 'res inline -> 'res =
+ fun d v f ->
+  match d with
+  | Map (_, e, d) -> inline d (e v) f
+  | Object o -> f.f o v
+  | s -> Fmt.failwith "inline field is not an object: %a" pp_descriptor s
+
 let rec object_fields : type t. t field -> string list = function
   | End -> []
   | Field { requirement = Default _ | Optional; rest; _ } -> object_fields rest

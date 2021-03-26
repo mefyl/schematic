@@ -248,11 +248,9 @@ module Make (Impl : Impl) = struct
             match encode_field requirement hd with
             | Some hd ->
               if inline then
-                match schema.descriptor with
-                | Null -> []
-                | Object fields -> encode_object hd fields @ tl
-                | Map (_, f, Object fields) -> encode_object (f hd) fields @ tl
-                | _ -> failwith "invalid inline schema"
+                Schema.inline schema.descriptor hd
+                  { f = (fun fields v -> encode_object v fields) }
+                @ tl
               else
                 let encoded = encode schema.descriptor hd in
                 (field, encoded) :: tl

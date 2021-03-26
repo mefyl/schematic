@@ -12,4 +12,8 @@ val extract_field_schema : 'a field_schema -> bool * 'a schema
 
 val descriptor_fields : ('a, [ `Value ]) descriptor -> string list
 
+type 'res inline = { f : 't. 't field -> 't -> 'res }
+
+val inline : ('t, [ `Value ]) descriptor -> 't -> 'res inline -> 'res
+
 val compare : 'a schema -> 'a -> 'a -> int
