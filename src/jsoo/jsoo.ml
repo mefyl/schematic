@@ -1,9 +1,79 @@
 module Impl_js = Json.Impl_js
 open Base
 open Js_of_ocaml
-open Poly
 open Schematic.Schema
 include Schematic.Schema.Schemas
+
+let date_of_js (date : Js.date Js.t) =
+  (date##getFullYear, date##getMonth + 1, date##getDate)
+
+let ptime_of_js (date : Js.date Js.t) =
+  match Ptime.of_float_s (date##getTime /. 1000.) with
+  | Some time -> time
+  | None -> failwith ("invalid time: " ^ Float.to_string date##getTime)
+
+let js_of_date (y, m, d) = new%js Js.date_day y (m - 1) d
+
+let js_of_ptime t = new%js Js.date_fromTimeValue (Ptime.to_float_s t *. 1000.)
+
+module Jsoo_coding : Schematic.Coding.S with type t = Js.Unsafe.any = struct
+  type t = Js.Unsafe.any
+
+  let null = Js.Unsafe.pure_js_expr "null"
+
+  let is_null v = Base.phys_equal v null
+
+  let of_bool v = Js.Unsafe.coerce @@ Js.bool v
+
+  let of_fields fields =
+    let res = Js.Unsafe.coerce (object%js end) in
+    let () =
+      let f (field, v) = Js.Unsafe.set res (Js.string field) v in
+      List.iter ~f fields
+    in
+    res
+
+  let of_float v = Js.Unsafe.coerce @@ Js.number_of_float v
+
+  let of_int v = Js.Unsafe.coerce @@ Js.number_of_float @@ Float.of_int v
+
+  let of_int64 v = Js.Unsafe.coerce @@ Js.number_of_float @@ Float.of_int64 v
+
+  let of_json v = Js.Unsafe.coerce @@ Impl_js.to_js v
+
+  let of_list v = Js.Unsafe.coerce @@ Js.array @@ Array.of_list v
+
+  let of_string v = Js.Unsafe.coerce @@ Js.string v
+
+  let of_time v = Js.Unsafe.coerce @@ js_of_ptime v
+
+  let of_time_local v = Js.Unsafe.coerce @@ js_of_ptime (fst v)
+
+  let to_bool _ = failwith "not implemented bool"
+
+  let to_fields o =
+    let f key = (Js.to_string key, Js_of_ocaml.Js.Unsafe.get o key) in
+    Option.return @@ List.map ~f @@ Array.to_list @@ Js.to_array
+    @@ Js_of_ocaml.Js.object_keys o
+
+  let to_float _ = failwith "not implemented float"
+
+  let to_int _ = failwith "not implemented int"
+
+  let to_int64 _ = failwith "not implemented int64"
+
+  let to_json _ = failwith "not implemented json"
+
+  let to_list _ = failwith "not implemented list"
+
+  let to_string _ = failwith "not implemented string"
+
+  let to_time _ = failwith "not implemented time"
+
+  let to_time_local _ = failwith "not implemented time_local"
+
+  let type_name _ = failwith "unimplemented yet: type_name"
+end
 
 let ( == ) = Caml.( == )
 
@@ -46,14 +116,6 @@ type 'a list_js = 'a Js.js_array Js.t
 type 'a option_js = 'a Js.opt
 
 type string_js = Js.js_string Js.t
-
-let date_of_js (date : Js.date Js.t) =
-  (date##getFullYear, date##getMonth + 1, date##getDate)
-
-let ptime_of_js (date : Js.date Js.t) =
-  match Ptime.of_float_s (date##getTime /. 1000.) with
-  | Some time -> time
-  | None -> failwith ("invalid time: " ^ Float.to_string date##getTime)
 
 let decode schema =
   let ( >>= ) = Result.( >>= ) in
@@ -243,102 +305,6 @@ let decode schema =
   in
   decode schema.id ids schema.descriptor
 
-let js_of_date (y, m, d) = new%js Js.date_day y (m - 1) d
+module Coding = Schematic.Coding.Make (Jsoo_coding)
 
-let js_of_ptime t = new%js Js.date_fromTimeValue (Ptime.to_float_s t *. 1000.)
-
-let encode schema =
-  let rec encode : type t. t descriptor -> t -> Js.Unsafe.any =
-   fun schema v ->
-    match schema with
-    | Any -> Js.Unsafe.coerce @@ Impl_js.to_js v
-    | Bool -> Js.Unsafe.coerce @@ Js.bool v
-    | Date -> Js.Unsafe.coerce @@ js_of_date v
-    | Float -> Js.Unsafe.coerce @@ Js.number_of_float v
-    | Ignore -> Js.Unsafe.coerce @@ Js.Unsafe.pure_js_expr "null"
-    | Int -> Js.Unsafe.coerce @@ Js.number_of_float @@ Float.of_int v
-    | Int64 -> Js.Unsafe.coerce @@ Js.number_of_float @@ Float.of_int64 v
-    | List items_schema ->
-      Js.Unsafe.coerce @@ Js.array @@ Array.of_list
-      @@ List.map ~f:(encode items_schema.descriptor) v
-    | Map (_, decons, schema) -> encode schema @@ decons v
-    | Null -> Js.Unsafe.coerce @@ Js.Unsafe.pure_js_expr "null"
-    | Nullable s -> (
-      match v with
-      | None -> Js.Unsafe.pure_js_expr "null"
-      | Some v -> encode s.descriptor v)
-    | Mapping _ -> failwith "FIXME"
-    | Object fields ->
-      let rec encode_object : type t. Js.Unsafe.any -> t field -> t -> unit =
-        let encode_field : type t r. (t, r) field_requirement -> r -> t option =
-          function
-          | Required -> Option.some
-          | Default default -> (
-            function
-            | v when v = default -> None
-            | v -> Some v)
-          | Optional -> Fn.id
-        in
-        fun into schema v ->
-          match schema with
-          | FieldEnd -> ()
-          | Field
-              {
-                schema =
-                  ( Outline { descriptor = Ignore; _ }
-                  | Inline { descriptor = Ignore; _ } );
-                rest;
-                _;
-              } ->
-            encode_object into rest (snd v)
-          | Field { field; requirement; schema; rest; _ } ->
-            let inline, schema = extract_field_schema schema in
-            let () =
-              match encode_field requirement (fst v) with
-              | None -> ()
-              | Some v ->
-                if inline then
-                  Schematic.Schema.inline_v schema.descriptor v
-                    { f = (fun fields v -> encode_object into fields v) }
-                else
-                  Js.Unsafe.set into (Js.string field)
-                    (encode schema.descriptor v)
-            in
-            encode_object into rest (snd v)
-      in
-      let o = Js.Unsafe.coerce (object%js end) in
-      let () = encode_object o fields v in
-      o
-    | Tuple items ->
-      let res = new%js Js.array_empty in
-      let rec encode_tuple : type t. t -> t tuple -> unit =
-       fun v -> function
-        | ItemEnd -> ()
-        | Item { schema; rest } ->
-          let _ = res##push (encode schema.descriptor (fst v)) in
-          encode_tuple (snd v) rest
-      in
-      let () = encode_tuple v items in
-      Js.Unsafe.coerce res
-    | String -> Js.Unsafe.coerce @@ Js.string v
-    | String_const v -> Js.Unsafe.coerce @@ Js.string v
-    | Time -> Js.Unsafe.coerce @@ js_of_ptime v
-    | Time_local -> Js.Unsafe.coerce @@ js_of_ptime (fst v)
-    | Union { cases; key } -> (
-      let conv (Case { encoder; name; schema; _ }) =
-        match encoder v with
-        | Some v ->
-          let res = encode schema.descriptor v in
-          let () =
-            match key with
-            | None -> ()
-            | Some key -> Js.Unsafe.set res (Js.string key) (Js.string name)
-          in
-          Some res
-        | None -> None
-      in
-      match List.find_map ~f:conv cases with
-      | Some res -> res
-      | None -> failwith "unmatched variant schema case")
-  in
-  encode schema.descriptor
+let encode = Coding.encode
