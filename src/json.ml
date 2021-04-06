@@ -1,10 +1,16 @@
 open Base
-open Poly
 include Json_intf
-open Schema
 
 module Json_coding : Coding.S with type t = Ezjsonm.value = struct
   type t = Ezjsonm.value
+
+  let type_name = function
+    | `O _ -> "object"
+    | `A _ -> "array"
+    | `Bool _ -> "bool"
+    | `Float _ -> "float"
+    | `String _ -> "string"
+    | `Null -> "null"
 
   let ( >>= ) = Result.( >>= )
 
@@ -14,13 +20,27 @@ module Json_coding : Coding.S with type t = Ezjsonm.value = struct
     | `Null -> true
     | _ -> false
 
-  let type_name = function
-    | `O _ -> "object"
-    | `A _ -> "array"
-    | `Bool _ -> "bool"
-    | `Float _ -> "float"
-    | `String _ -> "string"
-    | `Null -> "null"
+  let null = `Null
+
+  let of_bool b = `Bool b
+
+  let of_fields f = `O f
+
+  let of_float f = `Float f
+
+  let of_int i = `Float (Float.of_int i)
+
+  let of_int64 i = `Float (Float.of_int64 i)
+
+  let of_json v = v
+
+  let of_list l = `A l
+
+  let of_string s = `String s
+
+  let of_time t = `String (Ptime.to_rfc3339 t)
+
+  let of_time_local (t, tz_offset_s) = `String (Ptime.to_rfc3339 ~tz_offset_s t)
 
   let to_bool = function
     | `Bool v -> Some v
@@ -75,90 +95,6 @@ module Make (Impl : Impl) = struct
     match decode schema json with
     | Result.Error (`Decode r) -> Result.Error (`Json_decode r)
     | Result.Ok _ as v -> v
-
-  let encode_field : type t r. (t, r) field_requirement -> r -> t option =
-    function
-    | Required -> Option.some
-    | Default default -> (
-      function
-      | v when v = default -> None
-      | v -> Some v)
-    | Optional -> Fn.id
-
-  let encode schema =
-    let rec encode : type t. t descriptor -> t -> Ezjsonm.value =
-     fun schema v ->
-      match schema with
-      | Any -> v
-      | Bool -> `Bool v
-      | Date -> encode date_tuple_schema.descriptor v
-      | Float -> `Float v
-      | Ignore -> `Null
-      | Int -> `Float (Float.of_int v)
-      | Int64 -> `Float (Float.of_int64 v)
-      | List items_schema -> `A (List.map ~f:(encode items_schema.descriptor) v)
-      | Map (_, decons, schema) -> encode schema @@ decons v
-      | Null -> `Null
-      | Nullable s -> (
-        match v with
-        | None -> `Null
-        | Some v -> encode s.descriptor v)
-      | Mapping fields_schema ->
-        `O
-          (List.map
-             ~f:(fun (name, v) -> (name, encode fields_schema.descriptor v))
-             v)
-      | Object fields ->
-        let rec encode_object :
-            type t. t -> t field -> (string * Ezjsonm.value) list =
-         fun v -> function
-          | FieldEnd -> []
-          | Field { field; requirement; schema; rest; _ } -> (
-            let inline, schema = extract_field_schema schema
-            and hd, tl = v in
-            let tl = encode_object tl rest in
-            match encode_field requirement hd with
-            | Some hd ->
-              if inline then
-                Schema.inline_v schema.descriptor hd
-                  { f = (fun fields v -> encode_object v fields) }
-                @ tl
-              else
-                let encoded = encode schema.descriptor hd in
-                (field, encoded) :: tl
-            | None -> tl)
-        in
-        `O (encode_object v fields)
-      | Tuple items ->
-        let rec encode_tuple : type t. t -> t tuple -> Ezjsonm.value list =
-         fun v -> function
-          | ItemEnd -> []
-          | Item { schema; rest } ->
-            let hd, tl = v in
-            let hd = encode schema.descriptor hd in
-            hd :: encode_tuple tl rest
-        in
-        `A (encode_tuple v items)
-      | String -> `String v
-      | String_const v -> `String v
-      | Time -> `String (Ptime.to_rfc3339 v)
-      | Time_local ->
-        let t, tz_offset_s = v in
-        `String (Ptime.to_rfc3339 ~tz_offset_s t)
-      | Union { cases; key } -> (
-        let conv (Case { encoder; name; schema; _ }) =
-          match encoder v with
-          | Some v -> (
-            match (key, encode schema.descriptor v) with
-            | Some key, `O fields -> Some (`O ((key, `String name) :: fields))
-            | _, res -> Some res)
-          | None -> None
-        in
-        match List.find_map ~f:conv cases with
-        | Some res -> res
-        | None -> failwith "unmatched variant schema case")
-    in
-    encode schema.descriptor
 
   let from_channel c =
     match Ezjsonm.value_from_channel c with

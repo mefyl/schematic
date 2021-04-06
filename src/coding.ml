@@ -19,6 +19,28 @@ module type S = sig
 
   val is_null : t -> bool
 
+  val null : t
+
+  val of_bool : bool -> t
+
+  val of_fields : (string * t) list -> t
+
+  val of_float : float -> t
+
+  val of_int : int -> t
+
+  val of_int64 : int64 -> t
+
+  val of_json : Ezjsonm.value -> t
+
+  val of_list : t list -> t
+
+  val of_string : string -> t
+
+  val of_time : Ptime.t -> t
+
+  val of_time_local : Ptime.t * int -> t
+
   val to_bool : t -> bool option
 
   val to_fields : t -> (string * t) list option
@@ -215,4 +237,89 @@ module Make (Coding : S) = struct
         | None -> Result.fail (`Decode "no union case was matched"))
     in
     decode schema.Schema.id schema.descriptor
+
+  let encode schema =
+    let encode_field :
+        type t r. (t, r) Schema.field_requirement -> r -> t option = function
+      | Required -> Option.some
+      | Default default -> (
+        function
+        | v when Poly.(v = default (* FIXME: Poly rather bold *)) -> None
+        | v -> Some v)
+      | Optional -> Fn.id
+    in
+    let rec encode : type t. t Schema.descriptor -> t -> Coding.t =
+     fun schema v ->
+      match schema with
+      | Any -> Coding.of_json v
+      | Bool -> Coding.of_bool v
+      | Date -> encode date_tuple_schema.descriptor v
+      | Float -> Coding.of_float v
+      | Ignore -> Coding.null
+      | Int -> Coding.of_int v
+      | Int64 -> Coding.of_int64 v
+      | List items_schema ->
+        Coding.of_list (List.map ~f:(encode items_schema.descriptor) v)
+      | Map (_, decons, schema) -> encode schema @@ decons v
+      | Null -> Coding.null
+      | Nullable s -> (
+        match v with
+        | None -> Coding.null
+        | Some v -> encode s.descriptor v)
+      | Mapping fields_schema ->
+        Coding.of_fields
+          (List.map
+             ~f:(fun (name, v) -> (name, encode fields_schema.descriptor v))
+             v)
+      | Object fields ->
+        let rec encode_object :
+            type t. t -> t Schema.field -> (string * Coding.t) list =
+         fun v -> function
+          | FieldEnd -> []
+          | Field { field; requirement; schema; rest; _ } -> (
+            let inline, schema = Schema.extract_field_schema schema
+            and hd, tl = v in
+            let tl = encode_object tl rest in
+            match encode_field requirement hd with
+            | Some hd ->
+              if inline then
+                Schema.inline_v schema.descriptor hd
+                  { f = (fun fields v -> encode_object v fields) }
+                @ tl
+              else
+                let encoded = encode schema.descriptor hd in
+                (field, encoded) :: tl
+            | None -> tl)
+        in
+        Coding.of_fields (encode_object v fields)
+      | Tuple items ->
+        let rec encode_tuple : type t. t -> t Schema.tuple -> Coding.t list =
+         fun v -> function
+          | ItemEnd -> []
+          | Item { schema; rest } ->
+            let hd, tl = v in
+            let hd = encode schema.descriptor hd in
+            hd :: encode_tuple tl rest
+        in
+        Coding.of_list (encode_tuple v items)
+      | String -> Coding.of_string v
+      | String_const v -> Coding.of_string v
+      | Time -> Coding.of_time v
+      | Time_local -> Coding.of_time_local v
+      | Union { cases; key } -> (
+        let conv (Schema.Case { encoder; name; schema; _ }) =
+          match encoder v with
+          | Some v -> (
+            let v = encode schema.descriptor v in
+            match (key, Coding.to_fields v) with
+            | Some key, Some fields ->
+              Some (Coding.of_fields @@ (key, Coding.of_string name) :: fields)
+            | _ -> Some v)
+          | None -> None
+        in
+        match List.find_map ~f:conv cases with
+        | Some res -> res
+        | None -> failwith "unmatched variant schema case")
+    in
+    encode schema.Schema.descriptor
 end
