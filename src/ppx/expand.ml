@@ -1706,7 +1706,7 @@ module Jsoo_type : EXPANSION = struct
             fun (js : [%t js]) ->
               match [%e apply [%expr of_js]] js with
               | Result.Ok v -> v
-              | Result.Error (`Js_decode m) ->
+              | Result.Error e ->
                 Js_of_ocaml.Js.raise_js_error
                   ((fun (type res t0)
                         (t1 :
@@ -1714,7 +1714,10 @@ module Jsoo_type : EXPANSION = struct
                         (t0 : t0) (_ : unit) : res Js_of_ocaml.Js.t ->
                      Js_of_ocaml.Js.Unsafe.new_obj t1
                        [| Js_of_ocaml.Js.Unsafe.inject t0 |])
-                     Js_of_ocaml.Js.error_constr (Js_of_ocaml.Js.string m) ())]
+                     Js_of_ocaml.Js.error_constr
+                     (Js_of_ocaml.Js.string
+                     @@ Schematic.Coding.error_to_string e)
+                     ())]
         in
         parametrize body
       in

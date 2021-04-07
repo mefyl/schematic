@@ -25,8 +25,9 @@ let test name test schema value j =
   let () =
     match Schematic.Json.decode schema j with
     | Result.Ok decoded -> Alcotest.check test name value decoded
-    | Result.Error (`Json_decode e) ->
-      Alcotest.fail (Printf.sprintf "JSON decode error: %s" e)
+    | Result.Error e ->
+      Alcotest.fail
+        (Fmt.str "JSON decode error: %a" Schematic.Coding.pp_error e)
   in
   let schema = json_schema schema in
   let cmd =
@@ -543,16 +544,11 @@ module Error_messages = struct
   let test name schema str error =
     let res =
       let* json = Schematic.Json.of_string str in
-      let+ _ = Schematic.Json.decode schema json in
+      let+ _ =
+        Schematic.Json.decode schema json
+        |> Result.map_error ~f:(Fmt.str "%a" Schematic.Coding.pp_error)
+      in
       ()
-    in
-    let res =
-      Result.map_error
-        ~f:(function
-          | `Json_decode s
-          | `Parse s ->
-            s)
-        res
     in
     Alcotest.(check (result unit string) name (Result.Error error) res)
 

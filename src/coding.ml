@@ -12,7 +12,21 @@ module List_monad (Monad : Monad.S2) = struct
       map f tl >>= fun tl -> Monad.return (hd :: tl)
 end
 
-type error = [ `Decode of string ]
+type error = {
+  path : string list;
+  schema : string option;
+  reason : string;
+}
+
+let pp_error formatter { path; schema; reason } =
+  Fmt.(
+    pf formatter "path %a: %a%s"
+      (list ~sep:(const char '.') string)
+      (List.rev path)
+      (option (const string "schema " ++ string ++ const string ": "))
+      schema reason)
+
+let error_to_string = Fmt.to_to_string pp_error
 
 type 'a customizable =
   [ `Generic
@@ -74,15 +88,7 @@ module type S = sig
 end
 
 let fail id ids fmt =
-  let schema = id in
-  let f s =
-    Fmt.(
-      str "path %a: %a%s"
-        (list ~sep:(const char '.') string)
-        (List.rev ids)
-        (option (const string "schema " ++ string ++ const string ": "))
-        schema s)
-  in
+  let f reason = { path = ids; schema = id; reason } in
   Fmt.kstr f fmt
 
 let type_error expected effective =
@@ -99,11 +105,12 @@ module Make (Coding : S) = struct
       Result.fail @@ fail id ids "%s"
       @@ type_error expected (Coding.type_name v)
 
-  let set_key id ids o f v =
+  let set_key schema path o f v =
     match Coding.set_key with
-    | `Custom impl -> impl o f v
+    | `Custom impl ->
+      impl o f v |> Result.map_error ~f:(fun reason -> { path; schema; reason })
     | `Generic ->
-      let* fields = Coding.to_fields v |> type_error id ids "object" v in
+      let* fields = Coding.to_fields v |> type_error schema path "object" v in
       Result.return (Coding.of_fields @@ (f, v) :: fields)
 
   let decode schema =
@@ -124,8 +131,7 @@ module Make (Coding : S) = struct
       | Required -> (
         function
         | Some v -> decode schema.id ids_next schema.descriptor v
-        | None ->
-          Result.fail (`Decode (fail id ids "missing required field %S" field)))
+        | None -> Result.fail (fail id ids "missing required field %S" field))
       | Default default -> (
         function
         | Some v ->
@@ -150,13 +156,11 @@ module Make (Coding : S) = struct
         string list ->
         t Schema.descriptor ->
         Coding.t ->
-        (t, 'error) Result.t =
+        (t, error) Result.t =
      fun id ids schema v ->
-      let type_error expected res =
-        type_error id ids expected v res
-        |> Result.map_error ~f:(fun e -> `Decode e)
-      in
-      let open Result in
+      let type_error expected res = type_error id ids expected v res
+      and error reason = { path = ids; schema = id; reason }
+      and ( >>= ) = Result.( >>= ) in
       match schema with
       | Any -> Result.return (Coding.to_json v)
       | Bool -> Coding.to_bool v |> type_error "boolean"
@@ -185,8 +189,7 @@ module Make (Coding : S) = struct
           decode s.id ids s.descriptor v |> Result.map ~f:Option.return
       | Object fields_schema ->
         let* fields = Coding.to_fields v |> type_error "object" in
-        let rec decode_object :
-            type t. t Schema.field -> (t, [> `Decode of string ]) Result.t =
+        let rec decode_object : type t. t Schema.field -> (t, error) Result.t =
           function
           | FieldEnd -> Result.return ()
           | Field { field; omit; requirement; rest; schema; _ } ->
@@ -222,27 +225,22 @@ module Make (Coding : S) = struct
         match Coding.to_string v with
         | Some s when String.(s = expected) -> Result.return ()
         | Some s ->
-          Result.fail
-            (`Decode (Printf.sprintf "expected %S, got %S" expected s))
+          Result.fail (error @@ Fmt.str "expected %S, got %S" expected s)
         | None -> type_error "string" None)
-      | Time -> Coding.to_time v |> Result.map_error ~f:(fun e -> `Decode e)
-      | Time_local ->
-        Coding.to_time_local v |> Result.map_error ~f:(fun e -> `Decode e)
+      | Time -> Coding.to_time v |> Result.map_error ~f:error
+      | Time_local -> Coding.to_time_local v |> Result.map_error ~f:error
       | Tuple items ->
         let* v = Coding.to_list v |> type_error "list" in
         let rec decode_tuple :
-            type t.
-            t Schema.tuple ->
-            Coding.t list ->
-            (t, [> `Decode of string ]) Result.t =
+            type t. t Schema.tuple -> Coding.t list -> (t, error) Result.t =
          fun t v ->
           match (t, v) with
           | Item { schema; rest }, hd :: tl ->
             decode schema.id ids schema.descriptor hd >>= fun hd ->
             decode_tuple rest tl >>= fun tl -> Result.return (hd, tl)
           | ItemEnd, [] -> Result.return ()
-          | Item _, [] -> Result.fail (`Decode "not enough tuple elements")
-          | ItemEnd, _ -> Result.fail (`Decode "too many tuple elements")
+          | Item _, [] -> Result.fail (error "not enough tuple elements")
+          | ItemEnd, _ -> Result.fail (error "too many tuple elements")
         in
         decode_tuple items v
       | Union { cases; key } -> (
@@ -270,7 +268,7 @@ module Make (Coding : S) = struct
         in
         match List.find_map ~f:conv cases with
         | Some res -> Result.return res
-        | None -> Result.fail (`Decode "no union case was matched"))
+        | None -> Result.fail (error "no union case was matched"))
     in
     decode schema.Schema.id [] schema.descriptor
 

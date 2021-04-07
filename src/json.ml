@@ -93,15 +93,10 @@ end
 module Make (Impl : Impl) = struct
   include Coding.Make (Json_coding)
 
-  let decode schema json =
-    match decode schema json with
-    | Result.Error (`Decode r) -> Result.Error (`Json_decode r)
-    | Result.Ok _ as v -> v
-
   let from_channel c =
     match Ezjsonm.value_from_channel c with
     | v -> Result.return v
-    | exception Ezjsonm.Parse_error (_, msg) -> Result.fail @@ `Parse msg
+    | exception Ezjsonm.Parse_error (_, msg) -> Result.fail msg
 
   let of_string s = Impl.of_string s
 
@@ -144,7 +139,7 @@ module Impl_ezjsonm = struct
   let of_string s =
     match Ezjsonm.value_from_string s with
     | v -> Result.return v
-    | exception Ezjsonm.Parse_error (_, msg) -> Result.fail @@ `Parse msg
+    | exception Ezjsonm.Parse_error (_, msg) -> Result.fail msg
 
   let to_string t = Ezjsonm.value_to_string ~minify:true t
 end
