@@ -30,7 +30,7 @@ module Jsoo_coding : Schematic.Coding.S with type t = Js.Unsafe.any = struct
         else
           failwith "null or undefined"
       with
-      | _ -> Schematic.Coding.type_error "object" (type_name o)
+      | _ -> Result.fail @@ Schematic.Coding.type_error "object" (type_name o)
     in
     `Custom f
 

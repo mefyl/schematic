@@ -73,23 +73,37 @@ module type S = sig
   val type_name : t -> string
 end
 
+let fail id ids fmt =
+  let schema = id in
+  let f s =
+    Fmt.(
+      str "path %a: %a%s"
+        (list ~sep:(const char '.') string)
+        (List.rev ids)
+        (option (const string "schema " ++ string ++ const string ": "))
+        schema s)
+  in
+  Fmt.kstr f fmt
+
 let type_error expected effective =
-  Result.fail Fmt.(str "expected %s, got %s" expected effective)
+  Fmt.str "expected %s, got %s" expected effective
 
 module Make (Coding : S) = struct
   type date_tuple = int * int * int [@@deriving schema]
 
   let ( let* ) = Result.( >>= )
 
-  let type_error expected v = function
+  let type_error id ids expected v = function
     | Some v -> Result.return v
-    | None -> type_error expected (Coding.type_name v)
+    | None ->
+      Result.fail @@ fail id ids "%s"
+      @@ type_error expected (Coding.type_name v)
 
-  let set_key o f v =
+  let set_key id ids o f v =
     match Coding.set_key with
     | `Custom impl -> impl o f v
     | `Generic ->
-      let* fields = Coding.to_fields v |> type_error "object" v in
+      let* fields = Coding.to_fields v |> type_error id ids "object" v in
       Result.return (Coding.of_fields @@ (f, v) :: fields)
 
   let decode schema =
@@ -104,34 +118,26 @@ module Make (Coding : S) = struct
         Coding.t option ->
         (r, 'error) Result.t =
      fun id ids field schema ->
-      let ids = field :: ids in
+      let ids_next = field :: ids in
       function
       | Required -> (
         function
-        | Some v -> decode schema.id ids schema.descriptor v
-        | None -> (
-          match id with
-          | None ->
-            Result.fail
-              (`Decode (Printf.sprintf "missing required field %S" field))
-          | Some id ->
-            Result.fail
-              (`Decode
-                (Printf.sprintf "missing required field %S in schema %S" field
-                   id))))
+        | Some v -> decode schema.id ids_next schema.descriptor v
+        | None ->
+          Result.fail (`Decode (fail id ids "missing required field %S" field)))
       | Default default -> (
         function
-        | Some v -> decode schema.id ids schema.descriptor v
+        | Some v -> decode schema.id ids_next schema.descriptor v
         | None -> Result.return default)
       | Optional -> (
         function
         | Some v when Coding.is_null v -> (
-          match decode schema.id ids schema.descriptor v with
+          match decode schema.id ids_next schema.descriptor v with
           | Result.Ok v -> Result.return (Some v)
           | Result.Error _ -> Result.return None)
         | Some v ->
           Result.map ~f:Option.return
-          @@ decode schema.id ids schema.descriptor v
+          @@ decode schema.id ids_next schema.descriptor v
         | None -> Result.return None)
     and decode :
         type t.
@@ -142,7 +148,8 @@ module Make (Coding : S) = struct
         (t, 'error) Result.t =
      fun id ids schema v ->
       let type_error expected res =
-        type_error expected v res |> Result.map_error ~f:(fun e -> `Decode e)
+        type_error id ids expected v res
+        |> Result.map_error ~f:(fun e -> `Decode e)
       in
       let open Result in
       match schema with
@@ -337,7 +344,10 @@ module Make (Coding : S) = struct
             let v = encode schema.descriptor v in
             match key with
             | Some key -> (
-              match set_key v key (Coding.of_string name) with
+              match
+                set_key None [ (* FIXME: context *) ] v key
+                  (Coding.of_string name)
+              with
               | Result.Ok v -> Some v
               | Result.Error _ -> Some v)
             | None -> Some v)

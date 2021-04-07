@@ -80,7 +80,7 @@ module Json_coding : Coding.S with type t = Ezjsonm.value = struct
         Caml.Format.asprintf "%a" Ptime.pp_rfc3339_error e
       in
       Ptime.of_rfc3339 ~strict:true s |> Result.map_error ~f:error
-    | v -> Coding.type_error "string" (type_name v)
+    | v -> Result.fail @@ Coding.type_error "string" (type_name v)
 
   let to_time v = to_time_ v >>| fun (t, _tz, _) -> t
 

@@ -2,6 +2,10 @@ open Base
 open Poly
 open Schematic.Schema.Schemas
 
+let ( let* ) = Result.( >>= )
+
+let ( let+ ) = Result.( >>| )
+
 let root = Caml.Filename.dirname @@ Caml.Sys.executable_name
 
 let json_schema schema =
@@ -535,6 +539,28 @@ module Comparison = struct
     ()
 end
 
+module Error_messages = struct
+  let test name schema str error =
+    let res =
+      let* json = Schematic.Json.of_string str in
+      let+ _ = Schematic.Json.decode schema json in
+      ()
+    in
+    let res =
+      Result.map_error
+        ~f:(function
+          | `Json_decode s
+          | `Parse s ->
+            s)
+        res
+    in
+    Alcotest.(check (result unit string) name (Result.Error error) res)
+
+  let missing () =
+    test "missing" recursive_schema {|{"value":0,"next":{"value":1,"next":{}}}|}
+      {|path next.next: schema recursive: missing required field "value"|}
+end
+
 (* Phantom types *)
 
 type _ id = string [@@deriving schema]
@@ -583,4 +609,5 @@ let () =
           test_case "tuple" `Quick Comparison.tuple;
           test_case "variant" `Quick Comparison.variant;
         ] );
+      ("error-messages", [ test_case "missing" `Quick Error_messages.missing ]);
     ]
