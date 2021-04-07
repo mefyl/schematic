@@ -559,6 +559,11 @@ module Error_messages = struct
   let missing () =
     test "missing" recursive_schema {|{"value":0,"next":{"value":1,"next":{}}}|}
       {|path next.next: schema recursive: missing required field "value"|}
+
+  let type_error () =
+    test "missing" recursive_schema
+      {|{"value":0,"next":{"value":1,"next":{"value":"nope"}}}|}
+      {|path next.next.value: expected integer, got string|}
 end
 
 (* Phantom types *)
@@ -609,5 +614,9 @@ let () =
           test_case "tuple" `Quick Comparison.tuple;
           test_case "variant" `Quick Comparison.variant;
         ] );
-      ("error-messages", [ test_case "missing" `Quick Error_messages.missing ]);
+      ( "error-messages",
+        [
+          test_case "missing" `Quick Error_messages.missing;
+          test_case "type error" `Quick Error_messages.type_error;
+        ] );
     ]
