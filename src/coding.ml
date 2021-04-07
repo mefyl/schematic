@@ -97,15 +97,18 @@ module Make (Coding : S) = struct
     let rec decode_field :
         type t r.
         string option ->
+        string list ->
         string ->
         t Schema.schema ->
         (t, r) Schema.field_requirement ->
         Coding.t option ->
         (r, 'error) Result.t =
-     fun id field schema -> function
+     fun id ids field schema ->
+      let ids = field :: ids in
+      function
       | Required -> (
         function
-        | Some v -> decode schema.id schema.descriptor v
+        | Some v -> decode schema.id ids schema.descriptor v
         | None -> (
           match id with
           | None ->
@@ -118,22 +121,26 @@ module Make (Coding : S) = struct
                    id))))
       | Default default -> (
         function
-        | Some v -> decode schema.id schema.descriptor v
+        | Some v -> decode schema.id ids schema.descriptor v
         | None -> Result.return default)
       | Optional -> (
         function
         | Some v when Coding.is_null v -> (
-          match decode schema.id schema.descriptor v with
+          match decode schema.id ids schema.descriptor v with
           | Result.Ok v -> Result.return (Some v)
           | Result.Error _ -> Result.return None)
         | Some v ->
-          Result.map ~f:Option.return @@ decode schema.id schema.descriptor v
+          Result.map ~f:Option.return
+          @@ decode schema.id ids schema.descriptor v
         | None -> Result.return None)
     and decode :
         type t.
-        string option -> t Schema.descriptor -> Coding.t -> (t, 'error) Result.t
-        =
-     fun id schema v ->
+        string option ->
+        string list ->
+        t Schema.descriptor ->
+        Coding.t ->
+        (t, 'error) Result.t =
+     fun id ids schema v ->
       let type_error expected res =
         type_error expected v res |> Result.map_error ~f:(fun e -> `Decode e)
       in
@@ -141,20 +148,20 @@ module Make (Coding : S) = struct
       match schema with
       | Any -> Result.return (Coding.to_json v)
       | Bool -> Coding.to_bool v |> type_error "boolean"
-      | Date -> decode None date_tuple_schema.descriptor v
+      | Date -> decode None ids date_tuple_schema.descriptor v
       | Float -> Coding.to_float v |> type_error "float"
       | Ignore -> Result.return ()
       | Int -> Coding.to_int v |> type_error "integer"
       | Int64 -> Coding.to_int64 v |> type_error "integer"
       | List items_schema ->
         let* v = Coding.to_list v |> type_error "array" in
-        List.map (decode None items_schema.descriptor) v
+        List.map (decode None ids items_schema.descriptor) v
       | Map (cons, _, schema) ->
-        decode id schema v >>= fun value -> Result.return @@ cons value
+        decode id ids schema v >>= fun value -> Result.return @@ cons value
       | Mapping fields_schema ->
         let* fields = Coding.to_fields v |> type_error "mapping" in
         let f (name, value) =
-          decode fields_schema.id fields_schema.descriptor value
+          decode fields_schema.id ids fields_schema.descriptor value
           >>= fun value -> Result.return (name, value)
         in
         List.map f fields
@@ -163,7 +170,7 @@ module Make (Coding : S) = struct
         if Coding.is_null v then
           Result.return None
         else
-          decode s.id s.descriptor v |> Result.map ~f:Option.return
+          decode s.id ids s.descriptor v |> Result.map ~f:Option.return
       | Object fields_schema ->
         let* fields = Coding.to_fields v |> type_error "object" in
         let rec decode_object :
@@ -185,7 +192,7 @@ module Make (Coding : S) = struct
                   false
               in
               if missing then
-                decode_field id field schema requirement None
+                decode_field id ids field schema requirement None
               else
                 let value =
                   if inline then
@@ -193,7 +200,7 @@ module Make (Coding : S) = struct
                   else
                     List.Assoc.find ~equal:String.equal fields field
                 in
-                decode_field id field schema requirement value
+                decode_field id ids field schema requirement value
             in
             Result.Let_syntax.Let_syntax.both field (decode_object rest)
         in
@@ -219,7 +226,7 @@ module Make (Coding : S) = struct
          fun t v ->
           match (t, v) with
           | Item { schema; rest }, hd :: tl ->
-            decode schema.id schema.descriptor hd >>= fun hd ->
+            decode schema.id ids schema.descriptor hd >>= fun hd ->
             decode_tuple rest tl >>= fun tl -> Result.return (hd, tl)
           | ItemEnd, [] -> Result.return ()
           | Item _, [] -> Result.fail (`Decode "not enough tuple elements")
@@ -243,7 +250,7 @@ module Make (Coding : S) = struct
               | _ -> false)
           in
           if key then
-            match decode schema.id schema.descriptor v with
+            match decode schema.id ids schema.descriptor v with
             | Result.Ok v -> Some (decoder v)
             | Result.Error _ -> None
           else
@@ -253,7 +260,7 @@ module Make (Coding : S) = struct
         | Some res -> Result.return res
         | None -> Result.fail (`Decode "no union case was matched"))
     in
-    decode schema.Schema.id schema.descriptor
+    decode schema.Schema.id [] schema.descriptor
 
   let encode schema =
     let encode_field :
