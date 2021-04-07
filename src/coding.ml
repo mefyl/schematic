@@ -14,6 +14,13 @@ end
 
 type error = [ `Decode of string ]
 
+type 'a customizable =
+  [ `Generic
+  | `Custom of 'a
+  ]
+
+type 't set_key = ('t -> string -> 't -> ('t, string) Result.t) customizable
+
 module type S = sig
   type t
 
@@ -40,6 +47,8 @@ module type S = sig
   val of_time : Ptime.t -> t
 
   val of_time_local : Ptime.t * int -> t
+
+  val set_key : t set_key
 
   val to_bool : t -> bool option
 
@@ -71,6 +80,17 @@ module Make (Coding : S) = struct
   type date_tuple = int * int * int [@@deriving schema]
 
   let ( let* ) = Result.( >>= )
+
+  let type_error expected v = function
+    | Some v -> Result.return v
+    | None -> type_error expected (Coding.type_name v)
+
+  let set_key o f v =
+    match Coding.set_key with
+    | `Custom impl -> impl o f v
+    | `Generic ->
+      let* fields = Coding.to_fields v |> type_error "object" v in
+      Result.return (Coding.of_fields @@ (f, v) :: fields)
 
   let decode schema =
     let module List = List_monad (Result) in
@@ -114,11 +134,8 @@ module Make (Coding : S) = struct
         string option -> t Schema.descriptor -> Coding.t -> (t, 'error) Result.t
         =
      fun id schema v ->
-      let type_error expected = function
-        | Some v -> Result.return v
-        | None ->
-          type_error expected (Coding.type_name v)
-          |> Result.map_error ~f:(fun e -> `Decode e)
+      let type_error expected res =
+        type_error expected v res |> Result.map_error ~f:(fun e -> `Decode e)
       in
       let open Result in
       match schema with
@@ -311,10 +328,12 @@ module Make (Coding : S) = struct
           match encoder v with
           | Some v -> (
             let v = encode schema.descriptor v in
-            match (key, Coding.to_fields v) with
-            | Some key, Some fields ->
-              Some (Coding.of_fields @@ (key, Coding.of_string name) :: fields)
-            | _ -> Some v)
+            match key with
+            | Some key -> (
+              match set_key v key (Coding.of_string name) with
+              | Result.Ok v -> Some v
+              | Result.Error _ -> Some v)
+            | None -> Some v)
           | None -> None
         in
         match List.find_map ~f:conv cases with

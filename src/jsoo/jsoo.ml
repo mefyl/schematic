@@ -19,6 +19,21 @@ let js_of_ptime t = new%js Js.date_fromTimeValue (Ptime.to_float_s t *. 1000.)
 module Jsoo_coding : Schematic.Coding.S with type t = Js.Unsafe.any = struct
   type t = Js.Unsafe.any
 
+  let type_name _ = failwith "unimplemented yet: type_name"
+
+  let set_key =
+    let f o f v =
+      try
+        if Base.phys_equal (Js_of_ocaml.Js.typeof o) (Js.string "object") then
+          let () = Js.Unsafe.set o (Js.string f) v in
+          Result.return o
+        else
+          failwith "null or undefined"
+      with
+      | _ -> Schematic.Coding.type_error "object" (type_name o)
+    in
+    `Custom f
+
   let null = Js.Unsafe.pure_js_expr "null"
 
   let is_null v = Base.phys_equal v null
@@ -71,8 +86,6 @@ module Jsoo_coding : Schematic.Coding.S with type t = Js.Unsafe.any = struct
   let to_time _ = failwith "not implemented time"
 
   let to_time_local _ = failwith "not implemented time_local"
-
-  let type_name _ = failwith "unimplemented yet: type_name"
 end
 
 let ( == ) = Caml.( == )
