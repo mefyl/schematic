@@ -19,7 +19,7 @@ let js_of_ptime t = new%js Js.date_fromTimeValue (Ptime.to_float_s t *. 1000.)
 module Jsoo_coding : Schematic.Coding.S with type t = Js.Unsafe.any = struct
   type t = Js.Unsafe.any
 
-  let type_name _ = failwith "unimplemented yet: type_name"
+  let type_name o = Js_of_ocaml.Js.typeof o |> Js.to_string
 
   let set_key =
     let f o f v =
