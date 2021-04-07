@@ -16,6 +16,10 @@ let js_of_date (y, m, d) = new%js Js.date_day y (m - 1) d
 
 let js_of_ptime t = new%js Js.date_fromTimeValue (Ptime.to_float_s t *. 1000.)
 
+let ( == ) = Base.phys_equal
+
+let ( let+ ) = Option.( >>| )
+
 module Jsoo_coding : Schematic.Coding.S with type t = Js.Unsafe.any = struct
   type t = Js.Unsafe.any
 
@@ -24,7 +28,7 @@ module Jsoo_coding : Schematic.Coding.S with type t = Js.Unsafe.any = struct
   let set_key =
     let f o f v =
       try
-        if Base.phys_equal (Js_of_ocaml.Js.typeof o) (Js.string "object") then
+        if Js_of_ocaml.Js.typeof o == Js.string "object" then
           let () = Js.Unsafe.set o (Js.string f) v in
           Result.return o
         else
@@ -36,7 +40,7 @@ module Jsoo_coding : Schematic.Coding.S with type t = Js.Unsafe.any = struct
 
   let null = Js.Unsafe.pure_js_expr "null"
 
-  let is_null v = Base.phys_equal v null
+  let is_null v = v == null
 
   let of_bool v = Js.Unsafe.coerce @@ Js.bool v
 
@@ -64,31 +68,56 @@ module Jsoo_coding : Schematic.Coding.S with type t = Js.Unsafe.any = struct
 
   let of_time_local v = Js.Unsafe.coerce @@ js_of_ptime (fst v)
 
-  let to_bool _ = failwith "not implemented bool"
+  let to_bool v =
+    if Js.typeof v == Js.string "boolean" then
+      Js.Unsafe.coerce v |> Js.to_bool |> Option.return
+    else
+      None
 
   let to_fields o =
     let f key = (Js.to_string key, Js_of_ocaml.Js.Unsafe.get o key) in
     Option.return @@ List.map ~f @@ Array.to_list @@ Js.to_array
     @@ Js_of_ocaml.Js.object_keys o
 
-  let to_float _ = failwith "not implemented float"
+  let to_float v =
+    if Js.typeof v == Js.string "number" then
+      Js.Unsafe.coerce v |> Js.float_of_number |> Option.return
+    else
+      None
 
-  let to_int _ = failwith "not implemented int"
+  let to_int v =
+    let+ v = to_float v in
+    Int.of_float v
 
-  let to_int64 _ = failwith "not implemented int64"
+  let to_int64 v =
+    let+ v = to_float v in
+    Int64.of_float v
 
-  let to_json _ = failwith "not implemented json"
+  let to_json v = Impl_js.of_js v
 
-  let to_list _ = failwith "not implemented list"
+  let to_list v =
+    if Js.instanceof v Js.array_empty then
+      Js.Unsafe.coerce v |> Js.to_array |> Array.to_list |> Option.return
+    else
+      None
 
-  let to_string _ = failwith "not implemented string"
+  let to_string v =
+    if Js.typeof v == Js.string "string" then
+      Js.Unsafe.coerce v |> Js.to_string |> Option.return
+    else
+      None
 
-  let to_time _ = failwith "not implemented time"
+  let to_time v =
+    if Js.instanceof v Js.date_now then
+      let date = Js.Unsafe.coerce v in
+      Ptime.of_float_s (date##getTime /. 1000.)
+      |> Result.of_option ~error:"invalid date"
+    else
+      Result.fail @@ Schematic.Coding.type_error "Date" (type_name v)
 
-  let to_time_local _ = failwith "not implemented time_local"
+  let to_time_local v =
+    Result.map (to_time v) ~f:(fun time -> (time, 0 (* FIXME *)))
 end
-
-let ( == ) = Caml.( == )
 
 type decode_error = [ `Js_decode of string ]
 
@@ -130,7 +159,7 @@ type 'a option_js = 'a Js.opt
 
 type string_js = Js.js_string Js.t
 
-let decode schema =
+let _decode schema =
   let ( >>= ) = Result.( >>= ) in
   let fail id ids fmt =
     let schema = id in
@@ -256,8 +285,7 @@ let decode schema =
         let key =
           match key with
           | None -> true
-          | Some key ->
-            phys_equal (Js.Unsafe.get js (Js.string key)) (Js.string name)
+          | Some key -> Js.Unsafe.get js (Js.string key) == Js.string name
         in
         if key then
           match decode schema.id ids schema.descriptor js with
@@ -318,6 +346,9 @@ let decode schema =
   in
   decode schema.id ids schema.descriptor
 
-module Coding = Schematic.Coding.Make (Jsoo_coding)
+include Schematic.Coding.Make (Jsoo_coding)
 
-let encode = Coding.encode
+let decode schema js =
+  match decode schema js with
+  | Result.Error (`Decode r) -> Result.Error (`Js_decode r)
+  | Result.Ok _ as v -> v

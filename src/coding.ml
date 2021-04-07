@@ -110,6 +110,7 @@ module Make (Coding : S) = struct
     let module List = List_monad (Result) in
     let rec decode_field :
         type t r.
+        bool ->
         string option ->
         string list ->
         string ->
@@ -117,7 +118,7 @@ module Make (Coding : S) = struct
         (t, r) Schema.field_requirement ->
         Coding.t option ->
         (r, 'error) Result.t =
-     fun id ids field schema ->
+     fun omit id ids field schema ->
       let ids_next = field :: ids in
       function
       | Required -> (
@@ -127,7 +128,11 @@ module Make (Coding : S) = struct
           Result.fail (`Decode (fail id ids "missing required field %S" field)))
       | Default default -> (
         function
-        | Some v -> decode schema.id ids_next schema.descriptor v
+        | Some v ->
+          if omit then
+            Result.return default
+          else
+            decode schema.id ids_next schema.descriptor v
         | None -> Result.return default)
       | Optional -> (
         function
@@ -184,7 +189,7 @@ module Make (Coding : S) = struct
             type t. t Schema.field -> (t, [> `Decode of string ]) Result.t =
           function
           | FieldEnd -> Result.return ()
-          | Field { field; requirement; schema; rest; _ } ->
+          | Field { field; omit; requirement; rest; schema; _ } ->
             let inline, schema = Schema.extract_field_schema schema in
             let field =
               let missing =
@@ -199,7 +204,7 @@ module Make (Coding : S) = struct
                   false
               in
               if missing then
-                decode_field id ids field schema requirement None
+                decode_field omit id ids field schema requirement None
               else
                 let value =
                   if inline then
@@ -207,7 +212,7 @@ module Make (Coding : S) = struct
                   else
                     List.Assoc.find ~equal:String.equal fields field
                 in
-                decode_field id ids field schema requirement value
+                decode_field omit id ids field schema requirement value
             in
             Result.Let_syntax.Let_syntax.both field (decode_object rest)
         in
