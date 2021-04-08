@@ -53,26 +53,3 @@ module Uri : sig
 
   val schema : Uri.t Schema.t
 end
-
-include module type of Schemas_intf
-
-val bool_diff : bool -> bool -> bool option
-
-val int_diff : int -> int -> int option
-
-val list_diff :
-  ('v -> 'v -> 'p option) -> 'v list -> 'v list -> 'p option list option
-
-val string_diff : string -> string -> string option
-
-val unit_diff : unit -> unit -> unit option
-
-val bool_patch : bool -> bool -> bool
-
-val int_patch : int -> int -> int
-
-val list_patch : ('p -> 'v -> 'v) -> 'p option list -> 'v list -> 'v list
-
-val string_patch : string -> string -> string
-
-val unit_patch : unit -> unit -> unit
