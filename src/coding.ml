@@ -121,8 +121,8 @@ module Make (Coding : S) = struct
         string option ->
         string list ->
         string ->
-        t Schema.schema ->
-        (t, r) Schema.field_requirement ->
+        t Schema.t ->
+        (t, r) Schema.requirement ->
         Coding.t option ->
         (r, 'error) Result.t =
      fun omit id ids field schema ->
@@ -273,8 +273,8 @@ module Make (Coding : S) = struct
     decode schema.Schema.id [] schema.descriptor
 
   let encode schema =
-    let encode_field :
-        type t r. (t, r) Schema.field_requirement -> r -> t option = function
+    let encode_field : type t r. (t, r) Schema.requirement -> r -> t option =
+      function
       | Required -> Option.some
       | Default default -> (
         function

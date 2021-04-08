@@ -4,11 +4,10 @@ type t = Ezjsonm.value
 
 module type S = sig
   open Base
-  open Schema
 
-  val decode : 'a schema -> t -> ('a, Coding.error) Result.t
+  val decode : 'a Schema.t -> t -> ('a, Coding.error) Result.t
 
-  val encode : 'a schema -> 'a -> t
+  val encode : 'a Schema.t -> 'a -> t
 
   val from_channel : Stdio.In_channel.t -> (t, parse_error) Result.t
 

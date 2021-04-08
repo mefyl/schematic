@@ -2,14 +2,14 @@ open Base
 open Utils
 include Schema_intf
 
-let required : type a b. (a, b) field_requirement -> bool = function
+let required : type a b. (a, b) requirement -> bool = function
   | Required -> true
   | _ -> false
 
 let map cons decons { descriptor; _ } =
   { id = None; descriptor = Map (cons, decons, descriptor) }
 
-let rec pp_descriptor : type t. t descriptor Fmt.t =
+let rec pp_descriptor : type u. u descriptor Fmt.t =
  fun f d ->
   let fmt =
     let open Fmt in
@@ -44,7 +44,7 @@ let rec pp_descriptor : type t. t descriptor Fmt.t =
   in
   fmt f ()
 
-and pp : type t. t schema Fmt.t =
+and pp : type u. u t Fmt.t =
  fun f { descriptor; _ } -> pp_descriptor f descriptor
 
 let extract_field_schema = function
@@ -110,7 +110,7 @@ let compare schema =
     | _, `A _ -> 1
     | `O l, `O r -> assoc_compare compare_json l r
   in
-  let rec compare : type t. t descriptor -> t -> t -> int = function
+  let rec compare : type u. u descriptor -> u -> u -> int = function
     | Any -> compare_json
     | Bool -> Base.Bool.compare
     | Date -> Base.Poly.compare
@@ -133,13 +133,13 @@ let compare schema =
         | 0 -> Ptime.compare l r
         | v -> v)
     | Object fields ->
-      let rec compare_fields : type t. t field -> t -> t -> int = function
+      let rec compare_fields : type u. u field -> u -> u -> int = function
         | Field { schema; requirement; rest; _ } ->
           let _, schema = extract_field_schema schema in
           let f
               (type field req)
-              (schema : field schema)
-              (requirement : (field, req) field_requirement)
+              (schema : field t)
+              (requirement : (field, req) requirement)
               ((l : req), lr)
               ((r : req), rr) =
             let c =

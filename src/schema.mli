@@ -1,14 +1,14 @@
 include module type of Schema_intf
 
-val required : (_, _) field_requirement -> bool
+val required : (_, _) requirement -> bool
 
-val map : ('a -> 'b) -> ('b -> 'a) -> 'a schema -> 'b schema
+val map : ('a -> 'b) -> ('b -> 'a) -> 'a t -> 'b t
 
-val pp : Format.formatter -> _ schema -> unit
+val pp : Format.formatter -> _ t -> unit
 
 val pp_descriptor : Format.formatter -> _ descriptor -> unit
 
-val extract_field_schema : 'a field_schema -> bool * 'a schema
+val extract_field_schema : 'a field_schema -> bool * 'a t
 
 val descriptor_fields : 'a descriptor -> string list
 
@@ -20,4 +20,4 @@ type 'res inline_v = { f : 't. 't field -> 't -> 'res }
 
 val inline_v : 't descriptor -> 't -> 'res inline_v -> 'res
 
-val compare : 'a schema -> 'a -> 'a -> int
+val compare : 'a t -> 'a -> 'a -> int

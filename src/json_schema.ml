@@ -186,7 +186,7 @@ type date_tuple = int * int * int [@@deriving schema]
 
 let of_schema schema =
   let id_name s = "#" ^ s in
-  let rec of_schema : type t. ids -> t Schema.schema -> ids * json_schema =
+  let rec of_schema : type t. ids -> t Schema.t -> ids * json_schema =
    fun marks -> function
     | { id = None; descriptor } -> of_descriptor marks descriptor
     | { id = Some id; descriptor = _ } when Set.mem marks id ->

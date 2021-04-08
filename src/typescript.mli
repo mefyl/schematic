@@ -2,7 +2,7 @@
 type t
 
 (** [of_schema s] is the typescript typing corresponding to schema [s]. *)
-val of_schema : 'a Schema.schema -> t
+val of_schema : 'a Schema.t -> t
 
 (** [name t] is the typescript name of the type mapping to the type named [t] in
     OCaml. *)

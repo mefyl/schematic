@@ -1,20 +1,20 @@
-type (_, _) field_requirement =
-  | Required : ('a, 'a) field_requirement
-  | Default : 'a -> ('a, 'a) field_requirement
-  | Optional : ('a, 'a option) field_requirement
+type (_, _) requirement =
+  | Required : ('a, 'a) requirement
+  | Default : 'a -> ('a, 'a) requirement
+  | Optional : ('a, 'a option) requirement
 
 type _ case =
   | Case : {
       name : string;
-      schema : 'a schema;
+      schema : 'a t;
       encoder : 't -> 'a option;
       decoder : 'a -> 't;
     }
       -> 't case
 
 and 'a field_schema =
-  | Outline of 'a schema
-  | Inline of 'a schema
+  | Outline of 'a t
+  | Inline of 'a t
 
 and _ field =
   | FieldEnd : unit field
@@ -25,7 +25,7 @@ and _ field =
       maximum : int option;
       minimum : int option;
       omit : bool;
-      requirement : ('a, 'req) field_requirement;
+      requirement : ('a, 'req) requirement;
       rest : 'rest field;
       schema : 'a field_schema;
       title : string option;
@@ -35,7 +35,7 @@ and _ field =
 and _ tuple =
   | ItemEnd : unit tuple
   | Item : {
-      schema : 'a schema;
+      schema : 'a t;
       rest : 'b tuple;
     }
       -> ('a * 'b) tuple
@@ -48,11 +48,11 @@ and _ descriptor =
   | Ignore : unit descriptor
   | Int : int descriptor
   | Int64 : int64 descriptor
-  | List : 'a schema -> 'a list descriptor
+  | List : 'a t -> 'a list descriptor
   | Map : ('a -> 'b) * ('b -> 'a) * 'a descriptor -> 'b descriptor
-  | Mapping : 'a schema -> (string * 'a) list descriptor
+  | Mapping : 'a t -> (string * 'a) list descriptor
   | Null : unit descriptor
-  | Nullable : 'a schema -> 'a option descriptor
+  | Nullable : 'a t -> 'a option descriptor
   | String : string descriptor
   | String_const : string -> unit descriptor
   | Time : Ptime.t descriptor
@@ -65,7 +65,7 @@ and _ descriptor =
     }
       -> 't descriptor
 
-and 't schema = {
+and 't t = {
   id : string option;
   descriptor : 't descriptor;
 }

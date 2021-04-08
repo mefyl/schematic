@@ -1,5 +1,3 @@
-open Schema
-
 let name s =
   String.split_on_char '_' s
   |> List.map (String.split_on_char '-')
@@ -22,7 +20,7 @@ type t =
   | Tuple of t list
   | Union of t list
 
-let rec of_descriptor : type s. string option -> s descriptor -> t =
+let rec of_descriptor : type s. string option -> s Schema.descriptor -> t =
  fun name -> function
   | Any -> Atom "any"
   | Bool -> Atom "boolean"
@@ -47,11 +45,11 @@ let rec of_descriptor : type s. string option -> s descriptor -> t =
   | Tuple items -> Tuple (of_tuple items)
   | Union { cases; key } -> Union (List.map (of_case key) cases)
 
-and of_schema : type s. s schema -> t = function
+and of_schema : type s. s Schema.t -> t = function
   | { id = None; descriptor } -> of_descriptor None descriptor
   | { id = Some id; _ } -> Atom (name id)
 
-and of_object : type s. s field -> (string * t * bool) list = function
+and of_object : type s. s Schema.field -> (string * t * bool) list = function
   | Field
       {
         schema =
@@ -70,11 +68,11 @@ and of_object : type s. s field -> (string * t * bool) list = function
     @ of_object rest
   | FieldEnd -> []
 
-and of_tuple : type s. s tuple -> t list = function
+and of_tuple : type s. s Schema.tuple -> t list = function
   | Item { schema; rest } -> of_schema schema :: of_tuple rest
   | ItemEnd -> []
 
-and of_case : type s. string option -> s case -> t =
+and of_case : type s. string option -> s Schema.case -> t =
  fun key (Case { name; schema; _ }) ->
   let schema = of_schema schema in
   match key with
@@ -83,7 +81,7 @@ and of_case : type s. string option -> s case -> t =
     Intersection
       [ schema; Object { name = None; fields = [ (key, String name, true) ] } ]
 
-let of_schema { id; descriptor } = of_descriptor id descriptor
+let of_schema Schema.{ id; descriptor } = of_descriptor id descriptor
 
 let break sp id fmt _ = Format.pp_print_break fmt sp id
 
