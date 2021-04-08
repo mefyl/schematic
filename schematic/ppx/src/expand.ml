@@ -130,7 +130,7 @@ module Warning = struct
       attr_loc = loc;
     }
 
-  let _unused_rec ~loc = make ~loc "-39"
+  let unused_rec ~loc = make ~loc "-39"
 end
 
 (* Caml variant constructor of the form [Foo of int * int] surprisingly do not
@@ -427,9 +427,9 @@ module type EXPANSION = sig
 end
 
 module Schema : EXPANSION = struct
-  type closed = value_binding * bool
+  type closed = value_binding
 
-  type expanded = expression * bool
+  type expanded = expression
 
   let rec encode_type ~loc ~context = function
     (* Mapping *)
@@ -490,7 +490,7 @@ module Schema : EXPANSION = struct
       [%expr [%e expr_id ~loc (schema_id ~loc (Lident name))]]
     (* Polymorphic variant *)
     | { ptyp_desc = Ptyp_variant (fields, _, _); ptyp_loc = loc; _ } ->
-      let desc, _ = expand_polymorphic_variant ~loc ~context fields in
+      let desc = expand_polymorphic_variant ~loc ~context fields in
       [%expr { Schema.id = None; descriptor = [%e desc] }]
     (* Unsupported *)
     | core_type ->
@@ -797,9 +797,8 @@ module Schema : EXPANSION = struct
           ppat_attributes = [];
         }
     in
-    ( combinator ~loc fields field_name constructed deconstructed
-        [%expr Object [%e fields_schema]],
-      true )
+    combinator ~loc fields field_name constructed deconstructed
+      [%expr Object [%e fields_schema]]
 
   (*here*)
   and expand_variant ~loc ~context options =
@@ -851,9 +850,7 @@ module Schema : EXPANSION = struct
           let schema =
             match pcd_args with
             | Pcstr_record fields ->
-              let descriptor =
-                _expand_record true ~loc ~context fields |> fst
-              in
+              let descriptor = _expand_record true ~loc ~context fields in
               [%expr { Schema.id = None; descriptor = [%e descriptor] }]
             | _ -> encode_type ~loc ~context type_
           in
@@ -911,15 +908,14 @@ module Schema : EXPANSION = struct
       | None -> [%expr None]
       | Some name -> [%expr Some [%e Expr.string ~loc name]]
     in
-    ( [%expr
-        Schema.Union
-          { cases = [%e expr_list ~loc (List.map ~f options)]; key = [%e key] }],
-      true )
+    [%expr
+      Schema.Union
+        { cases = [%e expr_list ~loc (List.map ~f options)]; key = [%e key] }]
 
   let expand_abstract_type ~loc ~context t =
-    ([%expr [%e encode_type ~loc ~context t].descriptor], false)
+    [%expr [%e encode_type ~loc ~context t].descriptor]
 
-  let close ~loc ~context t params (body, recursive) =
+  let close ~loc ~context t params body =
     let init =
       [%expr
         {
@@ -944,31 +940,17 @@ module Schema : EXPANSION = struct
     let name = schema_name t.ptype_name.txt in
     let pattern = pattern_id ~loc:t.ptype_name.loc name in
     let body =
-      if recursive then
-        [%expr
-          let _ = [%e expr_id ~loc (Lident name)] in
-          [%e body]]
-      else
-        body
+      {
+        pvb_pat = pattern;
+        pvb_expr = body;
+        pvb_loc = loc;
+        pvb_attributes = [ Warning.unused_rec ~loc ];
+      }
     in
-    let body =
-      { pvb_pat = pattern; pvb_expr = body; pvb_loc = loc; pvb_attributes = [] }
-    in
-    (body, recursive)
+    body
 
   let combine ~loc expanded =
-    [
-      {
-        pstr_desc =
-          Pstr_value
-            ( (if List.exists ~f:snd expanded then
-                Recursive
-              else
-                Nonrecursive),
-              List.map ~f:fst expanded );
-        pstr_loc = loc;
-      };
-    ]
+    [ { pstr_desc = Pstr_value (Recursive, expanded); pstr_loc = loc } ]
 end
 
 module Jsoo_type : EXPANSION = struct
