@@ -29,13 +29,13 @@ and poly =
   ]
 [@@deriving schema ~jsoo]
 
-let fail s = Js.raise_js_error @@ new%js Js.error_constr (Js.string s)
-
 let of_result = function
   | Result.Ok v -> v
-  | Result.Error (`Parse e) -> fail ("parse error: " ^ e)
-  | Result.Error (`Json_decode e) -> fail ("decode error: " ^ e)
-  | Result.Error (`Js_decode e) -> fail ("decode error: " ^ e)
+  | Result.Error e -> Js.raise_js_error @@ new%js Js.error_constr (Js.string e)
+
+let decode_error coding =
+  Result.map_error ~f:(fun e ->
+      Fmt.str "%s decode error: %a" coding Schematic.Coding.pp_error e)
 
 let () =
   Js.export_all
@@ -45,13 +45,13 @@ let () =
          @@
          let open Result in
          Schematic_jsoo.Json.of_string (Js.to_string s) >>= fun json ->
-         Schematic.Json.decode o_schema json >>| o_to_js
+         Schematic.Json.decode o_schema json |> decode_error "JSON" >>| o_to_js
 
        method ofJs v =
          of_result
          @@
          let open Result in
-         Schematic_jsoo.Jsoo.decode o_schema v >>| o_to_js
+         Schematic_jsoo.Jsoo.decode o_schema v |> decode_error "js" >>| o_to_js
 
        method toString o =
          o_of_js_exn o
@@ -64,5 +64,6 @@ let () =
          of_result
          @@
          let open Result in
-         Schematic_jsoo.Jsoo.decode variant_schema js >>| variant_to_js
+         Schematic_jsoo.Jsoo.decode variant_schema js
+         |> decode_error "js" >>| variant_to_js
     end)

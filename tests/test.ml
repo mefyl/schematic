@@ -2,6 +2,10 @@ open Base
 open Poly
 open Schematic.Schema.Schemas
 
+let ( let* ) = Result.( >>= )
+
+let ( let+ ) = Result.( >>| )
+
 let root = Caml.Filename.dirname @@ Caml.Sys.executable_name
 
 let json_schema schema =
@@ -21,8 +25,9 @@ let test name test schema value j =
   let () =
     match Schematic.Json.decode schema j with
     | Result.Ok decoded -> Alcotest.check test name value decoded
-    | Result.Error (`Json_decode e) ->
-      Alcotest.fail (Printf.sprintf "JSON decode error: %s" e)
+    | Result.Error e ->
+      Alcotest.fail
+        (Fmt.str "JSON decode error: %a" Schematic.Coding.pp_error e)
   in
   let schema = json_schema schema in
   let cmd =
@@ -535,6 +540,28 @@ module Comparison = struct
     ()
 end
 
+module Error_messages = struct
+  let test name schema str error =
+    let res =
+      let* json = Schematic.Json.of_string str in
+      let+ _ =
+        Schematic.Json.decode schema json
+        |> Result.map_error ~f:(Fmt.str "%a" Schematic.Coding.pp_error)
+      in
+      ()
+    in
+    Alcotest.(check (result unit string) name (Result.Error error) res)
+
+  let missing () =
+    test "missing" recursive_schema {|{"value":0,"next":{"value":1,"next":{}}}|}
+      {|path next.next: schema recursive: missing required field "value"|}
+
+  let type_error () =
+    test "missing" recursive_schema
+      {|{"value":0,"next":{"value":1,"next":{"value":"nope"}}}|}
+      {|path next.next.value: expected integer, got string|}
+end
+
 (* Phantom types *)
 
 type _ id = string [@@deriving schema]
@@ -582,5 +609,10 @@ let () =
           test_case "record" `Quick Comparison.record;
           test_case "tuple" `Quick Comparison.tuple;
           test_case "variant" `Quick Comparison.variant;
+        ] );
+      ( "error-messages",
+        [
+          test_case "missing" `Quick Error_messages.missing;
+          test_case "type error" `Quick Error_messages.type_error;
         ] );
     ]
