@@ -35,7 +35,7 @@ let of_result = function
 
 let decode_error coding =
   Result.map_error ~f:(fun e ->
-      Fmt.str "%s decode error: %a" coding Schematic.Coding.pp_error e)
+      Fmt.str "%s decode error: %a" coding Schematic.Error.pp_decoding e)
 
 let () =
   Js.export_all

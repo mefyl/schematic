@@ -5,4 +5,4 @@
  (public_name schematic)
  (libraries base ezjsonm fmt ptime stdio uri)
  (preprocess
-  (pps schematic_ppx_inside ppx_here)))
+  (pps schematic_ppx_inside ppx_deriving.eq ppx_here)))

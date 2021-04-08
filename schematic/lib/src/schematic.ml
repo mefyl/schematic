@@ -1,3 +1,5 @@
+module Error = Error
+
 module Json = struct
   include Json
   module Schema = Json_schema

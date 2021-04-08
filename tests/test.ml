@@ -27,7 +27,7 @@ let test name test schema value j =
     | Result.Ok decoded -> Alcotest.check test name value decoded
     | Result.Error e ->
       Alcotest.fail
-        (Fmt.str "JSON decode error: %a" Schematic.Coding.pp_error e)
+        (Fmt.str "JSON decode error: %a" Schematic.Error.pp_decoding e)
   in
   let schema = json_schema schema in
   let cmd =
@@ -541,16 +541,21 @@ module Comparison = struct
 end
 
 module Error_messages = struct
-  let test name schema str error =
+  let test name schema str e =
     let res =
-      let* json = Schematic.Json.of_string str in
+      let* json =
+        Schematic.Json.of_string str
+        |> Result.map_error ~f:Schematic.Error.of_parsing
+      in
       let+ _ =
         Schematic.Json.decode schema json
-        |> Result.map_error ~f:(Fmt.str "%a" Schematic.Coding.pp_error)
+        |> Result.map_error ~f:(Schematic.Error.of_decoding `JSON)
       in
       ()
     in
-    Alcotest.(check (result unit string) name (Result.Error error) res)
+    Alcotest.(
+      check (result unit string) name (Result.Error e)
+        (Result.map_error ~f:Schematic.Error.to_string res))
 
   let missing () =
     test "missing" recursive_schema {|{"value":0,"next":{"value":1,"next":{}}}|}

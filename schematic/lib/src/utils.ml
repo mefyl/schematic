@@ -1,3 +1,7 @@
+module E = Error
+include Base
+module Error = E
+
 module type Monad = sig
   type 'a t
 

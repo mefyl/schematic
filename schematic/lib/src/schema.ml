@@ -1,4 +1,3 @@
-open Base
 open Utils
 include Schema_intf
 

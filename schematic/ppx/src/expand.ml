@@ -1169,7 +1169,7 @@ module Jsoo_type = struct
                        [| Js_of_ocaml.Js.Unsafe.inject t0 |])
                      Js_of_ocaml.Js.error_constr
                      (Js_of_ocaml.Js.string
-                     @@ Schematic.Coding.error_to_string e)
+                     @@ Schematic.Error.decoding_to_string e)
                      ())]
         in
         parametrize body

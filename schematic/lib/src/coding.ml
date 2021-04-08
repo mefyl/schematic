@@ -1,7 +1,8 @@
+module E = Error
 open Base
 
 (* FIXME: use Acid.Sequence *)
-module List_monad (Monad : Monad.S2) = struct
+module List_monad (Monad : Base.Monad.S2) = struct
   include List
   open Monad
 
@@ -11,22 +12,6 @@ module List_monad (Monad : Monad.S2) = struct
       f hd >>= fun hd ->
       map f tl >>= fun tl -> Monad.return (hd :: tl)
 end
-
-type error = {
-  path : string list;
-  schema : string option;
-  reason : string;
-}
-
-let pp_error formatter { path; schema; reason } =
-  Fmt.(
-    pf formatter "path %a: %a%s"
-      (list ~sep:(const char '.') string)
-      (List.rev path)
-      (option (const string "schema " ++ string ++ const string ": "))
-      schema reason)
-
-let error_to_string = Fmt.to_to_string pp_error
 
 type 'a customizable =
   [ `Generic
@@ -88,7 +73,7 @@ module type S = sig
 end
 
 let fail id ids fmt =
-  let f reason = { path = ids; schema = id; reason } in
+  let f reason = E.{ path = ids; schema = id; reason } in
   Fmt.kstr f fmt
 
 let type_error expected effective =
@@ -108,7 +93,8 @@ module Make (Coding : S) = struct
   let set_key schema path o f v =
     match Coding.set_key with
     | `Custom impl ->
-      impl o f v |> Result.map_error ~f:(fun reason -> { path; schema; reason })
+      impl o f v
+      |> Result.map_error ~f:(fun reason -> E.{ path; schema; reason })
     | `Generic ->
       let* fields = Coding.to_fields v |> type_error schema path "object" v in
       Result.return (Coding.of_fields @@ (f, v) :: fields)
@@ -156,10 +142,10 @@ module Make (Coding : S) = struct
         string list ->
         t Schema.descriptor ->
         Coding.t ->
-        (t, error) Result.t =
+        (t, E.decoding) Result.t =
      fun id ids schema v ->
       let type_error expected res = type_error id ids expected v res
-      and error reason = { path = ids; schema = id; reason }
+      and error reason = E.{ path = ids; schema = id; reason }
       and ( >>= ) = Result.( >>= ) in
       match schema with
       | Any -> Result.return (Coding.to_json v)
@@ -189,8 +175,8 @@ module Make (Coding : S) = struct
           decode s.id ids s.descriptor v |> Result.map ~f:Option.return
       | Object fields_schema ->
         let* fields = Coding.to_fields v |> type_error "object" in
-        let rec decode_object : type t. t Schema.field -> (t, error) Result.t =
-          function
+        let rec decode_object :
+            type t. t Schema.field -> (t, E.decoding) Result.t = function
           | FieldEnd -> Result.return ()
           | Field { field; omit; requirement; rest; schema; _ } ->
             let inline, schema = Schema.extract_field_schema schema in
@@ -232,7 +218,8 @@ module Make (Coding : S) = struct
       | Tuple items ->
         let* v = Coding.to_list v |> type_error "list" in
         let rec decode_tuple :
-            type t. t Schema.tuple -> Coding.t list -> (t, error) Result.t =
+            type t. t Schema.tuple -> Coding.t list -> (t, E.decoding) Result.t
+            =
          fun t v ->
           match (t, v) with
           | Item { schema; rest }, hd :: tl ->
