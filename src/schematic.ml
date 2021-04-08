@@ -1,13 +1,6 @@
 module Json = struct
   include Json
-
-  module Schema = struct
-    type t = Json_schema.json_schema
-
-    let of_schema = Json_schema.of_schema
-
-    let schema = Json_schema.json_schema_schema
-  end
+  module Schema = Json_schema
 end
 
 module Schema = struct

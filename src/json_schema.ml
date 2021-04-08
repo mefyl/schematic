@@ -1,107 +1,5 @@
 open Base
-open Schemas
-
-let ( % ) = Fn.compose
-
-type uri_reference = string
-
-and uri = string
-
-and type_ =
-  | Array
-  | Boolean
-  | Integer
-  | Null
-  | Number
-  | Object
-  | String
-  | OneOf of type_ list
-[@@deriving schema]
-
-type core = {
-  id : uri_reference option; [@schematic.as "$id"]
-  schema : uri option; [@schematic.as "$schema"]
-  anchor : string option; [@schematic.as "$anchor"]
-  ref : uri_reference option; [@schematic.as "$ref"]
-  recursive_ref : uri_reference option; [@schematic.as "$recursiveRef"]
-  recursive_anchor : bool option; [@schematic.as "$recursiveAnchor"]
-  vocabulary : (uri * bool) list option; [@schematic.as "$vocabulary"]
-  comment : string option; [@schematic.as "$comment"]
-  defs : (string * json_schema) list option;
-      [@schematic.as "$defs"] [@schematic.default []]
-}
-
-and additional_properties =
-  | Properties_schema of json_schema
-  | Allowed of bool
-
-and items =
-  | Items_schema of json_schema
-  | Tuple_schema of json_schema list
-
-and applicator = {
-  additionalItems : json_schema option;
-  unevaluatedItems : json_schema option;
-  items : items option;
-  contains : json_schema option;
-  additionalProperties : additional_properties option;
-  unevaluatedProperties : json_schema option;
-  properties : (string * json_schema) list option;
-  patternProperties : (string * json_schema) list option;
-  dependentSchema : (string * json_schema) list option;
-  propertyNames : json_schema option;
-  if_ : json_schema option;
-  then_ : json_schema option;
-  else_ : json_schema option;
-  not : json_schema option;
-  allOf : json_schema list option;
-  anyOf : json_schema list option;
-  oneOf : json_schema list option;
-}
-
-and validation = {
-  multipleOf : int option; [@schematic.properties { minimum = 1 }]
-  maximum : int option;
-  exclusiveMaximum : int option;
-  minimum : int option;
-  exclusiveMinimum : int option;
-  maxLength : int option; [@schematic.properties { minimum = 0 }]
-  minLength : int option;
-      [@schematic.default 0] [@schematic.properties { minimum = 0 }]
-  pattern : string option;
-  maxItems : int option; [@schematic.properties { minimum = 0 }]
-  minItems : int option; [@default 0] [@schematic.properties { minimum = 0 }]
-  uniqueItems : bool option; [@schematic.default false]
-  maxContains : int option; [@schematic.properties { minimum = 0 }]
-  minContains : int option; [@default 0] [@schematic.properties { minimum = 1 }]
-  maxProperties : int option; [@schematic.properties { minimum = 0 }]
-  minProperties : int option;
-      [@schematic.properties { minimum = 0 }] [@default 0]
-  required : string list option;
-      [@schematic.properties { unique = true }] [@default []]
-  dependentRequired : (string * string list) list option;
-  const : any option;
-  enum : any list option;
-  type_ : (type_, type_ list) Either.t option;
-}
-
-and metadata = {
-  title : string option;
-  description : string option;
-  default : any option;
-  deprecated : bool; [@schematic.default false]
-  readOnly : bool; [@schematic.default false]
-  writeOnly : bool; [@schematic.default false]
-  examples : any list; [@schematic.default []]
-}
-
-and json_schema = {
-  applicator : applicator; [@schematic.inline]
-  core : core; [@schematic.inline]
-  metadata : metadata; [@schematic.inline]
-  validation : validation; [@schematic.inline]
-}
-[@@deriving schema]
+include Json_schema_intf
 
 let applicator_empty =
   {
@@ -172,7 +70,7 @@ let validation_empty =
     type_ = None;
   }
 
-let json_schema_empty =
+let empty =
   {
     applicator = applicator_empty;
     core = core_empty;
@@ -186,20 +84,16 @@ type date_tuple = int * int * int [@@deriving schema]
 
 let of_schema schema =
   let id_name s = "#" ^ s in
-  let rec of_schema : type t. ids -> t Schema.t -> ids * json_schema =
+  let rec of_schema : type u. ids -> u Schema.t -> ids * t =
    fun marks -> function
     | { id = None; descriptor } -> of_descriptor marks descriptor
     | { id = Some id; descriptor = _ } when Set.mem marks id ->
-      ( marks,
-        {
-          json_schema_empty with
-          core = { core_empty with ref = Some (id_name id) };
-        } )
+      (marks, { empty with core = { core_empty with ref = Some (id_name id) } })
     | { id = Some id; descriptor } ->
       let marks = Set.add marks id in
       let marks, schema = of_descriptor marks descriptor in
       (marks, { schema with core = { schema.core with id = Some (id_name id) } })
-  and of_descriptor : type t. ids -> t Schema.descriptor -> ids * json_schema =
+  and of_descriptor : type u. ids -> u Schema.descriptor -> ids * t =
    fun marks schema ->
     let rec validation : type t. t Schema.descriptor -> validation = function
       | Schema.Any -> validation_empty
@@ -250,7 +144,7 @@ let of_schema schema =
         { validation_empty with type_ = Some (Either.first Array) }
       | Schema.Union _ -> validation_empty
     and applicator :
-        type t. ids -> t Schema.descriptor -> ids * applicator option =
+        type u. ids -> u Schema.descriptor -> ids * applicator option =
      fun marks -> function
       | Schema.Any -> (marks, Some applicator_empty)
       | Schema.Bool -> (marks, Some applicator_empty)
@@ -282,8 +176,7 @@ let of_schema schema =
       | Schema.Time_local -> (marks, Some applicator_empty)
       | Schema.Object o ->
         let rec get_fields :
-            type t.
-            ids -> t Schema.field -> ids * (string * json_schema) list option =
+            type u. ids -> u Schema.field -> ids * (string * t) list option =
          fun marks -> function
           | Schema.FieldEnd -> (marks, None)
           | Schema.Field
@@ -307,16 +200,16 @@ let of_schema schema =
                   (marks, Option.value ~default:[] applicator.properties)
                 | marks, None -> (marks, [])
               else
-                let marks, json_schema = of_schema marks schema
+                let marks, t = of_schema marks schema
                 and to_json v = Json.to_ezjsonm @@ Json.encode schema v in
                 ( marks,
                   [
                     ( field,
                       {
-                        json_schema with
+                        t with
                         metadata =
                           {
-                            json_schema.metadata with
+                            t.metadata with
                             default =
                               (match requirement with
                               | Schema.Default v -> Some (to_json v)
@@ -328,8 +221,7 @@ let of_schema schema =
                                    title);
                             examples = List.map ~f:to_json examples;
                           };
-                        validation =
-                          { json_schema.validation with maximum; minimum };
+                        validation = { t.validation with maximum; minimum };
                       } );
                   ] )
             in
@@ -346,8 +238,8 @@ let of_schema schema =
               additionalProperties = Some (Allowed false);
             } )
       | Schema.Tuple items ->
-        let rec tuple_applicator :
-            type t. ids -> t Schema.tuple -> ids * json_schema list =
+        let rec tuple_applicator : type u. ids -> u Schema.tuple -> ids * t list
+            =
          fun marks -> function
           | Schema.ItemEnd -> (marks, [])
           | Schema.Item { schema; rest } ->
