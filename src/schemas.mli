@@ -1,30 +1,30 @@
-val bool_schema : bool Schema.t
-
-val int_schema : int Schema.t
-
-val int64_schema : int64 Schema.t
-
-val float_schema : float Schema.t
-
-val list_schema : 'a Schema.t -> 'a list Schema.t
-
-val option_schema : 'a Schema.t -> 'a option Schema.t
-
-val mapping_schema : 'a Schema.t -> (string * 'a) list Schema.t
-
-val string_schema : string Schema.t
-
-val string_const_schema : string -> unit Schema.t
-
-val unit_schema : unit Schema.t
-
 type any = Ezjsonm.value
-
-val any_schema : any Schema.t
 
 type ignore = unit
 
+val any_schema : any Schema.t
+
+val bool_schema : bool Schema.t
+
+val float_schema : float Schema.t
+
 val ignore_schema : ignore Schema.t
+
+val int64_schema : int64 Schema.t
+
+val int_schema : int Schema.t
+
+val list_schema : 'a Schema.t -> 'a list Schema.t
+
+val mapping_schema : 'a Schema.t -> (string * 'a) list Schema.t
+
+val option_schema : 'a Schema.t -> 'a option Schema.t
+
+val string_const_schema : string -> unit Schema.t
+
+val string_schema : string Schema.t
+
+val unit_schema : unit Schema.t
 
 module Either : sig
   include module type of Base.Either

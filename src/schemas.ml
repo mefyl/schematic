@@ -1,34 +1,32 @@
 open Base
 
-module Schemas = struct
-  let unit_schema = { Schema.id = None; descriptor = Null }
-
-  let ignore_schema = { Schema.id = None; descriptor = Ignore }
-
-  let int_schema = { Schema.id = None; descriptor = Int }
-
-  let int64_schema = { Schema.id = None; descriptor = Int64 }
-
-  let float_schema = { Schema.id = None; descriptor = Float }
-
-  let option_schema s = { Schema.id = None; descriptor = Nullable s }
-
-  let string_schema = { Schema.id = None; descriptor = String }
-
-  let string_const_schema s = { Schema.id = None; descriptor = String_const s }
-
-  let bool_schema = { Schema.id = None; descriptor = Bool }
-
-  let list_schema schema = { Schema.id = None; descriptor = List schema }
-
-  let mapping_schema schema = { Schema.id = None; descriptor = Mapping schema }
-end
-
 type ignore = unit
 
 type any = Ezjsonm.value
 
 let any_schema = { Schema.id = None; descriptor = Any }
+
+let bool_schema = { Schema.id = None; descriptor = Bool }
+
+let float_schema = { Schema.id = None; descriptor = Float }
+
+let ignore_schema = { Schema.id = None; descriptor = Ignore }
+
+let int64_schema = { Schema.id = None; descriptor = Int64 }
+
+let int_schema = { Schema.id = None; descriptor = Int }
+
+let list_schema schema = { Schema.id = None; descriptor = List schema }
+
+let mapping_schema schema = { Schema.id = None; descriptor = Mapping schema }
+
+let option_schema s = { Schema.id = None; descriptor = Nullable s }
+
+let string_const_schema s = { Schema.id = None; descriptor = String_const s }
+
+let string_schema = { Schema.id = None; descriptor = String }
+
+let unit_schema = { Schema.id = None; descriptor = Null }
 
 module Ptime = struct
   include Ptime
@@ -62,7 +60,6 @@ module Uri = struct
     }
 end
 
-include Schemas
 include Schemas_intf
 
 let bool_diff l r = Option.some_if (not @@ Bool.equal l r) r
