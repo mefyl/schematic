@@ -11,16 +11,16 @@
  (action
   (run ./test.exe)))
 
-(test
- (name json)
- (modules json)
+(tests
+ (names json typescript)
+ (modules json typescript)
  (preprocess
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
  (libraries alcotest schematic))
 
 (test
- (name typescript)
- (modules typescript)
+ (name jsoo)
+ (modules jsoo)
  (preprocess
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
- (libraries alcotest schematic))
+ (libraries alcotest schematic schematic_jsoo))

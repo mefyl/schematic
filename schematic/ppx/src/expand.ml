@@ -84,10 +84,6 @@ module Expr = struct
         pexp_loc_stack = [];
         pexp_attributes = [];
       }
-
-  let fun_ ~loc args body =
-    let f body arg = pexp ~loc ~desc:(Pexp_fun (Nolabel, None, arg, body)) in
-    List.fold ~init:body ~f args
 end
 
 module Pattern = struct
@@ -134,7 +130,7 @@ module Warning = struct
       attr_loc = loc;
     }
 
-  let unused_rec ~loc = make ~loc "-39"
+  let _unused_rec ~loc = make ~loc "-39"
 end
 
 (* Caml variant constructor of the form [Foo of int * int] surprisingly do not
@@ -282,13 +278,6 @@ let rename name =
   else
     name
 
-let suffix suffix s =
-  let s = rename s in
-  if s = "t" then
-    suffix
-  else
-    s ^ "_" ^ suffix
-
 let name suffix s =
   let s = rename s in
   if s = "t" then
@@ -360,9 +349,6 @@ let suffix_id ~loc suffix = function
   | Ldot (q, n) -> Ldot (q, name suffix n)
   | Lapply (_, _) ->
     Ppxlib.Location.raise_errorf ~loc "Functor application found as a type"
-
-let suffix_id_loc suffix ({ txt; loc } as id) =
-  { id with txt = suffix_id ~loc suffix txt }
 
 let schema_id ~loc = suffix_id ~loc "schema"
 
@@ -1208,129 +1194,6 @@ module Jsoo_type : EXPANSION = struct
     in
     { pstr_desc = Pstr_type (Recursive, items); pstr_loc = loc }
     :: List.map ~f:converters items
-end
-
-module type FUNCTION_EXPANSION = sig
-  val name : string
-
-  val expand_composite :
-    loc:location ->
-    name:string ->
-    kind:type_kind ->
-    ((int -> pattern) -> pattern) ->
-    ((int -> expression -> expression) -> expression) ->
-    expression
-
-  val expand_variant :
-    loc:location ->
-    name:string ->
-    (constructor_declaration
-    * (expression
-      * int
-      * ((int -> pattern) -> pattern)
-      * ((int -> expression -> expression) -> expression))
-      option)
-    list ->
-    expression
-end
-
-module FunctionExpansion (F : FUNCTION_EXPANSION) : EXPANSION = struct
-  type closed = pattern * expression
-
-  type expanded = expression
-
-  let rec expand_type ~context t =
-    let loc = t.ptyp_loc in
-    match t.ptyp_desc with
-    | Ptyp_constr (idt, params) ->
-      let params = List.map ~f:(expand_type ~context) params
-      and f = pexp ~loc ~desc:(Pexp_ident (suffix_id_loc F.name idt)) in
-      Expr.apply ~loc f params
-    | Ptyp_tuple types ->
-      let fs = List.map ~f:(expand_type ~context) types in
-      let pattern f = Pattern.tuple ~loc (List.mapi ~f:(fun i _ -> f i) fs)
-      and value f = Expr.tuple ~loc (List.mapi ~f fs) in
-      F.expand_composite ~loc ~name:context.type_ ~kind:Ptype_abstract pattern
-        value
-    | Ptyp_var name -> pexp ~loc ~desc:(Pexp_ident { txt = Lident name; loc })
-    | _ ->
-      Ppxlib.Location.raise_errorf ~loc:t.ptyp_loc
-        "schematic-ppx: unsupported type"
-
-  let expand_record ~loc ~context fields =
-    let fs =
-      List.map
-        ~f:(fun ({ pld_type; _ } as f) -> (f, expand_type ~context pld_type))
-        fields
-    in
-    let pattern f =
-      ppat ~loc
-        ~desc:
-          (Ppat_record
-             ( List.mapi
-                 ~f:(fun i v -> ({ txt = Lident v.pld_name.txt; loc }, f i))
-                 fields,
-               Closed ))
-    and value f =
-      pexp ~loc
-        ~desc:
-          (Pexp_record
-             ( List.mapi
-                 ~f:(fun i (field, v) ->
-                   ({ txt = Lident field.pld_name.txt; loc }, f i v))
-                 fs,
-               None ))
-    in
-    F.expand_composite ~loc ~name:context.type_ ~kind:(Ptype_record []) pattern
-      value
-
-  let expand_variant ~loc ~context constructors =
-    let f ({ pcd_args; _ } as ctor) =
-      let pld =
-        match constructor_arguments_normalize ~loc pcd_args with
-        | None -> None
-        | Some
-            {
-              count = l;
-              ctor_pattern = pattern;
-              ctor_value = value;
-              type_ = t;
-              _;
-            } ->
-          let value f = value (fun i t -> f i (expand_type ~context t)) in
-          Some (expand_type ~context t, l, pattern, value)
-      in
-      (ctor, pld)
-    in
-    F.expand_variant ~loc ~name:context.type_ (List.map ~f constructors)
-
-  let expand_abstract_type ~loc:_ ~context t = expand_type ~context t
-
-  let close ~loc ~context:_ { ptype_name = n; ptype_params = params; _ } _ f =
-    let args =
-      let f (t, _) =
-        match t.ptyp_desc with
-        | Ptyp_var name -> ppat ~loc ~desc:(Ppat_var { txt = name; loc })
-        | _ ->
-          Ppxlib.Location.raise_errorf ~loc
-            "schematic-ppx: unsupported type parameter"
-      in
-      List.map ~f params
-    in
-    (Pattern.id ~loc @@ suffix F.name n.txt, Expr.fun_ ~loc args f)
-
-  let combine ~loc decls =
-    let f (name, f) =
-      {
-        pvb_pat = name;
-        pvb_expr = f;
-        pvb_attributes = [ Warning.unused_rec ~loc ];
-        pvb_loc = loc;
-      }
-    in
-    [
-      { pstr_desc = Pstr_value (Recursive, List.map ~f decls); pstr_loc = loc };
-    ]
 end
 
 module Expander (Expansion : EXPANSION) = struct
