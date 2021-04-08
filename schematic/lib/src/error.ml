@@ -25,6 +25,7 @@ type 'formats t =
   [ `Decoding of 'formats * decoding
   | `Parsing of parsing
   ]
+[@@deriving eq]
 
 let of_decoding fmt e = `Decoding (fmt, e)
 
@@ -35,10 +36,3 @@ let pp fmt = function
   | `Decoding (_, e) -> pp_decoding fmt e
 
 let to_string e = Fmt.str "%a" pp e
-
-let equal a b =
-  match (a, b) with
-  | `Decoding (_, a), `Decoding (_, b) -> equal_decoding a b
-  | `Parsing a, `Parsing b -> equal_parsing a b
-  | `Decoding _, `Parsing _ -> false
-  | `Parsing _, `Decoding _ -> false
