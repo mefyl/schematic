@@ -1,7 +1,7 @@
 (executable
  (name test)
  (modes js)
- (libraries js_of_ocaml schematic schematic.schematic_jsoo)
+ (libraries js_of_ocaml schematic schematic-jsoo)
  (preprocess
   (pps schematic.ppx js_of_ocaml-ppx)))
 

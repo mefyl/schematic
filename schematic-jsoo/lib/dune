@@ -1,0 +1,8 @@
+(include_subdirs unqualified)
+
+(library
+ (name schematic_jsoo)
+ (public_name schematic-jsoo)
+ (libraries base ezjsonm fmt js_of_ocaml ptime schematic stdio uri)
+ (preprocess
+  (pps js_of_ocaml-ppx ppx_here schematic_ppx_inside)))

@@ -1,3 +1,5 @@
+(include_subdirs unqualified)
+
 (library
  (name schematic_ppx_expand)
  (modules expand)
@@ -25,6 +27,7 @@
 
 (executable
  (name pp)
+ (package schematic)
  (public_name schematic-ppx)
  (modules pp)
  (preprocess

@@ -18,23 +18,15 @@
  (synopsis "Derive schemas from Ocaml types")
  (depends
   (alcotest
-   (or
-    (and
-     (>= 1.1.0)
-     :with-test)
-    (and
-     (>= 1.1.0)
-     :dev)))
+   (and
+    (>= 1.1.0)
+    :with-test))
   (base
    (>= 0.13.1))
   (dune
    (>= 2.7))
   (ezjsonm
    (>= 1.1.0))
-  (js_of_ocaml
-   (>= 3.6.0))
-  (js_of_ocaml-ppx
-   (>= 3.6.0))
   (merlin :dev)
   (ocamlformat
    (and
@@ -43,10 +35,24 @@
   (ocaml-base-compiler
    (>= 4.12.0))
   fmt
-  logs
   ppxlib
   (ppx_deriving :with-test)
   ppx_here
   (ptime
    (>= 0.8.5))
   uri))
+
+(package
+ (name schematic-jsoo)
+ (synopsis "Derive js_of_ocaml types and values from Ocaml types")
+ (depends
+  (alcotest
+   (and
+    (>= 1.1.0)
+    :with-test))
+  (js_of_ocaml
+   (>= 3.6.0))
+  (js_of_ocaml-ppx
+   (>= 3.6.0))
+  (schematic
+   (= :version))))
