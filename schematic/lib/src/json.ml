@@ -22,7 +22,7 @@ module Json_coding : Coding.S with type t = Ezjsonm.value = struct
     | `Null -> true
     | _ -> false
 
-  let null = `Null
+  let null () = `Null
 
   let of_bool b = `Bool b
 

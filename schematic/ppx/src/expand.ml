@@ -404,6 +404,8 @@ let specs_empty =
 module type EXPANSION = sig
   type closed
 
+  type configuration
+
   type expanded
 
   val close :
@@ -414,7 +416,8 @@ module type EXPANSION = sig
     expanded ->
     closed
 
-  val combine : loc:location -> closed list -> structure_item list
+  val combine :
+    loc:location -> configuration -> closed list -> structure_item list
 
   val expand_abstract_type :
     loc:location -> context:context -> core_type -> expanded
@@ -426,8 +429,10 @@ module type EXPANSION = sig
     loc:location -> context:context -> constructor_declaration list -> expanded
 end
 
-module Schema : EXPANSION = struct
+module Schema = struct
   type closed = value_binding
+
+  type configuration = unit
 
   type expanded = expression
 
@@ -949,12 +954,14 @@ module Schema : EXPANSION = struct
     in
     body
 
-  let combine ~loc expanded =
+  let combine ~loc () expanded =
     [ { pstr_desc = Pstr_value (Recursive, expanded); pstr_loc = loc } ]
 end
 
-module Jsoo_type : EXPANSION = struct
+module Jsoo_type = struct
   type closed = type_declaration
+
+  type configuration = { functions : bool }
 
   type expanded = core_type
 
@@ -1064,7 +1071,7 @@ module Jsoo_type : EXPANSION = struct
       ptype_attributes = [];
     }
 
-  let combine ~loc items =
+  let combine ~loc { functions } items =
     let converters { ptype_name = { txt; _ }; ptype_params; _ } =
       let name s =
         let prefix = String.sub ~pos:0 ~len:(String.length txt - 2) txt in
@@ -1173,13 +1180,15 @@ module Jsoo_type : EXPANSION = struct
           and of_js = [%e of_js] in
           let of_js_exn = [%e of_js_exn] in
           (to_js, of_js, of_js_exn)]
-    in
-    { pstr_desc = Pstr_type (Recursive, items); pstr_loc = loc }
-    :: List.map ~f:converters items
+    and type_ = { pstr_desc = Pstr_type (Recursive, items); pstr_loc = loc } in
+    if functions then
+      type_ :: List.map ~f:converters items
+    else
+      [ type_ ]
 end
 
 module Expander (Expansion : EXPANSION) = struct
-  let expand ~loc recursive t =
+  let expand ~loc configuration recursive t =
     let names =
       let f { ptype_name; _ } = ptype_name.txt in
       if recursive then
@@ -1221,7 +1230,7 @@ module Expander (Expansion : EXPANSION) = struct
       Expansion.close ~loc ~context t t.ptype_params body
     in
     let expanded = List.map ~f t in
-    Expansion.combine ~loc expanded
+    Expansion.combine ~loc configuration expanded
 end
 
 module Jsoo_type_expander = Expander (Jsoo_type)
@@ -1232,12 +1241,22 @@ let expand ~loc ~path:_ ~inside (r, types) jsoo =
   let contents =
     let contents = [] in
     let contents =
-      if jsoo then
-        contents @ Jsoo_type_expander.expand ~loc r types
-      else
+      match jsoo with
+      | None -> contents
+      | Some [%expr jsoo]
+      | Some [%expr true] ->
         contents
+        @ Jsoo_type_expander.expand ~loc Jsoo_type.{ functions = true } r types
+      | Some [%expr false] ->
+        contents
+        @ Jsoo_type_expander.expand ~loc Jsoo_type.{ functions = false } r types
+      | Some exp ->
+        Ppxlib.Location.raise_errorf ~loc
+          "schematic-ppx: invalid ~jsoo argument value: %a" Pprintast.expression
+          exp
     in
-    Schema_expander.expand ~loc r types @ contents
+
+    Schema_expander.expand ~loc () r types @ contents
   and namespace =
     if inside then
       [%str
@@ -1251,9 +1270,9 @@ let expand ~loc ~path:_ ~inside (r, types) jsoo =
 
         let _ = unit_schema]
   and jsoo =
-    if jsoo then
+    if Option.is_some jsoo then
       [%str
-        open Schematic_jsoo.Jsoo
+        open Schematic_jsoo.Schemas
 
         let _ = fun (_ : int_js) -> ()]
     else
@@ -1265,7 +1284,7 @@ let add inside =
   let str_type_decl =
     let open Deriving.Args in
     let arg =
-      let jsoo = flag "jsoo" in
+      let jsoo = arg "jsoo" __ in
       empty +> jsoo
     in
     Deriving.Generator.make ~attributes:[] arg (expand ~inside)

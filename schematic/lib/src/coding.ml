@@ -40,7 +40,7 @@ module type S = sig
 
   val is_null : t -> bool
 
-  val null : t
+  val null : unit -> t
 
   val of_bool : bool -> t
 
@@ -289,16 +289,16 @@ module Make (Coding : S) = struct
       | Bool -> Coding.of_bool v
       | Date -> encode date_tuple_schema.descriptor v
       | Float -> Coding.of_float v
-      | Ignore -> Coding.null
+      | Ignore -> Coding.null ()
       | Int -> Coding.of_int v
       | Int64 -> Coding.of_int64 v
       | List items_schema ->
         Coding.of_list (List.map ~f:(encode items_schema.descriptor) v)
       | Map (_, decons, schema) -> encode schema @@ decons v
-      | Null -> Coding.null
+      | Null -> Coding.null ()
       | Nullable s -> (
         match v with
-        | None -> Coding.null
+        | None -> Coding.null ()
         | Some v -> encode s.descriptor v)
       | Mapping fields_schema ->
         Coding.of_fields
