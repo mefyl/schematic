@@ -18,12 +18,18 @@ type 'a customizable =
   | `Custom of 'a
   ]
 
-type 't set_key = ('t -> string -> 't -> ('t, string) Result.t) customizable
+type 't key_get = ('t -> string -> ('t option, string) Result.t) customizable
+
+type 't key_set = ('t -> string -> 't -> ('t, string) Result.t) customizable
 
 module type S = sig
   type t
 
   val is_null : t -> bool
+
+  val key_get : t key_get
+
+  val key_set : t key_set
 
   val null : unit -> t
 
@@ -46,8 +52,6 @@ module type S = sig
   val of_time : Ptime.t -> t
 
   val of_time_local : Ptime.t * int -> t
-
-  val set_key : t set_key
 
   val to_bool : t -> bool option
 
@@ -90,8 +94,16 @@ module Make (Coding : S) = struct
       Result.fail @@ fail id ids "%s"
       @@ type_error expected (Coding.type_name v)
 
-  let set_key schema path o f v =
-    match Coding.set_key with
+  let key_get schema path o f =
+    match Coding.key_get with
+    | `Custom impl ->
+      impl o f |> Result.map_error ~f:(fun reason -> E.{ path; schema; reason })
+    | `Generic ->
+      let* fields = Coding.to_fields o |> type_error schema path "object" o in
+      List.Assoc.find ~equal:String.equal fields f |> Result.return
+
+  let key_set schema path o f v =
+    match Coding.key_set with
     | `Custom impl ->
       impl o f v
       |> Result.map_error ~f:(fun reason -> E.{ path; schema; reason })
@@ -233,25 +245,22 @@ module Make (Coding : S) = struct
       | Union { cases; key } -> (
         let conv (Schema.Case { decoder; name; schema; _ }) =
           let key =
-            match key with
-            | None -> true
-            | Some key -> (
-              match Coding.to_fields v with
-              | Some fields -> (
-                match
-                  List.Assoc.find fields ~equal:String.equal key
-                  |> Option.bind ~f:Coding.to_string
-                with
-                | Some n -> String.(n = name)
-                | _ -> false)
-              | _ -> false)
+            let ( let* ) = Option.( >>= ) in
+            let* key = key in
+            let* v =
+              match key_get id ids v key with
+              | Result.Error _ -> None
+              | Result.Ok v -> v
+            in
+            let* s = Coding.to_string v in
+            Some String.(s = name)
           in
-          if key then
+          match key with
+          | Some false -> None
+          | _ -> (
             match decode schema.id ids schema.descriptor v with
             | Result.Ok v -> Some (decoder v)
-            | Result.Error _ -> None
-          else
-            None
+            | Result.Error _ -> None)
         in
         match List.find_map ~f:conv cases with
         | Some res -> Result.return res
@@ -335,7 +344,7 @@ module Make (Coding : S) = struct
             match key with
             | Some key -> (
               match
-                set_key None [ (* FIXME: context *) ] v key
+                key_set None [ (* FIXME: context *) ] v key
                   (Coding.of_string name)
               with
               | Result.Ok v -> Some v

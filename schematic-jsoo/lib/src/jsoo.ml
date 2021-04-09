@@ -24,14 +24,26 @@ module Jsoo_coding : Schematic.Coding.S with type t = Js.Unsafe.any = struct
 
   let type_name o = Js_of_ocaml.Js.typeof o |> Js.to_string
 
-  let set_key =
+  let key_get =
+    let f o f =
+      try
+        if Js_of_ocaml.Js.typeof o == Js.string "object" then
+          Js.Unsafe.get o (Js.string f) |> Js.Optdef.to_option |> Result.return
+        else
+          Result.fail "null or undefined"
+      with
+      | _ -> Result.fail @@ Schematic.Coding.type_error "object" (type_name o)
+    in
+    `Custom f
+
+  let key_set =
     let f o f v =
       try
         if Js_of_ocaml.Js.typeof o == Js.string "object" then
           let () = Js.Unsafe.set o (Js.string f) v in
           Result.return o
         else
-          failwith "null or undefined"
+          Result.fail "null or undefined"
       with
       | _ -> Result.fail @@ Schematic.Coding.type_error "object" (type_name o)
     in

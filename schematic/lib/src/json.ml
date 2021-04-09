@@ -4,7 +4,9 @@ include Json_intf
 module Json_coding : Coding.S with type t = Ezjsonm.value = struct
   type t = Ezjsonm.value
 
-  let set_key = `Generic
+  let key_get = `Generic
+
+  let key_set = `Generic
 
   let type_name = function
     | `O _ -> "object"
