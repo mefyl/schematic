@@ -358,7 +358,7 @@ let expr_option ~loc expr = function
 
 module Source = struct
   (** Where a configuration item came from: generic attributes versus schematic
-      specific (eg. @default vs @schematic.default) *)
+      specific (eg. \@default vs \@schematic.default) *)
   type 'a t =
     | Generic of 'a
     | Schematic of 'a
