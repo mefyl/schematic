@@ -87,6 +87,16 @@ let fail id ids fmt =
 let type_error expected effective =
   Fmt.str "expected %s, got %s" expected effective
 
+module Defaults = struct
+  let key_get = `Generic
+
+  let key_set = `Generic
+
+  let of_date = `Generic
+
+  let to_date = `Generic
+end
+
 module Make (Coding : S) = struct
   type date_tuple = int * int * int [@@deriving schema]
 

@@ -4,9 +4,7 @@ include Json_intf
 module Json_coding : Coding.S with type t = Ezjsonm.value = struct
   type t = Ezjsonm.value
 
-  let key_get = `Generic
-
-  let key_set = `Generic
+  include Coding.Defaults
 
   let type_name = function
     | `O _ -> "object"
@@ -27,8 +25,6 @@ module Json_coding : Coding.S with type t = Ezjsonm.value = struct
   let null () = `Null
 
   let of_bool b = `Bool b
-
-  let of_date = `Generic
 
   let of_fields f = `O f
 
@@ -51,8 +47,6 @@ module Json_coding : Coding.S with type t = Ezjsonm.value = struct
   let to_bool = function
     | `Bool v -> Some v
     | _ -> None
-
-  let to_date = `Generic
 
   let to_fields = function
     | `O fields -> Some fields
