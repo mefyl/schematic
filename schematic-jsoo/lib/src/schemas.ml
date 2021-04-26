@@ -11,13 +11,13 @@ type unit_js = Js.Unsafe.any Js.Opt.t
 type ignore_js = Js.Unsafe.any
 
 module Either = struct
-  include Either
+  include Schematic.Schema.Schemas.Either
 
   type (_, _) js = Js.Unsafe.any
 end
 
 module Ptime = struct
-  include Ptime
+  include Schematic.Schema.Schemas.Ptime
 
   type js = Js.date Js.t
 
@@ -27,7 +27,7 @@ module Ptime = struct
 end
 
 module Uri = struct
-  include Uri
+  include Schematic.Schema.Schemas.Uri
 
   type js = Js.js_string Js.t
 end
