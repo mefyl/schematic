@@ -35,6 +35,8 @@ module type S = sig
 
   val of_bool : bool -> t
 
+  val of_date : (Ptime.date -> t) customizable
+
   val of_fields : (string * t) list -> t
 
   val of_float : float -> t
@@ -54,6 +56,8 @@ module type S = sig
   val of_time_local : Ptime.t * int -> t
 
   val to_bool : t -> bool option
+
+  val to_date : (t -> Ptime.date option) customizable
 
   val to_fields : t -> (string * t) list option
 
@@ -162,7 +166,10 @@ module Make (Coding : S) = struct
       match schema with
       | Any -> Result.return (Coding.to_json v)
       | Bool -> Coding.to_bool v |> type_error "boolean"
-      | Date -> decode None ids date_tuple_schema.descriptor v
+      | Date -> (
+        match Coding.to_date with
+        | `Generic -> decode None ids date_tuple_schema.descriptor v
+        | `Custom f -> f v |> type_error "date")
       | Float -> Coding.to_float v |> type_error "float"
       | Ignore -> Result.return ()
       | Int -> Coding.to_int v |> type_error "integer"
@@ -283,7 +290,10 @@ module Make (Coding : S) = struct
       match schema with
       | Any -> Coding.of_json v
       | Bool -> Coding.of_bool v
-      | Date -> encode date_tuple_schema.descriptor v
+      | Date -> (
+        match Coding.of_date with
+        | `Generic -> encode date_tuple_schema.descriptor v
+        | `Custom f -> f v)
       | Float -> Coding.of_float v
       | Ignore -> Coding.null ()
       | Int -> Coding.of_int v

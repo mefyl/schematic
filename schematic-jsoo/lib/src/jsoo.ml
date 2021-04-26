@@ -3,15 +3,20 @@ open Base
 open Js_of_ocaml
 include Schematic.Schema.Schemas
 
-let date_of_js (date : Js.date Js.t) =
-  (date##getFullYear, date##getMonth + 1, date##getDate)
+let date_of_js (date : Js.Unsafe.any) =
+  if Js.instanceof date Js.date_ms then
+    let (date : Js.date Js.t) = Js.Unsafe.coerce date in
+    Some (date##getFullYear, date##getMonth + 1, date##getDate)
+  else
+    None
 
 let ptime_of_js (date : Js.date Js.t) =
   match Ptime.of_float_s (date##getTime /. 1000.) with
   | Some time -> time
   | None -> failwith ("invalid time: " ^ Float.to_string date##getTime)
 
-let js_of_date (y, m, d) = new%js Js.date_day y (m - 1) d
+let js_of_date (y, m, d) : Js.Unsafe.any =
+  new%js Js.date_day y (m - 1) d |> Js.Unsafe.coerce
 
 let js_of_ptime t = new%js Js.date_fromTimeValue (Ptime.to_float_s t *. 1000.)
 
@@ -55,6 +60,8 @@ module Jsoo_coding : Schematic.Coding.S with type t = Js.Unsafe.any = struct
 
   let of_bool v = Js.Unsafe.coerce @@ Js.bool v
 
+  let of_date = `Custom js_of_date
+
   let of_fields fields =
     let res = Js.Unsafe.coerce (object%js end) in
     let () =
@@ -84,6 +91,8 @@ module Jsoo_coding : Schematic.Coding.S with type t = Js.Unsafe.any = struct
       Js.Unsafe.coerce v |> Js.to_bool |> Option.return
     else
       None
+
+  let to_date = `Custom date_of_js
 
   let to_fields o =
     let f key = (Js.to_string key, Js_of_ocaml.Js.Unsafe.get o key) in
