@@ -10,5 +10,7 @@ module Schema = struct
   module Schemas = Schemas
 end
 
+type 'a schema = 'a Schema.t
+
 module Coding = Coding
 module Typescript = Typescript
