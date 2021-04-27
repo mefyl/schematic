@@ -23,8 +23,6 @@
     :with-test))
   (base
    (>= 0.13.1))
-  (dune
-   (>= 2.7))
   (ezjsonm
    (>= 1.1.0))
   (merlin :dev)

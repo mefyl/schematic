@@ -7,9 +7,9 @@ license: "GPLv3"
 homepage: "https://github.com/mefyl/schematic"
 bug-reports: "https://github.com/mefyl/schematic/issues"
 depends: [
+  "dune" {>= "2.7"}
   "alcotest" {>= "1.1.0" & with-test}
   "base" {>= "0.13.1"}
-  "dune" {>= "2.7" & >= "2.7"}
   "ezjsonm" {>= "1.1.0"}
   "merlin" {dev}
   "ocamlformat" {= "0.17.0" & dev}
