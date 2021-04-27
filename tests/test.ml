@@ -12,9 +12,9 @@ let json_schema schema =
   Schematic.Json.Schema.of_schema schema
   |> Schematic.Json.encode Schematic.Json.Schema.schema
 
-let json = Alcotest.testable Schematic.Json.pp ( = )
+let json = Alcotest.testable Schematic.Json.pp Schematic.Json.equal
 
-let test name test schema value j =
+let test ?(validate = true) name test schema value j =
   let encoded = Schematic.Json.encode schema value in
   let j =
     match Schematic.Json.of_string j with
@@ -29,13 +29,14 @@ let test name test schema value j =
       Alcotest.fail
         (Fmt.str "JSON decode error: %a" Schematic.Error.pp_decoding e)
   in
-  let schema = json_schema schema in
-  let cmd =
-    Printf.sprintf "%s/validate-schema \"%s\" \"%s\"" root
-      (String.escaped @@ Schematic.Json.to_string @@ schema)
-      (String.escaped @@ Schematic.Json.to_string @@ encoded)
-  in
-  if Caml.Sys.command cmd <> 0 then Alcotest.check json name schema encoded
+  if validate then
+    let schema = json_schema schema in
+    let cmd =
+      Printf.sprintf "%s/validate-schema \"%s\" \"%s\"" root
+        (String.escaped @@ Schematic.Json.to_string @@ schema)
+        (String.escaped @@ Schematic.Json.to_string @@ encoded)
+    in
+    if Caml.Sys.command cmd <> 0 then Alcotest.check json name schema encoded
 
 (* Failure *)
 
@@ -392,6 +393,27 @@ let optional_inline () =
     }
     {|{"a":375,"b":376,"d":378,"c":377}|}
 
+(* FIXME: keyed unions *)
+
+type keyed =
+  | Paragraph of { content : string }
+  | Header of {
+      content : string;
+      level : int;
+    }
+[@@schematic.union_key "type"] [@@deriving eq, schema, show]
+
+let keyed () =
+  let tester = Alcotest.(testable pp_keyed equal_keyed) in
+  (* FIXME: we should validate but our json schema does not support keyed unions
+     yet *)
+  test ~validate:false "paragraph" tester keyed_schema
+    (Paragraph { content = "text" })
+    {| { "content": "text", "type": "paragraph" } |};
+  test ~validate:false "header" tester keyed_schema
+    (Header { content = "text"; level = 411 })
+    {| { "content": "text", "level": 411, "type": "header" } |}
+
 (* JSON Schema metadata *)
 
 module Metadata = struct
@@ -605,6 +627,7 @@ let () =
           test_case "json-schema-metadata-default" `Quick Metadata.default;
           test_case "failure" `Quick failure;
           test_case "optional-inline" `Quick optional_inline;
+          test_case "keyed" `Quick keyed;
         ] );
       ( "comparison",
         [

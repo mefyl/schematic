@@ -122,7 +122,7 @@ module Make (Coding : S) = struct
       impl o f v
       |> Result.map_error ~f:(fun reason -> E.{ path; schema; reason })
     | `Generic ->
-      let* fields = Coding.to_fields v |> type_error schema path "object" v in
+      let* fields = Coding.to_fields o |> type_error schema path "object" v in
       Result.return (Coding.of_fields @@ (f, v) :: fields)
 
   let decode schema =
