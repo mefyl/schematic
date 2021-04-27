@@ -13,6 +13,8 @@ module type S = sig
 
   val to_string : t -> string
 
+  val equal : t -> t -> bool
+
   val pp : Base.Formatter.t -> t -> unit
 
   val to_ezjsonm : t -> Ezjsonm.value
