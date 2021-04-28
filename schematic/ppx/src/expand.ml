@@ -805,7 +805,6 @@ module Schema = struct
     combinator ~loc fields field_name constructed deconstructed
       [%expr Object [%e fields_schema]]
 
-  (*here*)
   and expand_variant ~loc ~context options =
     let f
         {
@@ -837,16 +836,19 @@ module Schema = struct
         match constructor_arguments_normalize ~loc pcd_args with
         | None ->
           let schema =
-            let Attributes.{ alias; _ } =
-              Attributes.extract ~alias:true attrs
-            in
-            [%expr
-              {
-                Schema.id = None;
-                descriptor =
-                  String_const
-                    [%e Expr.string ~loc (Option.value ~default:name alias)];
-              }]
+            if Option.is_none context.attributes.union_key then
+              let Attributes.{ alias; _ } =
+                Attributes.extract ~alias:true attrs
+              in
+              [%expr
+                {
+                  Schema.id = None;
+                  descriptor =
+                    String_const
+                      [%e Expr.string ~loc (Option.value ~default:name alias)];
+                }]
+            else
+              [%expr { Schema.id = None; descriptor = Object FieldEnd }]
           in
           (schema, None, None, None, None)
         | Some { ctor_pattern; ctor_value; pattern; type_; value; _ } ->
@@ -907,8 +909,7 @@ module Schema = struct
             encoder = [%e construct];
             decoder = [%e destruct];
           }]
-    in
-    let key =
+    and key =
       match context.attributes.union_key with
       | None -> [%expr None]
       | Some name -> [%expr Some [%e Expr.string ~loc name]]
