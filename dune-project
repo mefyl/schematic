@@ -16,6 +16,8 @@
 (package
  (name schematic)
  (synopsis "Derive schemas from Ocaml types")
+ (description
+  "Schematic lets you derive type meta informations using a ppx_deriving\ndriver and provide functionalities on top of it:\n\n* Conversion to and from JSON.\n* Deduction of JSON schema specification.\n* Conversion to and from js_of_ocaml FFI using schematic-jsoo.\n* Deduction of typescript definitions.\n")
  (depends
   (alcotest
    (and
@@ -43,6 +45,8 @@
 (package
  (name schematic-jsoo)
  (synopsis "Derive js_of_ocaml types and values from Ocaml types")
+ (description
+  "Deduce js_of_ocaml FFI types\n and conversion functions from schematic type metadata.")
  (depends
   (alcotest
    (and
