@@ -1,4 +1,4 @@
-(lang dune 2.7)
+(lang dune 2.8)
 
 (name schematic)
 
@@ -10,8 +10,14 @@
 
 (authors "mefyl <mefyl@gruntech.org>")
 
+(version 0.1.0)
+
+(homepage https://gitlab.routine.co/routine/schematic)
+
+(bug_reports https://gitlab.routine.co/routine/schematic/-/issues)
+
 (source
- (github mefyl/schematic))
+ (uri git+https://gitlab.routine.co/routine/schematic.git))
 
 (package
  (name schematic)
@@ -36,7 +42,7 @@
    (>= 4.12.0))
   fmt
   ppxlib
-  (ppx_deriving :with-test)
+  ppx_deriving
   ppx_here
   (ptime
    (>= 0.8.5))

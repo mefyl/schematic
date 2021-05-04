@@ -19,6 +19,7 @@
 
 (library
  (name schematic_ppx_inside)
+ (package schematic)
  (modules ppx_inside)
  (kind ppx_deriver)
  (libraries ppxlib schematic_ppx_expand)
