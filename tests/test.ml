@@ -425,7 +425,7 @@ let keyed () =
     Alcotest.(
       check
         (result tester decoding_error)
-        "reject values if the key is missing"
+        "values are rejected if the key is missing"
         (make_error ~schema:"keyed" {|missing key field "type"|})
         (Schematic.Json.decode keyed_schema json))
   and () =
@@ -435,8 +435,16 @@ let keyed () =
     Alcotest.(
       check
         (result tester decoding_error)
-        "reject values if the key not recognized"
+        "values are rejected if the key not recognized"
         (make_error ~schema:"keyed" {|invalid key field "type" = "fumble"|})
+        (Schematic.Json.decode keyed_schema json))
+  and () =
+    let json = json_of_string {| { "type": "header", "content": "text" } |} in
+    Alcotest.(
+      check
+        (result tester decoding_error)
+        "errors are specific to the matched case schema"
+        (make_error ~schema:"keyed" {|missing required field "level"|})
         (Schematic.Json.decode keyed_schema json))
   in
   ()

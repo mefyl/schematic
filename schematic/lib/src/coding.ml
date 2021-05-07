@@ -261,41 +261,41 @@ module Make (Coding : S) = struct
         in
         decode_tuple items v
       | Union { cases; key } -> (
-        let* conv, error =
-          match key with
+        match key with
+        | None -> (
+          let conv (Schema.Case { decoder; schema; _ }) =
+            let id = Option.first_some schema.id id in
+            match decode id ids schema.descriptor v with
+            | Result.Ok v -> Some (decoder v)
+            | Result.Error _ -> None
+          in
+          match List.find_map ~f:conv cases with
+          | Some res -> Result.return res
+          | None -> Result.fail (error "no union case was matched"))
+        | Some key -> (
+          let* key_value =
+            let* v =
+              match key_get id ids v key with
+              | Result.Ok (Some v) -> Result.return v
+              | Result.Ok None ->
+                Result.Error (error "missing key field %S" key)
+              | Result.Error e -> Result.Error e
+            in
+            Coding.to_string v |> type_error "string"
+          in
+          let conv (Schema.Case { decoder; name; schema; _ }) =
+            let id = Option.first_some schema.id id in
+            if String.(name = key_value) then
+              Option.return
+              @@ let* v = decode id ids schema.descriptor v in
+                 Result.return (decoder v)
+            else
+              None
+          in
+          match List.find_map ~f:conv cases with
+          | Some res -> res
           | None ->
-            let conv (Schema.Case { decoder; schema; _ }) =
-              match decode schema.id ids schema.descriptor v with
-              | Result.Ok v -> Some (decoder v)
-              | Result.Error _ -> None
-            in
-            Result.return (conv, Result.fail (error "no union case was matched"))
-          | Some key ->
-            let* key_value =
-              let* v =
-                match key_get id ids v key with
-                | Result.Ok (Some v) -> Result.return v
-                | Result.Ok None ->
-                  Result.Error (error "missing key field %S" key)
-                | Result.Error e -> Result.Error e
-              in
-              Coding.to_string v |> type_error "string"
-            in
-            let conv (Schema.Case { decoder; name; schema; _ }) =
-              if String.(name = key_value) then
-                match decode schema.id ids schema.descriptor v with
-                | Result.Ok v -> Some (decoder v)
-                | Result.Error _ -> None
-              else
-                None
-            in
-            Result.return
-              ( conv,
-                Result.fail (error "invalid key field %S = %S" key key_value) )
-        in
-        match List.find_map ~f:conv cases with
-        | Some res -> Result.return res
-        | None -> error)
+            Result.fail (error "invalid key field %S = %S" key key_value)))
     in
     decode schema.Schema.id [] schema.descriptor
 
