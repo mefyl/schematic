@@ -609,8 +609,15 @@ module Error_messages = struct
         (Result.map_error ~f:Schematic.Error.to_string res))
 
   let missing () =
-    test "missing" recursive_schema {|{"value":0,"next":{"value":1,"next":{}}}|}
-      {|path next.next: schema recursive: missing required field "value"|}
+    let () =
+      test "missing fields are reported" recursive_schema
+        {|{"value":0,"next":{"value":1,"next":{}}}|}
+        {|path next.next: schema recursive: missing required field "value"|}
+    and () =
+      test "root error display no path" recursive_schema {|{}|}
+        {|schema recursive: missing required field "value"|}
+    in
+    ()
 
   let type_error () =
     test "missing" recursive_schema

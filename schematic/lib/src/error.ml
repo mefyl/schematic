@@ -6,10 +6,18 @@ type decoding = {
 [@@deriving eq]
 
 let pp_decoding formatter { path; schema; reason } =
+  let path =
+    match path with
+    | [] -> None
+    | _ -> Some (List.rev path)
+  in
   Fmt.(
-    pf formatter "path %a: %a%s"
-      (list ~sep:(const char '.') string)
-      (List.rev path)
+    pf formatter "%a%a%s"
+      (option
+         (const string "path "
+         ++ list ~sep:(const char '.') string
+         ++ const string ": "))
+      path
       (option (const string "schema " ++ string ++ const string ": "))
       schema reason)
 
