@@ -171,7 +171,9 @@ module Make (Coding : S) = struct
         (t, E.decoding) Result.t =
      fun id ids schema v ->
       let type_error expected res = type_error id ids expected v res
-      and error reason = E.{ path = ids; schema = id; reason }
+      and error reason =
+        let f reason = E.{ path = ids; schema = id; reason } in
+        Fmt.kstr f reason
       and ( >>= ) = Result.( >>= ) in
       match schema with
       | Any -> Result.return (Coding.to_json v)
@@ -239,11 +241,10 @@ module Make (Coding : S) = struct
       | String_const expected -> (
         match Coding.to_string v with
         | Some s when String.(s = expected) -> Result.return ()
-        | Some s ->
-          Result.fail (error @@ Fmt.str "expected %S, got %S" expected s)
+        | Some s -> Result.fail (error "expected %S, got %S" expected s)
         | None -> type_error "string" None)
-      | Time -> Coding.to_time v |> Result.map_error ~f:error
-      | Time_local -> Coding.to_time_local v |> Result.map_error ~f:error
+      | Time -> Coding.to_time v |> Result.map_error ~f:(error "%s")
+      | Time_local -> Coding.to_time_local v |> Result.map_error ~f:(error "%s")
       | Tuple items ->
         let* v = Coding.to_list v |> type_error "list" in
         let rec decode_tuple :
@@ -260,28 +261,41 @@ module Make (Coding : S) = struct
         in
         decode_tuple items v
       | Union { cases; key } -> (
-        let conv (Schema.Case { decoder; name; schema; _ }) =
-          let key =
-            let ( let* ) = Option.( >>= ) in
-            let* key = key in
-            let* v =
-              match key_get id ids v key with
-              | Result.Error _ -> None
-              | Result.Ok v -> v
-            in
-            let* s = Coding.to_string v in
-            Some String.(s = name)
-          in
+        let* conv, error =
           match key with
-          | Some false -> None
-          | _ -> (
-            match decode schema.id ids schema.descriptor v with
-            | Result.Ok v -> Some (decoder v)
-            | Result.Error _ -> None)
+          | None ->
+            let conv (Schema.Case { decoder; schema; _ }) =
+              match decode schema.id ids schema.descriptor v with
+              | Result.Ok v -> Some (decoder v)
+              | Result.Error _ -> None
+            in
+            Result.return (conv, Result.fail (error "no union case was matched"))
+          | Some key ->
+            let* key_value =
+              let* v =
+                match key_get id ids v key with
+                | Result.Ok (Some v) -> Result.return v
+                | Result.Ok None ->
+                  Result.Error (error "missing key field %S" key)
+                | Result.Error e -> Result.Error e
+              in
+              Coding.to_string v |> type_error "string"
+            in
+            let conv (Schema.Case { decoder; name; schema; _ }) =
+              if String.(name = key_value) then
+                match decode schema.id ids schema.descriptor v with
+                | Result.Ok v -> Some (decoder v)
+                | Result.Error _ -> None
+              else
+                None
+            in
+            Result.return
+              ( conv,
+                Result.fail (error "invalid key field %S = %S" key key_value) )
         in
         match List.find_map ~f:conv cases with
         | Some res -> Result.return res
-        | None -> Result.fail (error "no union case was matched"))
+        | None -> error)
     in
     decode schema.Schema.id [] schema.descriptor
 

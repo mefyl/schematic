@@ -14,13 +14,20 @@ let json_schema schema =
 
 let json = Alcotest.testable Schematic.Json.pp Schematic.Json.equal
 
+let make_error ?(path = []) ?schema reason =
+  Result.Error Schematic.Error.{ path; schema; reason }
+
+let decoding_error =
+  Alcotest.testable Schematic.Error.pp_decoding Schematic.Error.equal_decoding
+
+let json_of_string s =
+  match Schematic.Json.of_string s with
+  | Result.Ok parsed -> parsed
+  | Result.Error _ -> Alcotest.fail "invalid JSON expectation"
+
 let test ?(validate = true) name test schema value j =
   let encoded = Schematic.Json.encode schema value in
-  let j =
-    match Schematic.Json.of_string j with
-    | Result.Ok parsed -> parsed
-    | Result.Error _ -> Alcotest.fail "invalid JSON expectation"
-  in
+  let j = json_of_string j in
   Alcotest.check json name j encoded;
   let () =
     match Schematic.Json.decode schema j with
@@ -407,12 +414,34 @@ let keyed () =
   let tester = Alcotest.(testable pp_keyed equal_keyed) in
   (* FIXME: we should validate but our json schema does not support keyed unions
      yet *)
-  test ~validate:false "paragraph" tester keyed_schema
-    (Paragraph { content = "text" })
-    {| { "content": "text", "type": "paragraph" } |};
-  test ~validate:false "header" tester keyed_schema
-    (Header { content = "text"; level = 411 })
-    {| { "content": "text", "level": 411, "type": "header" } |}
+  let () =
+    test ~validate:false "paragraph" tester keyed_schema
+      (Paragraph { content = "text" })
+      {| { "content": "text", "type": "paragraph" } |}
+  and () =
+    test ~validate:false "header" tester keyed_schema
+      (Header { content = "text"; level = 411 })
+      {| { "content": "text", "level": 411, "type": "header" } |}
+  and () =
+    let json = json_of_string {| { "content": "text", "level": 411 } |} in
+    Alcotest.(
+      check
+        (result tester decoding_error)
+        "reject values if the key is missing"
+        (make_error ~schema:"keyed" {|missing key field "type"|})
+        (Schematic.Json.decode keyed_schema json))
+  and () =
+    let json =
+      json_of_string {| { "content": "text", "level": 411, "type": "fumble" } |}
+    in
+    Alcotest.(
+      check
+        (result tester decoding_error)
+        "reject values if the key not recognized"
+        (make_error ~schema:"keyed" {|invalid key field "type" = "fumble"|})
+        (Schematic.Json.decode keyed_schema json))
+  in
+  ()
 
 (* JSON Schema metadata *)
 
