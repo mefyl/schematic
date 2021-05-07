@@ -833,21 +833,17 @@ module Schema = struct
 
   and expand_any_variant ~loc ~context poly options =
     let f (txt, pcd_args, loc, attrs) =
-      let name = String.lowercase txt in
+      let Attributes.{ alias; _ } = Attributes.extract ~alias:true attrs in
+      let name = Option.value ~default:(String.lowercase txt) alias in
       let schema, ctor_pattern, ctor_value, pattern, value =
         match constructor_arguments_normalize ~loc pcd_args with
         | None ->
           let schema =
             if Option.is_none context.attributes.union_key then
-              let Attributes.{ alias; _ } =
-                Attributes.extract ~alias:true attrs
-              in
               [%expr
                 {
                   Schema.id = None;
-                  descriptor =
-                    String_const
-                      [%e Expr.string ~loc (Option.value ~default:name alias)];
+                  descriptor = String_const [%e Expr.string ~loc name];
                 }]
             else
               [%expr { Schema.id = None; descriptor = Object FieldEnd }]

@@ -400,10 +400,8 @@ let optional_inline () =
     }
     {|{"a":375,"b":376,"d":378,"c":377}|}
 
-(* FIXME: keyed unions *)
-
 type keyed =
-  | Paragraph of { content : string }
+  | Paragraph_ of { content : string } [@schematic.as "paragraph"]
   | Header of {
       content : string;
       level : int;
@@ -416,7 +414,7 @@ let keyed () =
      yet *)
   let () =
     test ~validate:false "paragraph" tester keyed_schema
-      (Paragraph { content = "text" })
+      (Paragraph_ { content = "text" })
       {| { "content": "text", "type": "paragraph" } |}
   and () =
     test ~validate:false "header" tester keyed_schema
