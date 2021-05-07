@@ -132,7 +132,7 @@ module Warning = struct
 
   let unused_var_strict ~loc = make ~loc "-unused-var-strict"
 
-  let unused_rec ~loc = make ~loc "-39"
+  let unused_rec ~loc = make ~loc "-unused-rec-flag"
 end
 
 (* Caml variant constructor of the form [Foo of int * int] surprisingly do not
