@@ -130,6 +130,8 @@ module Warning = struct
       attr_loc = loc;
     }
 
+  let unused_var_strict ~loc = make ~loc "-unused-var-strict"
+
   let unused_rec ~loc = make ~loc "-39"
 end
 
@@ -950,7 +952,8 @@ module Schema = struct
         pvb_pat = pattern;
         pvb_expr = body;
         pvb_loc = loc;
-        pvb_attributes = [ Warning.unused_rec ~loc ];
+        pvb_attributes =
+          [ Warning.unused_var_strict ~loc; Warning.unused_rec ~loc ];
       }
     in
     body
