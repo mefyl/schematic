@@ -57,6 +57,7 @@ let rec inline : type t. t descriptor -> 'res inline -> 'res =
   match d with
   | Map (_, _, d) -> inline d f
   | Object o -> f.f o
+  | Ignore -> f.f FieldEnd
   | s -> Fmt.failwith "inline field is not an object: %a" pp_descriptor s
 
 type 'res inline_v = { f : 't. 't field -> 't -> 'res }
@@ -66,6 +67,7 @@ let rec inline_v : type t. t descriptor -> t -> 'res inline_v -> 'res =
   match d with
   | Map (_, e, d) -> inline_v d (e v) f
   | Object o -> f.f o v
+  | Ignore -> f.f FieldEnd v
   | s -> Fmt.failwith "inline field is not an object: %a" pp_descriptor s
 
 let rec object_fields : type t. t field -> string list = function
