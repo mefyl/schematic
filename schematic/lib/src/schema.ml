@@ -14,13 +14,13 @@ let rec pp_descriptor : type u. u descriptor Fmt.t =
     let open Fmt in
     let indent = 2 in
     match d with
-    | Any -> const string "any"
-    | Bool -> const string "bool"
-    | Date -> const string "date"
-    | Float -> const string "int"
-    | Ignore -> const string "ignore"
-    | Int -> const string "int"
-    | Int64 -> const string "int64"
+    | Any -> const string "Any"
+    | Bool -> const string "Bool"
+    | Date -> const string "Date"
+    | Float -> const string "Float"
+    | Ignore -> const string "Ignore"
+    | Int -> const string "Int"
+    | Int64 -> const string "Int64"
     | List schema ->
       box ~indent
       @@ const string "[" ++ sp
@@ -28,20 +28,30 @@ let rec pp_descriptor : type u. u descriptor Fmt.t =
          ++ sp ++ const string "]"
     | Map (_, _, d) -> const pp_descriptor d
     | Mapping schema -> const pp schema
-    | Null -> const string "()"
+    | Null -> const string "Null"
     | Nullable s ->
       const string "Nullable ("
       ++ const pp_descriptor s.descriptor
       ++ const string ")"
-    | String -> const string "string"
+    | String -> const string "String"
     | String_const v -> escape v
-    | Time -> const string "time"
-    | Time_local -> const string "local-time"
+    | Time -> const string "Time"
+    | Time_local -> const string "Time_local"
     | Object _ -> const string "FIXME OBJECT"
     | Tuple _ -> const string "FIXME TUPLE"
-    | Union _ -> const string "FIXME UNION"
+    | Union { cases; _ } ->
+      box ~indent
+      @@ const string "Union [" ++ sp
+         ++ (box @@ const (list pp_case) cases)
+         ++ sp ++ const string "]"
   in
   fmt f ()
+
+and pp_case : type u. u case Fmt.t =
+  let pp_case f (Case { name; schema; _ }) =
+    Fmt.pf f "@[{@ name: %S,@ schema: %a@ }@]" name pp schema
+  in
+  pp_case
 
 and pp : type u. u t Fmt.t =
  fun f { descriptor; _ } -> pp_descriptor f descriptor
