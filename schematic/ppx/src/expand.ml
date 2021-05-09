@@ -311,7 +311,7 @@ module Attributes = struct
     in
     function
     | { attr_name = { txt; _ }; attr_loc = loc; attr_payload } :: attrs -> (
-      let attrs = extract attrs in
+      let attrs = extract ~alias ~name ~union_key attrs in
       match txt with
       | "schematic.as" when alias -> (
         match attrs with

@@ -408,7 +408,9 @@ type keyed =
       content : string;
       level : int;
     }
-[@@schematic.union_key "type"] [@@deriving eq, schema, show]
+[@@schematic.name "keyed"] (* Check multiple attributes work *)
+[@@schematic.union_key "type"]
+[@@deriving eq, schema, show]
 
 let keyed () =
   let tester = Alcotest.(testable pp_keyed equal_keyed) in
