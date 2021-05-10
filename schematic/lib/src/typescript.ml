@@ -138,25 +138,25 @@ and of_case : type s. string option -> s Schema.case -> t * Marks.t =
         ],
       marks )
 
-let of_schema ?(recursive = true) schema =
-  let rec of_schema : type a. Marks.t -> a Schema.t -> t list * Marks.t =
+let of_schema schema =
+  let rec of_schema :
+      type a. Marks.t -> a Schema.t -> (string * t) list * Marks.t =
    fun marks (Schema.{ id; descriptor } as schema) ->
     match id with
     | Some id when Marks.has marks (Mark.make id schema) -> ([], marks)
     | Some id ->
       let res, deps = of_descriptor (Some id) descriptor in
       let marks = Marks.add marks (Mark.make id schema) in
-      if recursive then
-        let f (res, marks) (Mark.Schema (_, dep)) =
-          let deps, marks = of_schema marks dep in
-          (res @ deps, marks)
-        in
-        Set.fold ~init:([ res ], marks) ~f deps
-      else
-        ([ res ], marks)
+      let f (res, marks) (Mark.Schema (_, dep)) =
+        let deps, marks = of_schema marks dep in
+        (res @ deps, marks)
+      in
+      Set.fold ~init:([ (name id, res) ], marks) ~f deps
     | None -> failwith "schema has no id"
   in
   of_schema Marks.empty schema |> fst
+
+let of_descriptor d = of_descriptor None d |> fst
 
 let break sp id fmt _ = Caml.Format.pp_print_break fmt sp id
 

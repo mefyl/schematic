@@ -1,8 +1,12 @@
 (** The deduced typescript typing for a schema. *)
 type t
 
-(** [of_schema s] is the typescript typing corresponding to schema [s]. *)
-val of_schema : ?recursive:bool -> 'a Schema.t -> t list
+(** [of_descriptor s] is the typescript type corresponding to descriptor [d]. *)
+val of_descriptor : 'a Schema.descriptor -> t
+
+(** [of_schema s] are the typescript types corresponding to schema [s] and all
+    referenced schemas. *)
+val of_schema : 'a Schema.t -> (string * t) list
 
 (** [name t] is the typescript name of the type mapping to the type named [t] in
     OCaml. *)
