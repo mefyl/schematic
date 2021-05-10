@@ -138,23 +138,35 @@ and of_case : type s. string option -> s Schema.case -> t * Marks.t =
         ],
       marks )
 
-let of_schema schema =
-  let rec of_schema :
-      type a. Marks.t -> a Schema.t -> (string * t) list * Marks.t =
-   fun marks (Schema.{ id; descriptor } as schema) ->
-    match id with
-    | Some id when Marks.has marks (Mark.make id schema) -> ([], marks)
-    | Some id ->
-      let res, deps = of_descriptor (Some id) descriptor in
-      let marks = Marks.add marks (Mark.make id schema) in
-      let f (res, marks) (Mark.Schema (_, dep)) =
-        let deps, marks = of_schema marks dep in
-        (res @ deps, marks)
-      in
-      Set.fold ~init:([ (name id, res) ], marks) ~f deps
-    | None -> failwith "schema has no id"
+let rec of_schema : type a. Marks.t -> a Schema.t -> (string * t) list * Marks.t
+    =
+ fun marks (Schema.{ id; descriptor } as schema) ->
+  match id with
+  | Some id when Marks.has marks (Mark.make id schema) -> ([], marks)
+  | Some id ->
+    let res, deps = of_descriptor (Some id) descriptor in
+    let marks = Marks.add marks (Mark.make id schema) in
+    let f (res, marks) (Mark.Schema (_, dep)) =
+      let deps, marks = of_schema marks dep in
+      (res @ deps, marks)
+    in
+    Set.fold ~init:([ (name id, res) ], marks) ~f deps
+  | None -> failwith "schema has no id"
+
+let unpacker marks =
+  let unpack : type a. a Schema.t -> (string * t) list * Marks.t =
+   fun s -> of_schema marks s
   in
-  of_schema Marks.empty schema |> fst
+  { Schema.unpack }
+
+let of_schemas schemas =
+  let f (res, marks) s =
+    let ts, marks = Schema.unpack (unpacker marks) s in
+    (res @ ts, marks)
+  in
+  List.fold_left ~init:([], Marks.empty) ~f schemas |> fst
+
+let of_schema schema = of_schema Marks.empty schema |> fst
 
 let of_descriptor d = of_descriptor None d |> fst
 

@@ -8,6 +8,10 @@ val of_descriptor : 'a Schema.descriptor -> t
     referenced schemas. *)
 val of_schema : 'a Schema.t -> (string * t) list
 
+(** [of_schemas s] are the typescript types corresponding to schema [s] and all
+    referenced schemas. *)
+val of_schemas : Schema.pack list -> (string * t) list
+
 (** [name t] is the typescript name of the type mapping to the type named [t] in
     OCaml. *)
 val name : string -> string

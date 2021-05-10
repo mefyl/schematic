@@ -189,3 +189,11 @@ let compare schema =
         Option.value ~default:0 @@ List.find_map ~f cases
   in
   compare schema.descriptor
+
+type pack = Pack : _ t -> pack
+
+let pack (type a) (schema : a t) = Pack schema
+
+type 'res unpacker = { unpack : 't. 't t -> 'res }
+
+let unpack { unpack } (Pack schema) = unpack schema

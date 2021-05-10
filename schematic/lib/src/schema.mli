@@ -21,3 +21,11 @@ type 'res inline_v = { f : 't. 't field -> 't -> 'res }
 val inline_v : 't descriptor -> 't -> 'res inline_v -> 'res
 
 val compare : 'a t -> 'a -> 'a -> int
+
+type pack
+
+val pack : _ t -> pack
+
+type 'res unpacker = { unpack : 't. 't t -> 'res }
+
+val unpack : 'res unpacker -> pack -> 'res
