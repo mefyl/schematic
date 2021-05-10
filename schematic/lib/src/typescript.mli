@@ -2,7 +2,7 @@
 type t
 
 (** [of_schema s] is the typescript typing corresponding to schema [s]. *)
-val of_schema : 'a Schema.t -> t
+val of_schema : ?recursive:bool -> 'a Schema.t -> t list
 
 (** [name t] is the typescript name of the type mapping to the type named [t] in
     OCaml. *)

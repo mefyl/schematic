@@ -1,9 +1,40 @@
+open Base
+
+module Mark = struct
+  module T = struct
+    type t = Schema : string * 'a Schema.t -> t
+
+    let sexp_of_t (Schema (id, _)) = Sexp.Atom id
+
+    let compare (Schema (l, _)) (Schema (r, _)) = String.compare l r
+  end
+
+  include T
+  include Base.Comparable.Make (T)
+
+  let make id schema = Schema (id, schema)
+end
+
+module Marks = struct
+  type t = (Mark.t, Mark.comparator_witness) Set.t
+
+  let empty = Set.empty (module Mark)
+
+  let make id s = Set.of_list (module Mark) [ Schema (id, s) ]
+
+  let merge = Set.union_list (module Mark)
+
+  let has = Set.mem
+
+  let add = Set.add
+end
+
 let name s =
-  String.split_on_char '_' s
-  |> List.map (String.split_on_char '-')
+  String.split ~on:'_' s
+  |> List.map ~f:(String.split ~on:'-')
   |> List.concat
-  |> List.map String.capitalize_ascii
-  |> String.concat ""
+  |> List.map ~f:String.capitalize
+  |> String.concat ~sep:""
 
 type t =
   | Atom of string
@@ -20,36 +51,51 @@ type t =
   | Tuple of t list
   | Union of t list
 
-let rec of_descriptor : type s. string option -> s Schema.descriptor -> t =
+let rec of_descriptor :
+    type s. string option -> s Schema.descriptor -> t * Marks.t =
  fun name -> function
-  | Any -> Atom "any"
-  | Bool -> Atom "boolean"
-  | Date -> Atom "Date"
-  | Ignore -> Atom "null"
+  | Any -> (Atom "any", Marks.empty)
+  | Bool -> (Atom "boolean", Marks.empty)
+  | Date -> (Atom "Date", Marks.empty)
+  | Ignore -> (Atom "null", Marks.empty)
   | Int
   | Int64
   | Float ->
-    Atom "number"
-  | List s -> Template { name = "Array"; args = [ of_schema s ] }
+    (Atom "number", Marks.empty)
+  | List s ->
+    let s, marks = of_schema s in
+    (Template { name = "Array"; args = [ s ] }, marks)
   | Map (_, _, d) -> of_descriptor name d
   | Mapping s ->
-    Template { name = "Record"; args = [ Atom "string"; of_schema s ] }
-  | Null -> Atom "null"
-  | Nullable s -> Union [ of_schema s; Atom "null" ]
-  | String -> Atom "string"
-  | String_const s -> Atom (Fmt.str "%S" s)
+    let s, marks = of_schema s in
+    (Template { name = "Record"; args = [ Atom "string"; s ] }, marks)
+  | Null -> (Atom "null", Marks.empty)
+  | Nullable s ->
+    let s, marks = of_schema s in
+    (Union [ s; Atom "null" ], marks)
+  | String -> (Atom "string", Marks.empty)
+  | String_const s -> (Atom (Fmt.str "%S" s), Marks.empty)
   | Time
   | Time_local ->
-    Atom "Date"
-  | Object fields -> Object { name; fields = of_object fields }
-  | Tuple items -> Tuple (of_tuple items)
-  | Union { cases; key } -> Union (List.map (of_case key) cases)
+    (Atom "Date", Marks.empty)
+  | Object fields ->
+    let fields, marks = of_object fields in
+    (Object { name; fields }, marks)
+  | Tuple items ->
+    let items, marks = of_tuple items in
+    (Tuple items, marks)
+  | Union { cases; key } ->
+    let cases = List.map ~f:(of_case key) cases in
+    let cases = List.map ~f:fst cases
+    and marks = Marks.merge @@ List.map ~f:snd cases in
+    (Union cases, marks)
 
-and of_schema : type s. s Schema.t -> t = function
+and of_schema : type s. s Schema.t -> t * Marks.t = function
   | { id = None; descriptor } -> of_descriptor None descriptor
-  | { id = Some id; _ } -> Atom (name id)
+  | { id = Some id; _ } as schema -> (Atom (name id), Marks.make id schema)
 
-and of_object : type s. s Schema.field -> (string * t * bool) list = function
+and of_object : type s. s Schema.field -> (string * t * bool) list * Marks.t =
+  function
   | Field
       {
         schema =
@@ -62,31 +108,61 @@ and of_object : type s. s Schema.field -> (string * t * bool) list = function
     if omit then
       of_object rest
     else
-      (field, of_schema schema, Schema.required requirement) :: of_object rest
+      let schema, marks = of_schema schema
+      and rest, rest_marks = of_object rest in
+      ( (field, schema, Schema.required requirement) :: rest,
+        Marks.merge [ marks; rest_marks ] )
   | Field { schema = Inline { descriptor; _ }; rest; _ } ->
-    Schema.inline descriptor { f = (fun fields -> of_object fields) }
-    @ of_object rest
-  | FieldEnd -> []
+    let fields, marks =
+      Schema.inline descriptor { f = (fun fields -> of_object fields) }
+    and rest, rest_marks = of_object rest in
+    (fields @ rest, Marks.merge [ marks; rest_marks ])
+  | FieldEnd -> ([], Marks.empty)
 
-and of_tuple : type s. s Schema.tuple -> t list = function
-  | Item { schema; rest } -> of_schema schema :: of_tuple rest
-  | ItemEnd -> []
+and of_tuple : type s. s Schema.tuple -> t list * Marks.t = function
+  | Item { schema; rest } ->
+    let schema, marks = of_schema schema
+    and rest, marks_rest = of_tuple rest in
+    (schema :: rest, Marks.merge [ marks; marks_rest ])
+  | ItemEnd -> ([], Marks.empty)
 
-and of_case : type s. string option -> s Schema.case -> t =
+and of_case : type s. string option -> s Schema.case -> t * Marks.t =
  fun key (Case { name; schema; _ }) ->
-  let schema = of_schema schema in
+  let schema, marks = of_schema schema in
   match key with
-  | None -> schema
+  | None -> (schema, marks)
   | Some key ->
-    Intersection
-      [ schema; Object { name = None; fields = [ (key, String name, true) ] } ]
+    ( Intersection
+        [
+          schema; Object { name = None; fields = [ (key, String name, true) ] };
+        ],
+      marks )
 
-let of_schema Schema.{ id; descriptor } = of_descriptor id descriptor
+let of_schema ?(recursive = true) schema =
+  let rec of_schema : type a. Marks.t -> a Schema.t -> t list * Marks.t =
+   fun marks (Schema.{ id; descriptor } as schema) ->
+    match id with
+    | Some id when Marks.has marks (Mark.make id schema) -> ([], marks)
+    | Some id ->
+      let res, deps = of_descriptor (Some id) descriptor in
+      let marks = Marks.add marks (Mark.make id schema) in
+      if recursive then
+        let f (res, marks) (Mark.Schema (_, dep)) =
+          let deps, marks = of_schema marks dep in
+          (res @ deps, marks)
+        in
+        Set.fold ~init:([ res ], marks) ~f deps
+      else
+        ([ res ], marks)
+    | None -> failwith "schema has no id"
+  in
+  of_schema Marks.empty schema |> fst
 
-let break sp id fmt _ = Format.pp_print_break fmt sp id
+let break sp id fmt _ = Caml.Format.pp_print_break fmt sp id
 
 let custom_break fits breaks fmt _ =
-  Format.pp_print_custom_break fmt ~fits:(fits, 0, "") ~breaks:(breaks, 0, "")
+  Caml.Format.pp_print_custom_break fmt ~fits:(fits, 0, "")
+    ~breaks:(breaks, 0, "")
 
 let pp ?(indent = 2) fmt ts =
   let rec pp fmt ts =
