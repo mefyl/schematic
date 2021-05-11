@@ -13,6 +13,8 @@ module Mark = struct
   include Base.Comparable.Make (T)
 
   let make id schema = Schema (id, schema)
+
+  let of_schema s = make (Option.value_exn ~here:[%here] s.Schema.id) s
 end
 
 module Marks = struct
@@ -22,11 +24,13 @@ module Marks = struct
 
   let make id s = Set.of_list (module Mark) [ Schema (id, s) ]
 
+  let add = Set.add
+
   let merge = Set.union_list (module Mark)
 
   let has = Set.mem
 
-  let add = Set.add
+  let of_list = Set.of_list (module Mark)
 end
 
 let name s =
@@ -159,12 +163,18 @@ let unpacker marks =
   in
   { Schema.unpack }
 
-let of_schemas schemas =
+let of_schemas ?(exclude = []) schemas =
   let f (res, marks) s =
     let ts, marks = Schema.unpack (unpacker marks) s in
     (res @ ts, marks)
   in
-  List.fold_left ~init:([], Marks.empty) ~f schemas |> fst
+  List.fold_left
+    ~init:
+      ( [],
+        Marks.of_list
+          (List.map ~f:(Schema.unpack { unpack = Mark.of_schema }) exclude) )
+    ~f schemas
+  |> fst
 
 let of_schema schema = of_schema Marks.empty schema |> fst
 
