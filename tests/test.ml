@@ -453,6 +453,18 @@ let keyed () =
   in
   ()
 
+let map_error () =
+  let schema =
+    let open Schematic.Schema in
+    { id = None; descriptor = Map ((fun s -> Result.fail s), Fn.id, String) }
+  in
+  Alcotest.(
+    check
+      (result string decoding_error)
+      "errors from Map descriptor decoding are forwarded properly"
+      (make_error "whatever")
+      (Schematic.Json.decode schema (`String "whatever")))
+
 (* JSON Schema metadata *)
 
 module Metadata = struct
@@ -674,6 +686,7 @@ let () =
           test_case "failure" `Quick failure;
           test_case "optional-inline" `Quick optional_inline;
           test_case "keyed" `Quick keyed;
+          test_case "map-error" `Quick map_error;
         ] );
       ( "comparison",
         [

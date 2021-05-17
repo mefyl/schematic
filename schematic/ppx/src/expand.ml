@@ -536,7 +536,8 @@ module Schema = struct
         List.fold_righti ~f ~init:[%pat? ()] fields
       in
       {
-        pexp_desc = Pexp_fun (Nolabel, None, pattern, constructed);
+        pexp_desc =
+          Pexp_fun (Nolabel, None, pattern, [%expr Result.Ok [%e constructed]]);
         pexp_loc = loc;
         pexp_loc_stack = [];
         pexp_attributes = [];

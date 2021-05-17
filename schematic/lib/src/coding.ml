@@ -190,7 +190,8 @@ module Make (Coding : S) = struct
         let* v = Coding.to_list v |> type_error "array" in
         List.map (decode None ids items_schema.descriptor) v
       | Map (cons, _, schema) ->
-        decode id ids schema v >>= fun value -> Result.return @@ cons value
+        decode id ids schema v >>= fun value ->
+        cons value |> Result.map_error ~f:(fun reason -> error "%s" reason)
       | Mapping fields_schema ->
         let* fields = Coding.to_fields v |> type_error "mapping" in
         let f (name, value) =

@@ -81,7 +81,7 @@ module Ptime = struct
       Schema.id = Some "duration";
       descriptor =
         Map
-          ( Span.of_int_s,
+          ( (fun s -> Result.return @@ Span.of_int_s s),
             (fun span -> Option.value_exn ~here:[%here] (Span.to_int_s span)),
             Int );
     }
@@ -93,6 +93,7 @@ module Uri = struct
   let schema =
     {
       Schema.id = None;
-      descriptor = Map (Uri.of_string, Uri.to_string, String);
+      descriptor =
+        Map ((fun s -> Result.return @@ Uri.of_string s), Uri.to_string, String);
     }
 end

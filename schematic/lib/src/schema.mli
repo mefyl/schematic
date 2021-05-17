@@ -2,7 +2,7 @@ include module type of Schema_intf
 
 val required : (_, _) requirement -> bool
 
-val map : ('a -> 'b) -> ('b -> 'a) -> 'a t -> 'b t
+val map : ('a -> ('b, string) Result.t) -> ('b -> 'a) -> 'a t -> 'b t
 
 val pp : Format.formatter -> _ t -> unit
 
