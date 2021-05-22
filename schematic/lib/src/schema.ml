@@ -197,3 +197,8 @@ let pack (type a) (schema : a t) = Pack schema
 type 'res unpacker = { unpack : 't. 't t -> 'res }
 
 let unpack { unpack } (Pack schema) = unpack schema
+
+let name_combine schema name =
+  match schema.id with
+  | Some id -> id ^ "-" ^ name
+  | None -> name

@@ -923,20 +923,34 @@ module Schema = struct
 
   let close ~loc ~context t params body =
     let name =
-      let default =
-        rename
-        @@
-        match t.ptype_name.txt with
-        | "t" ->
-          String.lowercase @@ Option.value ~default:"t" @@ List.last
-          @@ Ppxlib.Code_path.submodule_path context.code_path
-        | name -> name
+      let name =
+        let default =
+          rename
+          @@
+          match t.ptype_name.txt with
+          | "t" ->
+            String.lowercase @@ Option.value ~default:"t" @@ List.last
+            @@ Ppxlib.Code_path.submodule_path context.code_path
+          | name -> name
+        in
+        Option.value ~default context.attributes.name
       in
-      Option.value ~default context.attributes.name
+      let init = Expr.string ~loc name
+      and f param exp =
+        match param with
+        | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
+          [%expr
+            Schematic.Schema.name_combine
+              [%e Expr.id ~loc (schema_name name)]
+              [%e exp]]
+        | { ptyp_desc = Ptyp_any; _ }, _ -> exp
+        | t, _ ->
+          Ppxlib.Location.raise_errorf ~loc
+            "schematic-ppx: unsupported type parameter %a" Pprintast.core_type t
+      in
+      List.fold_right ~init ~f params
     in
-    let init =
-      [%expr
-        { Schema.id = Some [%e Expr.string ~loc name]; descriptor = [%e body] }]
+    let init = [%expr { Schema.id = Some [%e name]; descriptor = [%e body] }]
     and wrap arg exp =
       match arg with
       | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->

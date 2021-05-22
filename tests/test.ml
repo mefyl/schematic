@@ -669,6 +669,20 @@ module Names = struct
       check (option string)
         "schema name is deduced from type module name when type is \"t\""
         (Some "names") schema.id)
+
+  type 'a result =
+    | Ok of 'a
+    | Error
+  [@@deriving schema]
+
+  let parametric () =
+    Alcotest.(
+      check (option string) "schema name is deduced from type name"
+        (Some "foo-result") (result_schema foo_schema).id);
+    Alcotest.(
+      check (option string)
+        "schema name is deduced from type module name when type is \"t\""
+        (Some "names-result") (result_schema schema).id)
 end
 
 (* Driver *)
@@ -717,5 +731,9 @@ let () =
           test_case "missing" `Quick Error_messages.missing;
           test_case "type error" `Quick Error_messages.type_error;
         ] );
-      ("names", [ test_case "deduced names" `Quick Names.deduced ]);
+      ( "names",
+        [
+          test_case "deduced names" `Quick Names.deduced;
+          test_case "parametric schemas names" `Quick Names.parametric;
+        ] );
     ]
