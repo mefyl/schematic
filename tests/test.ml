@@ -656,6 +656,10 @@ type some_id = int id [@@deriving schema]
 type identified = { id : identified id [@schematic.schema id_schema ()] }
 [@@deriving schema]
 
+type t = int [@@deriving schema]
+
+let root_schema = schema
+
 module Names = struct
   type foo = int [@@deriving schema]
 
@@ -668,7 +672,11 @@ module Names = struct
     Alcotest.(
       check (option string)
         "schema name is deduced from type module name when type is \"t\""
-        (Some "names") schema.id)
+        (Some "names") schema.id);
+    Alcotest.(
+      check (option string)
+        "schema name is deduced from file name when type is \"t\"" (Some "test")
+        root_schema.id)
 
   type 'a result =
     | Ok of 'a

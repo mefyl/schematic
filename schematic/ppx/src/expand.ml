@@ -929,7 +929,10 @@ module Schema = struct
           @@
           match t.ptype_name.txt with
           | "t" ->
-            String.lowercase @@ Option.value ~default:"t" @@ List.last
+            String.lowercase
+            @@ Option.value
+                 ~default:(Code_path.main_module_name context.code_path)
+            @@ List.last
             @@ Ppxlib.Code_path.submodule_path context.code_path
           | name -> name
         in
