@@ -261,13 +261,17 @@ let expect_string ~loc = function
   | Pexp_constant (Pconst_string (value, _, _)) -> value
   | _ -> Ppxlib.Location.raise_errorf ~loc "schematic-ppx: string expected"
 
-let expect_string_constant ~loc = function
+let expect_payload_string ~loc = function
   | PStr
       [%str [%e? { pexp_desc = Pexp_constant (Pconst_string (txt, _, _)); _ }]]
     ->
     txt
   | _ ->
     Ppxlib.Location.raise_errorf ~loc "schematic-ppx: string constant expected"
+
+let expect_payload_expr ~loc = function
+  | PStr [%str [%e? e]] -> e
+  | _ -> Ppxlib.Location.raise_errorf ~loc "schematic-ppx: expression expected"
 
 let expect_int ~loc = function
   | Pexp_constant (Pconst_integer (value, None)) -> Int.of_string value
@@ -292,7 +296,7 @@ let schema_name = name "schema"
 module Attributes = struct
   type t = {
     alias : string option;
-    name : string option;
+    name : expression option;
     union_key : string option;
   }
 
@@ -316,14 +320,14 @@ module Attributes = struct
       | "schematic.as" when alias -> (
         match attrs with
         | { alias = None; _ } ->
-          { attrs with alias = Some (expect_string_constant ~loc attr_payload) }
+          { attrs with alias = Some (expect_payload_string ~loc attr_payload) }
         | _ ->
           Ppxlib.Location.raise_errorf ~loc
             "schematic-ppx: duplicate schematic.as annotation on schema")
       | "schematic.name" when name -> (
         match attrs with
         | { name = None; _ } ->
-          { attrs with name = Some (expect_string_constant ~loc attr_payload) }
+          { attrs with name = Some (expect_payload_expr ~loc attr_payload) }
         | _ ->
           Ppxlib.Location.raise_errorf ~loc
             "schematic-ppx: duplicate schematic.name annotation on schema")
@@ -332,7 +336,7 @@ module Attributes = struct
           attrs with
           union_key =
             merge "union_key" loc attrs.union_key
-            @@ expect_string_constant ~loc attr_payload;
+            @@ expect_payload_string ~loc attr_payload;
         }
       | _ ->
         let () = check_unknown_attribute ~loc txt in
@@ -675,7 +679,7 @@ module Schema = struct
                       "schematic-ppx: record payload expected")
                 | "schematic.as" ->
                   ( schema,
-                    expect_string_constant ~loc attr_payload,
+                    expect_payload_string ~loc attr_payload,
                     inline,
                     specs )
                 | "schematic.inline" -> (
@@ -923,22 +927,23 @@ module Schema = struct
 
   let close ~loc ~context t params body =
     let name =
-      let name =
+      let init =
         let default =
-          rename
-          @@
-          match t.ptype_name.txt with
-          | "t" ->
-            String.lowercase
-            @@ Option.value
-                 ~default:(Code_path.main_module_name context.code_path)
-            @@ List.last
-            @@ Ppxlib.Code_path.submodule_path context.code_path
-          | name -> name
+          let str =
+            rename
+            @@
+            match t.ptype_name.txt with
+            | "t" ->
+              String.lowercase
+              @@ Option.value
+                   ~default:(Code_path.main_module_name context.code_path)
+              @@ List.last
+              @@ Ppxlib.Code_path.submodule_path context.code_path
+            | name -> name
+          in
+          Expr.string ~loc str
         in
         Option.value ~default context.attributes.name
-      in
-      let init = Expr.string ~loc name
       and f param exp =
         match param with
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
