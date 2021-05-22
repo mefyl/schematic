@@ -1237,8 +1237,9 @@ end
 module Jsoo_type_expander = Expander (Jsoo_type)
 module Schema_expander = Expander (Schema)
 
-let expand ~loc ~path:_ ~inside (r, types) jsoo =
-  let r = r = Recursive in
+let expand ~ctxt ~inside (r, types) jsoo =
+  let r = r = Recursive
+  and loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt in
   let contents =
     let contents = [] in
     let contents =
@@ -1288,6 +1289,6 @@ let add inside =
       let jsoo = arg "jsoo" __ in
       empty +> jsoo
     in
-    Deriving.Generator.make ~attributes:[] arg (expand ~inside)
+    Deriving.Generator.V2.make arg (expand ~inside)
   in
   Deriving.add ~str_type_decl "schema"
