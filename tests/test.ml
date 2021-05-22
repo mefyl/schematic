@@ -656,6 +656,21 @@ type some_id = int id [@@deriving schema]
 type identified = { id : identified id [@schematic.schema id_schema ()] }
 [@@deriving schema]
 
+module Names = struct
+  type foo = int [@@deriving schema]
+
+  type t = int [@@deriving schema]
+
+  let deduced () =
+    Alcotest.(
+      check (option string) "schema name is deduced from type name" (Some "foo")
+        foo_schema.id);
+    Alcotest.(
+      check (option string)
+        "schema name is deduced from type module name when type is \"t\""
+        (Some "names") schema.id)
+end
+
 (* Driver *)
 
 let () =
@@ -702,4 +717,5 @@ let () =
           test_case "missing" `Quick Error_messages.missing;
           test_case "type error" `Quick Error_messages.type_error;
         ] );
+      ("names", [ test_case "deduced names" `Quick Names.deduced ]);
     ]

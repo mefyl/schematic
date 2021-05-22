@@ -342,6 +342,7 @@ end
 
 type context = {
   attributes : Attributes.t;
+  code_path : Ppxlib.Code_path.t;
   type_ : string;
   types : string list;
 }
@@ -921,17 +922,21 @@ module Schema = struct
     [%expr [%e encode_type ~loc ~context t].descriptor]
 
   let close ~loc ~context t params body =
+    let name =
+      let default =
+        rename
+        @@
+        match t.ptype_name.txt with
+        | "t" ->
+          String.lowercase @@ Option.value ~default:"t" @@ List.last
+          @@ Ppxlib.Code_path.submodule_path context.code_path
+        | name -> name
+      in
+      Option.value ~default context.attributes.name
+    in
     let init =
       [%expr
-        {
-          Schema.id =
-            Some
-              [%e
-                Expr.string ~loc
-                  (Option.value ~default:(rename t.ptype_name.txt)
-                     context.attributes.name)];
-          descriptor = [%e body];
-        }]
+        { Schema.id = Some [%e Expr.string ~loc name]; descriptor = [%e body] }]
     and wrap arg exp =
       match arg with
       | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
@@ -1189,7 +1194,7 @@ module Jsoo_type = struct
 end
 
 module Expander (Expansion : EXPANSION) = struct
-  let expand ~loc configuration recursive t =
+  let expand ~code_path ~loc configuration recursive t =
     let names =
       let f { ptype_name; _ } = ptype_name.txt in
       if recursive then
@@ -1202,6 +1207,7 @@ module Expander (Expansion : EXPANSION) = struct
         {
           attributes =
             Attributes.extract ~name:true ~union_key:true t.ptype_attributes;
+          code_path;
           type_ = t.ptype_name.txt;
           types = names;
         }
@@ -1239,7 +1245,8 @@ module Schema_expander = Expander (Schema)
 
 let expand ~ctxt ~inside (r, types) jsoo =
   let r = r = Recursive
-  and loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt in
+  and loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt
+  and code_path = Ppxlib.Expansion_context.Deriver.code_path ctxt in
   let contents =
     let contents = [] in
     let contents =
@@ -1248,17 +1255,20 @@ let expand ~ctxt ~inside (r, types) jsoo =
       | Some [%expr jsoo]
       | Some [%expr true] ->
         contents
-        @ Jsoo_type_expander.expand ~loc Jsoo_type.{ functions = true } r types
+        @ Jsoo_type_expander.expand ~code_path ~loc
+            Jsoo_type.{ functions = true }
+            r types
       | Some [%expr false] ->
         contents
-        @ Jsoo_type_expander.expand ~loc Jsoo_type.{ functions = false } r types
+        @ Jsoo_type_expander.expand ~code_path ~loc
+            Jsoo_type.{ functions = false }
+            r types
       | Some exp ->
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: invalid ~jsoo argument value: %a" Pprintast.expression
           exp
     in
-
-    Schema_expander.expand ~loc () r types @ contents
+    Schema_expander.expand ~code_path ~loc () r types @ contents
   and namespace =
     if inside then
       [%str
