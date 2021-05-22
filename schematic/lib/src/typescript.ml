@@ -95,7 +95,7 @@ let rec of_descriptor :
     (Union cases, marks)
 
 and of_schema : type s. s Schema.t -> t * Marks.t = function
-  | { id = None; descriptor } -> of_descriptor None descriptor
+  | { id = None; descriptor; _ } -> of_descriptor None descriptor
   | { id = Some id; _ } as schema -> (Atom (name id), Marks.make id schema)
 
 and of_object : type s. s Schema.field -> (string * t * bool) list * Marks.t =
@@ -144,7 +144,7 @@ and of_case : type s. string option -> s Schema.case -> t * Marks.t =
 
 let rec of_schema : type a. Marks.t -> a Schema.t -> (string * t) list * Marks.t
     =
- fun marks (Schema.{ id; descriptor } as schema) ->
+ fun marks (Schema.{ id; descriptor; _ } as schema) ->
   match id with
   | Some id when Marks.has marks (Mark.make id schema) -> ([], marks)
   | Some id ->

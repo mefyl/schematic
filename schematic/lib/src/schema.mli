@@ -31,3 +31,5 @@ type 'res unpacker = { unpack : 't. 't t -> 'res }
 val unpack : 'res unpacker -> pack -> 'res
 
 val name_combine : _ t -> string -> string
+
+val make : ?id:string -> ?parametric:'t parametric -> 't descriptor -> 't t

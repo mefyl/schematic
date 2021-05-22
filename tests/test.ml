@@ -455,8 +455,7 @@ let keyed () =
 
 let map_error () =
   let schema =
-    let open Schematic.Schema in
-    { id = None; descriptor = Map ((fun s -> Result.fail s), Fn.id, String) }
+    Schematic.Schema.make (Map ((fun s -> Result.fail s), Fn.id, String))
   in
   Alcotest.(
     check

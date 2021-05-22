@@ -436,6 +436,9 @@ module type EXPANSION = sig
     loc:location -> context:context -> constructor_declaration list -> expanded
 end
 
+let schema_of_descriptor ~loc ?(id = [%expr None]) desc =
+  [%expr { Schema.id = [%e id]; descriptor = [%e desc]; parametric = None }]
+
 module Schema = struct
   type closed = value_binding
 
@@ -446,11 +449,7 @@ module Schema = struct
   let rec encode_type ~loc ~context = function
     (* Mapping *)
     | [%type: (string * [%t? t]) list] ->
-      [%expr
-        {
-          Schema.id = None;
-          descriptor = Mapping [%e encode_type ~loc ~context t];
-        }]
+      schema_of_descriptor ~loc [%expr Mapping [%e encode_type ~loc ~context t]]
     (* Plain type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
       expr_id ~loc (schema_id ~loc txt)
@@ -458,11 +457,8 @@ module Schema = struct
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } -> (
       match (txt, args) with
       | Lident "list", [ arg ] ->
-        [%expr
-          {
-            Schema.id = None;
-            descriptor = List [%e encode_type ~loc ~context arg];
-          }]
+        schema_of_descriptor ~loc
+          [%expr List [%e encode_type ~loc ~context arg]]
       | _ ->
         let schema = expr_id ~loc (schema_id ~loc txt)
         and f t = (Nolabel, encode_type ~loc ~context t) in
@@ -496,14 +492,14 @@ module Schema = struct
         combinator ~loc types field_name constructed deconstructed
           (tuple_schema ~loc ~context types)
       in
-      [%expr { Schema.id = None; descriptor = [%e body] }]
+      schema_of_descriptor ~loc body
     (* Type variable *)
     | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ } ->
       [%expr [%e expr_id ~loc (schema_id ~loc (Lident name))]]
     (* Polymorphic variant *)
     | { ptyp_desc = Ptyp_variant (fields, _, _); ptyp_loc = loc; _ } ->
       let desc = expand_polymorphic_variant ~loc ~context fields in
-      [%expr { Schema.id = None; descriptor = [%e desc] }]
+      schema_of_descriptor ~loc desc
     (* Unsupported *)
     | core_type ->
       Ppxlib.Location.raise_errorf ~loc "schematic-ppx: unsupported type %a"
@@ -846,13 +842,10 @@ module Schema = struct
         | None ->
           let schema =
             if Option.is_none context.attributes.union_key then
-              [%expr
-                {
-                  Schema.id = None;
-                  descriptor = String_const [%e Expr.string ~loc name];
-                }]
+              schema_of_descriptor ~loc
+                [%expr String_const [%e Expr.string ~loc name]]
             else
-              [%expr { Schema.id = None; descriptor = Object FieldEnd }]
+              schema_of_descriptor ~loc [%expr Object FieldEnd]
           in
           (schema, None, None, None, None)
         | Some { ctor_pattern; ctor_value; pattern; type_; value; _ } ->
@@ -862,7 +855,7 @@ module Schema = struct
             match pcd_args with
             | Pcstr_record fields ->
               let descriptor = _expand_record true ~loc ~context fields in
-              [%expr { Schema.id = None; descriptor = [%e descriptor] }]
+              schema_of_descriptor ~loc descriptor
             | _ -> encode_type ~loc ~context type_
           in
           ( schema,
@@ -958,7 +951,7 @@ module Schema = struct
       in
       List.fold_right ~init ~f params
     in
-    let init = [%expr { Schema.id = Some [%e name]; descriptor = [%e body] }]
+    let init = schema_of_descriptor ~loc ~id:[%expr Some [%e name]] body
     and wrap arg exp =
       match arg with
       | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->

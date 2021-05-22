@@ -6,7 +6,7 @@ let required : type a b. (a, b) requirement -> bool = function
   | _ -> false
 
 let map cons decons { descriptor; _ } =
-  { id = None; descriptor = Map (cons, decons, descriptor) }
+  { id = None; descriptor = Map (cons, decons, descriptor); parametric = None }
 
 let rec pp_descriptor : type u. u descriptor Fmt.t =
  fun f d ->
@@ -202,3 +202,5 @@ let name_combine schema name =
   match schema.id with
   | Some id -> id ^ "-" ^ name
   | None -> name
+
+let make ?id ?parametric descriptor = { id; descriptor; parametric }

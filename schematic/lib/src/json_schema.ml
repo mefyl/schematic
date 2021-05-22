@@ -86,10 +86,10 @@ let of_schema schema =
   let id_name s = "#" ^ s in
   let rec of_schema : type u. ids -> u Schema.t -> ids * t =
    fun marks -> function
-    | { id = None; descriptor } -> of_descriptor marks descriptor
-    | { id = Some id; descriptor = _ } when Set.mem marks id ->
+    | { id = None; descriptor; _ } -> of_descriptor marks descriptor
+    | { id = Some id; _ } when Set.mem marks id ->
       (marks, { empty with core = { core_empty with ref = Some (id_name id) } })
-    | { id = Some id; descriptor } ->
+    | { id = Some id; descriptor; _ } ->
       let marks = Set.add marks id in
       let marks, schema = of_descriptor marks descriptor in
       (marks, { schema with core = { schema.core with id = Some (id_name id) } })

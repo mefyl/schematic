@@ -70,4 +70,17 @@ and _ descriptor =
 and 't t = {
   id : string option;
   descriptor : 't descriptor;
+  parametric : 't parametric option;
 }
+
+and 't parametric =
+  | Plain of {
+      name : string;
+      descriptor : 't descriptor;
+    }
+  | Parametric : {
+      name : string;
+      parameter : 'p t;
+      next : 'p t -> 't parametric;
+    }
+      -> 't parametric
