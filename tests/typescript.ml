@@ -43,6 +43,10 @@ module Generate_types = struct
 
   let nullable () = test nullable_schema [ ("Nullable", "boolean | null") ]
 
+  let record () =
+    test record_schema
+      [ ("Record", {|{ "a": number; "b"?: number; "c": string }|}) ]
+
   type string_or_int = (string, int) Either.t [@@deriving schema]
 
   type ('t, 'error) res =
@@ -65,11 +69,8 @@ module Generate_types = struct
         ("RecordRes", "Result<Record, string>");
         ( "Result<T, Error>",
           {|T & { "status": "ok" } | Error & { "status": "error" }|} );
+        ("Record", {|{ "a": number; "b"?: number; "c": string }|});
       ]
-
-  let record () =
-    test record_schema
-      [ ("Record", {|{ "a": number; "b"?: number; "c": string }|}) ]
 
   let tuple () = test tuple_schema [ ("Tuple", "[ string, number, null ]") ]
 

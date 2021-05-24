@@ -178,17 +178,22 @@ and of_parametric :
 let rec of_schema : type a. Marks.t -> a Schema.t -> (string * t) list * Marks.t
     =
  fun marks (Schema.{ id; descriptor; parametric } as schema) ->
-  match (id, parametric) with
-  | Some id, Some parametric -> of_parametric marks id parametric
-  | Some id, None when Marks.has marks (Mark.make id schema) -> ([], marks)
-  | Some id, None ->
-    let res, deps = of_descriptor descriptor in
+  match id with
+  | Some id when Marks.has marks (Mark.make id schema) -> ([], marks)
+  | Some id ->
+    let res, deps =
+      match parametric with
+      | None ->
+        let res, deps = of_descriptor descriptor in
+        ([ (name id, res) ], deps)
+      | Some parametric -> of_parametric marks id parametric
+    in
     let marks = Marks.add marks (Mark.make id schema) in
     let f (res, marks) (Mark.Schema (_, dep)) =
       let deps, marks = of_schema marks dep in
       (res @ deps, marks)
     in
-    Set.fold ~init:([ (name id, res) ], marks) ~f deps
+    Set.fold ~init:(res, marks) ~f deps
   | _ -> failwith "schema has no id"
 
 let unpacker marks =
