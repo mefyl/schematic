@@ -77,7 +77,7 @@ let options () =
   in
   ()
 
-type nullable_option = { no : int option option } [@@deriving schema, eq, show]
+type nullable_option = { no : int option option } [@@deriving eq, schema, show]
 
 let nullable_option = Alcotest.testable pp_nullable_option equal_nullable_option
 

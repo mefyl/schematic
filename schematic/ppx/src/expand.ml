@@ -84,6 +84,8 @@ module Expr = struct
         pexp_loc_stack = [];
         pexp_attributes = [];
       }
+
+  let some ~loc e = [%expr Some [%e e]]
 end
 
 module Pattern = struct
@@ -436,42 +438,61 @@ module type EXPANSION = sig
     loc:location -> context:context -> constructor_declaration list -> expanded
 end
 
-let schema_of_descriptor
-    ~loc ?(id = [%expr None]) ?(parametric = [%expr None]) desc =
-  [%expr
-    {
-      Schema.id = [%e id];
-      descriptor = [%e desc];
-      parametric = [%e parametric];
-    }]
-
 module Schema = struct
   type closed = value_binding
 
   type configuration = unit
 
-  type expanded = expression
+  type expanded =
+    | Components of {
+        descriptor : expression;
+        id : expression;
+        parametric : expression;
+      }
+    | Expression of expression
+
+  let expanded_of_descriptor
+      ~loc ?(id = [%expr None]) ?(parametric = [%expr None]) descriptor =
+    Components { descriptor; id; parametric }
+
+  let schema_of_expanded ~loc = function
+    | Components { descriptor; id; parametric } ->
+      [%expr
+        Schema.
+          {
+            descriptor = [%e descriptor];
+            id = [%e id];
+            parametric = [%e parametric];
+          }]
+    | Expression e -> e
 
   let rec encode_type ~loc ~context = function
-    (* Mapping *)
+    (* Map.ping *)
     | [%type: (string * [%t? t]) list] ->
-      schema_of_descriptor ~loc [%expr Mapping [%e encode_type ~loc ~context t]]
+      expanded_of_descriptor ~loc
+        [%expr
+          Mapping [%e schema_of_expanded ~loc @@ encode_type ~loc ~context t]]
     (* Plain type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
-      expr_id ~loc (schema_id ~loc txt)
+      Expression (expr_id ~loc (schema_id ~loc txt))
     (* Lists *)
     | { ptyp_desc = Ptyp_constr ({ txt = Lident "list"; loc }, [ arg ]); _ } ->
-      schema_of_descriptor ~loc [%expr List [%e encode_type ~loc ~context arg]]
+      expanded_of_descriptor ~loc
+        [%expr
+          List [%e schema_of_expanded ~loc @@ encode_type ~loc ~context arg]]
     (* Parametric type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } ->
       let schema = expr_id ~loc (schema_id ~loc txt)
-      and f t = (Nolabel, encode_type ~loc ~context t) in
-      {
-        pexp_desc = Pexp_apply (schema, List.map ~f args);
-        pexp_loc = loc;
-        pexp_loc_stack = [];
-        pexp_attributes = [];
-      }
+      and f t =
+        (Nolabel, schema_of_expanded ~loc @@ encode_type ~loc ~context t)
+      in
+      Expression
+        {
+          pexp_desc = Pexp_apply (schema, List.map ~f args);
+          pexp_loc = loc;
+          pexp_loc_stack = [];
+          pexp_attributes = [];
+        }
     (* Tuple *)
     | { ptyp_desc = Ptyp_tuple types; _ } ->
       let field_name i { ptyp_loc = loc; _ } = (loc, "e" ^ Int.to_string i)
@@ -494,24 +515,27 @@ module Schema = struct
       in
       let body =
         combinator ~loc types field_name constructed deconstructed
-          (tuple_schema ~loc ~context types)
+          (tuple_descriptor ~loc ~context types)
       in
-      schema_of_descriptor ~loc body
+      expanded_of_descriptor ~loc body
     (* Type variable *)
     | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ } ->
-      [%expr [%e expr_id ~loc (schema_id ~loc (Lident name))]]
+      Expression (expr_id ~loc (schema_id ~loc (Lident name)))
     (* Polymorphic variant *)
     | { ptyp_desc = Ptyp_variant (fields, _, _); ptyp_loc = loc; _ } ->
-      let desc = expand_polymorphic_variant ~loc ~context fields in
-      schema_of_descriptor ~loc desc
+      expand_polymorphic_variant ~loc ~context fields
     (* Unsupported *)
     | core_type ->
       Ppxlib.Location.raise_errorf ~loc "schematic-ppx: unsupported type %a"
         Pprintast.core_type core_type
 
-  and tuple_schema ~loc ~context types =
+  and tuple_descriptor ~loc ~context types =
     let items =
-      let args = List.map ~f:(encode_type ~loc ~context) types in
+      let args =
+        List.map
+          ~f:(fun d -> schema_of_expanded ~loc @@ encode_type ~loc ~context d)
+          types
+      in
       let init = [%expr ItemEnd] in
       let f r l = [%expr Item { schema = [%e r]; rest = [%e l] }] in
       List.fold_right ~f ~init args
@@ -719,7 +743,9 @@ module Schema = struct
                 | None -> ([%expr Required], t))
             in
             let schema =
-              Option.value ~default:(encode_type ~loc ~context t) schema
+              Option.value
+                ~default:(schema_of_expanded ~loc @@ encode_type ~loc ~context t)
+                schema
             in
             ( loc,
               requirement,
@@ -810,8 +836,9 @@ module Schema = struct
           ppat_attributes = [];
         }
     in
-    combinator ~loc fields field_name constructed deconstructed
-      [%expr Object [%e fields_schema]]
+    expanded_of_descriptor ~loc
+    @@ combinator ~loc fields field_name constructed deconstructed
+         [%expr Object [%e fields_schema]]
 
   and expand_variant ~loc ~context options =
     let f
@@ -846,10 +873,10 @@ module Schema = struct
         | None ->
           let schema =
             if Option.is_none context.attributes.union_key then
-              schema_of_descriptor ~loc
+              expanded_of_descriptor ~loc
                 [%expr String_const [%e Expr.string ~loc name]]
             else
-              schema_of_descriptor ~loc [%expr Object FieldEnd]
+              expanded_of_descriptor ~loc [%expr Object FieldEnd]
           in
           (schema, None, None, None, None)
         | Some { ctor_pattern; ctor_value; pattern; type_; value; _ } ->
@@ -857,9 +884,7 @@ module Schema = struct
           and v i _ = Expr.id ~loc (Fmt.str "f%i" i) in
           let schema =
             match pcd_args with
-            | Pcstr_record fields ->
-              let descriptor = _expand_record true ~loc ~context fields in
-              schema_of_descriptor ~loc descriptor
+            | Pcstr_record fields -> _expand_record true ~loc ~context fields
             | _ -> encode_type ~loc ~context type_
           in
           ( schema,
@@ -906,7 +931,7 @@ module Schema = struct
         Schema.Case
           {
             name = [%e Expr.string ~loc name];
-            schema = [%e schema];
+            schema = [%e schema_of_expanded ~loc schema];
             encoder = [%e construct];
             decoder = [%e destruct];
           }]
@@ -915,48 +940,53 @@ module Schema = struct
       | None -> [%expr None]
       | Some name -> [%expr Some [%e Expr.string ~loc name]]
     in
-    [%expr
-      Schema.Union
-        { cases = [%e expr_list ~loc (List.map ~f options)]; key = [%e key] }]
+    expanded_of_descriptor ~loc
+      [%expr
+        Schema.Union
+          { cases = [%e expr_list ~loc (List.map ~f options)]; key = [%e key] }]
 
-  let expand_abstract_type ~loc ~context t =
-    [%expr [%e encode_type ~loc ~context t].descriptor]
+  let expand_abstract_type ~loc ~context t = encode_type ~loc ~context t
 
-  let close ~loc ~context t params body =
-    let name =
-      let init =
-        let default =
-          let str =
-            rename
-            @@
-            match t.ptype_name.txt with
-            | "t" ->
-              String.lowercase
-              @@ Option.value
-                   ~default:(Code_path.main_module_name context.code_path)
-              @@ List.last
-              @@ Ppxlib.Code_path.submodule_path context.code_path
-            | name -> name
+  let close ~loc ~context t params schema =
+    let schema =
+      let id =
+        let init =
+          let default =
+            let str =
+              rename
+              @@
+              match t.ptype_name.txt with
+              | "t" ->
+                String.lowercase
+                @@ Option.value
+                     ~default:(Code_path.main_module_name context.code_path)
+                @@ List.last
+                @@ Ppxlib.Code_path.submodule_path context.code_path
+              | name -> name
+            in
+            Expr.string ~loc str
           in
-          Expr.string ~loc str
+          Option.value ~default context.attributes.name
+        and f param exp =
+          match param with
+          | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
+            [%expr
+              Schematic.Schema.name_combine
+                [%e Expr.id ~loc (schema_name name)]
+                [%e exp]]
+          | { ptyp_desc = Ptyp_any; _ }, _ -> exp
+          | t, _ ->
+            Ppxlib.Location.raise_errorf ~loc
+              "schematic-ppx: unsupported type parameter %a" Pprintast.core_type
+              t
         in
-        Option.value ~default context.attributes.name
-      and f param exp =
-        match param with
-        | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
-          [%expr
-            Schematic.Schema.name_combine
-              [%e Expr.id ~loc (schema_name name)]
-              [%e exp]]
-        | { ptyp_desc = Ptyp_any; _ }, _ -> exp
-        | t, _ ->
-          Ppxlib.Location.raise_errorf ~loc
-            "schematic-ppx: unsupported type parameter %a" Pprintast.core_type t
+        List.fold_right ~init ~f params |> Expr.some ~loc
       in
-      List.fold_right ~init ~f params
+      match schema with
+      | Components c -> schema_of_expanded ~loc (Components { c with id })
+      | Expression e -> [%expr { ([%e e]) with id = [%e id] }]
     in
-    let init = schema_of_descriptor ~loc ~id:[%expr Some [%e name]] body
-    and wrap arg exp =
+    let wrap arg exp =
       match arg with
       | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
         [%expr fun [%p pattern_id ~loc (schema_name name)] -> [%e exp]]
@@ -965,7 +995,7 @@ module Schema = struct
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: unsupported type parameter %a" Pprintast.core_type t
     in
-    let body = List.fold_right ~f:wrap ~init params in
+    let body = List.fold_right ~f:wrap ~init:schema params in
     let name = schema_name t.ptype_name.txt in
     let pattern = pattern_id ~loc:t.ptype_name.loc name in
     let body =
