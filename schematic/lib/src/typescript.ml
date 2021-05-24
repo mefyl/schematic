@@ -43,10 +43,7 @@ let name s =
 type t =
   | Atom of string
   | Intersection of t list
-  | Object of {
-      name : string option;
-      fields : (string * t * bool) list;
-    }
+  | Object of { fields : (string * t * bool) list }
   | String of string
   | Template of {
       name : string;
@@ -55,9 +52,7 @@ type t =
   | Tuple of t list
   | Union of t list
 
-let rec of_descriptor :
-    type s. string option -> s Schema.descriptor -> t * Marks.t =
- fun name -> function
+let rec of_descriptor : type s. s Schema.descriptor -> t * Marks.t = function
   | Any -> (Atom "any", Marks.empty)
   | Bool -> (Atom "boolean", Marks.empty)
   | Date -> (Atom "Date", Marks.empty)
@@ -69,7 +64,7 @@ let rec of_descriptor :
   | List s ->
     let s, marks = of_schema s in
     (Template { name = "Array"; args = [ s ] }, marks)
-  | Map (_, _, d) -> of_descriptor name d
+  | Map (_, _, d) -> of_descriptor d
   | Mapping s ->
     let s, marks = of_schema s in
     (Template { name = "Record"; args = [ Atom "string"; s ] }, marks)
@@ -84,7 +79,7 @@ let rec of_descriptor :
     (Atom "Date", Marks.empty)
   | Object fields ->
     let fields, marks = of_object fields in
-    (Object { name; fields }, marks)
+    (Object { fields }, marks)
   | Tuple items ->
     let items, marks = of_tuple items in
     (Tuple items, marks)
@@ -95,7 +90,7 @@ let rec of_descriptor :
     (Union cases, marks)
 
 and of_schema : type s. s Schema.t -> t * Marks.t = function
-  | { id = None; descriptor; _ } -> of_descriptor None descriptor
+  | { id = None; descriptor; _ } -> of_descriptor descriptor
   | { id = Some id; _ } as schema -> (Atom (name id), Marks.make id schema)
 
 and of_object : type s. s Schema.field -> (string * t * bool) list * Marks.t =
@@ -136,10 +131,7 @@ and of_case : type s. string option -> s Schema.case -> t * Marks.t =
   match key with
   | None -> (schema, marks)
   | Some key ->
-    ( Intersection
-        [
-          schema; Object { name = None; fields = [ (key, String name, true) ] };
-        ],
+    ( Intersection [ schema; Object { fields = [ (key, String name, true) ] } ],
       marks )
 
 let rec of_schema : type a. Marks.t -> a Schema.t -> (string * t) list * Marks.t
@@ -148,14 +140,14 @@ let rec of_schema : type a. Marks.t -> a Schema.t -> (string * t) list * Marks.t
   match id with
   | Some id when Marks.has marks (Mark.make id schema) -> ([], marks)
   | Some id ->
-    let res, deps = of_descriptor (Some id) descriptor in
+    let res, deps = of_descriptor descriptor in
     let marks = Marks.add marks (Mark.make id schema) in
     let f (res, marks) (Mark.Schema (_, dep)) =
       let deps, marks = of_schema marks dep in
       (res @ deps, marks)
     in
     Set.fold ~init:([ (name id, res) ], marks) ~f deps
-  | None -> failwith "schema has no id"
+  | _ -> failwith "schema has no id"
 
 let unpacker marks =
   let unpack : type a. a Schema.t -> (string * t) list * Marks.t =
@@ -178,7 +170,7 @@ let of_schemas ?(exclude = []) schemas =
 
 let of_schema schema = of_schema Marks.empty schema |> fst
 
-let of_descriptor d = of_descriptor None d |> fst
+let of_descriptor d = of_descriptor d |> fst
 
 let break sp id fmt _ = Caml.Format.pp_print_break fmt sp id
 
