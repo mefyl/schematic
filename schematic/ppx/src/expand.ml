@@ -951,6 +951,24 @@ module Schema = struct
   let expand_abstract_type ~loc ~context t = encode_type ~loc ~context t
 
   let close ~loc ~context t params schema =
+    let schema_id =
+      let default =
+        let str =
+          rename
+          @@
+          match t.ptype_name.txt with
+          | "t" ->
+            String.lowercase
+            @@ Option.value
+                 ~default:(Code_path.main_module_name context.code_path)
+            @@ List.last
+            @@ Ppxlib.Code_path.submodule_path context.code_path
+          | name -> name
+        in
+        Expr.string ~loc str
+      in
+      Option.value ~default context.attributes.name
+    in
     let params_wrap body =
       let wrap arg exp =
         match arg with
@@ -976,24 +994,7 @@ module Schema = struct
     in
     let schema =
       let id =
-        let init =
-          let default =
-            let str =
-              rename
-              @@
-              match t.ptype_name.txt with
-              | "t" ->
-                String.lowercase
-                @@ Option.value
-                     ~default:(Code_path.main_module_name context.code_path)
-                @@ List.last
-                @@ Ppxlib.Code_path.submodule_path context.code_path
-              | name -> name
-            in
-            Expr.string ~loc str
-          in
-          Option.value ~default context.attributes.name
-        and f param exp =
+        let f param exp =
           match param with
           | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
             [%expr
@@ -1006,7 +1007,7 @@ module Schema = struct
               "schematic-ppx: unsupported type parameter %a" Pprintast.core_type
               t
         in
-        List.fold_right ~init ~f params
+        List.fold_right ~init:schema_id ~f params
       in
       match schema with
       | Components c ->
@@ -1020,11 +1021,7 @@ module Schema = struct
           | _ ->
             let init =
               [%expr
-                Plain
-                  {
-                    name = [%e Expr.string ~loc t.ptype_name.txt];
-                    descriptor = [%e descriptor];
-                  }]
+                Plain { name = [%e schema_id]; descriptor = [%e descriptor] }]
             and f arg parametric =
               match arg with
               | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->

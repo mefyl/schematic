@@ -48,7 +48,9 @@ module Generate_types = struct
   type ('t, 'error) res =
     | Ok of 't
     | Error of 'error
-  [@@schematic.union_key "status"] [@@deriving schema]
+  [@@schematic.union_key "status"]
+  [@@schematic.name "result"]
+  [@@deriving schema]
 
   type record_res = (record, string) res [@@deriving schema]
 
@@ -60,8 +62,8 @@ module Generate_types = struct
       ];
     test record_res_schema
       [
-        ("RecordRes", "Res<Record, string>");
-        ( "Res<T, Error>",
+        ("RecordRes", "Result<Record, string>");
+        ( "Result<T, Error>",
           {|T & { "status": "ok" } | Error & { "status": "error" }|} );
       ]
 
