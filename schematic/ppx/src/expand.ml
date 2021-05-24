@@ -86,6 +86,8 @@ module Expr = struct
       }
 
   let some ~loc e = [%expr Some [%e e]]
+
+  let none ~loc = [%expr None]
 end
 
 module Pattern = struct
@@ -467,7 +469,7 @@ module Schema = struct
     | Expression e -> e
 
   let rec encode_type ~loc ~context = function
-    (* Map.ping *)
+    (* Mapping *)
     | [%type: (string * [%t? t]) list] ->
       expanded_of_descriptor ~loc
         [%expr
@@ -479,16 +481,17 @@ module Schema = struct
     | { ptyp_desc = Ptyp_constr ({ txt = Lident "list"; loc }, [ arg ]); _ } ->
       expanded_of_descriptor ~loc
         [%expr
-          List [%e schema_of_expanded ~loc @@ encode_type ~loc ~context arg]]
+          Schema.List
+            [%e schema_of_expanded ~loc @@ encode_type ~loc ~context arg]]
     (* Parametric type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } ->
-      let schema = expr_id ~loc (schema_id ~loc txt)
+      let schema_f = expr_id ~loc (schema_id ~loc txt)
       and f t =
         (Nolabel, schema_of_expanded ~loc @@ encode_type ~loc ~context t)
       in
       Expression
         {
-          pexp_desc = Pexp_apply (schema, List.map ~f args);
+          pexp_desc = Pexp_apply (schema_f, List.map ~f args);
           pexp_loc = loc;
           pexp_loc_stack = [];
           pexp_attributes = [];
@@ -590,7 +593,7 @@ module Schema = struct
         pexp_attributes = [];
       }
     in
-    [%expr Map ([%e construct], [%e deconstruct], [%e obj])]
+    [%expr Schema.Map ([%e construct], [%e deconstruct], [%e obj])]
 
   and expand_record ~loc ~context fields =
     _expand_record false ~loc ~context fields
@@ -948,6 +951,29 @@ module Schema = struct
   let expand_abstract_type ~loc ~context t = encode_type ~loc ~context t
 
   let close ~loc ~context t params schema =
+    let params_wrap body =
+      let wrap arg exp =
+        match arg with
+        | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
+          [%expr fun [%p pattern_id ~loc @@ schema_name name] -> [%e exp]]
+        | { ptyp_desc = Ptyp_any; _ }, _ -> [%expr fun _ -> [%e exp]]
+        | t, _ ->
+          Ppxlib.Location.raise_errorf ~loc
+            "schematic-ppx: unsupported type parameter %a" Pprintast.core_type t
+      in
+      List.fold_right ~f:wrap ~init:body params
+    and params_apply f =
+      let wrap f arg =
+        match arg with
+        | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
+          [%expr [%e f] [%e Expr.id ~loc @@ schema_name name]]
+        | { ptyp_desc = Ptyp_any; _ }, _ -> [%expr [%e f] ()]
+        | t, _ ->
+          Ppxlib.Location.raise_errorf ~loc
+            "schematic-ppx: unsupported type parameter %a" Pprintast.core_type t
+      in
+      List.fold_left ~f:wrap ~init:f params
+    in
     let schema =
       let id =
         let init =
@@ -980,22 +1006,61 @@ module Schema = struct
               "schematic-ppx: unsupported type parameter %a" Pprintast.core_type
               t
         in
-        List.fold_right ~init ~f params |> Expr.some ~loc
+        List.fold_right ~init ~f params
       in
       match schema with
-      | Components c -> schema_of_expanded ~loc (Components { c with id })
-      | Expression e -> [%expr { ([%e e]) with id = [%e id] }]
+      | Components c ->
+        (* if params = [] then
+         *   schema_of_expanded ~loc (Components { c with id })
+         * else *)
+        let descriptor = params_apply [%expr descriptor] in
+        let parametric =
+          match params with
+          | [] -> Expr.none ~loc
+          | _ ->
+            let init =
+              [%expr
+                Plain
+                  {
+                    name = [%e Expr.string ~loc t.ptype_name.txt];
+                    descriptor = [%e descriptor];
+                  }]
+            and f arg parametric =
+              match arg with
+              | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
+                let schema_name = schema_name name in
+                [%expr
+                  Parametric
+                    {
+                      name = [%e Expr.string ~loc name];
+                      parameter = [%e Expr.id ~loc schema_name];
+                      next =
+                        (fun [%p Pattern.id ~loc schema_name] ->
+                          [%e parametric]);
+                    }]
+              (* | { ptyp_desc = Ptyp_any; _ }, _ -> [%expr fun _ -> [%e exp]] *)
+              | t, _ ->
+                Ppxlib.Location.raise_errorf ~loc
+                  "schematic-ppx: unsupported type parameter %a"
+                  Pprintast.core_type t
+            in
+            Expr.some ~loc @@ List.fold_right ~f ~init params
+        in
+        [%expr
+          let descriptor = [%e params_wrap c.descriptor]
+          and id = [%e id] in
+          Schema.
+            {
+              descriptor = [%e descriptor];
+              id = Some id;
+              parametric = [%e parametric];
+            }]
+      | Expression e -> [%expr { ([%e e]) with id = [%e Expr.some ~loc id] }]
+      (* [%expr
+       *   let Schema.{ descriptor; parametric; _ } = [%e e] in
+       *   Schema.{ descriptor; id = [%e id]; parametric }] *)
     in
-    let wrap arg exp =
-      match arg with
-      | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
-        [%expr fun [%p pattern_id ~loc (schema_name name)] -> [%e exp]]
-      | { ptyp_desc = Ptyp_any; _ }, _ -> [%expr fun _ -> [%e exp]]
-      | t, _ ->
-        Ppxlib.Location.raise_errorf ~loc
-          "schematic-ppx: unsupported type parameter %a" Pprintast.core_type t
-    in
-    let body = List.fold_right ~f:wrap ~init:schema params in
+    let body = params_wrap schema in
     let name = schema_name t.ptype_name.txt in
     let pattern = pattern_id ~loc:t.ptype_name.loc name in
     let body =

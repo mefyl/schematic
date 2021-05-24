@@ -57,9 +57,13 @@ module Generate_types = struct
       [
         ("StringOrInt", "Either<string, number>");
         ("Either<First, Second>", "First | Second");
+      ];
+    test record_res_schema
+      [
+        ("RecordRes", "Res<Record, string>");
+        ( "Res<T, Error>",
+          {|T & { "status": "ok" } | Error & { "status": "error" }|} );
       ]
-  (*; test record_res_schema [ ("RecordRes", "Either<string, number>");
-    ("Result<T1, T2>", "T1 | T2") ]*)
 
   let record () =
     test record_schema
