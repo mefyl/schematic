@@ -155,21 +155,16 @@ and of_parametric :
         (name id, Template { name = name template_name; args = List.rev args })
       in
       let schemas, marks =
-        let mark = Mark.make template_name (Schema.make descriptor) in
-        if Marks.has marks mark then
-          ([ schema ], marks)
-        else
-          let template, deps = of_descriptor descriptor
-          and args = List.rev params in
-          ( [
-              schema;
-              ( Fmt.(
-                  str "%s<%a>" (name template_name)
-                    (list ~sep:(const string ", ") string)
-                    args),
-                template );
-            ],
-            Marks.merge [ marks; deps ] )
+        let mark =
+          let id =
+            Fmt.(
+              str "%s<%a>" (name template_name)
+                (list ~sep:(const string ", ") string)
+                (List.rev params))
+          in
+          Mark.make template_name (Schema.make ~id descriptor)
+        in
+        ([ schema ], Marks.add marks mark)
       in
       (schemas, marks)
   in

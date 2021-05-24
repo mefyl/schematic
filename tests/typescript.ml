@@ -67,9 +67,9 @@ module Generate_types = struct
     test record_res_schema
       [
         ("RecordRes", "Result<Record, string>");
+        ("Record", {|{ "a": number; "b"?: number; "c": string }|});
         ( "Result<T, Error>",
           {|T & { "status": "ok" } | Error & { "status": "error" }|} );
-        ("Record", {|{ "a": number; "b"?: number; "c": string }|});
       ]
 
   let tuple () = test tuple_schema [ ("Tuple", "[ string, number, null ]") ]
