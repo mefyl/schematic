@@ -10,13 +10,14 @@ and inline = { b : float option }
 
 and nullable = bool option
 
-and tuple = string * int64 * unit
+and tuple = string * int64 * unit [@@deriving schema]
 
-and variant =
+type variant =
   | Record of record
   | Otherwise of { i : int }
+[@@deriving schema]
 
-and keyed_variant =
+type keyed_variant =
   | KRecord of record
   | KOtherwise of { i : int }
 [@@schematic.union_key "kind"]
@@ -41,6 +42,24 @@ module Generate_types = struct
       @@ Schematic.Typescript.of_schema t)
 
   let nullable () = test nullable_schema [ ("Nullable", "boolean | null") ]
+
+  type string_or_int = (string, int) Either.t [@@deriving schema]
+
+  type ('t, 'error) res =
+    | Ok of 't
+    | Error of 'error
+  [@@schematic.union_key "status"] [@@deriving schema]
+
+  type record_res = (record, string) res [@@deriving schema]
+
+  let parametric () =
+    test string_or_int_schema
+      [
+        ("StringOrInt", "Either<string, number>");
+        ("Either<First, Second>", "First | Second");
+      ]
+  (*; test record_res_schema [ ("RecordRes", "Either<string, number>");
+    ("Result<T1, T2>", "T1 | T2") ]*)
 
   let record () =
     test record_schema
@@ -72,6 +91,7 @@ let () =
       ( "generate types",
         [
           test_case "nullable" `Quick Generate_types.nullable;
+          test_case "parametric" `Quick Generate_types.parametric;
           test_case "record" `Quick Generate_types.record;
           test_case "recursive" `Quick Generate_types.recursive;
           test_case "tuple" `Quick Generate_types.tuple;

@@ -91,7 +91,11 @@ let rec of_descriptor : type s. s Schema.descriptor -> t * Marks.t = function
 
 and of_schema : type s. s Schema.t -> t * Marks.t = function
   | { id = None; descriptor; _ } -> of_descriptor descriptor
-  | { id = Some id; _ } as schema -> (Atom (name id), Marks.make id schema)
+  | { id = Some id; _ } as schema ->
+    if String.is_prefix ~prefix:"#" id then
+      (Atom (name @@ String.subo ~pos:1 id), Marks.empty)
+    else
+      (Atom (name id), Marks.make id schema)
 
 and of_object : type s. s Schema.field -> (string * t * bool) list * Marks.t =
   function
@@ -134,12 +138,50 @@ and of_case : type s. string option -> s Schema.case -> t * Marks.t =
     ( Intersection [ schema; Object { fields = [ (key, String name, true) ] } ],
       marks )
 
+and of_parametric :
+    type a.
+    Marks.t -> string -> a Schema.parametric -> (string * t) list * Marks.t =
+ fun marks id parametric ->
+  let rec f params marks args = function
+    | Schema.Parametric { parameter; next; name = param_name } ->
+      let p, deps = of_schema parameter
+      and param_name = name param_name in
+      f (param_name :: params)
+        (Marks.merge [ marks; deps ])
+        (p :: args)
+        (next { parameter with id = Some ("#" ^ param_name) })
+    | Schema.Plain { name = template_name; descriptor } ->
+      let schema =
+        (name id, Template { name = name template_name; args = List.rev args })
+      in
+      let schemas, marks =
+        let mark = Mark.make template_name (Schema.make descriptor) in
+        if Marks.has marks mark then
+          ([ schema ], marks)
+        else
+          let template, deps = of_descriptor descriptor
+          and args = List.rev params in
+          ( [
+              schema;
+              ( Fmt.(
+                  str "%s<%a>" (name template_name)
+                    (list ~sep:(const string ", ") string)
+                    args),
+                template );
+            ],
+            Marks.merge [ marks; deps ] )
+      in
+      (schemas, marks)
+  in
+  f [] marks [] parametric
+
 let rec of_schema : type a. Marks.t -> a Schema.t -> (string * t) list * Marks.t
     =
- fun marks (Schema.{ id; descriptor; _ } as schema) ->
-  match id with
-  | Some id when Marks.has marks (Mark.make id schema) -> ([], marks)
-  | Some id ->
+ fun marks (Schema.{ id; descriptor; parametric } as schema) ->
+  match (id, parametric) with
+  | Some id, Some parametric -> of_parametric marks id parametric
+  | Some id, None when Marks.has marks (Mark.make id schema) -> ([], marks)
+  | Some id, None ->
     let res, deps = of_descriptor descriptor in
     let marks = Marks.add marks (Mark.make id schema) in
     let f (res, marks) (Mark.Schema (_, dep)) =
