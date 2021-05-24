@@ -436,8 +436,14 @@ module type EXPANSION = sig
     loc:location -> context:context -> constructor_declaration list -> expanded
 end
 
-let schema_of_descriptor ~loc ?(id = [%expr None]) desc =
-  [%expr { Schema.id = [%e id]; descriptor = [%e desc]; parametric = None }]
+let schema_of_descriptor
+    ~loc ?(id = [%expr None]) ?(parametric = [%expr None]) desc =
+  [%expr
+    {
+      Schema.id = [%e id];
+      descriptor = [%e desc];
+      parametric = [%e parametric];
+    }]
 
 module Schema = struct
   type closed = value_binding
@@ -453,21 +459,19 @@ module Schema = struct
     (* Plain type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
       expr_id ~loc (schema_id ~loc txt)
+    (* Lists *)
+    | { ptyp_desc = Ptyp_constr ({ txt = Lident "list"; loc }, [ arg ]); _ } ->
+      schema_of_descriptor ~loc [%expr List [%e encode_type ~loc ~context arg]]
     (* Parametric type *)
-    | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } -> (
-      match (txt, args) with
-      | Lident "list", [ arg ] ->
-        schema_of_descriptor ~loc
-          [%expr List [%e encode_type ~loc ~context arg]]
-      | _ ->
-        let schema = expr_id ~loc (schema_id ~loc txt)
-        and f t = (Nolabel, encode_type ~loc ~context t) in
-        {
-          pexp_desc = Pexp_apply (schema, List.map ~f args);
-          pexp_loc = loc;
-          pexp_loc_stack = [];
-          pexp_attributes = [];
-        })
+    | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } ->
+      let schema = expr_id ~loc (schema_id ~loc txt)
+      and f t = (Nolabel, encode_type ~loc ~context t) in
+      {
+        pexp_desc = Pexp_apply (schema, List.map ~f args);
+        pexp_loc = loc;
+        pexp_loc_stack = [];
+        pexp_attributes = [];
+      }
     (* Tuple *)
     | { ptyp_desc = Ptyp_tuple types; _ } ->
       let field_name i { ptyp_loc = loc; _ } = (loc, "e" ^ Int.to_string i)
