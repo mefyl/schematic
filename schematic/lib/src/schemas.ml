@@ -32,7 +32,7 @@ module Either = struct
   include Base.Either
 
   let schema first second =
-    let descriptor =
+    let descriptor first second =
       Schema.Union
         {
           cases =
@@ -61,7 +61,28 @@ module Either = struct
           key = None;
         }
     in
-    Schema.make descriptor
+    let parametric =
+      Schema.Parametric
+        {
+          name = "first";
+          parameter = first;
+          next =
+            (fun first ->
+              Parametric
+                {
+                  name = "second";
+                  parameter = second;
+                  next =
+                    (fun second ->
+                      Plain
+                        {
+                          name = "either";
+                          descriptor = descriptor first second;
+                        });
+                });
+        }
+    in
+    Schema.make ~parametric (descriptor first second)
 end
 
 module Ptime = struct
