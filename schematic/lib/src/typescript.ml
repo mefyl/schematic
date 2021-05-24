@@ -197,18 +197,20 @@ let unpacker marks =
   in
   { Schema.unpack }
 
-let of_schemas ?(exclude = []) schemas =
+let of_schemas_state marks schemas =
   let f (res, marks) s =
     let ts, marks = Schema.unpack (unpacker marks) s in
     (res @ ts, marks)
   in
-  List.fold_left
-    ~init:
-      ( [],
-        Marks.of_list
-          (List.map ~f:(Schema.unpack { unpack = Mark.of_schema }) exclude) )
-    ~f schemas
-  |> fst
+  List.fold_left ~init:([], marks) ~f schemas
+
+let state_exclude schemas =
+  Marks.of_list
+    (List.map ~f:(Schema.unpack { unpack = Mark.of_schema }) schemas)
+
+let of_schemas ?(exclude = []) schemas =
+  let marks = state_exclude exclude in
+  of_schemas_state marks schemas |> fst
 
 let of_schema schema = of_schema Marks.empty schema |> fst
 
@@ -269,3 +271,7 @@ let pp ?(indent = 2) fmt ts =
   pp fmt ts
 
 let to_string t = Fmt.(str "%a" (box pp) t)
+
+type state = Marks.t
+
+let state_empty = Marks.empty

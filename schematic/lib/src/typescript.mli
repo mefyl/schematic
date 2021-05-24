@@ -22,3 +22,18 @@ val pp : ?indent:int -> Format.formatter -> t -> unit
 
 (** [to_string t] is the typescript type declarations for [t]. *)
 val to_string : t -> string
+
+(** A state to be passed across invocation to avoid emitting types multiple
+    times. *)
+type state
+
+(** Initial empty state *)
+val state_empty : state
+
+(** State that prevent given types from being emitted *)
+val state_exclude : Schema.pack list -> state
+
+(** [of_schema_state state s] are the typescript types corresponding to schema
+    [s] and all referenced schemas. Schemas already present in [state] are not
+    emitted again, and an updated state with newly emitted types is returned. *)
+val of_schemas_state : state -> Schema.pack list -> (string * t) list * state
