@@ -16,6 +16,12 @@ module Either = struct
   type (_, _) js = Js.Unsafe.any
 end
 
+module Result = struct
+  include Schematic.Schema.Schemas.Result
+
+  type (_, _) js = Js.Unsafe.any
+end
+
 module Ptime = struct
   include Schematic.Schema.Schemas.Ptime
 

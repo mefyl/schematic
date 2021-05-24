@@ -32,6 +32,12 @@ module Either : sig
   val schema : 'a Schema.t -> 'b Schema.t -> ('a, 'b) t Schema.t
 end
 
+module Result : sig
+  include module type of Base.Result
+
+  val schema : 't Schema.t -> 'error Schema.t -> ('t, 'error) t Schema.t
+end
+
 module Ptime : sig
   include module type of Ptime with type t = Ptime.t and type span = Ptime.span
 

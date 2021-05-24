@@ -85,6 +85,59 @@ module Either = struct
     Schema.make ~parametric (descriptor first second)
 end
 
+module Result = struct
+  include Base.Result
+
+  let schema t error_schema =
+    let descriptor t error_schema =
+      Schema.Union
+        {
+          cases =
+            [
+              Case
+                {
+                  name = "t";
+                  schema = t;
+                  encoder =
+                    (function
+                    | Ok x -> Some x
+                    | Error _ -> None);
+                  decoder = Result.return;
+                };
+              Case
+                {
+                  name = "error";
+                  schema = error_schema;
+                  encoder =
+                    (function
+                    | Result.Error x -> Some x
+                    | Result.Ok _ -> None);
+                  decoder = Result.fail;
+                };
+            ];
+          key = None;
+        }
+    in
+    let parametric =
+      Schema.Parametric
+        {
+          name = "t";
+          parameter = t;
+          next =
+            (fun t ->
+              Parametric
+                {
+                  name = "error";
+                  parameter = error_schema;
+                  next =
+                    (fun error ->
+                      Plain { name = "result"; descriptor = descriptor t error });
+                });
+        }
+    in
+    Schema.make ~parametric (descriptor t error_schema)
+end
+
 module Ptime = struct
   include Ptime
 
