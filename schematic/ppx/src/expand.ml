@@ -473,7 +473,8 @@ module Schema = struct
     | [%type: (string * [%t? t]) list] ->
       expanded_of_descriptor ~loc
         [%expr
-          Mapping [%e schema_of_expanded ~loc @@ encode_type ~loc ~context t]]
+          Schema.Mapping
+            [%e schema_of_expanded ~loc @@ encode_type ~loc ~context t]]
     (* Plain type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
       Expression (expr_id ~loc (schema_id ~loc txt))
