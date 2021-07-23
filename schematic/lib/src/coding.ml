@@ -125,6 +125,13 @@ module Make (Coding : S) = struct
       let* fields = Coding.to_fields o |> type_error schema path "object" v in
       Result.return (Coding.of_fields @@ (f, v) :: fields)
 
+  let requirement_return
+      (type a req) (req : (a, req) Schema.requirement) (v : a) : req =
+    match req with
+    | Required -> v
+    | Default _ -> v
+    | Optional -> Some v
+
   let decode schema =
     let module List = List_monad (Result) in
     let rec decode_field :
@@ -210,32 +217,36 @@ module Make (Coding : S) = struct
         let rec decode_object :
             type t. t Schema.field -> (t, E.decoding) Result.t = function
           | FieldEnd -> Result.return ()
-          | Field { field; omit; requirement; rest; schema; _ } ->
-            let inline, schema = Schema.extract_field_schema schema in
-            let field =
-              let missing =
-                if inline then
-                  let expected = Schema.descriptor_fields schema.descriptor in
-                  Option.is_some
-                  @@ List.find
-                       ~f:(fun f ->
-                         not (List.Assoc.mem ~equal:String.equal fields f))
-                       expected
-                else
-                  false
-              in
-              if missing then
-                decode_field omit id ids field schema requirement None
-              else
-                let value =
+          | Field { field; omit; requirement; rest; schema; _ } -> (
+            match Schema.extract_field_schema schema with
+            | _, { descriptor = Ignore; _ } ->
+              let* rest = decode_object rest in
+              Result.Ok (requirement_return requirement (), rest)
+            | inline, schema ->
+              let field =
+                let missing =
                   if inline then
-                    Some v
+                    let expected = Schema.descriptor_fields schema.descriptor in
+                    Option.is_some
+                    @@ List.find
+                         ~f:(fun f ->
+                           not (List.Assoc.mem ~equal:String.equal fields f))
+                         expected
                   else
-                    List.Assoc.find ~equal:String.equal fields field
+                    false
                 in
-                decode_field omit id ids field schema requirement value
-            in
-            Result.Let_syntax.Let_syntax.both field (decode_object rest)
+                if missing then
+                  decode_field omit id ids field schema requirement None
+                else
+                  let value =
+                    if inline then
+                      Some v
+                    else
+                      List.Assoc.find ~equal:String.equal fields field
+                  in
+                  decode_field omit id ids field schema requirement value
+              in
+              Result.Let_syntax.Let_syntax.both field (decode_object rest))
         in
         decode_object fields_schema
       | String -> Coding.to_string v |> type_error "string"
@@ -341,6 +352,10 @@ module Make (Coding : S) = struct
             type t. t -> t Schema.field -> (string * Coding.t) list =
          fun v -> function
           | FieldEnd -> []
+          | Field { schema = Inline { descriptor = Ignore; _ }; rest; _ } ->
+            encode_object (snd v) rest
+          | Field { schema = Outline { descriptor = Ignore; _ }; rest; _ } ->
+            encode_object (snd v) rest
           | Field { field; requirement; schema; rest; _ } -> (
             let inline, schema = Schema.extract_field_schema schema
             and hd, tl = v in

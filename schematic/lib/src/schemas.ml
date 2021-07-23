@@ -2,6 +2,10 @@ open Base
 
 type ignore = unit
 
+let pp_ignore _ () = ()
+
+let equal_ignore () () = true
+
 type any = Ezjsonm.value
 
 let any_schema = Schema.make Any

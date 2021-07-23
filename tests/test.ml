@@ -290,6 +290,20 @@ let mutually () =
     { next_b = Some { next_a = Some { next_b = None } } }
     "{\"next_b\": {\"next_a\": {}}}"
 
+(* Ignored *)
+
+type ignored = {
+  ignored : ignore;
+  not_ignored : unit;
+}
+[@@deriving eq, schema, show]
+
+let ignored () =
+  let ignored = Alcotest.(testable pp_ignored equal_ignored) in
+  test "missing ignored fields are accepted" ignored ignored_schema
+    { ignored = (); not_ignored = () }
+    "{\"not_ignored\": null}"
+
 (* Inline *)
 
 type inlined = {
@@ -714,6 +728,7 @@ let () =
           test_case "escape" `Quick escape;
           test_case "recursive" `Quick recursive;
           test_case "mutually recursive" `Quick mutually;
+          test_case "ignored" `Quick ignored;
           test_case "inline" `Quick inline;
           test_case "time" `Quick time;
           test_case "json-schema-metadata-description" `Quick

@@ -2,6 +2,10 @@ type any = Ezjsonm.value
 
 type ignore = unit
 
+val pp_ignore : Base.Formatter.t -> ignore -> unit
+
+val equal_ignore : ignore -> ignore -> bool
+
 val any_schema : any Schema.t
 
 val bool_schema : bool Schema.t
