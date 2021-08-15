@@ -8,6 +8,8 @@ val equal_ignore : ignore -> ignore -> bool
 
 val any_schema : any Schema.t
 
+val equal_any : any -> any -> bool
+
 val bool_schema : bool Schema.t
 
 val float_schema : float Schema.t

@@ -11,7 +11,7 @@ and type_ =
   | Object
   | String
   | OneOf of type_ list
-[@@deriving schema]
+[@@deriving eq, schema]
 
 type core = {
   id : uri_reference option; [@schematic.as "$id"]
@@ -96,4 +96,4 @@ and t = {
   metadata : metadata; [@schematic.inline]
   validation : validation; [@schematic.inline]
 }
-[@@deriving schema]
+[@@deriving eq, schema]

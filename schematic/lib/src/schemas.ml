@@ -8,6 +8,22 @@ let equal_ignore () () = true
 
 type any = Ezjsonm.value
 
+let rec equal_any l r =
+  match (l, r) with
+  | `Null, `Null -> true
+  | `Bool l, `Bool r -> Bool.equal l r
+  | `Float l, `Float r -> Float.equal l r
+  | `String l, `String r -> String.equal l r
+  | `A l, `A r -> List.equal equal_any l r
+  | `O l, `O r -> (
+    try
+      let l = Map.of_alist_exn (module String) l
+      and r = Map.of_alist_exn (module String) r in
+      Map.equal equal_any l r
+    with
+    | _ -> false)
+  | _ -> false
+
 let any_schema = Schema.make Any
 
 let bool_schema = Schema.make Bool
