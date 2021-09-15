@@ -434,7 +434,11 @@ module type EXPANSION = sig
     loc:location -> context:context -> core_type -> expanded
 
   val expand_record :
-    loc:location -> context:context -> label_declaration list -> expanded
+    loc:location ->
+    context:context ->
+    ?type_:type_declaration ->
+    label_declaration list ->
+    expanded
 
   val expand_variant :
     loc:location -> context:context -> constructor_declaration list -> expanded
@@ -596,10 +600,25 @@ module Schema = struct
     in
     [%expr Schema.Map ([%e construct], [%e deconstruct], [%e obj])]
 
-  and expand_record ~loc ~context fields =
-    _expand_record false ~loc ~context fields
+  and expand_record ~loc ~context ?type_ fields =
+    _expand_record false ~loc ~context ?type_ fields
 
-  and _expand_record as_tuple ~loc ~context fields =
+  and _expand_record
+      as_tuple ~loc ~context ?(type_ : type_declaration option) fields =
+    let type_ =
+      (* This type is used to explicitely disambiguate mapped values in case of
+         record field name conflicts, otherwise a schema can end up manipulating
+         a completely different type. *)
+      match type_ with
+      | None -> None
+      | Some type_ ->
+        Some
+          (ptyp ~loc
+             ~desc:
+               (Ptyp_constr
+                  ( { txt = Lident type_.ptype_name.txt; loc },
+                    List.map ~f:fst type_.ptype_params )))
+    in
     let fields_schema =
       let expand_fields fields =
         let expand_field = function
@@ -806,12 +825,17 @@ module Schema = struct
             pexp_attributes = [];
           }
       else
-        {
-          pexp_desc = Pexp_record (List.map ~f fields, None);
-          pexp_loc = loc;
-          pexp_loc_stack = [];
-          pexp_attributes = [];
-        }
+        let constructed =
+          {
+            pexp_desc = Pexp_record (List.map ~f fields, None);
+            pexp_loc = loc;
+            pexp_loc_stack = [];
+            pexp_attributes = [];
+          }
+        in
+        match type_ with
+        | None -> constructed
+        | Some type_ -> [%expr ([%e constructed] : [%t type_])]
     and deconstructed =
       let f { pld_name = { txt; loc }; _ } =
         ( { txt = Lident txt; loc },
@@ -833,12 +857,17 @@ module Schema = struct
             ppat_attributes = [];
           }
       else
-        {
-          ppat_desc = Ppat_record (List.map ~f fields, Closed);
-          ppat_loc = loc;
-          ppat_loc_stack = [];
-          ppat_attributes = [];
-        }
+        let deconstructed =
+          {
+            ppat_desc = Ppat_record (List.map ~f fields, Closed);
+            ppat_loc = loc;
+            ppat_loc_stack = [];
+            ppat_attributes = [];
+          }
+        in
+        match type_ with
+        | None -> deconstructed
+        | Some type_ -> [%pat? ([%p deconstructed] : [%t type_])]
     in
     expanded_of_descriptor ~loc
     @@ combinator ~loc fields field_name constructed deconstructed
@@ -1109,7 +1138,7 @@ module Jsoo_type = struct
       Ppxlib.Location.raise_errorf ~loc:t.ptyp_loc
         "schematic-ppx: unsupported type %a" Pprintast.core_type t
 
-  and expand_record ~loc ~context fields =
+  and expand_record ~loc ~context ?type_:_ fields =
     let f { pld_name; pld_type; pld_loc; _ } : object_field =
       let t = expand_type ~loc ~context pld_type in
       let t = [%type: [%t t] Js_of_ocaml.Js.readonly_prop] in
@@ -1336,7 +1365,8 @@ module Expander (Expansion : EXPANSION) = struct
       let body =
         let loc = t.ptype_loc in
         match t.ptype_kind with
-        | Ptype_record fields -> Expansion.expand_record ~loc ~context fields
+        | Ptype_record fields ->
+          Expansion.expand_record ~loc ~context ~type_:t fields
         | Ptype_abstract -> (
           match t.ptype_manifest with
           | Some core_type ->

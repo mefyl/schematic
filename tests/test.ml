@@ -706,6 +706,39 @@ module Names = struct
         (Some "names-result") (result_schema schema).id)
 end
 
+[@@@warning "-30"]
+
+type collision_1 = {
+  collision_a : int;
+  collision_b : string;
+}
+
+and 't collision_2 = {
+  collision_a : int; [@warning "-30"]
+  collision_b : 't;
+}
+[@@deriving eq, schema, show]
+
+[@@@warning "+30"]
+
+let collision_1 = Alcotest.testable pp_collision_1 equal_collision_1
+
+let collision_2 =
+  Alcotest.testable (pp_collision_2 Fmt.string) (equal_collision_2 String.equal)
+
+let collision () =
+  let () =
+    test "collision_1" collision_1 collision_1_schema
+      ({ collision_a = 725; collision_b = "725" } : collision_1)
+      {|{"collision_a": 725, "collision_b": "725"}|}
+  and () =
+    test "collision_2" collision_2
+      (collision_2_schema Schematic.Schema.Schemas.string_schema)
+      ({ collision_a = 725; collision_b = "725" } : string collision_2)
+      {|{"collision_a": 725, "collision_b": "725"}|}
+  in
+  ()
+
 (* Driver *)
 
 let () =
@@ -738,6 +771,7 @@ let () =
           test_case "optional-inline" `Quick optional_inline;
           test_case "keyed" `Quick keyed;
           test_case "map-error" `Quick map_error;
+          test_case "collisions" `Quick collision;
         ] );
       ( "comparison",
         [
