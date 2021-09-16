@@ -304,34 +304,71 @@ let ignored () =
     { ignored = (); not_ignored = () }
     "{\"not_ignored\": null}"
 
-(* Inline *)
+module Inline = struct
+  type inlined = {
+    b : int;
+    c : int;
+  }
 
-type inlined = {
-  b : int;
-  c : int;
-}
-[@@deriving schema]
+  and inlined_variant =
+    | Foo of inlined
+    | Bar of {
+        d : int;
+        e : int;
+      }
 
-type inline = {
-  a : int;
-  coin : inlined; [@schematic.inline]
-  d : int;
-  (* Check ignored fields can be inlined *)
-  ignored : Schematic.Schema.Schemas.ignore; [@schematic.inline]
-}
-[@@deriving schema]
+  and inline = {
+    a : int;
+    coin : inlined; [@schematic.inline]
+    d : int;
+    (* Check ignored fields can be inlined *)
+    ignored : Schematic.Schema.Schemas.ignore; [@schematic.inline]
+  }
 
-let pp_inlined fmt { b; c } = fprintf fmt "(%i, %i)" b c
+  and variant_inline =
+    | Ctor of {
+        a : int;
+        coin : inlined; [@schematic.inline]
+        d : int;
+        (* Check ignored fields can be inlined *)
+        ignored : Schematic.Schema.Schemas.ignore; [@schematic.inline]
+      }
+    | Dummy
 
-let pp_inline fmt { a; coin; d; ignored = () } =
-  fprintf fmt "(%i, %a, %i)" a pp_inlined coin d
+  and inline_variant = {
+    x : int;
+    pan : inlined_variant; [@schematic.inline]
+  }
+  [@@deriving eq, schema, show]
 
-let test_inline = Alcotest.testable pp_inline ( = )
+  let inline = Alcotest.testable pp_inline equal_inline
 
-let inline () =
-  test "inline" test_inline inline_schema
-    { a = 0; coin = { b = 1; c = 2 }; d = 3; ignored = () }
-    "{\"a\": 0.000000, \"b\": 1.000000, \"c\": 2.000000, \"d\": 3.000000}"
+  let variant_inline = Alcotest.testable pp_variant_inline equal_variant_inline
+
+  let inline_variant = Alcotest.testable pp_inline_variant equal_inline_variant
+
+  let record () =
+    test "inline" inline inline_schema
+      { a = 0; coin = { b = 1; c = 2 }; d = 3; ignored = () }
+      "{\"a\": 0.000000, \"b\": 1.000000, \"c\": 2.000000, \"d\": 3.000000}"
+
+  let variant_payload () =
+    test "inline" variant_inline variant_inline_schema
+      (Ctor { a = 0; coin = { b = 1; c = 2 }; d = 3; ignored = () })
+      "{\"a\": 0.000000, \"b\": 1.000000, \"c\": 2.000000, \"d\": 3.000000}"
+
+  let inline_variant () =
+    let () =
+      test "inlining the first constructor of the variant" inline_variant
+        inline_variant_schema
+        { x = 362; pan = Foo { b = 363; c = 364 } }
+        "{\"x\": 362.000000, \"b\": 363.000000, \"c\": 364.000000 }"
+    in
+    test "inlining the second constructor of the variant" inline_variant
+      inline_variant_schema
+      { x = 369; pan = Bar { d = 370; e = 371 } }
+      "{\"x\": 366.000000, \"d\": 370.000000, \"e\": 371.000000 }"
+end
 
 (* Time *)
 
@@ -762,7 +799,9 @@ let () =
           test_case "recursive" `Quick recursive;
           test_case "mutually recursive" `Quick mutually;
           test_case "ignored" `Quick ignored;
-          test_case "inline" `Quick inline;
+          test_case "inline-record" `Quick Inline.record;
+          test_case "inline-variant-payload" `Quick Inline.variant_payload;
+          test_case "inline-variant" `Quick Inline.inline_variant;
           test_case "time" `Quick time;
           test_case "json-schema-metadata-description" `Quick
             Metadata.description;
