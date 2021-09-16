@@ -8,6 +8,10 @@ let required : type a b. (a, b) requirement -> bool = function
 let map cons decons { descriptor; _ } =
   { id = None; descriptor = Map (cons, decons, descriptor); parametric = None }
 
+let extract_field_schema = function
+  | Inline schema -> (true, schema)
+  | Outline schema -> (false, schema)
+
 let rec pp_descriptor : type u. u descriptor Fmt.t =
  fun f d ->
   let fmt =
@@ -37,28 +41,38 @@ let rec pp_descriptor : type u. u descriptor Fmt.t =
     | String_const v -> escape v
     | Time -> const string "Time"
     | Time_local -> const string "Time_local"
-    | Object _ -> const string "FIXME OBJECT"
+    | Object fields ->
+      box
+      @@ (hvbox ~indent
+         @@ (const string "{" ++ sp ++ const (hvbox pp_fields) fields))
+         ++ sp ++ const string "}"
     | Tuple _ -> const string "FIXME TUPLE"
     | Union { cases; _ } ->
-      box ~indent
-      @@ const string "Union [" ++ sp
-         ++ (box @@ const (list pp_case) cases)
+      box
+      @@ hvbox ~indent
+           (const string "Union [" ++ sp
+           ++ (hvbox @@ const (hvbox (list ~sep:comma pp_case)) cases))
          ++ sp ++ const string "]"
   in
   fmt f ()
 
 and pp_case : type u. u case Fmt.t =
-  let pp_case f (Case { name; schema; _ }) =
-    Fmt.pf f "@[{@ name: %S,@ schema: %a@ }@]" name pp schema
-  in
-  pp_case
+ fun f (Case { name; schema; _ }) ->
+  Fmt.pf f "@[@[<hv>{@ name: %S,@ schema: %a@ @]}@]" name pp schema
+
+and pp_fields : type t. t field Fmt.t =
+ fun fmt -> function
+  | FieldEnd -> ()
+  | Field { field = name; schema; rest; _ } ->
+    let _, schema = extract_field_schema schema in
+    Fmt.(
+      const string name ++ const string ": "
+      ++ const pp_descriptor schema.descriptor
+      ++ comma ++ const pp_fields rest)
+      fmt ()
 
 and pp : type u. u t Fmt.t =
  fun f { descriptor; _ } -> pp_descriptor f descriptor
-
-let extract_field_schema = function
-  | Inline schema -> (true, schema)
-  | Outline schema -> (false, schema)
 
 type 'res inline = { f : 't. 't field -> 'res }
 
