@@ -10,11 +10,11 @@ val pp_descriptor : Format.formatter -> _ descriptor -> unit
 
 val extract_field_schema : 'a field_schema -> bool * 'a t
 
-val descriptor_fields : 'a descriptor -> string list
+val descriptor_fields : 'a descriptor -> string list list
 
 type 'res inline = { f : 't. 't field -> 'res }
 
-val inline : 't descriptor -> 'res inline -> 'res
+val inline : 't descriptor -> 'res inline -> 'res list
 
 type 'res inline_v = { f : 't. 't field -> 't -> 'res }
 

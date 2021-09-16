@@ -28,10 +28,11 @@ let json_of_string s =
 let test ?(validate = true) name test schema value j =
   let encoded = Schematic.Json.encode schema value in
   let j = json_of_string j in
-  Alcotest.check json name j encoded;
+  Alcotest.check json (Fmt.str "%s: encoded JSON" name) j encoded;
   let () =
     match Schematic.Json.decode schema j with
-    | Result.Ok decoded -> Alcotest.check test name value decoded
+    | Result.Ok decoded ->
+      Alcotest.check test (Fmt.str "%s: decoded value" name) value decoded
     | Result.Error e ->
       Alcotest.fail
         (Fmt.str "JSON decode error: %a" Schematic.Error.pp_decoding e)
@@ -43,7 +44,8 @@ let test ?(validate = true) name test schema value j =
         (String.escaped @@ Schematic.Json.to_string @@ schema)
         (String.escaped @@ Schematic.Json.to_string @@ encoded)
     in
-    if Caml.Sys.command cmd <> 0 then Alcotest.check json name schema encoded
+    if Caml.Sys.command cmd <> 0 then
+      Alcotest.check json (Fmt.str "%s: schema validation" name) encoded schema
 
 (* Failure *)
 
@@ -333,7 +335,7 @@ module Inline = struct
         (* Check ignored fields can be inlined *)
         ignored : Schematic.Schema.Schemas.ignore; [@schematic.inline]
       }
-    | Dummy
+    | Dummy of { dummy : int }
 
   and inline_variant = {
     x : int;
@@ -348,26 +350,49 @@ module Inline = struct
   let inline_variant = Alcotest.testable pp_inline_variant equal_inline_variant
 
   let record () =
-    test "inline" inline inline_schema
+    let () =
+      Alcotest.(
+        check
+          (list @@ list string)
+          "the list of mandatory fields" [ [ "a"; "b"; "c"; "d" ] ]
+        @@ Schematic.Schema.descriptor_fields inline_schema.descriptor)
+    in
+    test "coding" inline inline_schema
       { a = 0; coin = { b = 1; c = 2 }; d = 3; ignored = () }
       "{\"a\": 0.000000, \"b\": 1.000000, \"c\": 2.000000, \"d\": 3.000000}"
 
   let variant_payload () =
-    test "inline" variant_inline variant_inline_schema
+    let () =
+      Alcotest.(
+        check
+          (list @@ list string)
+          "the list of mandatory fields"
+          [ [ "a"; "b"; "c"; "d" ]; [ "dummy" ] ]
+        @@ Schematic.Schema.descriptor_fields variant_inline_schema.descriptor)
+    in
+    test "coding" variant_inline variant_inline_schema
       (Ctor { a = 0; coin = { b = 1; c = 2 }; d = 3; ignored = () })
       "{\"a\": 0.000000, \"b\": 1.000000, \"c\": 2.000000, \"d\": 3.000000}"
 
   let inline_variant () =
     let () =
-      test "inlining the first constructor of the variant" inline_variant
-        inline_variant_schema
+      Alcotest.(
+        check
+          (list @@ list string)
+          "the list of mandatory fields"
+          [ [ "x"; "b"; "c" ]; [ "x"; "d"; "e" ] ]
+        @@ Schematic.Schema.descriptor_fields inline_variant_schema.descriptor)
+    in
+    let () =
+      (* FIXME: json schema of inlined variant not handled yet *)
+      test ~validate:false "coding of Foo" inline_variant inline_variant_schema
         { x = 362; pan = Foo { b = 363; c = 364 } }
         "{\"x\": 362.000000, \"b\": 363.000000, \"c\": 364.000000 }"
     in
-    test "inlining the second constructor of the variant" inline_variant
-      inline_variant_schema
+    (* FIXME: json schema of inlined variant not handled yet *)
+    test ~validate:false "coding of Bar" inline_variant inline_variant_schema
       { x = 369; pan = Bar { d = 370; e = 371 } }
-      "{\"x\": 366.000000, \"d\": 370.000000, \"e\": 371.000000 }"
+      "{\"x\": 369.000000, \"d\": 370.000000, \"e\": 371.000000 }"
 end
 
 (* Time *)

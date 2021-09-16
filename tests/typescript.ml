@@ -8,11 +8,16 @@ type record = {
 
 and inline = { b : float option }
 
+and inline_variant = {
+  coin : string;
+  pan : variant; [@schematic.inline]
+}
+
 and nullable = bool option
 
-and tuple = string * int64 * unit [@@deriving schema]
+and tuple = string * int64 * unit
 
-type variant =
+and variant =
   | Record of record
   | Otherwise of { i : int }
 [@@deriving schema]
@@ -33,6 +38,11 @@ and rec_b = {
 }
 [@@deriving schema]
 
+let record_typescript =
+  ("Record", {|{ "a": number; "b"?: number; "c": string }|})
+
+let variant_typescript = ("Variant", {|Record | { "i": number }|})
+
 module Generate_types = struct
   let test t expected =
     Alcotest.(
@@ -43,9 +53,7 @@ module Generate_types = struct
 
   let nullable () = test nullable_schema [ ("Nullable", "boolean | null") ]
 
-  let record () =
-    test record_schema
-      [ ("Record", {|{ "a": number; "b"?: number; "c": string }|}) ]
+  let record () = test record_schema [ record_typescript ]
 
   type string_or_int = (string, int) Either.t [@@deriving schema]
 
@@ -67,7 +75,7 @@ module Generate_types = struct
     test record_res_schema
       [
         ("RecordRes", "Result<Record, string>");
-        ("Record", {|{ "a": number; "b"?: number; "c": string }|});
+        record_typescript;
         ( "Result<T, Error>",
           {|T & { "status": "ok" } | Error & { "status": "error" }|} );
       ]
@@ -75,14 +83,22 @@ module Generate_types = struct
   let tuple () = test tuple_schema [ ("Tuple", "[ string, number, null ]") ]
 
   let variant () =
-    let variant = ("Variant", {|Record | { "i": number }|})
-    and keyed =
+    let keyed =
       ( "KeyedVariant",
         {|Record & { "kind": "krecord" } | { "i": number } & { "kind": "kotherwise" }|}
       )
-    and record = ("Record", {|{ "a": number; "b"?: number; "c": string }|}) in
-    test variant_schema [ variant; record ];
+    and record = record_typescript in
+    test variant_schema [ variant_typescript; record ];
     test keyed_variant_schema [ keyed; record ]
+
+  let inline_variant () =
+    test inline_variant_schema
+      [
+        ( "InlineVariant",
+          {|{ "coin": string; "a": number; "b"?: number; "c": string } |
+{ "coin": string; "i": number }|}
+        );
+      ]
 
   let recursive () =
     let rec_a = ("RecA", {|{ "self_a": RecA; "other_a": RecB }|})
@@ -103,5 +119,6 @@ let () =
           test_case "recursive" `Quick Generate_types.recursive;
           test_case "tuple" `Quick Generate_types.tuple;
           test_case "variant" `Quick Generate_types.variant;
+          test_case "inline-variant" `Quick Generate_types.inline_variant;
         ] );
     ]

@@ -77,9 +77,13 @@ let rec of_descriptor : type s. s Schema.descriptor -> t * Marks.t = function
   | Time
   | Time_local ->
     (Atom "Date", Marks.empty)
-  | Object fields ->
-    let fields, marks = of_object fields in
-    (Object { fields }, marks)
+  | Object fields -> (
+    let fields_cases, marks = of_object fields
+    and f fields = Object { fields } in
+    match fields_cases with
+    | [] -> failwith "typescript: of_objects yielded no result"
+    | [ fields ] -> (f fields, marks)
+    | cases -> (Union (List.map ~f cases), marks))
   | Tuple items ->
     let items, marks = of_tuple items in
     (Tuple items, marks)
@@ -97,8 +101,8 @@ and of_schema : type s. s Schema.t -> t * Marks.t = function
     else
       (Atom (name id), Marks.make id schema)
 
-and of_object : type s. s Schema.field -> (string * t * bool) list * Marks.t =
-  function
+and of_object :
+    type s. s Schema.field -> (string * t * bool) list list * Marks.t = function
   | Field
       {
         schema =
@@ -113,14 +117,24 @@ and of_object : type s. s Schema.field -> (string * t * bool) list * Marks.t =
     else
       let schema, marks = of_schema schema
       and rest, rest_marks = of_object rest in
-      ( (field, schema, Schema.required requirement) :: rest,
+      ( List.map ~f:(List.cons (field, schema, Schema.required requirement)) rest,
         Marks.merge [ marks; rest_marks ] )
   | Field { schema = Inline { descriptor; _ }; rest; _ } ->
     let fields, marks =
-      Schema.inline descriptor { f = (fun fields -> of_object fields) }
+      let fields, marks =
+        Schema.inline descriptor { f = (fun fields -> of_object fields) }
+        |> List.unzip
+      in
+      (Base.Sequence.(of_list fields |> map ~f:of_list |> concat), marks)
     and rest, rest_marks = of_object rest in
-    (fields @ rest, Marks.merge [ marks; rest_marks ])
-  | FieldEnd -> ([], Marks.empty)
+    let fields =
+      Base.Sequence.(
+        cartesian_product fields (of_list rest)
+        |> map ~f:(fun (l, r) -> l @ r)
+        |> to_list)
+    in
+    (fields, Marks.merge (rest_marks :: marks))
+  | FieldEnd -> ([ [] ], Marks.empty)
 
 and of_tuple : type s. s Schema.tuple -> t list * Marks.t = function
   | Item { schema; rest } ->

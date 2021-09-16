@@ -8,8 +8,9 @@ val of_descriptor : 'a Schema.descriptor -> t
     referenced schemas. *)
 val of_schema : 'a Schema.t -> (string * t) list
 
-(** [of_schemas s] are the typescript types corresponding to schema [s] and all
-    referenced schemas. *)
+(** [of_schemas ?exclude schemas] are the typescript types corresponding to all
+    schemas in [schemas] and all referenced schemas, except the one listed in
+    [excluded]. *)
 val of_schemas :
   ?exclude:Schema.pack list -> Schema.pack list -> (string * t) list
 

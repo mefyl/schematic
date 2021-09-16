@@ -226,12 +226,18 @@ module Make (Coding : S) = struct
               let field =
                 let missing =
                   if inline then
-                    let expected = Schema.descriptor_fields schema.descriptor in
-                    Option.is_some
-                    @@ List.find
-                         ~f:(fun f ->
-                           not (List.Assoc.mem ~equal:String.equal fields f))
-                         expected
+                    let expected_sets =
+                      Schema.descriptor_fields schema.descriptor
+                    in
+                    List.find
+                      ~f:(fun expected ->
+                        Option.is_none
+                        @@ List.find
+                             ~f:(fun f ->
+                               not (List.Assoc.mem ~equal:String.equal fields f))
+                             expected)
+                      expected_sets
+                    |> Option.is_none
                   else
                     false
                 in
