@@ -192,14 +192,15 @@ let of_schema schema =
                 schema;
                 title;
               } -> (
-            let inline, schema = Schema.extract_field_schema schema in
             let marks, fields =
-              if inline then
+              match schema with
+              | Inline schema
+              | Inline_try schema -> (
                 match applicator marks schema.descriptor with
                 | marks, Some applicator ->
                   (marks, Option.value ~default:[] applicator.properties)
-                | marks, None -> (marks, [])
-              else
+                | marks, None -> (marks, []))
+              | Outline schema ->
                 let marks, t = of_schema marks schema
                 and to_json v = Json.to_ezjsonm @@ Json.encode schema v in
                 ( marks,

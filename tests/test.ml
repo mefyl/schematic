@@ -341,13 +341,32 @@ module Inline = struct
     x : int;
     pan : inlined_variant; [@schematic.inline]
   }
+
+  and 'a inline_maybe = {
+    maybe : bool;
+    inline : 'a; [@schematic.inline_try]
+  }
   [@@deriving eq, schema, show]
 
   let inline = Alcotest.testable pp_inline equal_inline
 
+  let inlined = Alcotest.testable pp_inlined equal_inlined
+
   let variant_inline = Alcotest.testable pp_variant_inline equal_variant_inline
 
   let inline_variant = Alcotest.testable pp_inline_variant equal_inline_variant
+
+  let inline_maybe a =
+    Alcotest.(
+      testable (pp_inline_maybe @@ pp a) (equal_inline_maybe @@ equal a))
+
+  let descriptor_fields descriptor =
+    match
+      Schematic.Schema.(
+        inline descriptor { f = Schematic.Schema.object_fields })
+    with
+    | Result.Ok sets -> List.concat sets
+    | Result.Error e -> Alcotest.fail e
 
   let record () =
     let () =
@@ -355,7 +374,7 @@ module Inline = struct
         check
           (list @@ list string)
           "the list of mandatory fields" [ [ "a"; "b"; "c"; "d" ] ]
-        @@ Schematic.Schema.descriptor_fields inline_schema.descriptor)
+        @@ descriptor_fields inline_schema.descriptor)
     in
     test "coding" inline inline_schema
       { a = 0; coin = { b = 1; c = 2 }; d = 3; ignored = () }
@@ -368,7 +387,7 @@ module Inline = struct
           (list @@ list string)
           "the list of mandatory fields"
           [ [ "a"; "b"; "c"; "d" ]; [ "dummy" ] ]
-        @@ Schematic.Schema.descriptor_fields variant_inline_schema.descriptor)
+        @@ descriptor_fields variant_inline_schema.descriptor)
     in
     test "coding" variant_inline variant_inline_schema
       (Ctor { a = 0; coin = { b = 1; c = 2 }; d = 3; ignored = () })
@@ -381,7 +400,7 @@ module Inline = struct
           (list @@ list string)
           "the list of mandatory fields"
           [ [ "x"; "b"; "c" ]; [ "x"; "d"; "e" ] ]
-        @@ Schematic.Schema.descriptor_fields inline_variant_schema.descriptor)
+        @@ descriptor_fields inline_variant_schema.descriptor)
     in
     let () =
       (* FIXME: json schema of inlined variant not handled yet *)
@@ -393,6 +412,17 @@ module Inline = struct
     test ~validate:false "coding of Bar" inline_variant inline_variant_schema
       { x = 369; pan = Bar { d = 370; e = 371 } }
       "{\"x\": 369.000000, \"d\": 370.000000, \"e\": 371.000000 }"
+
+  let inline_try () =
+    test "inlinable" (inline_maybe inlined)
+      (inline_maybe_schema inlined_schema)
+      { maybe = true; inline = { b = 411; c = 412 } }
+      "{\"maybe\": true, \"b\": 411.000000, \"c\": 412.000000 }";
+    test ~validate:false "not inlinable"
+      (inline_maybe Alcotest.int)
+      (inline_maybe_schema int_schema)
+      { maybe = true; inline = 416 }
+      "{\"maybe\": true, \"inline\": 416.000000 }"
 end
 
 (* Time *)
@@ -827,6 +857,7 @@ let () =
           test_case "inline-record" `Quick Inline.record;
           test_case "inline-variant-payload" `Quick Inline.variant_payload;
           test_case "inline-variant" `Quick Inline.inline_variant;
+          test_case "inline-try" `Quick Inline.inline_try;
           test_case "time" `Quick time;
           test_case "json-schema-metadata-description" `Quick
             Metadata.description;

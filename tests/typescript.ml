@@ -22,6 +22,8 @@ and variant =
   | Otherwise of { i : int }
 [@@deriving schema]
 
+let tuple_typescript = ("Tuple", "[ string, number, null ]")
+
 type keyed_variant =
   | KRecord of record
   | KOtherwise of { i : int }
@@ -80,7 +82,7 @@ module Generate_types = struct
           {|T & { "status": "ok" } | Error & { "status": "error" }|} );
       ]
 
-  let tuple () = test tuple_schema [ ("Tuple", "[ string, number, null ]") ]
+  let tuple () = test tuple_schema [ tuple_typescript ]
 
   let variant () =
     let keyed =
@@ -98,6 +100,26 @@ module Generate_types = struct
           {|{ "coin": string; "a": number; "b"?: number; "c": string } |
 { "coin": string; "i": number }|}
         );
+      ]
+
+  type 'a inline_try = {
+    maybe : bool;
+    inline : 'a; [@schematic.inline_try]
+  }
+  [@@deriving schema]
+
+  let inline_try () =
+    test
+      { (inline_try_schema record_schema) with parametric = None }
+      [
+        ( "RecordInlineTry",
+          {|{ "maybe": boolean; "a": number; "b"?: number; "c": string }|} );
+      ];
+    test
+      { (inline_try_schema tuple_schema) with parametric = None }
+      [
+        ("TupleInlineTry", {|{ "maybe": boolean; "inline": Tuple }|});
+        tuple_typescript;
       ]
 
   let recursive () =
@@ -120,5 +142,6 @@ let () =
           test_case "tuple" `Quick Generate_types.tuple;
           test_case "variant" `Quick Generate_types.variant;
           test_case "inline-variant" `Quick Generate_types.inline_variant;
+          test_case "inline-try" `Quick Generate_types.inline_try;
         ] );
     ]

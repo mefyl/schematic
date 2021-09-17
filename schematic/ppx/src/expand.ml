@@ -2,6 +2,11 @@ open Base
 open Poly
 open Ppxlib
 
+type inline =
+  | Inline
+  | Inline_try
+  | Outline
+
 module List = struct
   include List
 
@@ -729,11 +734,18 @@ module Schema = struct
                     expect_payload_string ~loc attr_payload,
                     inline,
                     specs )
-                | "schematic.inline" -> (
+                | ("schematic.inline" as attr)
+                | ("schematic.inline_try" as attr) -> (
                   match attr_payload with
                   | PStr [] ->
-                    if not inline then
-                      (schema, txt, true, specs)
+                    if Option.is_none inline then
+                      let v =
+                        if String.(attr = "schematic.inline") then
+                          Inline
+                        else
+                          Inline_try
+                      in
+                      (schema, txt, Some v, specs)
                     else
                       Ppxlib.Location.raise_errorf ~loc
                         "schematic-ppx: inline specified multiple times"
@@ -745,7 +757,7 @@ module Schema = struct
                   (schema, txt, inline, specs)
               in
               List.fold_left ~f:read_attribute
-                ~init:(None, txt, false, specs_empty)
+                ~init:(None, txt, None, specs_empty)
                 pld_attributes
             in
             let requirement, t =
@@ -782,10 +794,10 @@ module Schema = struct
       let init = [%expr FieldEnd] in
       let f (loc, requirement, field, schema, inline, specs) rest =
         let schema =
-          if inline then
-            [%expr Inline [%e schema]]
-          else
-            [%expr Outline [%e schema]]
+          match Option.value ~default:Outline inline with
+          | Inline -> [%expr Inline [%e schema]]
+          | Inline_try -> [%expr Inline_try [%e schema]]
+          | Outline -> [%expr Outline [%e schema]]
         in
         [%expr
           Field

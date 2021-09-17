@@ -102,7 +102,32 @@ and of_schema : type s. s Schema.t -> t * Marks.t = function
       (Atom (name id), Marks.make id schema)
 
 and of_object :
-    type s. s Schema.field -> (string * t * bool) list list * Marks.t = function
+    type s. s Schema.field -> (string * t * bool) list list * Marks.t =
+  let inline descriptor rest =
+    let open Result in
+    Schema.inline descriptor { f = (fun fields -> of_object fields) }
+    |> map ~f:List.unzip
+    >>| fun (fields, marks) ->
+    let fields = Base.Sequence.(of_list fields |> map ~f:of_list |> concat)
+    and rest, rest_marks = of_object rest in
+    let fields =
+      Base.Sequence.(
+        cartesian_product fields (of_list rest)
+        |> map ~f:(fun (l, r) -> l @ r)
+        |> to_list)
+    in
+    (fields, Marks.merge (rest_marks :: marks))
+  in
+  let outline field schema rest requirement omit =
+    if omit then
+      of_object rest
+    else
+      let schema, marks = of_schema schema
+      and rest, rest_marks = of_object rest in
+      ( List.map ~f:(List.cons (field, schema, Schema.required requirement)) rest,
+        Marks.merge [ marks; rest_marks ] )
+  in
+  function
   | Field
       {
         schema =
@@ -112,28 +137,15 @@ and of_object :
       } ->
     of_object rest
   | Field { field; schema = Outline schema; rest; requirement; omit; _ } ->
-    if omit then
-      of_object rest
-    else
-      let schema, marks = of_schema schema
-      and rest, rest_marks = of_object rest in
-      ( List.map ~f:(List.cons (field, schema, Schema.required requirement)) rest,
-        Marks.merge [ marks; rest_marks ] )
-  | Field { schema = Inline { descriptor; _ }; rest; _ } ->
-    let fields, marks =
-      let fields, marks =
-        Schema.inline descriptor { f = (fun fields -> of_object fields) }
-        |> List.unzip
-      in
-      (Base.Sequence.(of_list fields |> map ~f:of_list |> concat), marks)
-    and rest, rest_marks = of_object rest in
-    let fields =
-      Base.Sequence.(
-        cartesian_product fields (of_list rest)
-        |> map ~f:(fun (l, r) -> l @ r)
-        |> to_list)
-    in
-    (fields, Marks.merge (rest_marks :: marks))
+    outline field schema rest requirement omit
+  | Field { schema = Inline { descriptor; _ }; rest; _ } -> (
+    match inline descriptor rest with
+    | Result.Ok v -> v
+    | Result.Error e -> failwith e)
+  | Field { field; omit; rest; requirement; schema = Inline_try schema; _ } -> (
+    match inline schema.descriptor rest with
+    | Result.Ok v -> v
+    | Result.Error _ -> outline field schema rest requirement omit)
   | FieldEnd -> ([ [] ], Marks.empty)
 
 and of_tuple : type s. s Schema.tuple -> t list * Marks.t = function

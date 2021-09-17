@@ -217,40 +217,71 @@ module Make (Coding : S) = struct
         let rec decode_object :
             type t. t Schema.field -> (t, E.decoding) Result.t = function
           | FieldEnd -> Result.return ()
-          | Field { field; omit; requirement; rest; schema; _ } -> (
-            match Schema.extract_field_schema schema with
-            | _, { descriptor = Ignore; _ } ->
+          | Field
+              {
+                field = field_name;
+                omit;
+                requirement;
+                rest;
+                schema = field_schema;
+                _;
+              } -> (
+            match Schema.extract_field_schema field_schema with
+            | { descriptor = Ignore; _ } ->
               let* rest = decode_object rest in
               Result.Ok (requirement_return requirement (), rest)
-            | inline, schema ->
+            | schema ->
               let field =
-                let missing =
-                  if inline then
-                    let expected_sets =
-                      Schema.descriptor_fields schema.descriptor
+                let missing, value =
+                  let inline Schema.{ descriptor; _ } =
+                    let missing =
+                      let expected_sets =
+                        match
+                          Schema.inline schema.descriptor
+                            { f = Schema.object_fields }
+                        with
+                        | Result.Ok v -> List.concat v
+                        | Result.Error _ -> [ [] ]
+                      in
+                      let res =
+                        List.find
+                          ~f:(fun expected ->
+                            Option.is_none
+                            @@ List.find
+                                 ~f:(fun f ->
+                                   not
+                                     (List.Assoc.mem ~equal:String.equal fields
+                                        f))
+                                 expected)
+                          expected_sets
+                        |> Option.is_none
+                      in
+                      Fmt.epr "MISSING: %b@." res;
+                      res
+                    and inlinable =
+                      Schema.inline descriptor { f = ignore } |> Result.is_ok
                     in
-                    List.find
-                      ~f:(fun expected ->
-                        Option.is_none
-                        @@ List.find
-                             ~f:(fun f ->
-                               not (List.Assoc.mem ~equal:String.equal fields f))
-                             expected)
-                      expected_sets
-                    |> Option.is_none
-                  else
-                    false
+                    (missing, inlinable)
+                  and outline () =
+                    List.Assoc.find ~equal:String.equal fields field_name
+                  in
+                  match field_schema with
+                  | Inline schema ->
+                    let missing, _inlinable = inline schema in
+                    (missing, Some v)
+                  | Inline_try schema ->
+                    let missing, inlinable = inline schema in
+                    ( missing,
+                      if inlinable then
+                        Some v
+                      else
+                        outline () )
+                  | Outline _ -> (false, outline ())
                 in
                 if missing then
-                  decode_field omit id ids field schema requirement None
+                  decode_field omit id ids field_name schema requirement None
                 else
-                  let value =
-                    if inline then
-                      Some v
-                    else
-                      List.Assoc.find ~equal:String.equal fields field
-                  in
-                  decode_field omit id ids field schema requirement value
+                  decode_field omit id ids field_name schema requirement value
               in
               Result.Let_syntax.Let_syntax.both field (decode_object rest))
         in
@@ -362,19 +393,28 @@ module Make (Coding : S) = struct
             encode_object (snd v) rest
           | Field { schema = Outline { descriptor = Ignore; _ }; rest; _ } ->
             encode_object (snd v) rest
-          | Field { field; requirement; schema; rest; _ } -> (
-            let inline, schema = Schema.extract_field_schema schema
-            and hd, tl = v in
+          | Field { field; requirement; schema = field_schema; rest; _ } -> (
+            let hd, tl = v in
             let tl = encode_object tl rest in
             match encode_field requirement hd with
-            | Some hd ->
-              if inline then
-                Schema.inline_v schema.descriptor hd
-                  { f = (fun fields v -> encode_object v fields) }
-                @ tl
-              else
-                let encoded = encode schema.descriptor hd in
+            | Some hd -> (
+              let outline schema =
+                let encoded = encode schema.Schema.descriptor hd in
                 (field, encoded) :: tl
+              in
+              match field_schema with
+              | Inline schema
+              | Inline_try schema -> (
+                match
+                  Schema.inline_v schema.descriptor hd
+                    { f = (fun fields v -> encode_object v fields) }
+                with
+                | Result.Ok v -> v @ tl
+                | Result.Error e -> (
+                  match field_schema with
+                  | Inline _ -> failwith e
+                  | _ -> outline schema))
+              | Outline schema -> outline schema)
             | None -> tl)
         in
         Coding.of_fields (encode_object v fields)

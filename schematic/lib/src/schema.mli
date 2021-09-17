@@ -8,17 +8,19 @@ val pp : Format.formatter -> _ t -> unit
 
 val pp_descriptor : Format.formatter -> _ descriptor -> unit
 
-val extract_field_schema : 'a field_schema -> bool * 'a t
+val extract_field_schema : 'a field_schema -> 'a t
 
-val descriptor_fields : 'a descriptor -> string list list
+(** [objects_fields fields] is a list of alternative mandatory fields name list
+    required to decode an object with fields [fields]. *)
+val object_fields : 'a field -> string list list
 
 type 'res inline = { f : 't. 't field -> 'res }
 
-val inline : 't descriptor -> 'res inline -> 'res list
+val inline : 't descriptor -> 'res inline -> ('res list, string) Result.t
 
 type 'res inline_v = { f : 't. 't field -> 't -> 'res }
 
-val inline_v : 't descriptor -> 't -> 'res inline_v -> 'res
+val inline_v : 't descriptor -> 't -> 'res inline_v -> ('res, string) Result.t
 
 val compare : 'a t -> 'a -> 'a -> int
 

@@ -15,6 +15,7 @@ type _ case =
 and 'a field_schema =
   | Outline of 'a t
   | Inline of 'a t
+  | Inline_try of 'a t
 
 and _ field =
   | FieldEnd : unit field

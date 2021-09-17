@@ -9,8 +9,9 @@ let map cons decons { descriptor; _ } =
   { id = None; descriptor = Map (cons, decons, descriptor); parametric = None }
 
 let extract_field_schema = function
-  | Inline schema -> (true, schema)
-  | Outline schema -> (false, schema)
+  | Inline schema -> schema
+  | Inline_try schema -> schema
+  | Outline schema -> schema
 
 let rec pp_descriptor : type u. u descriptor Fmt.t =
  fun f d ->
@@ -64,7 +65,7 @@ and pp_fields : type t. t field Fmt.t =
  fun fmt -> function
   | FieldEnd -> ()
   | Field { field = name; schema; rest; _ } ->
-    let _, schema = extract_field_schema schema in
+    let schema = extract_field_schema schema in
     Fmt.(
       const string name ++ const string ": "
       ++ const pp_descriptor schema.descriptor
@@ -76,25 +77,28 @@ and pp : type u. u t Fmt.t =
 
 type 'res inline = { f : 't. 't field -> 'res }
 
-let rec inline : type t. t descriptor -> 'res inline -> 'res list =
+let rec inline :
+    type t. t descriptor -> 'res inline -> ('res list, string) Result.t =
  fun d f ->
   match d with
-  | Ignore -> [ f.f FieldEnd ]
+  | Ignore -> Result.return [ f.f FieldEnd ]
   | Map (_, _, d) -> inline d f
-  | Object o -> [ f.f o ]
+  | Object o -> Result.return [ f.f o ]
   | Union { cases; _ } ->
     List.map ~f:(fun (Case { schema; _ }) -> inline schema.descriptor f) cases
-    |> List.concat
-  | s -> Fmt.failwith "inline field is not an object: %a" pp_descriptor s
+    |> Result.all |> Result.map ~f:List.concat
+  | s ->
+    Result.fail (Fmt.str "inline field is not an object: %a" pp_descriptor s)
 
 type 'res inline_v = { f : 't. 't field -> 't -> 'res }
 
-let rec inline_v : type t. t descriptor -> t -> 'res inline_v -> 'res =
+let rec inline_v :
+    type t. t descriptor -> t -> 'res inline_v -> ('res, string) Result.t =
  fun d v f ->
   match d with
-  | Ignore -> f.f FieldEnd v
+  | Ignore -> Result.return (f.f FieldEnd v)
   | Map (_, e, d) -> inline_v d (e v) f
-  | Object o -> f.f o v
+  | Object o -> Result.return (f.f o v)
   | Union { cases; _ } -> (
     let f (Case { encoder; schema; _ }) =
       match encoder v with
@@ -102,30 +106,43 @@ let rec inline_v : type t. t descriptor -> t -> 'res inline_v -> 'res =
       | Some v -> Some (inline_v schema.descriptor v f)
     in
     match List.find_map ~f cases with
-    | None -> Fmt.failwith "no union cased matched in inline_v"
+    | None -> Result.fail "no union cased matched in inline_v"
     | Some v -> v)
-  | s -> Fmt.failwith "inlined value field is not an object: %a" pp_descriptor s
+  | s ->
+    Result.fail
+      (Fmt.str "inlined value field is not an object: %a" pp_descriptor s)
 
-(** [descriptor_fields descriptor] is a list of alternative mandatory fields
-    name list required to decode an object decribed by [descriptor]. *)
-let descriptor_fields =
-  let rec object_fields : type t. t field -> string list list = function
+let object_fields =
+  let rec object_fields : type t. t field -> string list list =
+    let inline schema rest =
+      let open Base.Sequence in
+      descriptor_fields schema.descriptor
+      |> Result.map ~f:(fun fields ->
+             cartesian_product (of_list @@ fields)
+               (of_list @@ object_fields rest)
+             |> map ~f:(fun (l, r) -> l @ r)
+             |> to_list)
+    and outline field rest =
+      List.map ~f:(List.cons field) @@ object_fields rest
+    in
+    function
     | FieldEnd -> [ [] ]
     | Field { requirement = Default _ | Optional; rest; _ } ->
       object_fields rest
-    | Field { rest; schema = Inline schema; _ } ->
-      let open Base.Sequence in
-      cartesian_product
-        (of_list @@ descriptor_fields schema.descriptor)
-        (of_list @@ object_fields rest)
-      |> map ~f:(fun (l, r) -> l @ r)
-      |> to_list
-    | Field { field; rest; _ } ->
-      List.map ~f:(List.cons field) @@ object_fields rest
-  and descriptor_fields : type t. t descriptor -> string list list =
-   fun d -> inline d { f = object_fields } |> List.concat
+    | Field { rest; schema = Inline schema; _ } -> (
+      match inline schema rest with
+      | Result.Ok v -> v
+      | Result.Error e -> failwith e)
+    | Field { field; rest; schema = Inline_try schema; _ } -> (
+      match inline schema rest with
+      | Result.Ok v -> v
+      | Result.Error _ -> outline field rest)
+    | Field { field; rest; _ } -> outline field rest
+  and descriptor_fields :
+      type t. t descriptor -> (string list list, string) Result.t =
+   fun d -> inline d { f = object_fields } |> Result.map ~f:List.concat
   in
-  descriptor_fields
+  object_fields
 
 let assoc_compare compare l r =
   let f (key, l) =
@@ -183,7 +200,7 @@ let compare schema =
     | Object fields ->
       let rec compare_fields : type u. u field -> u -> u -> int = function
         | Field { schema; requirement; rest; _ } ->
-          let _, schema = extract_field_schema schema in
+          let schema = extract_field_schema schema in
           let f
               (type field req)
               (schema : field t)
