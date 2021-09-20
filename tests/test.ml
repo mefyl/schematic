@@ -423,6 +423,37 @@ module Inline = struct
       (inline_maybe_schema int_schema)
       { maybe = true; inline = 416 }
       "{\"maybe\": true, \"inline\": 416.000000 }"
+
+  type 'a inline_parametric =
+    | A of {
+        value : int;
+        param : 'a;
+      }
+    | B of {
+        value : string;
+        param : 'a;
+      }
+  [@@deriving eq, schema, show]
+
+  type parametric = {
+    inlined : Schematic.Schema.Schemas.ignore inline_parametric;
+        [@schematic.inline]
+        (* inlined : string option inline_parametric; [@schematic.inline] *)
+  }
+  [@@deriving eq, schema, show]
+
+  (* let inline_parametric a =
+   *   Alcotest.(
+   *     testable
+   *       (pp_inline_parametric @@ pp a)
+   *       (equal_inline_parametric @@ equal a)) *)
+
+  let parametric = Alcotest.testable pp_parametric equal_parametric
+
+  let inline_parametric () =
+    test ~validate:false "parametric inlinable" parametric parametric_schema
+      { inlined = A { value = 457; param = () } }
+      {|{"value": 457.000000 }|}
 end
 
 (* Time *)
@@ -858,6 +889,7 @@ let () =
           test_case "inline-variant-payload" `Quick Inline.variant_payload;
           test_case "inline-variant" `Quick Inline.inline_variant;
           test_case "inline-try" `Quick Inline.inline_try;
+          test_case "inline-parametric" `Quick Inline.inline_parametric;
           test_case "time" `Quick time;
           test_case "json-schema-metadata-description" `Quick
             Metadata.description;

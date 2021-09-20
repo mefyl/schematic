@@ -129,6 +129,8 @@ let object_fields =
     | FieldEnd -> [ [] ]
     | Field { requirement = Default _ | Optional; rest; _ } ->
       object_fields rest
+    | Field { schema = Outline { descriptor = Ignore; _ }; rest; _ } ->
+      object_fields rest
     | Field { rest; schema = Inline schema; _ } -> (
       match inline schema rest with
       | Result.Ok v -> v

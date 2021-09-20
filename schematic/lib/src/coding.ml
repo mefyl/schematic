@@ -256,7 +256,6 @@ module Make (Coding : S) = struct
                           expected_sets
                         |> Option.is_none
                       in
-                      Fmt.epr "MISSING: %b@." res;
                       res
                     and inlinable =
                       Schema.inline descriptor { f = ignore } |> Result.is_ok
