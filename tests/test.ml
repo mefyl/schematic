@@ -81,6 +81,8 @@ let options () =
 
 type nullable_option = { no : int option option } [@@deriving eq, schema, show]
 
+(* Nullable option *)
+
 let nullable_option = Alcotest.testable pp_nullable_option equal_nullable_option
 
 let nullable_option () =
@@ -92,6 +94,33 @@ let nullable_option () =
   and () =
     test "specified" nullable_option nullable_option_schema
       { no = Some (Some 74) } {|{ "no" : 74 }|}
+  in
+  ()
+
+(* Default option*)
+
+module Option = struct
+  include Option
+
+  let schema = Schematic.Schema.Schemas.option_schema
+
+  let pp pp =
+    Fmt.(option ~none:(const string "None") (const string "Some " ++ pp))
+end
+
+type default_option = { oo : int Option.t Option.t [@default None] }
+[@@deriving eq, schema, show]
+
+let default_option = Alcotest.(testable pp_default_option equal_default_option)
+
+let default_option () =
+  let () = test "none" default_option default_option_schema { oo = None } "{}"
+  and () =
+    test "some none" default_option default_option_schema { oo = Some None }
+      {|{"oo": null}|}
+  and () =
+    test "some some" default_option default_option_schema
+      { oo = Some (Some 877) } {|{"oo": 877}|}
   in
   ()
 
@@ -874,6 +903,7 @@ let () =
           test_case "string" `Quick atom_string;
           test_case "option" `Quick options;
           test_case "nullable option" `Quick nullable_option;
+          test_case "default option" `Quick default_option;
           test_case "record" `Quick record;
           test_case "tuple" `Quick tuple;
           test_case "variant" `Quick variant;

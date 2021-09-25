@@ -153,11 +153,16 @@ module Make (Coding : S) = struct
         | None -> Result.fail (fail id ids "missing required field %S" field))
       | Default default -> (
         function
-        | Some v ->
+        | Some v -> (
           if omit then
             Result.return default
           else
-            decode schema.id ids_next schema.descriptor v
+            match (Coding.is_null v, schema.descriptor) with
+            | true, Nullable nullable -> (
+              match decode schema.id ids_next nullable.descriptor v with
+              | Result.Ok v -> Result.return (Some v)
+              | Result.Error _ -> decode schema.id ids_next schema.descriptor v)
+            | _ -> decode schema.id ids_next schema.descriptor v)
         | None -> Result.return default)
       | Optional -> (
         function
