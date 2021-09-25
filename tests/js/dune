@@ -7,6 +7,7 @@
 
 (rule
  (alias runtest)
+ (package schematic-jsoo)
  (deps ./test.bc.js)
  (action
   (run ./test.js)))
