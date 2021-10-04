@@ -1402,49 +1402,43 @@ let expand ~ctxt ~inside (r, types) jsoo =
   and loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt
   and code_path = Ppxlib.Expansion_context.Deriver.code_path ctxt in
   let contents =
-    let contents = [] in
     let contents =
       match jsoo with
-      | None -> contents
+      | None -> []
       | Some [%expr jsoo]
       | Some [%expr true] ->
-        contents
-        @ Jsoo_type_expander.expand ~code_path ~loc
-            Jsoo_type.{ functions = true }
-            r types
+        Jsoo_type_expander.expand ~code_path ~loc
+          Jsoo_type.{ functions = true }
+          r types
       | Some [%expr false] ->
-        contents
-        @ Jsoo_type_expander.expand ~code_path ~loc
-            Jsoo_type.{ functions = false }
-            r types
+        Jsoo_type_expander.expand ~code_path ~loc
+          Jsoo_type.{ functions = false }
+          r types
       | Some exp ->
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: invalid ~jsoo argument value: %a" Pprintast.expression
           exp
     in
     Schema_expander.expand ~code_path ~loc () r types @ contents
-  and namespace =
-    if inside then
-      [%str
-        open Schemas
-
-        let _ = unit_schema]
-    else
-      [%str
-        module Schema = Schematic.Schema
-        open Schematic.Schema.Schemas
-
-        let _ = unit_schema]
-  and jsoo =
-    if Option.is_some jsoo then
-      [%str
-        open Schematic_jsoo.Schemas
-
-        let _ = fun (_ : int_js) -> ()]
-    else
-      []
   in
-  namespace @ jsoo @ contents
+  if Option.is_some jsoo then
+    [%str
+      open Schematic_jsoo.Schemas
+
+      let _ = fun (_ : int_js) -> ()]
+    @ contents
+  else if inside then
+    [%str
+      open Schemas
+
+      let _ = unit_schema]
+    @ contents
+  else
+    [%str
+      open Schematic.Schema.Schemas
+
+      let _ = unit_schema]
+    @ contents
 
 let add inside =
   let str_type_decl =

@@ -1,3 +1,5 @@
+module Schema : module type of Schema
+
 type any = Ezjsonm.value
 
 type ignore = unit

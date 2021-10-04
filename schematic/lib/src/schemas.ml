@@ -1,4 +1,5 @@
 open Base
+module Schema = Schema
 
 type ignore = unit
 
