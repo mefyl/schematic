@@ -140,3 +140,17 @@ module Jsoo_coding : Schematic.Coding.S with type t = Js.Unsafe.any = struct
 end
 
 include Schematic.Coding.Make (Jsoo_coding)
+
+let helpers name schema =
+  let to_js = encode schema
+  and of_js = decode schema
+  and of_js_exn js =
+    match decode schema js with
+    | Result.Ok event -> event
+    | Result.Error e ->
+      Js.raise_js_error
+      @@ new%js Js.error_constr
+           (Js.string
+              (Fmt.str "invalid %s: %a" name Schematic.Error.pp_decoding e))
+  in
+  (to_js, of_js, of_js_exn)
