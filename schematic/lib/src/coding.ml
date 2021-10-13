@@ -1,17 +1,13 @@
 module E = Error
 open Base
 
-(* FIXME: use Acid.Sequence *)
-module List_monad (Monad : Base.Monad.S2) = struct
-  include List
-  open Monad
-
-  let rec map f = function
-    | [] -> Monad.return []
-    | hd :: tl ->
-      f hd >>= fun hd ->
-      map f tl >>= fun tl -> Monad.return (hd :: tl)
-end
+let map_results ~f l =
+  let rec rev_results res = function
+    | [] -> Result.return res
+    | (Result.Error _ as error) :: _ -> error
+    | Result.Ok hd :: tl -> rev_results (hd :: res) tl
+  in
+  List.rev_map ~f l |> rev_results []
 
 type 'a customizable =
   [ `Generic
@@ -133,7 +129,6 @@ module Make (Coding : S) = struct
     | Optional -> Some v
 
   let decode schema =
-    let module List = List_monad (Result) in
     let rec decode_field :
         type t r.
         bool ->
@@ -200,7 +195,7 @@ module Make (Coding : S) = struct
       | Int64 -> Coding.to_int64 v |> type_error "integer"
       | List items_schema ->
         let* v = Coding.to_list v |> type_error "array" in
-        List.map (decode None ids items_schema.descriptor) v
+        map_results ~f:(decode None ids items_schema.descriptor) v
       | Map (cons, _, schema) ->
         decode id ids schema v >>= fun value ->
         cons value |> Result.map_error ~f:(fun reason -> error "%s" reason)
@@ -210,7 +205,7 @@ module Make (Coding : S) = struct
           decode fields_schema.id ids fields_schema.descriptor value
           >>= fun value -> Result.return (name, value)
         in
-        List.map f fields
+        map_results ~f fields
       | Null -> Option.some_if (Coding.is_null v) () |> type_error "null"
       | Nullable s ->
         if Coding.is_null v then
