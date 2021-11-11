@@ -64,3 +64,19 @@
    (>= 3.6.0))
   (schematic
    (= :version))))
+
+(package
+ (name schematic-sqml)
+ (synopsis "Derive SQML bindings from Ocaml types")
+ (description "Deduce SQML bindings from schematic type metadata.")
+ (depends
+  (alcotest
+   (and
+    (>= 1.1.0)
+    :with-test))
+  (sqml
+   (and
+    (>= 0.4.0)
+    (< 0.5.0)))
+  (schematic
+   (= :version))))

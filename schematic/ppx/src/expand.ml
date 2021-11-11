@@ -22,14 +22,6 @@ end
 
 (* Helpers *)
 
-let pexp ~loc ~desc =
-  {
-    pexp_desc = desc;
-    pexp_loc = loc;
-    pexp_loc_stack = [];
-    pexp_attributes = [];
-  }
-
 let ppat ~loc ~desc =
   {
     ppat_desc = desc;
@@ -47,19 +39,21 @@ let ptyp ~loc ~desc =
   }
 
 module Expr = struct
-  let id ~loc name =
-    {
-      pexp_desc = Pexp_ident { txt = Lident name; loc };
-      pexp_loc = loc;
-      pexp_loc_stack = [];
-      pexp_attributes = [];
-    }
+  let make ~loc pexp_desc =
+    { pexp_desc; pexp_loc = loc; pexp_loc_stack = []; pexp_attributes = [] }
+
+  let id ~loc name = make ~loc (Pexp_ident { txt = Lident name; loc })
 
   let bool ~loc v =
     if v then
       [%expr true]
     else
       [%expr false]
+
+  let list ~loc list =
+    let f m l = [%expr [%e m] :: [%e l]]
+    and init = [%expr []] in
+    List.fold_right ~f ~init list
 
   let string ~loc txt =
     {
@@ -96,13 +90,15 @@ module Expr = struct
 end
 
 module Pattern = struct
-  let id ~loc name =
-    {
-      ppat_desc = Ppat_var { txt = name; loc };
-      ppat_loc = loc;
-      ppat_loc_stack = [];
-      ppat_attributes = [];
-    }
+  let make ~loc ppat_desc =
+    { ppat_desc; ppat_loc = loc; ppat_loc_stack = []; ppat_attributes = [] }
+
+  let id ~loc name = make ~loc (Ppat_var { txt = name; loc })
+
+  let list ~loc list =
+    let f m l = [%pat? [%p m] :: [%p l]]
+    and init = [%pat? []] in
+    List.fold_right ~f ~init list
 
   let tuple ~loc = function
     | [] -> [%pat? ()]
@@ -114,6 +110,16 @@ module Pattern = struct
         ppat_loc_stack = [];
         ppat_attributes = [];
       }
+end
+
+module Type = struct
+  let id ~loc name =
+    {
+      ptyp_desc = Ptyp_constr ({ loc; txt = Lident name }, []);
+      ptyp_loc_stack = [];
+      ptyp_loc = loc;
+      ptyp_attributes = [];
+    }
 end
 
 module Warning = struct
@@ -205,14 +211,13 @@ let constructor_arguments_normalize ~loc = function
                  fields,
                Closed ))
     and ctor_value f =
-      pexp ~loc
-        ~desc:
-          (Pexp_record
-             ( List.mapi
-                 ~f:(fun i { pld_name; pld_type; pld_loc = loc; _ } ->
-                   ({ txt = Lident pld_name.txt; loc }, f i pld_type))
-                 fields,
-               None ))
+      Expr.make ~loc
+        (Pexp_record
+           ( List.mapi
+               ~f:(fun i { pld_name; pld_type; pld_loc = loc; _ } ->
+                 ({ txt = Lident pld_name.txt; loc }, f i pld_type))
+               fields,
+             None ))
     in
     let type_, pattern, value =
       match types with
@@ -252,11 +257,6 @@ let expr_id ~loc txt =
     pexp_loc_stack = [];
     pexp_attributes = [];
   }
-
-let expr_list ~loc list =
-  let f m l = [%expr [%e m] :: [%e l]]
-  and init = [%expr []] in
-  List.fold_right ~f ~init list
 
 let expr_int ~loc i =
   {
@@ -427,6 +427,7 @@ module type EXPANSION = sig
   val close :
     loc:location ->
     context:context ->
+    configuration:configuration ->
     type_declaration ->
     (core_type * (variance * injectivity)) list ->
     expanded ->
@@ -803,7 +804,7 @@ module Schema = struct
           Field
             {
               description = [%e expr_option ~loc Expr.string specs.description];
-              examples = [%e expr_list ~loc specs.examples];
+              examples = [%e Expr.list ~loc specs.examples];
               field = [%e field];
               maximum = [%e expr_option ~loc expr_int specs.maximum];
               minimum = [%e expr_option ~loc expr_int specs.minimum];
@@ -988,11 +989,11 @@ module Schema = struct
     expanded_of_descriptor ~loc
       [%expr
         Schema.Union
-          { cases = [%e expr_list ~loc (List.map ~f options)]; key = [%e key] }]
+          { cases = [%e Expr.list ~loc (List.map ~f options)]; key = [%e key] }]
 
   let expand_abstract_type ~loc ~context t = encode_type ~loc ~context t
 
-  let close ~loc ~context t params schema =
+  let close ~loc ~context ~configuration:_ t params schema =
     let schema_id =
       let default =
         let str =
@@ -1077,7 +1078,6 @@ module Schema = struct
                         (fun [%p Pattern.id ~loc schema_name] ->
                           [%e parametric]);
                     }]
-              (* | { ptyp_desc = Ptyp_any; _ }, _ -> [%expr fun _ -> [%e exp]] *)
               | t, _ ->
                 Ppxlib.Location.raise_errorf ~loc
                   "schematic-ppx: unsupported type parameter %a"
@@ -1218,7 +1218,12 @@ module Jsoo_type = struct
   let expand_abstract_type ~loc ~context t = expand_type ~loc ~context t
 
   let close
-      ~loc ~context:_ { ptype_name = { loc = name_loc; txt }; _ } params js =
+      ~loc
+      ~context:_
+      ~configuration:_
+      { ptype_name = { loc = name_loc; txt }; _ }
+      params
+      js =
     {
       ptype_name = { loc = name_loc; txt = name "js" txt };
       ptype_params = params;
@@ -1388,16 +1393,181 @@ module Expander (Expansion : EXPANSION) = struct
         | Ptype_variant options ->
           Expansion.expand_variant ~loc ~context options
       in
-      Expansion.close ~loc ~context t t.ptype_params body
+      Expansion.close ~loc ~context ~configuration t t.ptype_params body
     in
     let expanded = List.map ~f t in
     Expansion.combine ~loc configuration expanded
 end
 
+module Sqml_binding = struct
+  type closed = structure_item list
+
+  type configuration = { name : string }
+
+  type expanded = {
+    columns : structure_item list;
+    column_explosions : structure_item list;
+    columns_list : expression;
+    columns_pattern : pattern;
+    columns_type : core_type;
+    expr_explosions : structure_item list;
+    record : expression;
+    record_pattern : pattern;
+  }
+
+  let expand_record ~loc ~context ?type_:_ fields =
+    let column_name s = "column_" ^ s in
+    let column_explosion_of_field { pld_name = { loc; txt }; _ } =
+      [%stri
+        let Sqml.Expression.Column.List.([%p Pattern.id ~loc txt] :: rest) =
+          rest]
+    and column_of_field { pld_name; pld_type; pld_loc = loc; _ } =
+      [%stri
+        let [%p Pattern.id ~loc:pld_name.loc (column_name pld_name.txt)] =
+          Sqml.Column.make
+            [%e Expr.string ~loc:pld_name.loc pld_name.txt]
+            (Schematic_sqml.type_of_schema
+               [%e
+                 Schema.(
+                   schema_of_expanded ~loc @@ encode_type ~loc ~context pld_type)])]
+    and column_type_of_field { pld_type; _ } tail =
+      [%type: [%t pld_type] * [%t tail]]
+    and expr_explosion_of_field { pld_name = { loc; txt }; _ } =
+      [%stri let Sqml.Expression.List.([%p Pattern.id ~loc txt] :: rest) = rest]
+    and id_of_field { pld_name; pld_loc = loc; _ } =
+      Expr.id ~loc (column_name pld_name.txt)
+    and pattern_of_field { pld_name; pld_loc = loc; _ } =
+      Pattern.id ~loc (column_name pld_name.txt)
+    and record_field_of_field { pld_name; pld_loc = loc; _ } =
+      ( { txt = Lident pld_name.txt; loc = pld_name.loc },
+        Expr.id ~loc (column_name pld_name.txt) )
+    and record_pattern_of_field { pld_name; pld_loc = loc; _ } =
+      ( { txt = Lident pld_name.txt; loc = pld_name.loc },
+        Pattern.id ~loc (column_name pld_name.txt) )
+    in
+    {
+      columns = List.map ~f:column_of_field fields;
+      column_explosions = List.map ~f:column_explosion_of_field fields;
+      columns_list = Expr.list ~loc (List.map ~f:id_of_field fields);
+      columns_pattern =
+        [%pat?
+          Acid.Hlist.(
+            [%p Pattern.list ~loc (List.map ~f:pattern_of_field fields)])];
+      columns_type =
+        List.fold_right ~init:[%type: unit] ~f:column_type_of_field fields;
+      expr_explosions = List.map ~f:expr_explosion_of_field fields;
+      record =
+        Expr.make ~loc
+          (Pexp_record (List.map ~f:record_field_of_field fields, None));
+      record_pattern =
+        Pattern.make ~loc
+          (Ppat_record (List.map ~f:record_pattern_of_field fields, Closed));
+    }
+
+  and expand_variant ~loc ~context:_ _ =
+    Ppxlib.Location.raise_errorf ~loc
+      "schematic-ppx: SQML can only bind record types"
+
+  let expand_abstract_type ~loc ~context:_ _ =
+    Ppxlib.Location.raise_errorf ~loc
+      "schematic-ppx: SQML can only bind record types"
+
+  let close
+      ~loc
+      ~context:_
+      ~configuration:{ name }
+      { ptype_name; _ }
+      _
+      {
+        column_explosions;
+        columns;
+        columns_list;
+        columns_pattern;
+        columns_type;
+        expr_explosions;
+        record;
+        record_pattern;
+      } =
+    let meta =
+      [%str
+        include Sqml.Table.Meta (struct
+          let name = [%e Expr.string ~loc name]
+
+          include
+            [%m
+            {
+              pmod_desc = Pmod_structure columns;
+              pmod_loc = loc;
+              pmod_attributes = [];
+            }]
+
+          type columns = [%t columns_type]
+
+          let columns = Sqml.Column.List.([%e columns_list])
+        end)
+
+        type mapped = [%t Type.id ~loc:ptype_name.loc ptype_name.txt]
+
+        let map [%p columns_pattern] = [%e record]
+
+        let unmap [%p record_pattern] = Acid.Hlist.([%e columns_list])
+
+        module Import (Table : Sqml.Table.S with type Meta.columns = columns) =
+        struct
+          include Table
+
+          module Column = struct
+            include Table.Column
+
+            include
+              [%m
+              {
+                pmod_desc =
+                  Pmod_structure
+                    ([%stri let rest = columns] :: column_explosions);
+                pmod_loc = loc;
+                pmod_attributes = [];
+              }]
+          end
+
+          include
+            [%m
+            {
+              pmod_desc =
+                Pmod_structure
+                  ([%stri let rest = Expression.columns] :: expr_explosions);
+              pmod_loc = loc;
+              pmod_attributes = [];
+            }]
+        end]
+    in
+    [
+      {
+        pstr_desc =
+          Pstr_module
+            {
+              pmb_name = { txt = Some ("Sqml_meta_" ^ name); loc };
+              pmb_expr =
+                {
+                  pmod_desc = Pmod_structure meta;
+                  pmod_loc = loc;
+                  pmod_attributes = [];
+                };
+              pmb_loc = loc;
+              pmb_attributes = [];
+            };
+        pstr_loc = loc;
+      };
+    ]
+
+  let combine ~loc:_ _ items = List.concat items
+end
+
 module Jsoo_type_expander = Expander (Jsoo_type)
 module Schema_expander = Expander (Schema)
+module Sqml_binding_expander = Expander (Sqml_binding)
 
-let expand ~ctxt ~inside (r, types) jsoo =
+let expand ~ctxt ~inside (r, types) jsoo sqml =
   let r = r = Recursive
   and loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt
   and code_path = Ppxlib.Expansion_context.Deriver.code_path ctxt in
@@ -1407,9 +1577,7 @@ let expand ~ctxt ~inside (r, types) jsoo =
       | None -> []
       | Some [%expr jsoo]
       | Some [%expr true] ->
-        Jsoo_type_expander.expand ~code_path ~loc
-          Jsoo_type.{ functions = true }
-          r types
+        Jsoo_type_expander.expand ~code_path ~loc { functions = true } r types
       | Some [%expr false] ->
         Jsoo_type_expander.expand ~code_path ~loc
           Jsoo_type.{ functions = false }
@@ -1418,6 +1586,12 @@ let expand ~ctxt ~inside (r, types) jsoo =
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: invalid ~jsoo argument value: %a" Pprintast.expression
           exp
+    in
+    let contents =
+      match sqml with
+      | None -> contents
+      | Some name ->
+        Sqml_binding_expander.expand ~code_path ~loc { name } r types @ contents
     in
     Schema_expander.expand ~code_path ~loc () r types @ contents
   in
@@ -1444,8 +1618,9 @@ let add inside =
   let str_type_decl =
     let open Deriving.Args in
     let arg =
-      let jsoo = arg "jsoo" __ in
-      empty +> jsoo
+      let jsoo = arg "jsoo" __
+      and sqml = arg "sqml" (estring __) in
+      empty +> jsoo +> sqml
     in
     Deriving.Generator.V2.make arg (expand ~inside)
   in
