@@ -13,24 +13,18 @@
  (modules ppx)
  (public_name schematic.ppx)
  (kind ppx_deriver)
- (libraries ppxlib schematic_ppx_expand)
- (preprocess
-  (pps ppxlib.metaquot)))
+ (libraries ppxlib schematic_ppx_expand))
 
 (library
  (name schematic_ppx_inside)
  (package schematic)
  (modules ppx_inside)
  (kind ppx_deriver)
- (libraries ppxlib schematic_ppx_expand)
- (preprocess
-  (pps ppxlib.metaquot)))
+ (libraries ppxlib schematic_ppx_expand))
 
 (executable
  (name pp)
  (package schematic)
  (public_name schematic-ppx)
  (modules pp)
- (preprocess
-  (pps ppxlib.metaquot))
  (libraries schematic_ppx ppxlib))
