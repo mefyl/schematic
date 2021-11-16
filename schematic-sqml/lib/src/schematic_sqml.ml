@@ -13,7 +13,7 @@ let rec type_of_descriptor :
   | Int -> Int
   | Ignore -> failwith "schematic-sqml: cannot bind Ignore schema"
   | Int64 -> Bigint
-  | List _ -> failwith "schematic-sqml: cannot bind Ignore schema"
+  | List _ -> failwith "schematic-sqml: cannot bind List schema"
   | Null -> failwith "schematic-sqml: cannot bind Null schema"
   | String -> Text
   | Time -> Time
