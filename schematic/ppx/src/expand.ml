@@ -302,64 +302,6 @@ let name suffix s =
 
 let schema_name = name "schema"
 
-module Attributes = struct
-  type t = {
-    alias : string option;
-    name : expression option;
-    union_key : string option;
-  }
-
-  let check_unknown_attribute ~loc name =
-    if String.is_prefix ~prefix:"schematic." name then
-      Ppxlib.Location.raise_errorf ~loc
-        "schematic-ppx: unknown schematic annotation %s" name
-
-  let rec extract ?(alias = false) ?(name = false) ?(union_key = false) =
-    let merge name loc old v =
-      match old with
-      | None -> Some v
-      | Some _ ->
-        Ppxlib.Location.raise_errorf ~loc
-          "schematic-ppx: duplicate schematic.%s annotation on schema" name
-    in
-    function
-    | { attr_name = { txt; _ }; attr_loc = loc; attr_payload } :: attrs -> (
-      let attrs = extract ~alias ~name ~union_key attrs in
-      match txt with
-      | "schematic.as" when alias -> (
-        match attrs with
-        | { alias = None; _ } ->
-          { attrs with alias = Some (expect_payload_string ~loc attr_payload) }
-        | _ ->
-          Ppxlib.Location.raise_errorf ~loc
-            "schematic-ppx: duplicate schematic.as annotation on schema")
-      | "schematic.name" when name -> (
-        match attrs with
-        | { name = None; _ } ->
-          { attrs with name = Some (expect_payload_expr ~loc attr_payload) }
-        | _ ->
-          Ppxlib.Location.raise_errorf ~loc
-            "schematic-ppx: duplicate schematic.name annotation on schema")
-      | "schematic.union_key" when union_key ->
-        {
-          attrs with
-          union_key =
-            merge "union_key" loc attrs.union_key
-            @@ expect_payload_string ~loc attr_payload;
-        }
-      | _ ->
-        let () = check_unknown_attribute ~loc txt in
-        attrs)
-    | [] -> { alias = None; name = None; union_key = None }
-end
-
-type context = {
-  attributes : Attributes.t;
-  code_path : Ppxlib.Code_path.t;
-  type_ : string;
-  types : string list;
-}
-
 let suffix_id ~loc suffix = function
   | Lident n -> Lident (name suffix n)
   | Ldot (q, n) -> Ldot (q, name suffix n)
@@ -416,6 +358,72 @@ let specs_empty =
     minimum = None;
     omit = false;
   }
+
+module Attributes = struct
+  type field = {
+    inline : inline option;
+    schema : expression option;
+    name : string;
+    specs : specs;
+  }
+  [@@deriving make]
+
+  type t = {
+    alias : string option;
+    name : expression option;
+    union_key : string option;
+  }
+
+  let check_unknown_attribute ~loc name =
+    if String.is_prefix ~prefix:"schematic." name then
+      Ppxlib.Location.raise_errorf ~loc
+        "schematic-ppx: unknown schematic annotation %s" name
+
+  let rec extract ?(alias = false) ?(name = false) ?(union_key = false) =
+    let merge name loc old v =
+      match old with
+      | None -> Some v
+      | Some _ ->
+        Ppxlib.Location.raise_errorf ~loc
+          "schematic-ppx: duplicate schematic.%s annotation on schema" name
+    in
+    function
+    | { attr_name = { txt; _ }; attr_loc = loc; attr_payload } :: attrs -> (
+      let attrs = extract ~alias ~name ~union_key attrs in
+      match txt with
+      | "schematic.as" when alias -> (
+        match attrs with
+        | { alias = None; _ } ->
+          { attrs with alias = Some (expect_payload_string ~loc attr_payload) }
+        | _ ->
+          Ppxlib.Location.raise_errorf ~loc
+            "schematic-ppx: duplicate schematic.as annotation on schema")
+      | "schematic.name" when name -> (
+        match attrs with
+        | { name = None; _ } ->
+          { attrs with name = Some (expect_payload_expr ~loc attr_payload) }
+        | _ ->
+          Ppxlib.Location.raise_errorf ~loc
+            "schematic-ppx: duplicate schematic.name annotation on schema")
+      | "schematic.union_key" when union_key ->
+        {
+          attrs with
+          union_key =
+            merge "union_key" loc attrs.union_key
+            @@ expect_payload_string ~loc attr_payload;
+        }
+      | _ ->
+        let () = check_unknown_attribute ~loc txt in
+        attrs)
+    | [] -> { alias = None; name = None; union_key = None }
+end
+
+type context = {
+  attributes : Attributes.t;
+  code_path : Ppxlib.Code_path.t;
+  type_ : string;
+  types : string list;
+}
 
 module type EXPANSION = sig
   type closed
@@ -631,13 +639,13 @@ module Schema = struct
           | {
               pld_attributes;
               pld_loc = loc;
-              pld_name = { txt; _ };
+              pld_name = { txt = name; _ };
               pld_type;
               _;
             } ->
-            let schema, txt, inline, specs =
+            let Attributes.{ inline; name; schema; specs } =
               let read_attribute
-                  (schema, txt, inline, specs)
+                  (attrs : Attributes.field)
                   { attr_name; attr_loc = loc; attr_payload } =
                 let default f req omit =
                   match attr_payload with
@@ -648,17 +656,18 @@ module Schema = struct
                       else
                         exp
                     in
-                    ( schema,
-                      txt,
-                      inline,
-                      {
-                        specs with
-                        default =
-                          Some
-                            (Source.merge ~loc "default" specs.default
-                               (f default));
-                        omit;
-                      } )
+                    {
+                      attrs with
+                      specs =
+                        {
+                          attrs.specs with
+                          default =
+                            Some
+                              (Source.merge ~loc "default" attrs.specs.default
+                                 (f default));
+                          omit;
+                        };
+                    }
                   | _ ->
                     Ppxlib.Location.raise_errorf ~loc
                       "schematic-ppx: expression payload expected"
@@ -666,7 +675,7 @@ module Schema = struct
                 match attr_name.txt with
                 | "schematic.schema" -> (
                   match attr_payload with
-                  | PStr [%str [%e? exp]] -> (Some exp, txt, inline, specs)
+                  | PStr [%str [%e? exp]] -> { attrs with schema = Some exp }
                   | _ ->
                     Ppxlib.Location.raise_errorf ~loc
                       "schematic-ppx: expression payload expected")
@@ -723,30 +732,27 @@ module Schema = struct
                         Ppxlib.Location.raise_errorf ~loc
                           "schematic-ppx: unrecognized property"
                     in
-                    ( schema,
-                      txt,
-                      inline,
-                      List.fold ~init:specs ~f:prop properties )
+                    {
+                      attrs with
+                      specs = List.fold ~init:attrs.specs ~f:prop properties;
+                    }
                   | _ ->
                     Ppxlib.Location.raise_errorf ~loc
                       "schematic-ppx: record payload expected")
                 | "schematic.as" ->
-                  ( schema,
-                    expect_payload_string ~loc attr_payload,
-                    inline,
-                    specs )
+                  { attrs with name = expect_payload_string ~loc attr_payload }
                 | ("schematic.inline" as attr)
                 | ("schematic.inline_try" as attr) -> (
                   match attr_payload with
                   | PStr [] ->
-                    if Option.is_none inline then
+                    if Option.is_none attrs.inline then
                       let v =
                         if String.(attr = "schematic.inline") then
                           Inline
                         else
                           Inline_try
                       in
-                      (schema, txt, Some v, specs)
+                      { attrs with inline = Some v }
                     else
                       Ppxlib.Location.raise_errorf ~loc
                         "schematic-ppx: inline specified multiple times"
@@ -755,10 +761,12 @@ module Schema = struct
                       "schematic-ppx: no payload expected")
                 | name ->
                   let () = Attributes.check_unknown_attribute ~loc name in
-                  (schema, txt, inline, specs)
+                  attrs
               in
               List.fold_left ~f:read_attribute
-                ~init:(None, txt, None, specs_empty)
+                ~init:
+                  Attributes.
+                    { inline = None; name; schema = None; specs = specs_empty }
                 pld_attributes
             in
             let requirement, t =
@@ -785,7 +793,7 @@ module Schema = struct
             in
             ( loc,
               requirement,
-              Expr.string ~loc (rename txt),
+              Expr.string ~loc (rename name),
               schema,
               inline,
               specs )
