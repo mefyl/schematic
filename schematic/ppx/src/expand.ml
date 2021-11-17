@@ -361,12 +361,19 @@ let specs_empty =
 
 module Attributes = struct
   type field = {
+    alias : string option;
     inline : inline option;
-    schema : expression option;
+    loc : location;
     name : string;
+    schema : expression option;
     specs : specs;
+    type_ : core_type;
   }
   [@@deriving make]
+
+  let make_field ?alias ?inline ~loc ?schema ?(specs = specs_empty) ~type_ name
+      =
+    { alias; inline; loc; name; schema; specs; type_ }
 
   type t = {
     alias : string option;
@@ -419,11 +426,24 @@ module Attributes = struct
 end
 
 type context = {
-  attributes : Attributes.t;
   code_path : Ppxlib.Code_path.t;
-  type_ : string;
+  loc : location;
+  recursive : bool;
   types : string list;
 }
+
+type type_context = {
+  attributes : Attributes.t;
+  loc : location;
+  name : string;
+  params : (core_type * (variance * injectivity)) list; (* type_ : string; *)
+}
+
+and type_ =
+  | Abstract
+  | Core of core_type
+  | Record of Attributes.field list
+  | Variant of constructor_declaration list
 
 module type EXPANSION = sig
   type closed
@@ -433,11 +453,9 @@ module type EXPANSION = sig
   type expanded
 
   val close :
-    loc:location ->
-    context:context ->
     configuration:configuration ->
-    type_declaration ->
-    (core_type * (variance * injectivity)) list ->
+    context:context ->
+    type_context:type_context ->
     expanded ->
     closed
 
@@ -445,18 +463,124 @@ module type EXPANSION = sig
     loc:location -> configuration -> closed list -> structure_item list
 
   val expand_abstract_type :
-    loc:location -> context:context -> core_type -> expanded
+    context:context -> type_context:type_context -> core_type -> expanded
 
   val expand_record :
-    loc:location ->
     context:context ->
-    ?type_:type_declaration ->
-    label_declaration list ->
+    type_context:type_context ->
+    Attributes.field list ->
     expanded
 
   val expand_variant :
-    loc:location -> context:context -> constructor_declaration list -> expanded
+    context:context ->
+    type_context:type_context ->
+    constructor_declaration list ->
+    expanded
 end
+
+let expand_field
+    { pld_attributes; pld_loc = loc; pld_name = { txt = name; _ }; pld_type; _ }
+    =
+  let read_attribute
+      (attrs : Attributes.field) { attr_name; attr_loc = loc; attr_payload } =
+    let default f req omit =
+      match attr_payload with
+      | PStr [%str [%e? exp]] ->
+        let default =
+          if req then
+            [%expr Some [%e exp]]
+          else
+            exp
+        in
+        {
+          attrs with
+          specs =
+            {
+              attrs.specs with
+              default =
+                Some
+                  (Source.merge ~loc "default" attrs.specs.default (f default));
+              omit;
+            };
+        }
+      | _ ->
+        Ppxlib.Location.raise_errorf ~loc
+          "schematic-ppx: expression payload expected"
+    in
+    match attr_name.txt with
+    | "schematic.schema" ->
+      { attrs with schema = Some (expect_payload_expr ~loc attr_payload) }
+    | "default" -> default Source.generic true false
+    | "schematic.default" -> default Source.schematic true false
+    | "schematic.default_opt" -> default Source.schematic false false
+    | "schematic.omit" -> default Source.schematic true true
+    | "schematic.omit_opt" -> default Source.schematic false true
+    | "schematic.properties" -> (
+      match attr_payload with
+      | PStr
+          [%str
+            [%e?
+              { pexp_desc = Pexp_record (properties, None); pexp_loc = loc; _ }]]
+        ->
+        let prop specs = function
+          | ( { txt = Lident name; loc = loc_name; _ },
+              ({ pexp_desc = value; pexp_loc = loc; _ } as desc) ) -> (
+            match name with
+            | "description" ->
+              { specs with description = Some (expect_string ~loc value) }
+            | "default" ->
+              let () =
+                Fmt.epr "%a Warning: deprecated, use @schematic.default\n"
+                  Ppxlib.Location.print loc_name
+              in
+              {
+                specs with
+                default =
+                  Some
+                    (Source.merge ~loc:loc_name "default" specs.default
+                       (Source.schematic [%expr Some [%e desc]]));
+              }
+            | "example" -> { specs with examples = [ desc ] }
+            | "minimum" -> { specs with maximum = Some (expect_int ~loc value) }
+            | "maximum" -> { specs with minimum = Some (expect_int ~loc value) }
+            | "unique" -> specs
+            | _ ->
+              Ppxlib.Location.raise_errorf ~loc:loc_name
+                "schematic-ppx: unrecognized property %S" name)
+          | _ ->
+            Ppxlib.Location.raise_errorf ~loc
+              "schematic-ppx: unrecognized property"
+        in
+        { attrs with specs = List.fold ~init:attrs.specs ~f:prop properties }
+      | _ ->
+        Ppxlib.Location.raise_errorf ~loc
+          "schematic-ppx: record payload expected")
+    | "schematic.as" ->
+      { attrs with alias = Some (expect_payload_string ~loc attr_payload) }
+    | ("schematic.inline" as attr)
+    | ("schematic.inline_try" as attr) -> (
+      match attr_payload with
+      | PStr [] ->
+        if Option.is_none attrs.inline then
+          let v =
+            if String.(attr = "schematic.inline") then
+              Inline
+            else
+              Inline_try
+          in
+          { attrs with inline = Some v }
+        else
+          Ppxlib.Location.raise_errorf ~loc
+            "schematic-ppx: inline specified multiple times"
+      | _ ->
+        Ppxlib.Location.raise_errorf ~loc "schematic-ppx: no payload expected")
+    | name ->
+      let () = Attributes.check_unknown_attribute ~loc name in
+      attrs
+  in
+  List.fold_left ~f:read_attribute
+    ~init:(Attributes.make_field ~loc ~type_:pld_type name)
+    pld_attributes
 
 module Schema = struct
   type closed = value_binding
@@ -486,13 +610,15 @@ module Schema = struct
           }]
     | Expression e -> e
 
-  let rec encode_type ~loc ~context = function
+  let rec encode_type ~context ~type_context =
+    let loc = type_context.loc in
+    function
     (* Mapping *)
     | [%type: (string * [%t? t]) list] ->
       expanded_of_descriptor ~loc
         [%expr
           Schema.Mapping
-            [%e schema_of_expanded ~loc @@ encode_type ~loc ~context t]]
+            [%e schema_of_expanded ~loc @@ encode_type ~context ~type_context t]]
     (* Plain type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
       Expression (expr_id ~loc (schema_id ~loc txt))
@@ -501,12 +627,14 @@ module Schema = struct
       expanded_of_descriptor ~loc
         [%expr
           Schema.List
-            [%e schema_of_expanded ~loc @@ encode_type ~loc ~context arg]]
+            [%e
+              schema_of_expanded ~loc @@ encode_type ~context ~type_context arg]]
     (* Parametric type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } ->
       let schema_f = expr_id ~loc (schema_id ~loc txt)
       and f t =
-        (Nolabel, schema_of_expanded ~loc @@ encode_type ~loc ~context t)
+        ( Nolabel,
+          schema_of_expanded ~loc @@ encode_type ~context ~type_context t )
       in
       Expression
         {
@@ -537,25 +665,27 @@ module Schema = struct
       in
       let body =
         combinator ~loc types field_name constructed deconstructed
-          (tuple_descriptor ~loc ~context types)
+          (tuple_descriptor ~context ~type_context types)
       in
       expanded_of_descriptor ~loc body
     (* Type variable *)
     | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ } ->
       Expression (expr_id ~loc (schema_id ~loc (Lident name)))
     (* Polymorphic variant *)
-    | { ptyp_desc = Ptyp_variant (fields, _, _); ptyp_loc = loc; _ } ->
-      expand_polymorphic_variant ~loc ~context fields
+    | { ptyp_desc = Ptyp_variant (fields, _, _); _ } ->
+      expand_polymorphic_variant ~context ~type_context fields
     (* Unsupported *)
     | core_type ->
       Ppxlib.Location.raise_errorf ~loc "schematic-ppx: unsupported type %a"
         Pprintast.core_type core_type
 
-  and tuple_descriptor ~loc ~context types =
+  and tuple_descriptor ~context ~type_context types =
+    let loc = type_context.loc in
     let items =
       let args =
         List.map
-          ~f:(fun d -> schema_of_expanded ~loc @@ encode_type ~loc ~context d)
+          ~f:(fun d ->
+            schema_of_expanded ~loc @@ encode_type ~context ~type_context d)
           types
       in
       let init = [%expr ItemEnd] in
@@ -614,194 +744,51 @@ module Schema = struct
     in
     [%expr Schema.Map ([%e construct], [%e deconstruct], [%e obj])]
 
-  and expand_record ~loc ~context ?type_ fields =
-    _expand_record false ~loc ~context ?type_ fields
+  and expand_record ~context ~type_context fields =
+    _expand_record false ~context ~type_context fields
 
   and _expand_record
-      as_tuple ~loc ~context ?(type_ : type_declaration option) fields =
+      as_tuple ~context ~type_context (fields : Attributes.field list) =
+    let loc = type_context.loc in
     let type_ =
       (* This type is used to explicitely disambiguate mapped values in case of
          record field name conflicts, otherwise a schema can end up manipulating
          a completely different type. *)
-      match type_ with
-      | None -> None
-      | Some type_ ->
-        Some
-          (ptyp ~loc
-             ~desc:
-               (Ptyp_constr
-                  ( { txt = Lident type_.ptype_name.txt; loc },
-                    List.map ~f:fst type_.ptype_params )))
+      ptyp ~loc
+        ~desc:
+          (Ptyp_constr
+             ( { txt = Lident type_context.name; loc },
+               List.map ~f:fst type_context.params ))
     in
     let fields_schema =
-      let expand_fields fields =
-        let expand_field = function
-          | {
-              pld_attributes;
-              pld_loc = loc;
-              pld_name = { txt = name; _ };
-              pld_type;
-              _;
-            } ->
-            let Attributes.{ inline; name; schema; specs } =
-              let read_attribute
-                  (attrs : Attributes.field)
-                  { attr_name; attr_loc = loc; attr_payload } =
-                let default f req omit =
-                  match attr_payload with
-                  | PStr [%str [%e? exp]] ->
-                    let default =
-                      if req then
-                        [%expr Some [%e exp]]
-                      else
-                        exp
-                    in
-                    {
-                      attrs with
-                      specs =
-                        {
-                          attrs.specs with
-                          default =
-                            Some
-                              (Source.merge ~loc "default" attrs.specs.default
-                                 (f default));
-                          omit;
-                        };
-                    }
-                  | _ ->
-                    Ppxlib.Location.raise_errorf ~loc
-                      "schematic-ppx: expression payload expected"
-                in
-                match attr_name.txt with
-                | "schematic.schema" -> (
-                  match attr_payload with
-                  | PStr [%str [%e? exp]] -> { attrs with schema = Some exp }
-                  | _ ->
-                    Ppxlib.Location.raise_errorf ~loc
-                      "schematic-ppx: expression payload expected")
-                | "default" -> default Source.generic true false
-                | "schematic.default" -> default Source.schematic true false
-                | "schematic.default_opt" ->
-                  default Source.schematic false false
-                | "schematic.omit" -> default Source.schematic true true
-                | "schematic.omit_opt" -> default Source.schematic false true
-                | "schematic.properties" -> (
-                  match attr_payload with
-                  | PStr
-                      [%str
-                        [%e?
-                          {
-                            pexp_desc = Pexp_record (properties, None);
-                            pexp_loc = loc;
-                            _;
-                          }]] ->
-                    let prop specs = function
-                      | ( { txt = Lident name; loc = loc_name; _ },
-                          ({ pexp_desc = value; pexp_loc = loc; _ } as desc) )
-                        -> (
-                        match name with
-                        | "description" ->
-                          {
-                            specs with
-                            description = Some (expect_string ~loc value);
-                          }
-                        | "default" ->
-                          let () =
-                            Fmt.epr
-                              "%a Warning: deprecated, use @schematic.default\n"
-                              Ppxlib.Location.print loc_name
-                          in
-                          {
-                            specs with
-                            default =
-                              Some
-                                (Source.merge ~loc:loc_name "default"
-                                   specs.default
-                                   (Source.schematic [%expr Some [%e desc]]));
-                          }
-                        | "example" -> { specs with examples = [ desc ] }
-                        | "minimum" ->
-                          { specs with maximum = Some (expect_int ~loc value) }
-                        | "maximum" ->
-                          { specs with minimum = Some (expect_int ~loc value) }
-                        | "unique" -> specs
-                        | _ ->
-                          Ppxlib.Location.raise_errorf ~loc:loc_name
-                            "schematic-ppx: unrecognized property %S" name)
-                      | _ ->
-                        Ppxlib.Location.raise_errorf ~loc
-                          "schematic-ppx: unrecognized property"
-                    in
-                    {
-                      attrs with
-                      specs = List.fold ~init:attrs.specs ~f:prop properties;
-                    }
-                  | _ ->
-                    Ppxlib.Location.raise_errorf ~loc
-                      "schematic-ppx: record payload expected")
-                | "schematic.as" ->
-                  { attrs with name = expect_payload_string ~loc attr_payload }
-                | ("schematic.inline" as attr)
-                | ("schematic.inline_try" as attr) -> (
-                  match attr_payload with
-                  | PStr [] ->
-                    if Option.is_none attrs.inline then
-                      let v =
-                        if String.(attr = "schematic.inline") then
-                          Inline
-                        else
-                          Inline_try
-                      in
-                      { attrs with inline = Some v }
-                    else
-                      Ppxlib.Location.raise_errorf ~loc
-                        "schematic-ppx: inline specified multiple times"
-                  | _ ->
-                    Ppxlib.Location.raise_errorf ~loc
-                      "schematic-ppx: no payload expected")
-                | name ->
-                  let () = Attributes.check_unknown_attribute ~loc name in
-                  attrs
-              in
-              List.fold_left ~f:read_attribute
-                ~init:
-                  Attributes.
-                    { inline = None; name; schema = None; specs = specs_empty }
-                pld_attributes
-            in
-            let requirement, t =
-              match pld_type with
-              | {
-               ptyp_desc = Ptyp_constr ({ txt = Lident "option"; _ }, [ t ]);
-               _;
-              } ->
-                ([%expr Optional], t)
-              | t -> (
-                match specs.default with
-                | Some default ->
-                  ( [%expr
-                      match [%e Source.value default] with
-                      | Some default -> Default default
-                      | None -> Required],
-                    t )
-                | None -> ([%expr Required], t))
-            in
-            let schema =
-              Option.value
-                ~default:(schema_of_expanded ~loc @@ encode_type ~loc ~context t)
-                schema
-            in
-            ( loc,
-              requirement,
-              Expr.string ~loc (rename name),
-              schema,
-              inline,
-              specs )
-        in
-        List.map ~f:expand_field fields
-      in
       let init = [%expr FieldEnd] in
-      let f (loc, requirement, field, schema, inline, specs) rest =
+      let f
+          Attributes.{ alias; inline; loc; name; schema; specs; type_; _ } rest
+          =
+        let requirement, type_ =
+          match type_ with
+          | {
+           ptyp_desc = Ptyp_constr ({ txt = Lident "option"; _ }, [ type_ ]);
+           _;
+          } ->
+            ([%expr Optional], type_)
+          | type_ -> (
+            match specs.default with
+            | Some default ->
+              ( [%expr
+                  match [%e Source.value default] with
+                  | Some default -> Default default
+                  | None -> Required],
+                type_ )
+            | None -> ([%expr Required], type_))
+        in
+        let schema =
+          Option.value
+            ~default:
+              (schema_of_expanded ~loc
+              @@ encode_type ~context ~type_context type_)
+            schema
+        in
         let schema =
           match Option.value ~default:Outline inline with
           | Inline -> [%expr Inline [%e schema]]
@@ -813,7 +800,9 @@ module Schema = struct
             {
               description = [%e expr_option ~loc Expr.string specs.description];
               examples = [%e Expr.list ~loc specs.examples];
-              field = [%e field];
+              field =
+                [%e
+                  Expr.string ~loc (rename @@ Option.value ~default:name alias)];
               maximum = [%e expr_option ~loc expr_int specs.maximum];
               minimum = [%e expr_option ~loc expr_int specs.minimum];
               omit = [%e Expr.bool ~loc specs.omit];
@@ -823,14 +812,14 @@ module Schema = struct
               title = None;
             }]
       in
-      List.fold_right ~f ~init (expand_fields fields)
-    and field_name _ { pld_name = { txt; loc }; _ } = (loc, txt)
+      List.fold_right ~f ~init fields
+    and field_name _ (field : Attributes.field) = (field.loc, field.name)
     and constructed =
-      let f { pld_name = { txt; loc }; _ } =
-        ( { txt = Lident txt; loc },
+      let f (field : Attributes.field) =
+        ( { txt = Lident field.name; loc },
           {
-            pexp_desc = Pexp_ident { txt = Lident txt; loc };
-            pexp_loc = loc;
+            pexp_desc = Pexp_ident { txt = Lident field.name; loc };
+            pexp_loc = field.loc;
             pexp_loc_stack = [];
             pexp_attributes = [];
           } )
@@ -854,15 +843,13 @@ module Schema = struct
             pexp_attributes = [];
           }
         in
-        match type_ with
-        | None -> constructed
-        | Some type_ -> [%expr ([%e constructed] : [%t type_])]
+        [%expr ([%e constructed] : [%t type_])]
     and deconstructed =
-      let f { pld_name = { txt; loc }; _ } =
-        ( { txt = Lident txt; loc },
+      let f (field : Attributes.field) =
+        ( { txt = Lident field.name; loc },
           {
-            ppat_desc = Ppat_var { txt; loc };
-            ppat_loc = loc;
+            ppat_desc = Ppat_var { txt = field.name; loc };
+            ppat_loc = field.loc;
             ppat_loc_stack = [];
             ppat_attributes = [];
           } )
@@ -886,15 +873,13 @@ module Schema = struct
             ppat_attributes = [];
           }
         in
-        match type_ with
-        | None -> deconstructed
-        | Some type_ -> [%pat? ([%p deconstructed] : [%t type_])]
+        [%pat? ([%p deconstructed] : [%t type_])]
     in
     expanded_of_descriptor ~loc
     @@ combinator ~loc fields field_name constructed deconstructed
          [%expr Object [%e fields_schema]]
 
-  and expand_variant ~loc ~context options =
+  and expand_variant ~context ~type_context options =
     let f
         {
           pcd_name = { txt; loc = _ };
@@ -905,9 +890,9 @@ module Schema = struct
         } =
       (txt, pcd_args, loc, attrs)
     in
-    expand_any_variant ~loc ~context false @@ List.map ~f options
+    expand_any_variant ~context ~type_context false @@ List.map ~f options
 
-  and expand_polymorphic_variant ~loc ~context options =
+  and expand_polymorphic_variant ~context ~type_context options =
     let f { prf_desc; prf_loc; prf_attributes } =
       match prf_desc with
       | Rtag ({ txt; _ }, _, types) ->
@@ -916,9 +901,10 @@ module Schema = struct
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: inheriting polymorphic variants not supported"
     in
-    expand_any_variant ~loc ~context true @@ List.map ~f options
+    expand_any_variant ~context ~type_context true @@ List.map ~f options
 
-  and expand_any_variant ~loc ~context poly options =
+  and expand_any_variant ~context ~type_context poly options =
+    let loc = type_context.loc in
     let f (txt, pcd_args, loc, attrs) =
       let Attributes.{ alias; _ } = Attributes.extract ~alias:true attrs in
       let name = Option.value ~default:(String.lowercase txt) alias in
@@ -926,7 +912,7 @@ module Schema = struct
         match constructor_arguments_normalize ~loc pcd_args with
         | None ->
           let schema =
-            if Option.is_none context.attributes.union_key then
+            if Option.is_none type_context.attributes.union_key then
               expanded_of_descriptor ~loc
                 [%expr String_const [%e Expr.string ~loc name]]
             else
@@ -938,8 +924,10 @@ module Schema = struct
           and v i _ = Expr.id ~loc (Fmt.str "f%i" i) in
           let schema =
             match pcd_args with
-            | Pcstr_record fields -> _expand_record true ~loc ~context fields
-            | _ -> encode_type ~loc ~context type_
+            | Pcstr_record fields ->
+              _expand_record true ~context ~type_context
+                (List.map ~f:expand_field fields)
+            | _ -> encode_type ~context ~type_context type_
           in
           ( schema,
             Some (ctor_pattern p),
@@ -990,7 +978,7 @@ module Schema = struct
             decoder = [%e destruct];
           }]
     and key =
-      match context.attributes.union_key with
+      match type_context.attributes.union_key with
       | None -> [%expr None]
       | Some name -> [%expr Some [%e Expr.string ~loc name]]
     in
@@ -999,15 +987,17 @@ module Schema = struct
         Schema.Union
           { cases = [%e Expr.list ~loc (List.map ~f options)]; key = [%e key] }]
 
-  let expand_abstract_type ~loc ~context t = encode_type ~loc ~context t
+  let expand_abstract_type ~context ~type_context t =
+    encode_type ~context ~type_context t
 
-  let close ~loc ~context ~configuration:_ t params schema =
+  let close ~configuration:_ ~context ~type_context schema =
+    let loc = type_context.loc in
     let schema_id =
       let default =
         let str =
           rename
           @@
-          match t.ptype_name.txt with
+          match type_context.name with
           | "t" ->
             String.lowercase
             @@ Option.value
@@ -1018,7 +1008,7 @@ module Schema = struct
         in
         Expr.string ~loc str
       in
-      Option.value ~default context.attributes.name
+      Option.value ~default type_context.attributes.name
     in
     let params_wrap body =
       let wrap arg exp =
@@ -1030,7 +1020,7 @@ module Schema = struct
           Ppxlib.Location.raise_errorf ~loc
             "schematic-ppx: unsupported type parameter %a" Pprintast.core_type t
       in
-      List.fold_right ~f:wrap ~init:body params
+      List.fold_right ~f:wrap ~init:body type_context.params
     and params_apply f =
       let wrap f arg =
         match arg with
@@ -1041,7 +1031,7 @@ module Schema = struct
           Ppxlib.Location.raise_errorf ~loc
             "schematic-ppx: unsupported type parameter %a" Pprintast.core_type t
       in
-      List.fold_left ~f:wrap ~init:f params
+      List.fold_left ~f:wrap ~init:f type_context.params
     in
     let schema =
       let id =
@@ -1058,7 +1048,7 @@ module Schema = struct
               "schematic-ppx: unsupported type parameter %a" Pprintast.core_type
               t
         in
-        List.fold_right ~init:schema_id ~f params
+        List.fold_right ~init:schema_id ~f type_context.params
       in
       match schema with
       | Components c ->
@@ -1067,7 +1057,7 @@ module Schema = struct
          * else *)
         let descriptor = params_apply [%expr descriptor] in
         let parametric =
-          match params with
+          match type_context.params with
           | [] -> Expr.none ~loc
           | _ ->
             let init =
@@ -1091,7 +1081,7 @@ module Schema = struct
                   "schematic-ppx: unsupported type parameter %a"
                   Pprintast.core_type t
             in
-            Expr.some ~loc @@ List.fold_right ~f ~init params
+            Expr.some ~loc @@ List.fold_right ~f ~init type_context.params
         in
         [%expr
           let descriptor = [%e params_wrap c.descriptor]
@@ -1103,13 +1093,10 @@ module Schema = struct
               parametric = [%e parametric];
             }]
       | Expression e -> [%expr { ([%e e]) with id = [%e Expr.some ~loc id] }]
-      (* [%expr
-       *   let Schema.{ descriptor; parametric; _ } = [%e e] in
-       *   Schema.{ descriptor; id = [%e id]; parametric }] *)
     in
     let body = params_wrap schema in
-    let name = schema_name t.ptype_name.txt in
-    let pattern = pattern_id ~loc:t.ptype_name.loc name in
+    let name = schema_name type_context.name in
+    let pattern = pattern_id ~loc name in
     let body =
       {
         pvb_pat = pattern;
@@ -1158,11 +1145,16 @@ module Jsoo_type = struct
       Ppxlib.Location.raise_errorf ~loc:t.ptyp_loc
         "schematic-ppx: unsupported type %a" Pprintast.core_type t
 
-  and expand_record ~loc ~context ?type_:_ fields =
-    let f { pld_name; pld_type; pld_loc; _ } : object_field =
-      let t = expand_type ~loc ~context pld_type in
+  and expand_record ~context ~type_context fields =
+    let loc = type_context.loc in
+    let f Attributes.{ loc; name; type_; _ } =
+      let t = expand_type ~loc ~context type_ in
       let t = [%type: [%t t] Js_of_ocaml.Js.readonly_prop] in
-      { pof_desc = Otag (pld_name, t); pof_loc = pld_loc; pof_attributes = [] }
+      {
+        pof_desc = Otag ({ loc; txt = name }, t);
+        pof_loc = loc;
+        pof_attributes = [];
+      }
     in
     {
       ptyp_desc =
@@ -1181,7 +1173,7 @@ module Jsoo_type = struct
       ptyp_loc_stack = [];
     }
 
-  and expand_variant ~loc ~context options =
+  and expand_variant ~context ~type_context options =
     let f
         {
           pcd_name = { txt; loc = _ };
@@ -1192,7 +1184,8 @@ module Jsoo_type = struct
         } =
       (txt, pcd_args, loc, attrs)
     in
-    expand_any_variant ~loc ~context false @@ List.map ~f options
+    expand_any_variant ~loc:type_context.loc ~context false
+    @@ List.map ~f options
 
   and expand_polymorphic_variant ~loc ~context options =
     let f { prf_desc; prf_loc; prf_attributes } =
@@ -1223,23 +1216,23 @@ module Jsoo_type = struct
         ptyp_attributes = [];
       }
 
-  let expand_abstract_type ~loc ~context t = expand_type ~loc ~context t
+  let expand_abstract_type ~context ~type_context t =
+    expand_type ~loc:type_context.loc ~context t
 
   let close
-      ~loc
-      ~context:_
       ~configuration:_
-      { ptype_name = { loc = name_loc; txt }; _ }
-      params
-      js =
+      ~context:_
+      ~type_context
+      (* { ptype_name = { loc = name_loc; txt }; _ } *)
+        js =
     {
-      ptype_name = { loc = name_loc; txt = name "js" txt };
-      ptype_params = params;
+      ptype_name = { loc = type_context.loc; txt = name "js" type_context.name };
+      ptype_params = type_context.params;
       ptype_cstrs = [];
       ptype_kind = Ptype_abstract;
       ptype_private = Public;
       ptype_manifest = Some js;
-      ptype_loc = loc;
+      ptype_loc = type_context.loc;
       ptype_attributes = [];
     }
 
@@ -1359,54 +1352,6 @@ module Jsoo_type = struct
       [ type_ ]
 end
 
-module Expander (Expansion : EXPANSION) = struct
-  let expand ~code_path ~loc configuration recursive t =
-    let names =
-      let f { ptype_name; _ } = ptype_name.txt in
-      if recursive then
-        List.map ~f t
-      else
-        []
-    in
-    let f t =
-      let context =
-        {
-          attributes =
-            Attributes.extract ~name:true ~union_key:true t.ptype_attributes;
-          code_path;
-          type_ = t.ptype_name.txt;
-          types = names;
-        }
-      in
-      let () =
-        match (context.attributes.union_key, t.ptype_kind) with
-        | None, _
-        | Some _, Ptype_variant _ ->
-          ()
-        | _ ->
-          Ppxlib.Location.raise_errorf ~loc:t.ptype_loc
-            "schematic-ppx: union_key is only valid on variants"
-      in
-      let body =
-        let loc = t.ptype_loc in
-        match t.ptype_kind with
-        | Ptype_record fields ->
-          Expansion.expand_record ~loc ~context ~type_:t fields
-        | Ptype_abstract -> (
-          match t.ptype_manifest with
-          | Some core_type ->
-            Expansion.expand_abstract_type ~loc ~context core_type
-          | None -> failwith "no manifest on abstract type")
-        | Ptype_open -> failwith "unsupported Ptype_open"
-        | Ptype_variant options ->
-          Expansion.expand_variant ~loc ~context options
-      in
-      Expansion.close ~loc ~context ~configuration t t.ptype_params body
-    in
-    let expanded = List.map ~f t in
-    Expansion.combine ~loc configuration expanded
-end
-
 module Sqml_binding = struct
   type closed = structure_item list
 
@@ -1423,35 +1368,42 @@ module Sqml_binding = struct
     record_pattern : pattern;
   }
 
-  let expand_record ~loc ~context ?type_:_ fields =
-    let column_name s = "column_" ^ s in
-    let column_explosion_of_field { pld_name = { loc; txt }; _ } =
+  let expand_record ~context ~type_context (fields : Attributes.field list) =
+    let loc = type_context.loc
+    and column_name s = "column_" ^ s in
+    let column_explosion_of_field (field : Attributes.field) =
       [%stri
-        let Sqml.Expression.Column.List.([%p Pattern.id ~loc txt] :: rest) =
+        let Sqml.Expression.Column.List.(
+              [%p Pattern.id ~loc:field.loc field.name] :: rest) =
           rest]
-    and column_of_field { pld_name; pld_type; pld_loc = loc; _ } =
+    and column_of_field (field : Attributes.field) =
+      let loc = field.loc in
       [%stri
-        let [%p Pattern.id ~loc:pld_name.loc (column_name pld_name.txt)] =
+        let [%p Pattern.id ~loc:field.loc (column_name field.name)] =
           Sqml.Column.make
-            [%e Expr.string ~loc:pld_name.loc pld_name.txt]
+            [%e Expr.string ~loc:field.loc field.name]
             (Schematic_sqml.type_of_schema
                [%e
                  Schema.(
-                   schema_of_expanded ~loc @@ encode_type ~loc ~context pld_type)])]
-    and column_type_of_field { pld_type; _ } tail =
-      [%type: [%t pld_type] * [%t tail]]
-    and expr_explosion_of_field { pld_name = { loc; txt }; _ } =
-      [%stri let Sqml.Expression.List.([%p Pattern.id ~loc txt] :: rest) = rest]
-    and id_of_field { pld_name; pld_loc = loc; _ } =
-      Expr.id ~loc (column_name pld_name.txt)
-    and pattern_of_field { pld_name; pld_loc = loc; _ } =
-      Pattern.id ~loc (column_name pld_name.txt)
-    and record_field_of_field { pld_name; pld_loc = loc; _ } =
-      ( { txt = Lident pld_name.txt; loc = pld_name.loc },
-        Expr.id ~loc (column_name pld_name.txt) )
-    and record_pattern_of_field { pld_name; pld_loc = loc; _ } =
-      ( { txt = Lident pld_name.txt; loc = pld_name.loc },
-        Pattern.id ~loc (column_name pld_name.txt) )
+                   schema_of_expanded ~loc:field.loc
+                   @@ encode_type ~context ~type_context field.type_)])]
+    and column_type_of_field (field : Attributes.field) tail =
+      [%type: [%t field.type_] * [%t tail]]
+    and expr_explosion_of_field (field : Attributes.field) =
+      [%stri
+        let Sqml.Expression.List.(
+              [%p Pattern.id ~loc:field.loc field.name] :: rest) =
+          rest]
+    and id_of_field (field : Attributes.field) =
+      Expr.id ~loc:field.loc (column_name field.name)
+    and pattern_of_field (field : Attributes.field) =
+      Pattern.id ~loc:field.loc (column_name field.name)
+    and record_field_of_field (field : Attributes.field) =
+      ( { txt = Lident field.name; loc = field.loc },
+        Expr.id ~loc:field.loc (column_name field.name) )
+    and record_pattern_of_field (field : Attributes.field) =
+      ( { txt = Lident field.name; loc = field.loc },
+        Pattern.id ~loc:field.loc (column_name field.name) )
     in
     {
       columns = List.map ~f:column_of_field fields;
@@ -1472,20 +1424,18 @@ module Sqml_binding = struct
           (Ppat_record (List.map ~f:record_pattern_of_field fields, Closed));
     }
 
-  and expand_variant ~loc ~context:_ _ =
-    Ppxlib.Location.raise_errorf ~loc
+  and expand_variant ~context:_ ~type_context _ =
+    Ppxlib.Location.raise_errorf ~loc:type_context.loc
       "schematic-ppx: SQML can only bind record types"
 
-  let expand_abstract_type ~loc ~context:_ _ =
-    Ppxlib.Location.raise_errorf ~loc
+  let expand_abstract_type ~context:_ ~type_context _ =
+    Ppxlib.Location.raise_errorf ~loc:type_context.loc
       "schematic-ppx: SQML can only bind record types"
 
   let close
-      ~loc
-      ~context:_
       ~configuration:{ name }
-      { ptype_name; _ }
-      _
+      ~context:_
+      ~type_context
       {
         column_explosions;
         columns;
@@ -1496,6 +1446,7 @@ module Sqml_binding = struct
         record;
         record_pattern;
       } =
+    let loc = type_context.loc in
     let meta =
       [%str
         include Sqml.Table.Meta (struct
@@ -1514,7 +1465,7 @@ module Sqml_binding = struct
           let columns = Sqml.Column.List.([%e columns_list])
         end)
 
-        type mapped = [%t Type.id ~loc:ptype_name.loc ptype_name.txt]
+        type mapped = [%t Type.id ~loc:type_context.loc type_context.name]
 
         let map [%p columns_pattern] = [%e record]
 
@@ -1571,27 +1522,93 @@ module Sqml_binding = struct
   let combine ~loc:_ _ items = List.concat items
 end
 
+module Expander (Expansion : EXPANSION) = struct
+  let expand ~configuration ~context types =
+    let f (type_, type_context) =
+      let body =
+        match type_ with
+        | Abstract -> failwith "no manifest on abstract type"
+        | Core core ->
+          Expansion.expand_abstract_type ~context ~type_context core
+        | Record fields -> Expansion.expand_record ~context ~type_context fields
+        | Variant options ->
+          Expansion.expand_variant ~context ~type_context options
+      in
+      Expansion.close ~configuration ~context ~type_context body
+    in
+    let expanded = List.map ~f types in
+    Expansion.combine ~loc:context.loc configuration expanded
+end
+
 module Jsoo_type_expander = Expander (Jsoo_type)
 module Schema_expander = Expander (Schema)
 module Sqml_binding_expander = Expander (Sqml_binding)
 
-let expand ~ctxt ~inside (r, types) jsoo sqml =
-  let r = r = Recursive
-  and loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt
-  and code_path = Ppxlib.Expansion_context.Deriver.code_path ctxt in
+let expand ~ctxt ~inside (recursive, types) jsoo sqml =
+  let loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt in
+  let context =
+    let recursive = Poly.(recursive = Recursive)
+    and code_path = Ppxlib.Expansion_context.Deriver.code_path ctxt in
+    let types =
+      let f { ptype_name; _ } = ptype_name.txt in
+      if recursive then
+        List.map ~f types
+      else
+        []
+    in
+    { code_path; loc; types; recursive }
+  in
+  let types =
+    let f t =
+      let type_context =
+        {
+          attributes =
+            Attributes.extract ~name:true ~union_key:true t.ptype_attributes;
+          loc = t.ptype_loc;
+          name = t.ptype_name.txt;
+          params = t.ptype_params;
+        }
+      in
+      let () =
+        match (type_context.attributes.union_key, t.ptype_kind) with
+        | None, _
+        | Some _, Ptype_variant _ ->
+          ()
+        | _ ->
+          Ppxlib.Location.raise_errorf ~loc:t.ptype_loc
+            "schematic-ppx: union_key is only valid on variants"
+      in
+      let loc = t.ptype_loc in
+      let type_ =
+        match t.ptype_kind with
+        | Ptype_record fields -> Record (List.map ~f:expand_field fields)
+        | Ptype_abstract -> (
+          match t.ptype_manifest with
+          | Some type_ -> Core type_
+          | None -> Abstract)
+        | Ptype_open ->
+          Ppxlib.Location.raise_errorf ~loc
+            "schematic-ppx: unsupported Ptype_open"
+        | Ptype_variant options -> Variant options
+      in
+      (type_, type_context)
+    in
+    List.map ~f types
+  in
   let contents =
     let contents =
       match jsoo with
       | None -> []
       | Some [%expr jsoo]
       | Some [%expr true] ->
-        Jsoo_type_expander.expand ~code_path ~loc { functions = true } r types
+        Jsoo_type_expander.expand ~configuration:{ functions = true } ~context
+          types
       | Some [%expr false] ->
-        Jsoo_type_expander.expand ~code_path ~loc
-          Jsoo_type.{ functions = false }
-          r types
+        Jsoo_type_expander.expand
+          ~configuration:Jsoo_type.{ functions = false }
+          ~context types
       | Some exp ->
-        Ppxlib.Location.raise_errorf ~loc
+        Ppxlib.Location.raise_errorf ~loc:exp.pexp_loc
           "schematic-ppx: invalid ~jsoo argument value: %a" Pprintast.expression
           exp
     in
@@ -1599,9 +1616,10 @@ let expand ~ctxt ~inside (r, types) jsoo sqml =
       match sqml with
       | None -> contents
       | Some name ->
-        Sqml_binding_expander.expand ~code_path ~loc { name } r types @ contents
+        Sqml_binding_expander.expand ~configuration:{ name } ~context types
+        @ contents
     in
-    Schema_expander.expand ~code_path ~loc () r types @ contents
+    Schema_expander.expand ~configuration:() ~context types @ contents
   in
   if Option.is_some jsoo then
     [%str
