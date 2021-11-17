@@ -383,9 +383,11 @@ module Attributes = struct
   }
 
   let check_unknown_attribute ~loc name =
-    if String.is_prefix ~prefix:"schematic." name then
+    match String.chop_prefix ~prefix:"schematic." name with
+    | Some name ->
       Ppxlib.Location.raise_errorf ~loc
         "schematic-ppx: unknown schematic annotation %s" name
+    | None -> ()
 
   let rec extract ?(alias = false) ?(name = false) ?(union_key = false) =
     let merge name loc old v =
