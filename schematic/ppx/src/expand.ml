@@ -367,14 +367,23 @@ module Attributes = struct
     name : string;
     schema : expression option;
     specs : specs;
-    sqml : expression option;
+    sqml_primary : bool option;
+    sqml_type : expression option;
     type_ : core_type;
   }
   [@@deriving make]
 
   let make_field
-      ?alias ?inline ~loc ?schema ?(specs = specs_empty) ?sqml ~type_ name =
-    { alias; inline; loc; name; schema; specs; sqml; type_ }
+      ?alias
+      ?inline
+      ~loc
+      ?schema
+      ?(specs = specs_empty)
+      ?sqml_primary
+      ?sqml_type
+      ~type_
+      name =
+    { alias; inline; loc; name; schema; specs; sqml_primary; sqml_type; type_ }
 
   type t = {
     alias : string option;
@@ -577,12 +586,18 @@ let expand_field
             "schematic-ppx: inline specified multiple times"
       | _ ->
         Ppxlib.Location.raise_errorf ~loc "schematic-ppx: no payload expected")
-    | "schematic.sqml.type" ->
-      if Option.is_some attrs.sqml then
+    | "schematic.sqml.primary" ->
+      if Option.is_some attrs.sqml_primary then
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: duplicate schematic.sqml annotation"
       else
-        { attrs with sqml = Some (expect_payload_expr ~loc attr_payload) }
+        { attrs with sqml_primary = Some true }
+    | "schematic.sqml.type" ->
+      if Option.is_some attrs.sqml_type then
+        Ppxlib.Location.raise_errorf ~loc
+          "schematic-ppx: duplicate schematic.sqml annotation"
+      else
+        { attrs with sqml_type = Some (expect_payload_expr ~loc attr_payload) }
     | name ->
       let () = Attributes.check_unknown_attribute ~loc name in
       attrs
@@ -1388,7 +1403,7 @@ module Sqml_binding = struct
     and column_of_field (field : Attributes.field) =
       let loc = field.loc in
       let column_type =
-        match field.sqml with
+        match field.sqml_type with
         | Some t -> t
         | None ->
           [%expr
@@ -1397,10 +1412,12 @@ module Sqml_binding = struct
                 Schema.(
                   schema_of_expanded ~loc:field.loc
                   @@ encode_type ~context ~type_context field.type_)]]
+      and primary =
+        Expr.bool ~loc (Option.value ~default:false field.sqml_primary)
       in
       [%stri
         let [%p Pattern.id ~loc:field.loc (column_name field.name)] =
-          Sqml.Column.make
+          Sqml.Column.make ~primary:[%e primary]
             [%e Expr.string ~loc:field.loc field.name]
             [%e column_type]]
     and column_type_of_field (field : Attributes.field) tail =
