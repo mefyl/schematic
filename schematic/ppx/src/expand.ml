@@ -266,25 +266,7 @@ let expr_int ~loc i =
     pexp_attributes = [];
   }
 
-let expect_string ~loc = function
-  | Pexp_constant (Pconst_string (value, _, _)) -> value
-  | _ -> Ppxlib.Location.raise_errorf ~loc "schematic-ppx: string expected"
-
-let expect_payload_string ~loc = function
-  | PStr
-      [%str [%e? { pexp_desc = Pexp_constant (Pconst_string (txt, _, _)); _ }]]
-    ->
-    txt
-  | _ ->
-    Ppxlib.Location.raise_errorf ~loc "schematic-ppx: string constant expected"
-
-let expect_payload_expr ~loc = function
-  | PStr [%str [%e? e]] -> e
-  | _ -> Ppxlib.Location.raise_errorf ~loc "schematic-ppx: expression expected"
-
-let expect_int ~loc = function
-  | Pexp_constant (Pconst_integer (value, None)) -> Int.of_string value
-  | _ -> Ppxlib.Location.raise_errorf ~loc "schematic-ppx: int expected"
+let expect ~loc pattern ast = Ast_pattern.parse pattern loc ast Fn.id
 
 let rename name =
   let len = String.length name in
@@ -413,14 +395,26 @@ module Attributes = struct
       | "schematic.as" when alias -> (
         match attrs with
         | { alias = None; _ } ->
-          { attrs with alias = Some (expect_payload_string ~loc attr_payload) }
+          {
+            attrs with
+            alias =
+              Some
+                (expect
+                   Ast_pattern.(single_expr_payload (estring __))
+                   ~loc attr_payload);
+          }
         | _ ->
           Ppxlib.Location.raise_errorf ~loc
             "schematic-ppx: duplicate schematic.as annotation on schema")
       | "schematic.name" when name -> (
         match attrs with
         | { name = None; _ } ->
-          { attrs with name = Some (expect_payload_expr ~loc attr_payload) }
+          {
+            attrs with
+            name =
+              Some
+                (expect ~loc Ast_pattern.(single_expr_payload __) attr_payload);
+          }
         | _ ->
           Ppxlib.Location.raise_errorf ~loc
             "schematic-ppx: duplicate schematic.name annotation on schema")
@@ -429,7 +423,9 @@ module Attributes = struct
           attrs with
           union_key =
             merge "union_key" loc attrs.union_key
-            @@ expect_payload_string ~loc attr_payload;
+            @@ expect ~loc
+                 Ast_pattern.(single_expr_payload (estring __))
+                 attr_payload;
         }
       | _ ->
         let () = check_unknown_attribute ~loc txt in
@@ -521,7 +517,11 @@ let expand_field
     in
     match attr_name.txt with
     | "schematic.schema" ->
-      { attrs with schema = Some (expect_payload_expr ~loc attr_payload) }
+      {
+        attrs with
+        schema =
+          Some (expect ~loc Ast_pattern.(single_expr_payload __) attr_payload);
+      }
     | "default" -> default Source.generic true false
     | "schematic.default" -> default Source.schematic true false
     | "schematic.default_opt" -> default Source.schematic false false
@@ -535,11 +535,13 @@ let expand_field
               { pexp_desc = Pexp_record (properties, None); pexp_loc = loc; _ }]]
         ->
         let prop specs = function
-          | ( { txt = Lident name; loc = loc_name; _ },
-              ({ pexp_desc = value; pexp_loc = loc; _ } as desc) ) -> (
+          | { txt = Lident name; loc = loc_name; _ }, value -> (
             match name with
             | "description" ->
-              { specs with description = Some (expect_string ~loc value) }
+              {
+                specs with
+                description = Some (expect Ast_pattern.(estring __) ~loc value);
+              }
             | "default" ->
               let () =
                 Fmt.epr "%a Warning: deprecated, use @schematic.default\n"
@@ -550,11 +552,19 @@ let expand_field
                 default =
                   Some
                     (Source.merge ~loc:loc_name "default" specs.default
-                       (Source.schematic [%expr Some [%e desc]]));
+                       (Source.schematic [%expr Some [%e value]]));
               }
-            | "example" -> { specs with examples = [ desc ] }
-            | "minimum" -> { specs with maximum = Some (expect_int ~loc value) }
-            | "maximum" -> { specs with minimum = Some (expect_int ~loc value) }
+            | "example" -> { specs with examples = [ value ] }
+            | "minimum" ->
+              {
+                specs with
+                maximum = Some (expect ~loc Ast_pattern.(eint __) value);
+              }
+            | "maximum" ->
+              {
+                specs with
+                minimum = Some (expect ~loc Ast_pattern.(eint __) value);
+              }
             | "unique" -> specs
             | _ ->
               Ppxlib.Location.raise_errorf ~loc:loc_name
@@ -568,7 +578,10 @@ let expand_field
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: record payload expected")
     | "schematic.as" ->
-      { attrs with alias = Some (expect_payload_string ~loc attr_payload) }
+      Ast_pattern.parse
+        Ast_pattern.(single_expr_payload (estring __))
+        loc attr_payload
+        (fun alias -> { attrs with alias = Some alias })
     | ("schematic.inline" as attr)
     | ("schematic.inline_try" as attr) -> (
       match attr_payload with
@@ -597,7 +610,10 @@ let expand_field
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: duplicate schematic.sqml annotation"
       else
-        { attrs with sqml_type = Some (expect_payload_expr ~loc attr_payload) }
+        Ast_pattern.parse
+          Ast_pattern.(single_expr_payload __)
+          loc attr_payload
+          (fun sqml_type -> { attrs with sqml_type = Some sqml_type })
     | name ->
       let () = Attributes.check_unknown_attribute ~loc name in
       attrs
