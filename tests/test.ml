@@ -234,23 +234,47 @@ let polymorphic_variant () =
 
 (* List *)
 
-let list_test () =
-  test "list" (Alcotest.list test_version) (list_schema version_schema) [] "[]";
-  test "list"
-    (Alcotest.list test_version)
-    (list_schema version_schema)
-    [ { major = 0; minor = 1; subminor = 2 } ]
-    "[{\"major\": 0.000000, \"minor\": 1.000000, \"subminor\": 2.000000}].";
-  test "list"
-    (Alcotest.list test_version)
-    (list_schema version_schema)
-    [
-      { major = 0; minor = 1; subminor = 2 };
-      { major = 3; minor = 4; subminor = 5 };
-      { major = 6; minor = 7; subminor = 8 };
-    ]
-    "[{\"major\": 0, \"minor\": 1, \"subminor\": 2},{\"major\": 3, \"minor\": \
-     4, \"subminor\": 5.00000},{\"major\": 6, \"minor\": 7, \"subminor\": 8}]."
+module List = struct
+  let objects () =
+    test "list"
+      (Alcotest.list test_version)
+      (list_schema version_schema)
+      [] "[]";
+    test "list"
+      (Alcotest.list test_version)
+      (list_schema version_schema)
+      [ { major = 0; minor = 1; subminor = 2 } ]
+      "[{\"major\": 0.000000, \"minor\": 1.000000, \"subminor\": 2.000000}].";
+    test "list"
+      (Alcotest.list test_version)
+      (list_schema version_schema)
+      [
+        { major = 0; minor = 1; subminor = 2 };
+        { major = 3; minor = 4; subminor = 5 };
+        { major = 6; minor = 7; subminor = 8 };
+      ]
+      "[{\"major\": 0, \"minor\": 1, \"subminor\": 2},{\"major\": 3, \
+       \"minor\": 4, \"subminor\": 5.00000},{\"major\": 6, \"minor\": 7, \
+       \"subminor\": 8}]."
+
+  let option () =
+    test "list"
+      Alcotest.(list (option int))
+      (list_schema (option_schema int_schema))
+      [] "[]";
+    test "list"
+      Alcotest.(list (option int))
+      (list_schema (option_schema int_schema))
+      [ Some 1; Some 2; Some 3 ] "[1, 2, 3]";
+    test "list"
+      Alcotest.(list (option int))
+      (list_schema (option_schema int_schema))
+      [ None; None; None ] "[null, null, null]";
+    test "list"
+      Alcotest.(list (option int))
+      (list_schema (option_schema int_schema))
+      [ Some 1; None; Some 3 ] "[1, null, 3]"
+end
 
 (* Parametric *)
 
@@ -394,7 +418,7 @@ module Inline = struct
       Schematic.Schema.(
         inline descriptor { f = Schematic.Schema.object_fields })
     with
-    | Result.Ok sets -> List.concat sets
+    | Result.Ok sets -> Base.List.concat sets
     | Result.Error e -> Alcotest.fail e
 
   let record () =
@@ -759,7 +783,7 @@ module Comparison = struct
         (1, v022, v012);
       ]
     in
-    List.iter ~f:(fun (exp, l, r) -> check exp (f l) (f r)) tests
+    Base.List.iter ~f:(fun (exp, l, r) -> check exp (f l) (f r)) tests
 
   let record () =
     let check = check "version" version_schema in
@@ -909,7 +933,8 @@ let () =
           test_case "variant" `Quick variant;
           test_case "polymorphic variant" `Quick polymorphic_variant;
           test_case "alias" `Quick alias;
-          test_case "list" `Quick list_test;
+          test_case "list" `Quick List.objects;
+          test_case "option list" `Quick List.option;
           test_case "parametric_type" `Quick parametric_type;
           test_case "escape" `Quick escape;
           test_case "recursive" `Quick recursive;
