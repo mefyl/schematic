@@ -77,9 +77,9 @@ module Generate_types = struct
     test record_res_schema
       [
         ("RecordRes", "Result<Record, string>");
-        record_typescript;
         ( "Result<T, Error>",
           {|T & { "status": "ok" } | Error & { "status": "error" }|} );
+        record_typescript;
       ]
 
   let tuple () = test tuple_schema [ tuple_typescript ]

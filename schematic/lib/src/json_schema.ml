@@ -100,6 +100,7 @@ let of_schema schema =
       | Schema.Bool ->
         { validation_empty with type_ = Some (Either.first Boolean) }
       | Schema.Date -> validation date_tuple_schema.descriptor
+      | Fixpoint s -> validation (Lazy.force s)
       | Schema.Float ->
         { validation_empty with type_ = Some (Either.first Number) }
       | Schema.Ignore -> validation_empty
@@ -149,6 +150,7 @@ let of_schema schema =
       | Schema.Any -> (marks, Some applicator_empty)
       | Schema.Bool -> (marks, Some applicator_empty)
       | Schema.Date -> applicator marks date_tuple_schema.descriptor
+      | Fixpoint s -> applicator marks (Lazy.force s)
       | Schema.Float
       | Schema.Ignore ->
         (marks, Some applicator_empty)

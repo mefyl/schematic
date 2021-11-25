@@ -10,6 +10,7 @@ let rec type_of_descriptor :
     let decode = Fn.compose Result.return Timmy.Date.to_tuple
     and encode = Timmy.Date.of_tuple_exn ~here:[%here] in
     Custom { decode; encode; repr = Date }
+  | Fixpoint s -> type_of_descriptor (Lazy.force s)
   | Int -> Int
   | Ignore -> failwith "schematic-sqml: cannot bind Ignore schema"
   | Int64 -> Bigint

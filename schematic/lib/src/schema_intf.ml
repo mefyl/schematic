@@ -45,6 +45,7 @@ and _ descriptor =
   | Any : Ezjsonm.value descriptor
   | Bool : bool descriptor
   | Date : Ptime.date descriptor
+  | Fixpoint : 'a descriptor Lazy.t -> 'a descriptor
   | Float : float descriptor
   | Ignore : unit descriptor
   | Int : int descriptor
@@ -74,6 +75,8 @@ and 't t = {
   parametric : 't parametric option;
 }
 
+and 't schema = 't t
+
 and 't parametric =
   | Plain of {
       name : string;
@@ -85,3 +88,65 @@ and 't parametric =
       next : 'p t -> 't parametric;
     }
       -> 't parametric
+
+module type WALK = sig
+  type t
+
+  type fields
+
+  (* Schema *)
+
+  val schema : string option -> (unit -> t) option -> (unit -> t) -> t
+
+  val parametric : string -> string list -> t list -> t -> t
+
+  (* Object *)
+
+  val fields_empty : unit -> fields
+
+  val field_inline : fields list -> fields -> fields
+
+  val field_outline : string -> bool -> t -> fields -> fields
+
+  val object_ : fields -> t
+
+  (* Union *)
+
+  val case : string option -> string -> t -> t
+
+  val union : t list -> t
+
+  (* Descriptors *)
+
+  val any : unit -> t
+
+  val bool : unit -> t
+
+  val float : unit -> t
+
+  val date : unit -> t
+
+  val mapping : t -> t
+
+  val int : unit -> t
+
+  val ignore : unit -> t
+
+  val int64 : unit -> t
+
+  val list : t -> t
+
+  val null : unit -> t
+
+  val nullable : t -> t
+
+  val string : unit -> t
+
+  val string_const : string -> t
+
+  val time : unit -> t
+
+  val time_local : unit -> t
+
+  val tuple : t list -> t
+end

@@ -13,6 +13,8 @@ let extract_field_schema = function
   | Inline_try schema -> schema
   | Outline schema -> schema
 
+(* Pretty printer *)
+
 let rec pp_descriptor : type u. u descriptor Fmt.t =
  fun f d ->
   let fmt =
@@ -22,6 +24,7 @@ let rec pp_descriptor : type u. u descriptor Fmt.t =
     | Any -> const string "Any"
     | Bool -> const string "Bool"
     | Date -> const string "Date"
+    | Fixpoint s -> const pp_descriptor (Lazy.force s)
     | Float -> const string "Float"
     | Ignore -> const string "Ignore"
     | Int -> const string "Int"
@@ -75,6 +78,8 @@ and pp_fields : type t. t field Fmt.t =
 and pp : type u. u t Fmt.t =
  fun f { descriptor; _ } -> pp_descriptor f descriptor
 
+(* Inline helpers *)
+
 type 'res inline = { f : 't. 't field -> 'res }
 
 let rec inline :
@@ -111,6 +116,104 @@ let rec inline_v :
   | s ->
     Result.fail
       (Fmt.str "inlined value field is not an object: %a" pp_descriptor s)
+
+(* Walker *)
+
+module Walk (W : WALK) = struct
+  let rec descriptor : type t. t descriptor -> W.t = function
+    | Any -> W.any ()
+    | Bool -> W.bool ()
+    | Float -> W.float ()
+    | Date -> W.date ()
+    | Fixpoint s -> descriptor (Lazy.force s)
+    | Int -> W.int ()
+    | Ignore -> W.ignore ()
+    | Int64 -> W.int64 ()
+    | List l -> W.list (schema l)
+    | Null -> W.null ()
+    | String -> W.string ()
+    | Time -> W.time ()
+    | Time_local -> W.time_local ()
+    | Map (_, _, d) -> descriptor d
+    | Mapping s -> W.mapping (schema s)
+    | Nullable s -> W.nullable (schema s)
+    | String_const s -> W.string_const s
+    | Object f -> W.object_ (fields f)
+    | Tuple l -> W.tuple @@ tuple l
+    | Union { cases; key } -> W.union @@ List.map ~f:(case key) cases
+
+  and case : type t. string option -> t case -> W.t =
+   fun key (Case { name; schema = s; _ }) -> W.case key name (schema s)
+
+  and schema : type t. t Schema_intf.t -> W.t =
+   fun { id; descriptor = d; parametric = p } ->
+    let schema () = descriptor d
+    and parametric =
+      match p with
+      | None -> None
+      | Some p ->
+        Some
+          (fun () ->
+            let name, args, eff_args, t = parametric p in
+            W.parametric name args eff_args t)
+    in
+    W.schema id parametric schema
+
+  and parametric : type t. t parametric -> string * string list * W.t list * W.t
+      = function
+    | Plain { name; descriptor = d } -> (name, [], [], descriptor d)
+    | Parametric { name; parameter; next } ->
+      let template_name, args, eff_args, t =
+        parametric (next { parameter with id = Some ("#" ^ name) })
+      in
+      (template_name, name :: args, schema parameter :: eff_args, t)
+
+  and fields : type t. t field -> W.fields = function
+    | FieldEnd -> W.fields_empty ()
+    | Field
+        {
+          schema =
+            ( Outline { descriptor = Ignore; _ }
+            | Inline { descriptor = Ignore; _ }
+            | Inline_try { descriptor = Ignore; _ } );
+          rest;
+          _;
+        } ->
+      fields rest
+    | Field { omit = true; rest; _ } -> fields rest
+    | Field { field; requirement; rest; schema = Outline s; _ } ->
+      let rest = fields rest
+      and schema = schema s in
+      W.field_outline field (required requirement) schema rest
+    | Field { rest; schema = Inline { descriptor; _ }; _ } ->
+      let fields =
+        match inline descriptor { f = (fun f -> fields f) } with
+        | Result.Ok v -> v
+        | Result.Error e -> failwith e
+      and rest = fields rest in
+      W.field_inline fields rest
+    | Field
+        {
+          field;
+          requirement;
+          rest;
+          schema = Inline_try ({ descriptor; _ } as s);
+          _;
+        } -> (
+      let rest = fields rest in
+      match inline descriptor { f = (fun f -> fields f) } with
+      | Result.Ok fields -> W.field_inline fields rest
+      | Result.Error _ ->
+        W.field_outline field (required requirement) (schema s) rest)
+
+  and tuple : type t. t tuple -> W.t list = function
+    | ItemEnd -> []
+    | Item { schema = s; rest } -> schema s :: tuple rest
+
+  let parametric p =
+    let name, args, eff_args, t = parametric p in
+    W.parametric name args eff_args t
+end
 
 let object_fields =
   let rec object_fields : type t. t field -> string list list =
@@ -181,6 +284,7 @@ let compare schema =
     | Any -> compare_json
     | Bool -> Base.Bool.compare
     | Date -> Base.Poly.compare
+    | Fixpoint s -> compare (Lazy.force s)
     | Float -> Base.Poly.compare
     | Ignore -> Base.Poly.compare
     | Int
@@ -260,3 +364,7 @@ let name_combine schema name =
   | None -> name
 
 let make ?id ?parametric descriptor = { id; descriptor; parametric }
+
+let fixpoint f =
+  let rec self = Fixpoint (lazy (f self)) in
+  f self

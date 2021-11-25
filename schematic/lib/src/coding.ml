@@ -189,6 +189,7 @@ module Make (Coding : S) = struct
         match Coding.to_date with
         | `Generic -> decode None ids date_tuple_schema.descriptor v
         | `Custom f -> f v |> type_error "date")
+      | Fixpoint s -> decode id ids (Lazy.force s) v
       | Float -> Coding.to_float v |> type_error "float"
       | Ignore -> Result.return ()
       | Int -> Coding.to_int v |> type_error "integer"
@@ -366,6 +367,7 @@ module Make (Coding : S) = struct
         match Coding.of_date with
         | `Generic -> encode date_tuple_schema.descriptor v
         | `Custom f -> f v)
+      | Fixpoint s -> encode (Lazy.force s) v
       | Float -> Coding.of_float v
       | Ignore -> Coding.null ()
       | Int -> Coding.of_int v

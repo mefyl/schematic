@@ -1,45 +1,5 @@
 open Base
 
-module Mark = struct
-  module T = struct
-    type t = Schema : string * 'a Schema.t -> t
-
-    let sexp_of_t (Schema (id, _)) = Sexp.Atom id
-
-    let compare (Schema (l, _)) (Schema (r, _)) = String.compare l r
-  end
-
-  include T
-  include Base.Comparable.Make (T)
-
-  let make id schema = Schema (id, schema)
-
-  let of_schema s = make (Option.value_exn ~here:[%here] s.Schema.id) s
-end
-
-module Marks = struct
-  type t = (Mark.t, Mark.comparator_witness) Set.t
-
-  let empty = Set.empty (module Mark)
-
-  let make id s = Set.of_list (module Mark) [ Schema (id, s) ]
-
-  let add = Set.add
-
-  let merge = Set.union_list (module Mark)
-
-  let has = Set.mem
-
-  let of_list = Set.of_list (module Mark)
-end
-
-let name s =
-  String.split ~on:'_' s
-  |> List.map ~f:(String.split ~on:'-')
-  |> List.concat
-  |> List.map ~f:String.capitalize
-  |> String.concat ~sep:""
-
 type t =
   | Atom of string
   | Intersection of t list
@@ -52,64 +12,111 @@ type t =
   | Tuple of t list
   | Union of t list
 
-let rec of_descriptor : type s. s Schema.descriptor -> t * Marks.t = function
-  | Any -> (Atom "any", Marks.empty)
-  | Bool -> (Atom "boolean", Marks.empty)
-  | Date -> (Atom "Date", Marks.empty)
-  | Ignore -> (Atom "null", Marks.empty)
-  | Int
-  | Int64
-  | Float ->
-    (Atom "number", Marks.empty)
-  | List s ->
-    let s, marks = of_schema s in
-    (Template { name = "Array"; args = [ s ] }, marks)
-  | Map (_, _, d) -> of_descriptor d
-  | Mapping s ->
-    let s, marks = of_schema s in
-    (Template { name = "Record"; args = [ Atom "string"; s ] }, marks)
-  | Null -> (Atom "null", Marks.empty)
-  | Nullable s ->
-    let s, marks = of_schema s in
-    (Union [ s; Atom "null" ], marks)
-  | String -> (Atom "string", Marks.empty)
-  | String_const s -> (Atom (Fmt.str "%S" s), Marks.empty)
-  | Time
-  | Time_local ->
-    (Atom "Date", Marks.empty)
-  | Object fields -> (
-    let fields_cases, marks = of_object fields
-    and f fields = Object { fields } in
-    match fields_cases with
-    | [] -> failwith "typescript: of_objects yielded no result"
-    | [ fields ] -> (f fields, marks)
-    | cases -> (Union (List.map ~f cases), marks))
-  | Tuple items ->
-    let items, marks = of_tuple items in
-    (Tuple items, marks)
-  | Union { cases; key } ->
-    let cases = List.map ~f:(of_case key) cases in
-    let cases = List.map ~f:fst cases
-    and marks = Marks.merge @@ List.map ~f:snd cases in
-    (Union cases, marks)
+type typescript = t
 
-and of_schema : type s. s Schema.t -> t * Marks.t = function
-  | { id = None; descriptor; _ } -> of_descriptor descriptor
-  | { id = Some id; _ } as schema ->
-    if String.is_prefix ~prefix:"#" id then
-      (Atom (name @@ String.subo ~pos:1 id), Marks.empty)
-    else
-      (Atom (name id), Marks.make id schema)
+module rec Mark :
+  (Comparable.S with type t = string * (typescript * Marks.t) Lazy.t) = struct
+  module T = struct
+    type t = string * (typescript * Marks.t) Lazy.t
 
-and of_object :
-    type s. s Schema.field -> (string * t * bool) list list * Marks.t =
-  let inline descriptor rest =
-    let open Result in
-    Schema.inline descriptor { f = (fun fields -> of_object fields) }
-    |> map ~f:List.unzip
-    >>| fun (fields, marks) ->
-    let fields = Base.Sequence.(of_list fields |> map ~f:of_list |> concat)
-    and rest, rest_marks = of_object rest in
+    let sexp_of_t (id, _) = Sexp.Atom id
+
+    let compare (l, _) (r, _) = String.compare l r
+  end
+
+  include T
+  include Base.Comparable.Make (T)
+end
+
+and Marks : sig
+  type t
+
+  val empty : t
+
+  val make : string -> (unit -> typescript * Marks.t) -> t
+
+  val add : t -> Mark.t -> t
+
+  val fold : t -> init:'a -> f:('a -> Mark.t -> 'a) -> 'a
+
+  val has : t -> Mark.t -> bool
+
+  val merge : t list -> t
+
+  val of_list : Mark.t list -> t
+end = struct
+  type t = (Mark.t, Mark.comparator_witness) Set.t
+
+  let empty = Set.empty (module Mark)
+
+  let make id f = Set.of_list (module Mark) [ (id, lazy (f ())) ]
+
+  let add = Set.add
+
+  let fold = Set.fold
+
+  let has = Set.mem
+
+  let merge = Set.union_list (module Mark)
+
+  let of_list = Set.of_list (module Mark)
+end
+
+let name s =
+  String.split ~on:'_' s
+  |> List.map ~f:(String.split ~on:'-')
+  |> List.concat
+  |> List.map ~f:String.capitalize
+  |> String.concat ~sep:""
+
+module Of = Schema.Walk (struct
+  type res = t * Marks.t
+
+  type fields = (string * t * bool) list list * Marks.t
+
+  type t = res
+
+  (* Schema *)
+
+  let schema id parametric s =
+    match id with
+    | None -> (
+      match parametric with
+      | None -> s ()
+      | Some parametric -> parametric ())
+    | Some id ->
+      let mark = Marks.make id s in
+      if String.is_prefix ~prefix:"#" id then
+        (Atom (name @@ String.subo ~pos:1 id), Marks.empty)
+      else
+        (Atom (name id), mark)
+
+  let parametric template_name args effective t =
+    let template_name = name template_name in
+    let effective, marks = List.unzip effective in
+    let mark =
+      let id =
+        Fmt.(
+          str "%s<%a>" template_name
+            (list ~sep:(const string ", ") string)
+            (List.map ~f:name args))
+      in
+      (id, lazy t)
+    in
+    ( Template { name = template_name; args = effective },
+      Marks.add (Marks.merge marks) mark )
+
+  let make name = (Atom name, Marks.empty)
+
+  let any () = make "any"
+
+  let bool () = make "boolean"
+
+  let fields_empty () = ([ [] ], Marks.empty)
+
+  let field_inline cases (rest, rest_marks) =
+    let fields, marks = List.unzip cases in
+    let fields = Base.Sequence.(of_list fields |> map ~f:of_list |> concat) in
     let fields =
       Base.Sequence.(
         cartesian_product fields (of_list rest)
@@ -117,105 +124,85 @@ and of_object :
         |> to_list)
     in
     (fields, Marks.merge (rest_marks :: marks))
-  in
-  let outline field schema rest requirement omit =
-    if omit then
-      of_object rest
-    else
-      let schema, marks = of_schema schema
-      and rest, rest_marks = of_object rest in
-      ( List.map ~f:(List.cons (field, schema, Schema.required requirement)) rest,
-        Marks.merge [ marks; rest_marks ] )
-  in
-  function
-  | Field
-      {
-        schema =
-          Outline { descriptor = Ignore; _ } | Inline { descriptor = Ignore; _ };
-        rest;
-        _;
-      } ->
-    of_object rest
-  | Field { field; schema = Outline schema; rest; requirement; omit; _ } ->
-    outline field schema rest requirement omit
-  | Field { schema = Inline { descriptor; _ }; rest; _ } -> (
-    match inline descriptor rest with
-    | Result.Ok v -> v
-    | Result.Error e -> failwith e)
-  | Field { field; omit; rest; requirement; schema = Inline_try schema; _ } -> (
-    match inline schema.descriptor rest with
-    | Result.Ok v -> v
-    | Result.Error _ -> outline field schema rest requirement omit)
-  | FieldEnd -> ([ [] ], Marks.empty)
 
-and of_tuple : type s. s Schema.tuple -> t list * Marks.t = function
-  | Item { schema; rest } ->
-    let schema, marks = of_schema schema
-    and rest, marks_rest = of_tuple rest in
-    (schema :: rest, Marks.merge [ marks; marks_rest ])
-  | ItemEnd -> ([], Marks.empty)
+  let field_outline name required (schema, marks) (rest, rest_marks) =
+    ( List.map ~f:(List.cons (name, schema, required)) rest,
+      Marks.merge [ marks; rest_marks ] )
 
-and of_case : type s. string option -> s Schema.case -> t * Marks.t =
- fun key (Case { name; schema; _ }) ->
-  let schema, marks = of_schema schema in
-  match key with
-  | None -> (schema, marks)
-  | Some key ->
-    ( Intersection [ schema; Object { fields = [ (key, String name, true) ] } ],
-      marks )
+  let float () = make "number"
 
-and of_parametric :
-    type a.
-    Marks.t -> string -> a Schema.parametric -> (string * t) list * Marks.t =
- fun marks id parametric ->
-  let rec f params marks args = function
-    | Schema.Parametric { parameter; next; name = param_name } ->
-      let p, deps = of_schema parameter
-      and param_name = name param_name in
-      f (param_name :: params)
-        (Marks.merge [ marks; deps ])
-        (p :: args)
-        (next { parameter with id = Some ("#" ^ param_name) })
-    | Schema.Plain { name = template_name; descriptor } ->
-      let schema =
-        (name id, Template { name = name template_name; args = List.rev args })
-      in
-      let schemas, marks =
-        let mark =
-          let id =
-            Fmt.(
-              str "%s<%a>" (name template_name)
-                (list ~sep:(const string ", ") string)
-                (List.rev params))
-          in
-          Mark.make template_name (Schema.make ~id descriptor)
-        in
-        ([ schema ], Marks.add marks mark)
-      in
-      (schemas, marks)
-  in
-  f [] marks [] parametric
+  let date () = make "Date"
 
-let rec of_schema : type a. Marks.t -> a Schema.t -> (string * t) list * Marks.t
-    =
- fun marks (Schema.{ id; descriptor; parametric } as schema) ->
-  match id with
-  | Some id when Marks.has marks (Mark.make id schema) -> ([], marks)
-  | Some id ->
+  let int = float
+
+  let ignore () = make "null"
+
+  let int64 = float
+
+  let list (s, marks) = (Template { name = "Array"; args = [ s ] }, marks)
+
+  let mapping (elt, marks) =
+    (Template { name = "Record"; args = [ Atom "string"; elt ] }, marks)
+
+  let null () = make "null"
+
+  let nullable (t, marks) = (Union [ t; Atom "null" ], marks)
+
+  let object_ (fields_cases, marks) =
+    let f fields = Object { fields } in
+    match fields_cases with
+    | [] -> failwith "typescript: of_objects yielded no result"
+    | [ fields ] -> (f fields, marks)
+    | cases -> (Union (List.map ~f cases), marks)
+
+  let string () = make "string"
+
+  let time () = make "Date"
+
+  let time_local = time
+
+  let tuple items =
+    let items, marks = List.unzip items in
+    (Tuple items, Marks.merge marks)
+
+  let string_const s = (Atom (Fmt.str "%S" s), Marks.empty)
+
+  (* Union *)
+
+  let case key name (schema, marks) =
+    match key with
+    | None -> (schema, marks)
+    | Some key ->
+      ( Intersection [ schema; Object { fields = [ (key, String name, true) ] } ],
+        marks )
+
+  let union cases =
+    let t, marks = List.unzip cases in
+    (Union t, Marks.merge marks)
+end)
+
+let rec of_mark marks mark =
+  if Marks.has marks mark then
+    ([], marks)
+  else
     let res, deps =
-      match parametric with
-      | None ->
-        let res, deps = of_descriptor descriptor in
-        ([ (name id, res) ], deps)
-      | Some parametric -> of_parametric marks id parametric
+      let res, deps = Lazy.force @@ snd mark in
+      ([ (name @@ fst mark, res) ], deps)
     in
-    let marks = Marks.add marks (Mark.make id schema) in
-    let f (res, marks) (Mark.Schema (_, dep)) =
-      let deps, marks = of_schema marks dep in
+    let marks = Marks.add marks mark in
+    let f (res, marks) mark =
+      let deps, marks = of_mark marks mark in
       (res @ deps, marks)
     in
-    Set.fold ~init:(res, marks) ~f deps
-  | _ -> failwith "schema has no id"
+    Marks.fold ~init:(res, marks) ~f deps
+
+let mark_of_schema Schema.{ id; descriptor; parametric } =
+  match parametric with
+  | None -> (Option.value_exn ~here:[%here] id, lazy (Of.descriptor descriptor))
+  | Some parametric ->
+    (Option.value_exn ~here:[%here] id, lazy (Of.parametric parametric))
+
+let of_schema marks s = of_mark marks @@ mark_of_schema s
 
 let unpacker marks =
   let unpack : type a. a Schema.t -> (string * t) list * Marks.t =
@@ -232,7 +219,7 @@ let of_schemas_state marks schemas =
 
 let state_exclude schemas =
   Marks.of_list
-    (List.map ~f:(Schema.unpack { unpack = Mark.of_schema }) schemas)
+    (List.map ~f:(Schema.unpack { unpack = mark_of_schema }) schemas)
 
 let of_schemas ?(exclude = []) schemas =
   let marks = state_exclude exclude in
@@ -240,7 +227,7 @@ let of_schemas ?(exclude = []) schemas =
 
 let of_schema schema = of_schema Marks.empty schema |> fst
 
-let of_descriptor d = of_descriptor d |> fst
+let of_descriptor d = Of.descriptor d |> fst
 
 let break sp id fmt _ = Caml.Format.pp_print_break fmt sp id
 

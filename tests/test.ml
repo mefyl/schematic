@@ -37,8 +37,9 @@ let test ?(validate = true) name test schema value j =
       Alcotest.fail
         (Fmt.str "JSON decode error: %a" Schematic.Error.pp_decoding e)
   in
-  if validate then
+  if validate then (
     let schema = json_schema schema in
+    Fmt.epr "%s@." Ezjsonm.(value_to_string schema);
     let cmd =
       Printf.sprintf "%s/validate-schema \"%s\" \"%s\"" root
         (String.escaped @@ Schematic.Json.to_string @@ schema)
@@ -46,6 +47,7 @@ let test ?(validate = true) name test schema value j =
     in
     if Caml.Sys.command cmd <> 0 then
       Alcotest.check json (Fmt.str "%s: schema validation" name) encoded schema
+  )
 
 (* Failure *)
 
@@ -308,35 +310,175 @@ let escape () =
 
 (* Recursive *)
 
-type recursive = {
-  value : int;
-  next : recursive option;
-}
-[@@deriving schema]
+module Recursive = struct
+  type t = {
+    value : int;
+    next : t option;
+  }
+  [@@schematic.name "recursive"] [@@deriving schema]
 
-let pp_option pp fmt = function
-  | None -> fprintf fmt "None"
-  | Some v ->
-    fprintf fmt "Some ";
-    pp fmt v
+  let rec pp_recursive fmt { value; next } =
+    fprintf fmt "(%i, %a)" value (Fmt.option pp_recursive) next
 
-let rec pp_recursive fmt { value; next } =
-  fprintf fmt "(%i, %a)" value (pp_option pp_recursive) next
+  let test_recursive = Alcotest.testable pp_recursive ( = )
 
-let test_recursive = Alcotest.testable pp_recursive ( = )
+  let plain () =
+    test "recursive" test_recursive schema
+      { value = 0; next = Some { value = 1; next = None } }
+      "{\"value\": 0, \"next\": {\"value\": 1}}"
 
-let recursive () =
-  test "recursive" test_recursive recursive_schema
-    { value = 0; next = Some { value = 1; next = None } }
-    "{\"value\": 0, \"next\": {\"value\": 1}}"
+  type 'a parametric = {
+    value : 'a;
+    next : 'a parametric option;
+  }
+  [@@schematic.name "recursive-parametric"] [@@deriving eq, schema, show]
+
+  include struct
+    open Schematic.Schema.Schemas
+
+    (*   let parametric_schema a_schema =
+     *     let rec self = lazy (descriptor a_schema)
+     *     and descriptor a_schema =
+     *       Schema.Map
+     *         ( (fun (value, (next, ())) ->
+     *             Result.Ok ({ value; next } : 'a parametric)),
+     *           (fun ({ value; next } : 'a parametric) -> (value, (next, ()))),
+     *           Object
+     *             (Field
+     *                {
+     *                  description = None;
+     *                  examples = [];
+     *                  field = "value";
+     *                  maximum = None;
+     *                  minimum = None;
+     *                  omit = false;
+     *                  requirement = Required;
+     *                  rest =
+     *                    Field
+     *                      {
+     *                        description = None;
+     *                        examples = [];
+     *                        field = "next";
+     *                        maximum = None;
+     *                        minimum = None;
+     *                        omit = false;
+     *                        requirement = Optional;
+     *                        rest = FieldEnd;
+     *                        schema = Outline (schema (Schema.Fixpoint self));
+     *                        title = None;
+     *                      };
+     *                  schema = Outline a_schema;
+     *                  title = None;
+     *                }) )
+     *     and id = Schematic.Schema.name_combine a_schema "recursive-parametric"
+     *     and schema d =
+     *       Schema.
+     *         {
+     *           descriptor = d;
+     *           id = Some id;
+     *           parametric =
+     *             Some
+     *               (Parametric
+     *                  {
+     *                    name = "a";
+     *                    parameter = a_schema;
+     *                    next =
+     *                      (fun a_schema ->
+     *                        Plain
+     *                          {
+     *                            name = "recursive-parametric";
+     *                            descriptor = descriptor a_schema;
+     *                          });
+     *                  });
+     *         }
+     *     in
+     *     Fmt.epr "DEBUG descriptor@.";
+     *     let descriptor = descriptor a_schema in
+     *     Fmt.epr "DEBUG schema@.";
+     *     schema descriptor
+     * end *)
+
+    let parametric_schema a_schema =
+      let rec descriptor a_schema =
+        let f self =
+          Schema.Map
+            ( (fun (value, (next, ())) ->
+                Result.Ok ({ value; next } : 'a parametric)),
+              (fun ({ value; next } : 'a parametric) -> (value, (next, ()))),
+              Object
+                (Field
+                   {
+                     description = None;
+                     examples = [];
+                     field = "value";
+                     maximum = None;
+                     minimum = None;
+                     omit = false;
+                     requirement = Required;
+                     rest =
+                       Field
+                         {
+                           description = None;
+                           examples = [];
+                           field = "next";
+                           maximum = None;
+                           minimum = None;
+                           omit = false;
+                           requirement = Optional;
+                           rest = FieldEnd;
+                           schema = Outline (schema self);
+                           title = None;
+                         };
+                     schema = Outline a_schema;
+                     title = None;
+                   }) )
+        in
+        Schema.fixpoint f
+      and id = Schematic.Schema.name_combine a_schema "recursive-parametric"
+      and schema d =
+        Schema.
+          {
+            descriptor = d;
+            id = Some id;
+            parametric =
+              Some
+                (Parametric
+                   {
+                     name = "a";
+                     parameter = a_schema;
+                     next =
+                       (fun a_schema ->
+                         Plain
+                           {
+                             name = "recursive-parametric";
+                             descriptor = descriptor a_schema;
+                           });
+                   });
+          }
+      in
+      let descriptor = descriptor a_schema in
+      schema descriptor
+  end
+
+  let parametric t =
+    Alcotest.testable
+      (pp_parametric (Alcotest.pp t))
+      (equal_parametric (Alcotest.equal t))
+
+  let parametric () =
+    test "recursive" (parametric Alcotest.int)
+      (parametric_schema int_schema)
+      { value = 0; next = Some { value = 1; next = None } }
+      "{\"value\": 0, \"next\": {\"value\": 1}}"
+end
 
 type mutually_a = { next_b : mutually_b option }
 
 and mutually_b = { next_a : mutually_a option } [@@deriving schema]
 
-let rec pp_mutually_a fmt { next_b } = pp_option pp_mutally_b fmt next_b
+let rec pp_mutually_a fmt { next_b } = Fmt.option pp_mutally_b fmt next_b
 
-and pp_mutally_b fmt { next_a } = pp_option pp_mutually_a fmt next_a
+and pp_mutally_b fmt { next_a } = Fmt.option pp_mutually_a fmt next_a
 
 let test_mutually_a = Alcotest.testable pp_mutually_a ( = )
 
@@ -821,17 +963,17 @@ module Error_messages = struct
 
   let missing () =
     let () =
-      test "missing fields are reported" recursive_schema
+      test "missing fields are reported" Recursive.schema
         {|{"value":0,"next":{"value":1,"next":{}}}|}
         {|path next.next: schema recursive: missing required field "value"|}
     and () =
-      test "root error display no path" recursive_schema {|{}|}
+      test "root error display no path" Recursive.schema {|{}|}
         {|schema recursive: missing required field "value"|}
     in
     ()
 
   let type_error () =
-    test "missing" recursive_schema
+    test "missing" Recursive.schema
       {|{"value":0,"next":{"value":1,"next":{"value":"nope"}}}|}
       {|path next.next.value: expected integer, got string|}
 end
@@ -937,7 +1079,8 @@ let () =
           test_case "option list" `Quick List.option;
           test_case "parametric_type" `Quick parametric_type;
           test_case "escape" `Quick escape;
-          test_case "recursive" `Quick recursive;
+          test_case "recursive" `Quick Recursive.plain;
+          test_case "recursive_parametric" `Quick Recursive.parametric;
           test_case "mutually recursive" `Quick mutually;
           test_case "ignored" `Quick ignored;
           test_case "inline-record" `Quick Inline.record;
