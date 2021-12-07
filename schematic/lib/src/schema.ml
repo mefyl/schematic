@@ -164,7 +164,8 @@ module Walk (W : WALK) = struct
     | Plain { name; descriptor = d } -> (name, [], [], descriptor d)
     | Parametric { name; parameter; next } ->
       let template_name, args, eff_args, t =
-        parametric (next { parameter with id = Some ("#" ^ name) })
+        parametric
+          (next { parameter with id = Some ("#" ^ name); parametric = None })
       in
       (template_name, name :: args, schema parameter :: eff_args, t)
 

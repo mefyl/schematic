@@ -79,17 +79,17 @@ module Of = Schema.Walk (struct
   (* Schema *)
 
   let schema id parametric s =
-    match id with
+    match parametric with
+    | Some parametric -> parametric ()
     | None -> (
-      match parametric with
+      match id with
       | None -> s ()
-      | Some parametric -> parametric ())
-    | Some id ->
-      let mark = Marks.make id s in
-      if String.is_prefix ~prefix:"#" id then
-        (Atom (name @@ String.subo ~pos:1 id), Marks.empty)
-      else
-        (Atom (name id), mark)
+      | Some id ->
+        if String.is_prefix ~prefix:"#" id then
+          (Atom (name @@ String.subo ~pos:1 id), Marks.empty)
+        else
+          let mark = Marks.make id s in
+          (Atom (name id), mark))
 
   let parametric template_name args effective t =
     let template_name = name template_name in
