@@ -1,0 +1,9 @@
+include:
+  - local: '/.logistic/ci/.gitlab-ci.yml'
+
+build-image:
+  extends: .ocaml-toolchain
+  variables:
+    # Opam does not install sqml with `--deps-only` because it depends
+    # (optionally) on schematic via timmy.
+    OPAM_PACKAGES: "sqml.0.4.0"
