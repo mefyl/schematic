@@ -157,7 +157,7 @@ module Generate_types = struct
     test ShouldInlineOptions.schema
       [
         ( "Shouldinlineoptions",
-          {|{ "mandatory_id": string; "a": string; "a_opt"?: string }|} );
+          {|{ "mandatory_id"?: string; "a"?: string; "a_opt"?: string }|} );
       ]
 end
 

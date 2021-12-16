@@ -114,13 +114,18 @@ module Of = Schema.Walk (struct
 
   let fields_empty () = ([ [] ], Marks.empty)
 
-  let field_inline cases (rest, rest_marks) =
+  let field_inline inline_required cases (rest, rest_marks) =
     let fields, marks = List.unzip cases in
     let fields = Base.Sequence.(of_list fields |> map ~f:of_list |> concat) in
     let fields =
       Base.Sequence.(
         cartesian_product fields (of_list rest)
-        |> map ~f:(fun (l, r) -> l @ r)
+        |> map ~f:(fun (l, r) ->
+               List.map
+                 ~f:(fun (name, t, required) ->
+                   (name, t, required && inline_required))
+                 l
+               @ r)
         |> to_list)
     in
     (fields, Marks.merge (rest_marks :: marks))

@@ -104,7 +104,7 @@ module type WALK = sig
 
   val fields_empty : unit -> fields
 
-  val field_inline : fields list -> fields -> fields
+  val field_inline : bool -> fields list -> fields -> fields
 
   val field_outline : string -> bool -> t -> fields -> fields
 

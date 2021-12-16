@@ -191,13 +191,13 @@ module Walk (W : WALK) = struct
       let rest = fields rest
       and schema = schema s in
       W.field_outline field (required requirement) schema rest
-    | Field { rest; schema = Inline { descriptor; _ }; _ } ->
+    | Field { requirement; rest; schema = Inline { descriptor; _ }; _ } ->
       let fields =
         match inline descriptor { f = (fun f -> fields f) } with
         | Result.Ok v -> v
         | Result.Error e -> failwith e
       and rest = fields rest in
-      W.field_inline fields rest
+      W.field_inline (required requirement) fields rest
     | Field
         {
           field;
@@ -208,7 +208,7 @@ module Walk (W : WALK) = struct
         } -> (
       let rest = fields rest in
       match inline descriptor { f = (fun f -> fields f) } with
-      | Result.Ok fields -> W.field_inline fields rest
+      | Result.Ok fields -> W.field_inline (required requirement) fields rest
       | Result.Error _ ->
         W.field_outline field (required requirement) (schema s) rest)
 
