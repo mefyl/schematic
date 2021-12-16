@@ -33,11 +33,6 @@
    (>= 0.13.1))
   (ezjsonm
    (>= 1.1.0))
-  (merlin :dev)
-  (ocamlformat
-   (and
-    (= 0.17.0)
-    :dev))
   (ocaml-base-compiler
    (>= 4.12.0))
   fmt
