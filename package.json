@@ -1,0 +1,21 @@
+{
+  "name": "schematic",
+  "version": "0.11.3",
+  "description": "![Master build status](https://gitlab.routine.co/routine/schematic/badges/master/pipeline.svg)",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@gitlab.routine.co:routine/schematic"
+  },
+  "author": "mefyl@gruntech.org",
+  "license": "LGPL-3.0-or-later",
+  "dependencies": {
+    "jsonschema": "^1.4.0"
+  }
+}
