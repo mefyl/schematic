@@ -88,6 +88,7 @@ let rec inline :
   match d with
   | Ignore -> Result.return [ f.f FieldEnd ]
   | Map (_, _, d) -> inline d f
+  | Nullable d -> inline d.descriptor f
   | Object o -> Result.return [ f.f o ]
   | Union { cases; _ } ->
     List.map ~f:(fun (Case { schema; _ }) -> inline schema.descriptor f) cases
@@ -103,6 +104,10 @@ let rec inline_v :
   match d with
   | Ignore -> Result.return (f.f FieldEnd v)
   | Map (_, e, d) -> inline_v d (e v) f
+  | Nullable d -> (
+    match v with
+    | Some v -> inline_v d.descriptor v f
+    | None -> Result.return @@ f.f FieldEnd ())
   | Object o -> Result.return (f.f o v)
   | Union { cases; _ } -> (
     let f (Case { encoder; schema; _ }) =
