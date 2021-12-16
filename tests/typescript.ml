@@ -40,57 +40,29 @@ and rec_b = {
 }
 [@@deriving schema]
 
-(* nested inline optional while hiding type with a functor *)
-module type S = sig
-  type 'a t
+module ShouldInlineOptions = struct
+  (* nested inline optional while hiding type with a functor *)
 
-  val default : 'a -> 'a t
+  module Hide = struct
+    type 'a t = 'a
 
-  val if_optional : 'a option -> 'a t option
+    let schema s = s
+  end
 
-  val schema : 'a Schematic.Schema.t -> 'a t Schematic.Schema.t
-end
-
-module HideType = struct
-  type 'a t = 'a
-
-  let default v = v
-
-  let if_optional _ = None
-
-  let schema s = s
-end
-
-module Fields = struct
-  type t = {
+  type fields = {
     a : string;
     a_opt : string option;
   }
   [@@deriving schema]
-end
 
-module Fonctored (M : S) = struct
-  type t = {
-    mandatory : string M.t; [@schematic.as "mandatory_id"]
-    inside_struct : Fields.t M.t; [@schematic.inline]
+  type inner = {
+    mandatory : string Hide.t; [@schematic.as "mandatory_id"]
+    inside_struct : fields Hide.t; [@schematic.inline]
   }
   [@@deriving schema]
-end
 
-module Basic = struct
-  include Fonctored (HideType)
-end
-
-module NestedHidingType (M : S) = struct
-  type t = {
-    title : string M.t; [@schematic.default_opt M.if_optional None]
-    inner : Basic.t option M.t; [@schematic.inline] [@default M.default None]
-  }
+  type t = { inner : inner option Hide.t [@schematic.inline] [@default None] }
   [@@deriving schema]
-end
-
-module ShouldInlineOptions = struct
-  include NestedHidingType (HideType)
 end
 
 let record_typescript =
@@ -181,7 +153,12 @@ module Generate_types = struct
     test rec_a_schema [ rec_a; rec_b ];
     test rec_b_schema [ rec_b; rec_a ]
 
-  let hidden_inline_optional () = test ShouldInlineOptions.schema []
+  let hidden_inline_optional () =
+    test ShouldInlineOptions.schema
+      [
+        ( "Shouldinlineoptions",
+          {|{ "mandatory_id": string; "a": string; "a_opt"?: string }|} );
+      ]
 end
 
 let () =
