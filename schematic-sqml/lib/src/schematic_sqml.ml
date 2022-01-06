@@ -17,7 +17,13 @@ let rec type_of_descriptor :
   | List _ -> failwith "schematic-sqml: cannot bind List schema"
   | Null -> failwith "schematic-sqml: cannot bind Null schema"
   | String -> Text
-  | Time -> Time
+  | Time ->
+    Sqml.Column.Type.Custom
+      {
+        repr = Time;
+        encode = Timmy.Time.of_ptime;
+        decode = Fn.compose Result.return Timmy.Time.to_ptime;
+      }
   | Time_local -> failwith "FIXME"
   | Map (decode, encode, repr) ->
     Custom { decode; encode; repr = type_of_descriptor repr }
