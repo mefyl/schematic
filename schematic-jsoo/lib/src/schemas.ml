@@ -4,6 +4,8 @@ type bool_js = bool Js_of_ocaml.Js.t
 
 type int_js = Js_of_ocaml.Js.number Js_of_ocaml.Js.t
 
+type float_js = Js_of_ocaml.Js.number Js_of_ocaml.Js.t
+
 type any_js = Js_of_ocaml.Js.Unsafe.any
 
 type unit_js = Js_of_ocaml.Js.Unsafe.any Js_of_ocaml.Js.Opt.t
