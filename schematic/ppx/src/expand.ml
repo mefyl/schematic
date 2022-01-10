@@ -1187,11 +1187,11 @@ module Jsoo_type = struct
 
   and expand_record ~context ~type_context fields =
     let loc = type_context.loc in
-    let f Attributes.{ loc; name; type_; _ } =
+    let f Attributes.{ alias; loc; name; type_; _ } =
       let t = expand_type ~loc ~context type_ in
       let t = [%type: [%t t] Js_of_ocaml.Js.readonly_prop] in
       {
-        pof_desc = Otag ({ loc; txt = name }, t);
+        pof_desc = Otag ({ loc; txt = Option.value ~default:name alias }, t);
         pof_loc = loc;
         pof_attributes = [];
       }
