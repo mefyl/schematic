@@ -5,9 +5,9 @@ module type S = sig
 
   val encode : 'a Schema.t -> 'a -> t
 
-  val from_channel : Stdio.In_channel.t -> (t, Error.parsing) Base.Result.t
+  val from_channel : Caml.in_channel -> (t, Error.parsing) Base.Result.t
 
-  val to_channel : Stdio.Out_channel.t -> t -> unit
+  val to_channel : Caml.out_channel -> t -> unit
 
   val of_string : string -> (t, Error.parsing) Base.Result.t
 

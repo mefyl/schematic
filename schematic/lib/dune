@@ -3,7 +3,7 @@
 (library
  (name schematic)
  (public_name schematic)
- (libraries base ezjsonm fmt ptime stdio uri)
+ (libraries base ezjsonm fmt ptime uri)
  (preprocess
   (pps
    schematic_ppx_inside

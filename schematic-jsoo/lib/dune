@@ -3,6 +3,6 @@
 (library
  (name schematic_jsoo)
  (public_name schematic-jsoo)
- (libraries base ezjsonm fmt js_of_ocaml ptime schematic stdio uri)
+ (libraries base ezjsonm fmt js_of_ocaml ptime schematic uri)
  (preprocess
   (pps js_of_ocaml-ppx ppx_here)))
