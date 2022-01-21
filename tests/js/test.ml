@@ -5,18 +5,19 @@ module Namespace = struct
   type int_alias = int [@@deriving schema ~jsoo]
 end
 
+type 'param inline = {
+  s : 'param;
+  b : bool;
+}
+[@@deriving schema ~jsoo]
+
 type o = {
   i : int;
-  inline : inline; [@schematic.inline]
+  inline : string inline; [@schematic.inline]
   opt : bool option;
   opt_nullable : bool option option;
   a : Namespace.int_alias list;
   pair : bool * bool;
-}
-
-and inline = {
-  s : string;
-  b : bool;
 }
 
 and variant =
@@ -36,6 +37,9 @@ let of_result = function
 let decode_error coding =
   Result.map_error ~f:(fun e ->
       Fmt.str "%s decode error: %a" coding Schematic.Error.pp_decoding e)
+
+(** Check inlining works in the expanded JSOO type *)
+let f (o : o_js) : Js.js_string Js.t = o##.s
 
 let () =
   Js.export_all

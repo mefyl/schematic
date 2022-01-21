@@ -113,9 +113,9 @@ module Pattern = struct
 end
 
 module Type = struct
-  let id ~loc name =
+  let id ~loc ?(parameters = []) name =
     {
-      ptyp_desc = Ptyp_constr ({ loc; txt = Lident name }, []);
+      ptyp_desc = Ptyp_constr ({ loc; txt = Lident name }, parameters);
       ptyp_loc_stack = [];
       ptyp_loc = loc;
       ptyp_attributes = [];
@@ -1153,11 +1153,13 @@ module Schema = struct
 end
 
 module Jsoo_type = struct
-  type closed = type_declaration
+  type closed = type_declaration list
 
   type configuration = { functions : bool }
 
-  type expanded = core_type
+  type expanded =
+    | Type of core_type
+    | Object of core_type
 
   let expand_ident = function
     | Lident n -> Lident (name "js" n)
@@ -1187,31 +1189,41 @@ module Jsoo_type = struct
 
   and expand_record ~context ~type_context fields =
     let loc = type_context.loc in
-    let f Attributes.{ alias; loc; name; type_; _ } =
-      let t = expand_type ~loc ~context type_ in
-      let t = [%type: [%t t] Js_of_ocaml.Js.readonly_prop] in
-      {
-        pof_desc = Otag ({ loc; txt = Option.value ~default:name alias }, t);
-        pof_loc = loc;
-        pof_attributes = [];
-      }
+    let f Attributes.{ alias; inline; loc; name; type_; _ } =
+      let desc =
+        match Option.value ~default:Outline inline with
+        | Inline -> (
+          match type_.ptyp_desc with
+          | Ptyp_constr (id, parameters) ->
+            Some
+              (Oinherit
+                 {
+                   ptyp_desc =
+                     Ptyp_constr
+                       ( { txt = suffix_id ~loc "js_fields" id.txt; loc },
+                         List.map ~f:(expand_type ~loc ~context) parameters );
+                   ptyp_loc = loc;
+                   ptyp_loc_stack = [];
+                   ptyp_attributes = [];
+                 })
+          | _ -> None)
+        | Inline_try -> None
+        | Outline ->
+          let t = expand_type ~loc ~context type_ in
+          let t = [%type: [%t t] Js_of_ocaml.Js.readonly_prop] in
+          Some (Otag ({ loc; txt = Option.value ~default:name alias }, t))
+      in
+      Option.map
+        ~f:(fun pof_desc -> { pof_desc; pof_loc = loc; pof_attributes = [] })
+        desc
     in
-    {
-      ptyp_desc =
-        Ptyp_constr
-          ( { loc; txt = Ldot (Ldot (Lident "Js_of_ocaml", "Js"), "t") },
-            [
-              {
-                ptyp_desc = Ptyp_object (List.map ~f fields, Closed);
-                ptyp_attributes = [];
-                ptyp_loc = loc;
-                ptyp_loc_stack = [];
-              };
-            ] );
-      ptyp_attributes = [];
-      ptyp_loc = loc;
-      ptyp_loc_stack = [];
-    }
+    Object
+      {
+        ptyp_desc = Ptyp_object (List.filter_map ~f fields, Closed);
+        ptyp_attributes = [];
+        ptyp_loc = loc;
+        ptyp_loc_stack = [];
+      }
 
   and expand_variant ~context ~type_context options =
     let f
@@ -1224,8 +1236,9 @@ module Jsoo_type = struct
         } =
       (txt, pcd_args, loc, attrs)
     in
-    expand_any_variant ~loc:type_context.loc ~context false
-    @@ List.map ~f options
+    Type
+      (expand_any_variant ~loc:type_context.loc ~context false
+      @@ List.map ~f options)
 
   and expand_polymorphic_variant ~loc ~context options =
     let f { prf_desc; prf_loc; prf_attributes } =
@@ -1257,137 +1270,181 @@ module Jsoo_type = struct
       }
 
   let expand_abstract_type ~context ~type_context t =
-    expand_type ~loc:type_context.loc ~context t
+    Type (expand_type ~loc:type_context.loc ~context t)
 
-  let close
-      ~configuration:_
-      ~context:_
-      ~type_context
-      (* { ptype_name = { loc = name_loc; txt }; _ } *)
-        js =
-    {
-      ptype_name = { loc = type_context.loc; txt = name "js" type_context.name };
-      ptype_params = type_context.params;
-      ptype_cstrs = [];
-      ptype_kind = Ptype_abstract;
-      ptype_private = Public;
-      ptype_manifest = Some js;
-      ptype_loc = type_context.loc;
-      ptype_attributes = [];
-    }
+  let close ~configuration:_ ~context:_ ~type_context =
+    let loc = type_context.loc in
+    function
+    | Type manifest ->
+      [
+        {
+          ptype_name = { loc; txt = name "js" type_context.name };
+          ptype_params = type_context.params;
+          ptype_cstrs = [];
+          ptype_kind = Ptype_abstract;
+          ptype_private = Public;
+          ptype_manifest = Some manifest;
+          ptype_loc = type_context.loc;
+          ptype_attributes = [];
+        };
+      ]
+    | Object manifest ->
+      [
+        {
+          ptype_name =
+            { loc = type_context.loc; txt = name "js_fields" type_context.name };
+          ptype_params = type_context.params;
+          ptype_cstrs = [];
+          ptype_kind = Ptype_abstract;
+          ptype_private = Public;
+          ptype_manifest = Some manifest;
+          ptype_loc = type_context.loc;
+          ptype_attributes = [];
+        };
+        {
+          ptype_name =
+            { loc = type_context.loc; txt = name "js" type_context.name };
+          ptype_params = type_context.params;
+          ptype_cstrs = [];
+          ptype_kind = Ptype_abstract;
+          ptype_private = Public;
+          ptype_manifest =
+            Some
+              {
+                ptyp_desc =
+                  Ptyp_constr
+                    ( {
+                        loc;
+                        txt = Ldot (Ldot (Lident "Js_of_ocaml", "Js"), "t");
+                      },
+                      [
+                        Type.id ~loc
+                          ~parameters:(List.map ~f:fst type_context.params)
+                          (name "js_fields" type_context.name);
+                      ] );
+                ptyp_attributes = [];
+                ptyp_loc = loc;
+                ptyp_loc_stack = [];
+              };
+          ptype_loc = type_context.loc;
+          ptype_attributes = [];
+        };
+      ]
 
   let combine ~loc { functions } items =
+    let items = List.concat items in
     let converters { ptype_name = { txt; _ }; ptype_params; _ } =
-      let name s =
-        let prefix = String.sub ~pos:0 ~len:(String.length txt - 2) txt in
-        prefix ^ s
-      in
-      let fname n =
-        {
-          ppat_attributes = [];
-          ppat_desc = Ppat_var { txt = name n; loc };
-          ppat_loc = loc;
-          ppat_loc_stack = [];
-        }
-      and schema =
-        {
-          pexp_attributes = [];
-          pexp_desc = Pexp_ident { txt = Lident (name "schema"); loc };
-          pexp_loc = loc;
-          pexp_loc_stack = [];
-        }
-      and js =
-        {
-          ptyp_attributes = [];
-          ptyp_desc =
-            Ptyp_constr
-              ( { txt = Lident (name "js"); loc },
-                List.map
-                  ~f:(fun _ ->
-                    {
-                      ptyp_desc = Ptyp_any;
-                      ptyp_loc = loc;
-                      ptyp_loc_stack = [];
-                      ptyp_attributes = [];
-                    })
-                  ptype_params );
-          ptyp_loc = loc;
-          ptyp_loc_stack = [];
-        }
-      in
-      let apply, parametrize =
-        let params =
-          let f ({ ptyp_desc; ptyp_loc = loc; _ }, _) =
-            match ptyp_desc with
-            | Ptyp_any -> None
-            | Ptyp_var n -> Some (loc, Fmt.str "%s_schema" n)
-            | _ ->
-              Ppxlib.Location.raise_errorf ~loc
-                "schematic-ppx: unsupported type parameter"
+      match String.chop_suffix ~suffix:"js" txt with
+      | None -> None
+      | Some prefix ->
+        let name s = prefix ^ s in
+        let fname n =
+          {
+            ppat_attributes = [];
+            ppat_desc = Ppat_var { txt = name n; loc };
+            ppat_loc = loc;
+            ppat_loc_stack = [];
+          }
+        and schema =
+          {
+            pexp_attributes = [];
+            pexp_desc = Pexp_ident { txt = Lident (name "schema"); loc };
+            pexp_loc = loc;
+            pexp_loc_stack = [];
+          }
+        and js =
+          {
+            ptyp_attributes = [];
+            ptyp_desc =
+              Ptyp_constr
+                ( { txt = Lident (name "js"); loc },
+                  List.map
+                    ~f:(fun _ ->
+                      {
+                        ptyp_desc = Ptyp_any;
+                        ptyp_loc = loc;
+                        ptyp_loc_stack = [];
+                        ptyp_attributes = [];
+                      })
+                    ptype_params );
+            ptyp_loc = loc;
+            ptyp_loc_stack = [];
+          }
+        in
+        let apply, parametrize =
+          let params =
+            let f ({ ptyp_desc; ptyp_loc = loc; _ }, _) =
+              match ptyp_desc with
+              | Ptyp_any -> None
+              | Ptyp_var n -> Some (loc, Fmt.str "%s_schema" n)
+              | _ ->
+                Ppxlib.Location.raise_errorf ~loc
+                  "schematic-ppx: unsupported type parameter"
+            in
+            List.filter_map ~f ptype_params
           in
-          List.filter_map ~f ptype_params
-        in
-        let apply e =
-          let args =
-            let f (loc, name) = Expr.id ~loc name in
-            List.map ~f params
+          let apply e =
+            let args =
+              let f (loc, name) = Expr.id ~loc name in
+              List.map ~f params
+            in
+            Expr.apply ~loc e args
+          and parametrize e =
+            let f (loc, name) f =
+              let pattern = Pattern.id ~loc name in
+              [%expr fun [%p pattern] -> [%e f]]
+            in
+            List.fold_right ~init:e ~f params
           in
-          Expr.apply ~loc e args
-        and parametrize e =
-          let f (loc, name) f =
-            let pattern = Pattern.id ~loc name in
-            [%expr fun [%p pattern] -> [%e f]]
+          (apply, parametrize)
+        in
+        let to_js =
+          let body =
+            [%expr
+              fun v : [%t js] ->
+                Js_of_ocaml.Js.Unsafe.coerce
+                @@ Schematic_jsoo.Jsoo.encode [%e apply schema] v]
           in
-          List.fold_right ~init:e ~f params
+          parametrize body
+        and of_js =
+          let body =
+            [%expr
+              fun (js : [%t js]) ->
+                Schematic_jsoo.Jsoo.decode [%e apply schema]
+                  (Js_of_ocaml.Js.Unsafe.coerce js)]
+          in
+          parametrize body
+        and of_js_exn =
+          let body =
+            [%expr
+              fun (js : [%t js]) ->
+                match [%e apply [%expr of_js]] js with
+                | Result.Ok v -> v
+                | Result.Error e ->
+                  Js_of_ocaml.Js.raise_js_error
+                    ((fun (type res t0)
+                          (t1 :
+                            (t0 -> res Js_of_ocaml.Js.t) Js_of_ocaml.Js.constr)
+                          (t0 : t0) (_ : unit) : res Js_of_ocaml.Js.t ->
+                       Js_of_ocaml.Js.Unsafe.new_obj t1
+                         [| Js_of_ocaml.Js.Unsafe.inject t0 |])
+                       Js_of_ocaml.Js.error_constr
+                       (Js_of_ocaml.Js.string
+                       @@ Schematic.Error.decoding_to_string e)
+                       ())]
+          in
+          parametrize body
         in
-        (apply, parametrize)
-      in
-      let to_js =
-        let body =
-          [%expr
-            fun v : [%t js] ->
-              Js_of_ocaml.Js.Unsafe.coerce
-              @@ Schematic_jsoo.Jsoo.encode [%e apply schema] v]
-        in
-        parametrize body
-      and of_js =
-        let body =
-          [%expr
-            fun (js : [%t js]) ->
-              Schematic_jsoo.Jsoo.decode [%e apply schema]
-                (Js_of_ocaml.Js.Unsafe.coerce js)]
-        in
-        parametrize body
-      and of_js_exn =
-        let body =
-          [%expr
-            fun (js : [%t js]) ->
-              match [%e apply [%expr of_js]] js with
-              | Result.Ok v -> v
-              | Result.Error e ->
-                Js_of_ocaml.Js.raise_js_error
-                  ((fun (type res t0)
-                        (t1 :
-                          (t0 -> res Js_of_ocaml.Js.t) Js_of_ocaml.Js.constr)
-                        (t0 : t0) (_ : unit) : res Js_of_ocaml.Js.t ->
-                     Js_of_ocaml.Js.Unsafe.new_obj t1
-                       [| Js_of_ocaml.Js.Unsafe.inject t0 |])
-                     Js_of_ocaml.Js.error_constr
-                     (Js_of_ocaml.Js.string
-                     @@ Schematic.Error.decoding_to_string e)
-                     ())]
-        in
-        parametrize body
-      in
-      [%stri
-        let [%p fname "to_js"], [%p fname "of_js"], [%p fname "of_js_exn"] =
-          let to_js = [%e to_js]
-          and of_js = [%e of_js] in
-          let of_js_exn = [%e of_js_exn] in
-          (to_js, of_js, of_js_exn)]
+        Some
+          [%stri
+            let [%p fname "to_js"], [%p fname "of_js"], [%p fname "of_js_exn"] =
+              let to_js = [%e to_js]
+              and of_js = [%e of_js] in
+              let of_js_exn = [%e of_js_exn] in
+              (to_js, of_js, of_js_exn)]
     and type_ = { pstr_desc = Pstr_type (Recursive, items); pstr_loc = loc } in
     if functions then
-      type_ :: List.map ~f:converters items
+      type_ :: List.filter_map ~f:converters items
     else
       [ type_ ]
 end
