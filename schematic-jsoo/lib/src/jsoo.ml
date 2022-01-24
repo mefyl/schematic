@@ -154,3 +154,16 @@ let helpers name schema =
               (Fmt.str "invalid %s: %a" name Schematic.Error.pp_decoding e))
   in
   (to_js, of_js, of_js_exn)
+
+module type JS = sig
+  type t
+
+  type js
+end
+
+let helpers_typed (module _ : JS with type t = 't and type js = 'js) name schema
+    =
+  let to_js, of_js, of_js_exn = helpers name schema in
+  ( (to_js : 't -> 'js),
+    (of_js : 'js -> ('t, Schematic.Error.decoding) Result.t),
+    (of_js_exn : 'js -> 't) )
