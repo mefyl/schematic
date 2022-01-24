@@ -142,10 +142,10 @@ end
 include Schematic.Coding.Make (Jsoo_coding)
 
 let helpers name schema =
-  let to_js = encode schema
-  and of_js = decode schema
+  let rec to_js v = encode schema v |> Js.Unsafe.coerce
+  and of_js js = Js.Unsafe.coerce js |> decode schema
   and of_js_exn js =
-    match decode schema js with
+    match of_js js with
     | Result.Ok event -> event
     | Result.Error e ->
       Js.raise_js_error
