@@ -32,7 +32,8 @@ and poly =
 
 let of_result = function
   | Result.Ok v -> v
-  | Result.Error e -> Js.raise_js_error @@ new%js Js.error_constr (Js.string e)
+  | Result.Error e ->
+    Js_error.raise_ @@ Js_error.of_error @@ new%js Js.error_constr (Js.string e)
 
 let decode_error coding =
   Result.map_error ~f:(fun e ->

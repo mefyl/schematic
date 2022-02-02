@@ -1057,6 +1057,22 @@ let collision () =
   in
   ()
 
+(* Computed *)
+
+module Computed = struct
+  type t = {
+    x : int;
+    y : int;
+  }
+  [@@schematic.computed { sum : int = x + y }] [@@deriving eq, schema, show]
+
+  let t = Alcotest.testable pp equal
+
+  let computed () =
+    test "computed" t schema { x = 1; y = 2 } {|{"x": 1, "y": 2}|}
+  (* {|{"x": 1, "y": 2, "sum": 3}|} *)
+end
+
 (* Driver *)
 
 let () =
@@ -1097,6 +1113,7 @@ let () =
           test_case "keyed" `Quick keyed;
           test_case "map-error" `Quick map_error;
           test_case "collisions" `Quick collision;
+          test_case "computed" `Quick Computed.computed;
         ] );
       ( "comparison",
         [

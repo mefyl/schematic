@@ -22,6 +22,53 @@ end
 
 (* Helpers *)
 
+module Ast_pattern = struct
+  include Ast_pattern
+
+  let econstraint expression type_ =
+    let expression = to_func expression
+    and type_ = to_func type_ in
+    let f context loc pl cont =
+      match pl with
+      | { pexp_desc = Pexp_constraint (exp, t); _ } ->
+        expression context exp.pexp_loc exp (fun exp ->
+            type_ context t.ptyp_loc t (fun t -> cont exp t))
+      | _ -> Location.raise_errorf ~loc "type constraint expected"
+    in
+    of_func f
+
+  let erecord field value =
+    let field = to_func field
+    and value = to_func value in
+    let f context loc pl cont =
+      match pl with
+      | { pexp_desc = Pexp_record (fields, None); _ } ->
+        let rec f acc = function
+          | (ident, exp) :: tail ->
+            field context ident.loc ident (fun field ->
+                value context exp.pexp_loc exp (fun value ->
+                    f ((field, value) :: acc) tail))
+          | [] -> cont acc
+        in
+        f [] fields
+      | _ -> Location.raise_errorf ~loc "literal record expected"
+    in
+    of_func f
+
+  module Longident = struct
+    let ident string =
+      let f context loc id cont =
+        let id =
+          match id with
+          | { txt = Lident s; loc } -> (to_func string) context loc s Fn.id
+          | _ -> Location.raise_errorf ~loc "simple identifier expected"
+        in
+        cont id
+      in
+      of_func f
+  end
+end
+
 let ppat ~loc ~desc =
   {
     ppat_desc = desc;
@@ -369,6 +416,8 @@ module Attributes = struct
 
   type t = {
     alias : string option;
+    computed :
+      (string, expression * core_type, String.comparator_witness) Map.t;
     name : expression option;
     union_key : string option;
   }
@@ -380,7 +429,9 @@ module Attributes = struct
         "schematic-ppx: unknown schematic annotation %s" name
     | None -> ()
 
-  let rec extract ?(alias = false) ?(name = false) ?(union_key = false) =
+  let rec extract
+      ?(alias = false) ?(computed = false) ?(name = false) ?(union_key = false)
+      =
     let merge name loc old v =
       match old with
       | None -> Some v
@@ -390,7 +441,7 @@ module Attributes = struct
     in
     function
     | { attr_name = { txt; _ }; attr_loc = loc; attr_payload } :: attrs -> (
-      let attrs = extract ~alias ~name ~union_key attrs in
+      let attrs = extract ~alias ~computed ~name ~union_key attrs in
       match txt with
       | "schematic.as" when alias -> (
         match attrs with
@@ -406,6 +457,28 @@ module Attributes = struct
         | _ ->
           Ppxlib.Location.raise_errorf ~loc
             "schematic-ppx: duplicate schematic.as annotation on schema")
+      | "schematic.computed" when computed ->
+        let computed =
+          let computed =
+            expect ~loc
+              Ast_pattern.(
+                single_expr_payload
+                  (erecord Longident.(ident __) (pack2 @@ econstraint __ __)))
+              attr_payload
+          in
+          match Map.of_alist (module String) computed with
+          | `Ok computed -> computed
+          | `Duplicate_key key ->
+            Ppxlib.Location.raise_errorf ~loc
+              "schematic-ppx: duplicate schematic.computed key: %s" key
+        and combine ~key _ _ =
+          Ppxlib.Location.raise_errorf ~loc
+            "schematic-ppx: duplicate schematic.computed key: %s" key
+        in
+        {
+          attrs with
+          computed = Map.merge_skewed ~combine attrs.computed computed;
+        }
       | "schematic.name" when name -> (
         match attrs with
         | { name = None; _ } ->
@@ -430,7 +503,13 @@ module Attributes = struct
       | _ ->
         let () = check_unknown_attribute ~loc txt in
         attrs)
-    | [] -> { alias = None; name = None; union_key = None }
+    | [] ->
+      {
+        alias = None;
+        computed = Map.empty (module String);
+        name = None;
+        union_key = None;
+      }
 end
 
 type context = {
@@ -1421,17 +1500,19 @@ module Jsoo_type = struct
                 match [%e apply [%expr of_js]] js with
                 | Result.Ok v -> v
                 | Result.Error e ->
-                  Js_of_ocaml.Js.raise_js_error
-                    ((fun (type res t0)
-                          (t1 :
-                            (t0 -> res Js_of_ocaml.Js.t) Js_of_ocaml.Js.constr)
-                          (t0 : t0) (_ : unit) : res Js_of_ocaml.Js.t ->
-                       Js_of_ocaml.Js.Unsafe.new_obj t1
-                         [| Js_of_ocaml.Js.Unsafe.inject t0 |])
-                       Js_of_ocaml.Js.error_constr
-                       (Js_of_ocaml.Js.string
-                       @@ Schematic.Error.decoding_to_string e)
-                       ())]
+                  Js_of_ocaml.Js_error.raise_
+                    (Js_of_ocaml.Js_error.of_error
+                       ((fun (type res t0)
+                             (t1 :
+                               (t0 -> res Js_of_ocaml.Js.t)
+                               Js_of_ocaml.Js.constr) (t0 : t0) (_ : unit) :
+                             res Js_of_ocaml.Js.t ->
+                          Js_of_ocaml.Js.Unsafe.new_obj t1
+                            [| Js_of_ocaml.Js.Unsafe.inject t0 |])
+                          Js_of_ocaml.Js.error_constr
+                          (Js_of_ocaml.Js.string
+                          @@ Schematic.Error.decoding_to_string e)
+                          ()))]
           in
           parametrize body
         in
@@ -1669,7 +1750,8 @@ let expand ~ctxt ~inside (recursive, types) jsoo sqml =
       let type_context =
         {
           attributes =
-            Attributes.extract ~name:true ~union_key:true t.ptype_attributes;
+            Attributes.extract ~computed:true ~name:true ~union_key:true
+              t.ptype_attributes;
           loc = t.ptype_loc;
           name = t.ptype_name.txt;
           params = t.ptype_params;
