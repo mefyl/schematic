@@ -54,9 +54,9 @@
     (>= 1.1.0)
     :with-test))
   (js_of_ocaml
-   (>= 3.6.0))
+   (>= 4.0.0))
   (js_of_ocaml-ppx
-   (>= 3.6.0))
+   (>= 4.0.0))
   (schematic
    (= :version))))
 

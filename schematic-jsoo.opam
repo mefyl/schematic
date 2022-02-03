@@ -13,8 +13,8 @@ bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "dune" {>= "2.8"}
   "alcotest" {>= "1.1.0" & with-test}
-  "js_of_ocaml" {>= "3.6.0"}
-  "js_of_ocaml-ppx" {>= "3.6.0"}
+  "js_of_ocaml" {>= "4.0.0"}
+  "js_of_ocaml-ppx" {>= "4.0.0"}
   "schematic" {= version}
   "odoc" {with-doc}
 ]
