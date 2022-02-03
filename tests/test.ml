@@ -1062,15 +1062,18 @@ let collision () =
 module Computed = struct
   type t = {
     x : int;
-    y : int;
+    y : int; [@default 0]
   }
-  [@@schematic.computed { sum : int = x + y }] [@@deriving eq, schema, show]
+  [@@schematic.computed
+    { sum : int = x + y; opposite : int option = Option.some_if (x <> 0) (-x) }]
+  [@@deriving eq, schema, show]
 
   let t = Alcotest.testable pp equal
 
   let computed () =
-    test "computed" t schema { x = 1; y = 2 } {|{"x": 1, "y": 2}|}
-  (* {|{"x": 1, "y": 2, "sum": 3}|} *)
+    test "computed" t schema { x = 1; y = 2 }
+      {|{"x": 1, "y": 2, "sum": 3, "opposite": -1}|};
+    test "computed optional" t schema { x = 0; y = 0 } {|{"x": 0, "sum": 0}|}
 end
 
 (* Driver *)

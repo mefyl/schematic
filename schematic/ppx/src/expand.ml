@@ -391,28 +391,17 @@ let specs_empty =
 module Attributes = struct
   type field = {
     alias : string option;
+    computed : expression option;
     inline : inline option;
     loc : location;
-    name : string;
+    name : string; [@main]
     schema : expression option;
-    specs : specs;
+    specs : specs; [@default specs_empty]
     sqml_primary : bool option;
     sqml_type : expression option;
     type_ : core_type;
   }
   [@@deriving make]
-
-  let make_field
-      ?alias
-      ?inline
-      ~loc
-      ?schema
-      ?(specs = specs_empty)
-      ?sqml_primary
-      ?sqml_type
-      ~type_
-      name =
-    { alias; inline; loc; name; schema; specs; sqml_primary; sqml_type; type_ }
 
   type t = {
     alias : string option;
@@ -765,6 +754,8 @@ module Schema = struct
     (* Tuple *)
     | { ptyp_desc = Ptyp_tuple types; _ } ->
       let field_name i { ptyp_loc = loc; _ } = (loc, "e" ^ Int.to_string i)
+      and field_value i { ptyp_loc = loc; _ } =
+        expr_id ~loc @@ Lident ("e" ^ Int.to_string i)
       and constructed =
         let f i _ = expr_id ~loc (Lident ("e" ^ Int.to_string i)) in
         {
@@ -783,7 +774,7 @@ module Schema = struct
         }
       in
       let body =
-        combinator ~loc types field_name constructed deconstructed
+        combinator ~loc types field_name field_value constructed deconstructed
           (tuple_descriptor ~context ~type_context types)
       in
       expanded_of_descriptor ~loc body
@@ -818,11 +809,12 @@ module Schema = struct
       loc:location ->
       f list ->
       (int -> f -> location * label) ->
+      (int -> f -> expression) ->
       expression ->
       pattern ->
       expression ->
       expression =
-   fun ~loc fields field_name constructed deconstructed obj ->
+   fun ~loc fields field_name field_value constructed deconstructed obj ->
     let construct =
       let pattern =
         let pattern i f =
@@ -844,10 +836,7 @@ module Schema = struct
       }
     and deconstruct =
       let value =
-        let expr i f =
-          let loc, name = field_name i f in
-          expr_id ~loc (Lident name)
-        in
+        let expr i f = field_value i f in
         let f i tl field =
           let expr = expr i field in
           [%expr [%e expr], [%e tl]]
@@ -933,22 +922,37 @@ module Schema = struct
       in
       List.fold_right ~f ~init fields
     and field_name _ (field : Attributes.field) = (field.loc, field.name)
+    and field_value _ (field : Attributes.field) =
+      match field.computed with
+      | None -> expr_id ~loc @@ Lident field.name
+      | Some computed -> computed
     and constructed =
       let f (field : Attributes.field) =
-        ( { txt = Lident field.name; loc },
+        let value =
           {
             pexp_desc = Pexp_ident { txt = Lident field.name; loc };
             pexp_loc = field.loc;
             pexp_loc_stack = [];
             pexp_attributes = [];
-          } )
+          }
+        in
+        match field.computed with
+        | None -> Some ({ txt = Lident field.name; loc }, value)
+        | Some _ -> None
       in
       if as_tuple then
         match fields with
-        | [ field ] -> f field |> snd
+        | [ field ] -> (
+          match f field with
+          | Some (_, value) -> value
+          | None ->
+            Ppxlib.Location.raise_errorf ~loc
+              "schematic-ppx: unexpected empty record")
         | _ ->
           {
-            pexp_desc = Pexp_tuple (List.map ~f:(fun x -> f x |> snd) fields);
+            pexp_desc =
+              Pexp_tuple
+                (List.filter_map ~f:(fun x -> f x |> Option.map ~f:snd) fields);
             pexp_loc = loc;
             pexp_loc_stack = [];
             pexp_attributes = [];
@@ -956,7 +960,7 @@ module Schema = struct
       else
         let constructed =
           {
-            pexp_desc = Pexp_record (List.map ~f fields, None);
+            pexp_desc = Pexp_record (List.filter_map ~f fields, None);
             pexp_loc = loc;
             pexp_loc_stack = [];
             pexp_attributes = [];
@@ -965,20 +969,31 @@ module Schema = struct
         [%expr ([%e constructed] : [%t type_])]
     and deconstructed =
       let f (field : Attributes.field) =
-        ( { txt = Lident field.name; loc },
-          {
-            ppat_desc = Ppat_var { txt = field.name; loc };
-            ppat_loc = field.loc;
-            ppat_loc_stack = [];
-            ppat_attributes = [];
-          } )
+        match field.computed with
+        | Some _ -> None
+        | None ->
+          Some
+            ( { txt = Lident field.name; loc },
+              {
+                ppat_desc = Ppat_var { txt = field.name; loc };
+                ppat_loc = field.loc;
+                ppat_loc_stack = [];
+                ppat_attributes = [];
+              } )
       in
       if as_tuple then
         match fields with
-        | [ field ] -> f field |> snd
+        | [ field ] -> (
+          match f field with
+          | Some (_, v) -> v
+          | None ->
+            Ppxlib.Location.raise_errorf ~loc
+              "schematic-ppx: unexpected empty record")
         | _ ->
           {
-            ppat_desc = Ppat_tuple (List.map ~f:(fun x -> f x |> snd) fields);
+            ppat_desc =
+              Ppat_tuple
+                (List.filter_map ~f:(fun x -> f x |> Option.map ~f:snd) fields);
             ppat_loc = loc;
             ppat_loc_stack = [];
             ppat_attributes = [];
@@ -986,7 +1001,7 @@ module Schema = struct
       else
         let deconstructed =
           {
-            ppat_desc = Ppat_record (List.map ~f fields, Closed);
+            ppat_desc = Ppat_record (List.filter_map ~f fields, Closed);
             ppat_loc = loc;
             ppat_loc_stack = [];
             ppat_attributes = [];
@@ -995,7 +1010,7 @@ module Schema = struct
         [%pat? ([%p deconstructed] : [%t type_])]
     in
     expanded_of_descriptor ~loc
-    @@ combinator ~loc fields field_name constructed deconstructed
+    @@ combinator ~loc fields field_name field_value constructed deconstructed
          [%expr Object [%e fields_schema]]
 
   and expand_variant ~context ~type_context options =
@@ -1765,11 +1780,28 @@ let expand ~ctxt ~inside (recursive, types) jsoo sqml =
         | _ ->
           Ppxlib.Location.raise_errorf ~loc:t.ptype_loc
             "schematic-ppx: union_key is only valid on variants"
+      and () =
+        match t.ptype_kind with
+        | Ptype_record _ -> ()
+        | _ when Map.length type_context.attributes.computed = 0 -> ()
+        | _ ->
+          Ppxlib.Location.raise_errorf ~loc:t.ptype_loc
+            "schematic-ppx: computed is only valid on records"
       in
       let loc = t.ptype_loc in
       let type_ =
         match t.ptype_kind with
-        | Ptype_record fields -> Record (List.map ~f:expand_field fields)
+        | Ptype_record fields ->
+          let fields = List.map ~f:expand_field fields
+          and computed =
+            let f (name, (value, type_)) =
+              Attributes.make_field ~loc:value.pexp_loc ~type_ ~computed:value
+                name
+            in
+            Map.to_sequence type_context.attributes.computed
+            |> Sequence.map ~f |> Sequence.to_list
+          in
+          Record (fields @ computed)
         | Ptype_abstract -> (
           match t.ptype_manifest with
           | Some type_ -> Core type_
