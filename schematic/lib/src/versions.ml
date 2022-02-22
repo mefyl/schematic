@@ -1,4 +1,4 @@
-module V0_10_0 = struct
+module V0_11_0 = struct
   module Error = Error
 
   module Json = struct
@@ -15,4 +15,5 @@ module V0_10_0 = struct
 
   module Coding = Coding
   module Typescript = Typescript
+  module Version = Version
 end

@@ -41,6 +41,7 @@
   ppx_here
   (ptime
    (>= 0.8.5))
+  semver2
   uri))
 
 (package

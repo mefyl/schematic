@@ -25,6 +25,12 @@ end
 module Ast_pattern = struct
   include Ast_pattern
 
+  let ( let+ ) v f = map1 ~f v
+
+  let drop =
+    let f _ _ _ cont = cont in
+    of_func f
+
   let econstraint expression type_ =
     let expression = to_func expression
     and type_ = to_func type_ in
@@ -36,37 +42,6 @@ module Ast_pattern = struct
       | _ -> Location.raise_errorf ~loc "type constraint expected"
     in
     of_func f
-
-  let erecord field value =
-    let field = to_func field
-    and value = to_func value in
-    let f context loc pl cont =
-      match pl with
-      | { pexp_desc = Pexp_record (fields, None); _ } ->
-        let rec f acc = function
-          | (ident, exp) :: tail ->
-            field context ident.loc ident (fun field ->
-                value context exp.pexp_loc exp (fun value ->
-                    f ((field, value) :: acc) tail))
-          | [] -> cont acc
-        in
-        f [] fields
-      | _ -> Location.raise_errorf ~loc "literal record expected"
-    in
-    of_func f
-
-  module Longident = struct
-    let ident string =
-      let f context loc id cont =
-        let id =
-          match id with
-          | { txt = Lident s; loc } -> (to_func string) context loc s Fn.id
-          | _ -> Location.raise_errorf ~loc "simple identifier expected"
-        in
-        cont id
-      in
-      of_func f
-  end
 end
 
 let ppat ~loc ~desc =
@@ -160,13 +135,11 @@ module Pattern = struct
 end
 
 module Type = struct
+  let make ~loc ptyp_desc =
+    { ptyp_desc; ptyp_loc_stack = []; ptyp_loc = loc; ptyp_attributes = [] }
+
   let id ~loc ?(parameters = []) name =
-    {
-      ptyp_desc = Ptyp_constr ({ loc; txt = Lident name }, parameters);
-      ptyp_loc_stack = [];
-      ptyp_loc = loc;
-      ptyp_attributes = [];
-    }
+    make ~loc @@ Ptyp_constr ({ loc; txt = Lident name }, parameters)
 end
 
 module Warning = struct
@@ -329,15 +302,11 @@ let name suffix s =
   else
     s ^ "_" ^ suffix
 
-let schema_name = name "schema"
-
 let suffix_id ~loc suffix = function
   | Lident n -> Lident (name suffix n)
   | Ldot (q, n) -> Ldot (q, name suffix n)
   | Lapply (_, _) ->
     Ppxlib.Location.raise_errorf ~loc "Functor application found as a type"
-
-let schema_id ~loc = suffix_id ~loc "schema"
 
 let expr_option ~loc expr = function
   | None -> [%expr None]
@@ -395,7 +364,8 @@ module Attributes = struct
     inline : inline option;
     loc : location;
     name : string; [@main]
-    schema : expression option;
+    schema :
+      (expression * (Semver.t * [ `Eq | `Gt | `Gte | `Lt | `Lte ]) option) list;
     specs : specs; [@default specs_empty]
     sqml_primary : bool option;
     sqml_type : expression option;
@@ -452,7 +422,11 @@ module Attributes = struct
             expect ~loc
               Ast_pattern.(
                 single_expr_payload
-                  (erecord Longident.(ident __) (pack2 @@ econstraint __ __)))
+                  (pexp_record
+                     (many
+                        (pair (loc (lident __)) (econstraint __ __ |> pack2)
+                        |> pack2))
+                     drop))
               attr_payload
           in
           match Map.of_alist (module String) computed with
@@ -503,6 +477,7 @@ end
 
 type context = {
   code_path : Ppxlib.Code_path.t;
+  inside : bool;
   loc : location;
   recursive : bool;
   types : string list;
@@ -585,11 +560,50 @@ let expand_field
     in
     match attr_name.txt with
     | "schematic.schema" ->
-      {
-        attrs with
-        schema =
-          Some (expect ~loc Ast_pattern.(single_expr_payload __) attr_payload);
-      }
+      let pattern =
+        let open Ast_pattern in
+        let versioned =
+          let+ op, (schema, version) =
+            let version v =
+              let f context loc pl cont =
+                parse (estring __) loc pl (fun s ->
+                    match Semver.of_string s with
+                    | None ->
+                      Location.raise_errorf ~loc "invalid semantic version"
+                    | Some version ->
+                      (to_func v) context loc version (fun v -> cont v))
+              in
+              of_func f
+            and op v =
+              let f context loc pl cont =
+                let v = to_func v in
+                parse
+                  (pexp_ident @@ lident __)
+                  loc pl
+                  (function
+                    | "=" -> v context loc `Eq (fun v -> cont v)
+                    | "<" -> v context loc `Lt (fun v -> cont v)
+                    | "<=" -> v context loc `Lte (fun v -> cont v)
+                    | ">" -> v context loc `Gt (fun v -> cont v)
+                    | ">=" -> v context loc `Gte (fun v -> cont v)
+                    | op ->
+                      Location.raise_errorf ~loc "invalid version operator: %s"
+                        op)
+              in
+              of_func f
+            in
+            pexp_apply (op __)
+              (pair nolabel __ ^:: pair nolabel (version __) ^:: nil |> pack2)
+            |> pack2
+          in
+          (schema, Some (version, op))
+        and plain =
+          let+ expr = __ in
+          (expr, None)
+        in
+        single_expr_payload (versioned ||| plain)
+      in
+      { attrs with schema = expect ~loc pattern attr_payload :: attrs.schema }
     | "default" -> default Source.generic true false
     | "schematic.default" -> default Source.schematic true false
     | "schematic.default_opt" -> default Source.schematic false false
@@ -691,7 +705,7 @@ let expand_field
     pld_attributes
 
 module Schema = struct
-  type closed = value_binding
+  type closed = value_binding * value_binding
 
   type configuration = unit
 
@@ -702,6 +716,12 @@ module Schema = struct
         parametric : expression;
       }
     | Expression of expression
+
+  let schema_name s = name "schema" s
+
+  let schema_name_versioned s = name "schema_versioned" s
+
+  let schema_id_versioned ~loc = suffix_id ~loc "schema_versioned"
 
   let expanded_of_descriptor
       ~loc ?(id = [%expr None]) ?(parametric = [%expr None]) descriptor =
@@ -729,7 +749,9 @@ module Schema = struct
             [%e schema_of_expanded ~loc @@ encode_type ~context ~type_context t]]
     (* Plain type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
-      Expression (expr_id ~loc (schema_id ~loc txt))
+      Expression
+        [%expr
+          [%e expr_id ~loc @@ schema_id_versioned ~loc txt] __schematic_version]
     (* Lists *)
     | { ptyp_desc = Ptyp_constr ({ txt = Lident "list"; loc }, [ arg ]); _ } ->
       expanded_of_descriptor ~loc
@@ -739,14 +761,17 @@ module Schema = struct
               schema_of_expanded ~loc @@ encode_type ~context ~type_context arg]]
     (* Parametric type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } ->
-      let schema_f = expr_id ~loc (schema_id ~loc txt)
+      let schema_f = expr_id ~loc (schema_id_versioned ~loc txt)
       and f t =
         ( Nolabel,
           schema_of_expanded ~loc @@ encode_type ~context ~type_context t )
       in
       Expression
         {
-          pexp_desc = Pexp_apply (schema_f, List.map ~f args);
+          pexp_desc =
+            Pexp_apply
+              ( schema_f,
+                (Nolabel, [%expr __schematic_version]) :: List.map ~f args );
           pexp_loc = loc;
           pexp_loc_stack = [];
           pexp_attributes = [];
@@ -780,7 +805,7 @@ module Schema = struct
       expanded_of_descriptor ~loc body
     (* Type variable *)
     | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ } ->
-      Expression (expr_id ~loc (schema_id ~loc (Lident name)))
+      Expression (expr_id ~loc (schema_id_versioned ~loc (Lident name)))
     (* Polymorphic variant *)
     | { ptyp_desc = Ptyp_variant (fields, _, _); _ } ->
       expand_polymorphic_variant ~context ~type_context fields
@@ -891,11 +916,43 @@ module Schema = struct
             | None -> ([%expr Required], type_))
         in
         let schema =
-          Option.value
-            ~default:
+          let f next = function
+            | schema, None -> schema
+            | schema, Some (Semver.{ major; minor; patch; _ }, op) ->
+              let module Ast_builder = Ast_builder.Make (struct
+                let loc = loc
+              end) in
+              let version =
+                [%expr
+                  Schematic.Version.make [%e Ast_builder.eint major]
+                    [%e Ast_builder.eint minor] [%e Ast_builder.eint patch]]
+              and predicate =
+                match op with
+                | `Eq -> [%expr Schematic.Version.equal]
+                | `Gt -> [%expr Schematic.Version.greater_than]
+                | `Gte ->
+                  [%expr
+                    fun l r ->
+                      Schematic.Version.equal l r
+                      || Schematic.Version.greater_than l r]
+                | `Lt -> [%expr Schematic.Version.less_than]
+                | `Lte ->
+                  [%expr
+                    fun l r ->
+                      Schematic.Version.equal l r
+                      || Schematic.Version.less_than l r]
+              in
+              [%expr
+                match __schematic_version with
+                | Some version when [%e predicate] version [%e version] ->
+                  [%e schema]
+                | _ -> [%e next]]
+          in
+          List.fold
+            ~init:
               (schema_of_expanded ~loc
               @@ encode_type ~context ~type_context type_)
-            schema
+            ~f schema
         in
         let schema =
           match Option.value ~default:Outline inline with
@@ -1144,11 +1201,23 @@ module Schema = struct
       in
       Option.value ~default type_context.attributes.name
     in
-    let params_wrap body =
+    let type_wrap t =
+      let wrap param t =
+        match param with
+        | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
+          [%type: [%t Type.make ~loc @@ Ptyp_var name] Schema.t -> [%t t]]
+        | { ptyp_desc = Ptyp_any; _ }, _ -> [%type: _ -> [%t t]]
+        | t, _ ->
+          Ppxlib.Location.raise_errorf ~loc
+            "schematic-ppx: unsupported type parameter %a" Pprintast.core_type t
+      in
+      List.fold_right ~f:wrap ~init:t type_context.params
+    and params_wrap body =
       let wrap arg exp =
         match arg with
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
-          [%expr fun [%p pattern_id ~loc @@ schema_name name] -> [%e exp]]
+          [%expr
+            fun [%p pattern_id ~loc @@ schema_name_versioned name] -> [%e exp]]
         | { ptyp_desc = Ptyp_any; _ }, _ -> [%expr fun _ -> [%e exp]]
         | t, _ ->
           Ppxlib.Location.raise_errorf ~loc
@@ -1159,7 +1228,7 @@ module Schema = struct
       let wrap f arg =
         match arg with
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
-          [%expr [%e f] [%e Expr.id ~loc @@ schema_name name]]
+          [%expr [%e f] [%e Expr.id ~loc @@ schema_name_versioned name]]
         | { ptyp_desc = Ptyp_any; _ }, _ -> [%expr [%e f] ()]
         | t, _ ->
           Ppxlib.Location.raise_errorf ~loc
@@ -1167,14 +1236,14 @@ module Schema = struct
       in
       List.fold_left ~f:wrap ~init:f type_context.params
     in
-    let schema =
+    let schema, cache =
       let id =
         let f param exp =
           match param with
           | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
             [%expr
               Schematic.Schema.name_combine
-                [%e Expr.id ~loc (schema_name name)]
+                [%e Expr.id ~loc (schema_name_versioned name)]
                 [%e exp]]
           | { ptyp_desc = Ptyp_any; _ }, _ -> exp
           | t, _ ->
@@ -1186,9 +1255,6 @@ module Schema = struct
       in
       match schema with
       | Components c ->
-        (* if params = [] then
-         *   schema_of_expanded ~loc (Components { c with id })
-         * else *)
         let descriptor = params_apply [%expr descriptor] in
         let parametric =
           match type_context.params with
@@ -1200,7 +1266,7 @@ module Schema = struct
             and f arg parametric =
               match arg with
               | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
-                let schema_name = schema_name name in
+                let schema_name = schema_name_versioned name in
                 [%expr
                   Parametric
                     {
@@ -1217,33 +1283,101 @@ module Schema = struct
             in
             Expr.some ~loc @@ List.fold_right ~f ~init type_context.params
         in
-        [%expr
-          let descriptor = [%e params_wrap c.descriptor]
-          and id = [%e id] in
-          Schema.
-            {
-              descriptor = [%e descriptor];
-              id = Some id;
-              parametric = [%e parametric];
-            }]
-      | Expression e -> [%expr { ([%e e]) with id = [%e Expr.some ~loc id] }]
+        let cache = List.is_empty type_context.params in
+        ( [%expr
+            let descriptor =
+              [%e
+                if cache then
+                  [%expr
+                    match
+                      Base.Map.find !__schematic_cache __schematic_version
+                    with
+                    | None ->
+                      Schema.fixpoint (fun __schematic_self ->
+                          __schematic_cache :=
+                            Base.Map.set !__schematic_cache
+                              ~key:__schematic_version ~data:__schematic_self;
+                          [%e c.descriptor])
+                    | Some schema -> schema]
+                else
+                  params_wrap c.descriptor]
+            and id = [%e id] in
+            Schema.
+              {
+                descriptor = [%e descriptor];
+                id = Some id;
+                parametric = [%e parametric];
+              }],
+          cache )
+      | Expression e ->
+        ([%expr { ([%e e]) with id = [%e Expr.some ~loc id] }], false)
     in
-    let body = params_wrap schema in
-    let name = schema_name type_context.name in
-    let pattern = pattern_id ~loc name in
+    let name, name_versioned =
+      (schema_name type_context.name, schema_name_versioned type_context.name)
+    in
     let body =
+      params_wrap (params_apply [%expr [%e Expr.id ~loc name_versioned] None])
+    and body_versioned =
+      let body =
+        if context.inside then
+          [%expr
+            fun (__schematic_version : Version.t option) ->
+              [%e params_wrap schema]]
+        else
+          [%expr
+            fun (__schematic_version : Schematic.Version.t option) ->
+              [%e params_wrap schema]]
+      in
+      if cache then
+        if context.inside then
+          [%expr
+            let __schematic_cache =
+              ref (Base.Map.empty (module Version.Option))
+            in
+            [%e body]]
+        else
+          [%expr
+            let __schematic_cache =
+              ref (Base.Map.empty (module Schematic.Version.Option))
+            in
+            [%e body]]
+      else
+        body
+    in
+    let pattern, pattern_versioned =
+      ( Pattern.make ~loc
+          (Ppat_constraint
+             ( Pattern.id ~loc name,
+               type_wrap
+                 [%type:
+                   [%t
+                     Type.id ~loc
+                       ~parameters:(List.map ~f:fst type_context.params)
+                       type_context.name]
+                   Schema.t] )),
+        Pattern.id ~loc name_versioned )
+    in
+    ( {
+        pvb_pat = pattern_versioned;
+        pvb_expr = body_versioned;
+        pvb_loc = loc;
+        pvb_attributes =
+          [ Warning.unused_var_strict ~loc; Warning.unused_rec ~loc ];
+      },
       {
         pvb_pat = pattern;
         pvb_expr = body;
         pvb_loc = loc;
         pvb_attributes =
           [ Warning.unused_var_strict ~loc; Warning.unused_rec ~loc ];
-      }
-    in
-    body
+      } )
 
   let combine ~loc () expanded =
-    [ { pstr_desc = Pstr_value (Recursive, expanded); pstr_loc = loc } ]
+    let versioned, unversioned = List.unzip expanded in
+    [
+      { pstr_desc = Pstr_value (Recursive, versioned); pstr_loc = loc };
+      { pstr_desc = Pstr_value (Nonrecursive, unversioned); pstr_loc = loc };
+    ]
 end
 
 module Jsoo_type = struct
@@ -1654,6 +1788,8 @@ module Sqml_binding = struct
         include Sqml.Table.Meta (struct
           let name = [%e Expr.string ~loc name]
 
+          let __schematic_version = None
+
           include
             [%m
             {
@@ -1758,7 +1894,7 @@ let expand ~ctxt ~inside (recursive, types) jsoo sqml =
       else
         []
     in
-    { code_path; loc; types; recursive }
+    { code_path; inside; loc; types; recursive }
   in
   let types =
     let f t =

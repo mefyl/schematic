@@ -25,14 +25,17 @@ let json_of_string s =
   | Result.Ok parsed -> parsed
   | Result.Error _ -> Alcotest.fail "invalid JSON expectation"
 
-let test ?(validate = true) name test schema value j =
+let test ?(validate = true) ?decoded name test schema value j =
   let encoded = Schematic.Json.encode schema value in
   let j = json_of_string j in
   Alcotest.check json (Fmt.str "%s: encoded JSON" name) j encoded;
   let () =
     match Schematic.Json.decode schema j with
-    | Result.Ok decoded ->
-      Alcotest.check test (Fmt.str "%s: decoded value" name) value decoded
+    | Result.Ok d ->
+      Alcotest.check test
+        (Fmt.str "%s: decoded value" name)
+        (Option.value ~default:value decoded)
+        d
     | Result.Error e ->
       Alcotest.fail
         (Fmt.str "JSON decode error: %a" Schematic.Error.pp_decoding e)
@@ -46,7 +49,7 @@ let test ?(validate = true) name test schema value j =
         (String.escaped @@ Schematic.Json.to_string @@ encoded)
     in
     if Caml.Sys.command cmd <> 0 then
-      Alcotest.check json (Fmt.str "%s: schema validation" name) encoded schema
+      Alcotest.check json (Fmt.str "%s: schema validation" name) schema encoded
   )
 
 (* Failure *)
@@ -104,7 +107,7 @@ let nullable_option () =
 module Option = struct
   include Option
 
-  let schema = Schematic.Schema.Schemas.option_schema
+  let schema_versioned = Schematic.Schema.Schemas.option_schema_versioned
 
   let pp pp =
     Fmt.(option ~none:(const string "None") (const string "Some " ++ pp))
@@ -335,68 +338,6 @@ module Recursive = struct
 
   include struct
     open Schematic.Schema.Schemas
-
-    (*   let parametric_schema a_schema =
-     *     let rec self = lazy (descriptor a_schema)
-     *     and descriptor a_schema =
-     *       Schema.Map
-     *         ( (fun (value, (next, ())) ->
-     *             Result.Ok ({ value; next } : 'a parametric)),
-     *           (fun ({ value; next } : 'a parametric) -> (value, (next, ()))),
-     *           Object
-     *             (Field
-     *                {
-     *                  description = None;
-     *                  examples = [];
-     *                  field = "value";
-     *                  maximum = None;
-     *                  minimum = None;
-     *                  omit = false;
-     *                  requirement = Required;
-     *                  rest =
-     *                    Field
-     *                      {
-     *                        description = None;
-     *                        examples = [];
-     *                        field = "next";
-     *                        maximum = None;
-     *                        minimum = None;
-     *                        omit = false;
-     *                        requirement = Optional;
-     *                        rest = FieldEnd;
-     *                        schema = Outline (schema (Schema.Fixpoint self));
-     *                        title = None;
-     *                      };
-     *                  schema = Outline a_schema;
-     *                  title = None;
-     *                }) )
-     *     and id = Schematic.Schema.name_combine a_schema "recursive-parametric"
-     *     and schema d =
-     *       Schema.
-     *         {
-     *           descriptor = d;
-     *           id = Some id;
-     *           parametric =
-     *             Some
-     *               (Parametric
-     *                  {
-     *                    name = "a";
-     *                    parameter = a_schema;
-     *                    next =
-     *                      (fun a_schema ->
-     *                        Plain
-     *                          {
-     *                            name = "recursive-parametric";
-     *                            descriptor = descriptor a_schema;
-     *                          });
-     *                  });
-     *         }
-     *     in
-     *     Fmt.epr "DEBUG descriptor@.";
-     *     let descriptor = descriptor a_schema in
-     *     Fmt.epr "DEBUG schema@.";
-     *     schema descriptor
-     * end *)
 
     let parametric_schema a_schema =
       let rec descriptor a_schema =
@@ -1076,6 +1017,46 @@ module Computed = struct
     test "computed optional" t schema { x = 0; y = 0 } {|{"x": 0, "sum": 0}|}
 end
 
+(* Version *)
+
+module Version = struct
+  type v =
+    | Int of int
+    | String of string
+  [@@deriving eq, schema, show]
+
+  let legacy =
+    let decode = function
+      | None -> Result.return None
+      | Some i -> Result.return (Some (Int i))
+    and encode = function
+      | Some (Int i) -> Some i
+      | _ -> None
+    in
+    Schematic.Schema.make
+    @@ Map (decode, encode, Nullable Schematic.Schema.Schemas.int_schema)
+
+  type t = { v : v Option.t [@schematic.schema legacy < "0.6.1"] }
+  [@@deriving eq, schema, show]
+
+  let t = Alcotest.testable pp equal
+
+  let test () =
+    test ~validate:false "latest none" t schema { v = None } {|{"v":null}|};
+    test ~validate:false "latest int" t schema { v = Some (Int 3) } {|{"v": 3}|};
+    test ~validate:false "latest string" t schema { v = Some (String "3") }
+      {|{"v": "3"}|};
+    test ~validate:false "old none" t
+      (schema_versioned @@ Some (Schematic.Version.make 0 6 0))
+      { v = None } {|{"v": null}|};
+    test ~validate:false "old int" t
+      (schema_versioned @@ Some (Schematic.Version.make 0 6 0))
+      { v = Some (Int 3) } {|{"v": 3}|};
+    test ~validate:false "old string" t
+      (schema_versioned @@ Some (Schematic.Version.make 0 6 0))
+      { v = Some (String "3") } ~decoded:{ v = None } {|{"v": null}|}
+end
+
 (* Driver *)
 
 let () =
@@ -1117,6 +1098,7 @@ let () =
           test_case "map-error" `Quick map_error;
           test_case "collisions" `Quick collision;
           test_case "computed" `Quick Computed.computed;
+          test_case "version" `Quick Version.test;
         ] );
       ( "comparison",
         [

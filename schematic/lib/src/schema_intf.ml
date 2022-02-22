@@ -89,10 +89,22 @@ and 't parametric =
     }
       -> 't parametric
 
-module type WALK = sig
+module type WALK_TYPES = sig
   type t
 
   type fields
+end
+
+module type WALK_DEFAULT = sig
+  include WALK_TYPES
+
+  val t : t
+
+  val fields : fields
+end
+
+module type WALK = sig
+  include WALK_TYPES
 
   (* Schema *)
 

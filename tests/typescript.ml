@@ -46,7 +46,7 @@ module ShouldInlineOptions = struct
   module Hide = struct
     type 'a t = 'a
 
-    let schema s = s
+    let schema_versioned _ s = s
   end
 
   type fields = {

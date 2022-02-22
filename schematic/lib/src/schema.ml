@@ -82,11 +82,65 @@ and pp : type u. u t Fmt.t =
 
 type 'res inline = { f : 't. 't field -> 'res }
 
+module Default_walk (Default : WALK_DEFAULT) :
+  WALK with type t = Default.t and type fields = Default.fields = struct
+  include Default
+
+  let schema _ _ _ = t
+
+  let parametric _ _ _ _ = t
+
+  let fields_empty _ = fields
+
+  let field_inline _ _ f = f
+
+  let field_outline _ _ _ f = f
+
+  let object_ _ = t
+
+  let case _ _ _ = t
+
+  let union _ = t
+
+  let any _ = t
+
+  let bool _ = t
+
+  let float _ = t
+
+  let date _ = t
+
+  let mapping _ = t
+
+  let int _ = t
+
+  let ignore _ = t
+
+  let int64 _ = t
+
+  let list _ = t
+
+  let null _ = t
+
+  let nullable t = t
+
+  let string _ = t
+
+  let string_const _ = t
+
+  let time _ = t
+
+  let time_local _ = t
+
+  let tuple _ = t
+end
+
 let rec inline :
-    type t. t descriptor -> 'res inline -> ('res list, string) Result.t =
+    type t res. t descriptor -> res inline -> (res list, string) Result.t =
  fun d f ->
   match d with
   | Ignore -> Result.return [ f.f FieldEnd ]
+  | Fixpoint d -> inline (Lazy.force d) f
   | Map (_, _, d) -> inline d f
   | Nullable d -> inline d.descriptor f
   | Object o -> Result.return [ f.f o ]
@@ -103,6 +157,7 @@ let rec inline_v :
  fun d v f ->
   match d with
   | Ignore -> Result.return (f.f FieldEnd v)
+  | Fixpoint d -> inline_v (Lazy.force d) v f
   | Map (_, e, d) -> inline_v d (e v) f
   | Nullable d -> (
     match v with

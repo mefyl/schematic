@@ -3,11 +3,12 @@
 (library
  (name schematic)
  (public_name schematic)
- (libraries base ezjsonm fmt ptime uri)
+ (libraries base ezjsonm fmt ptime semver2 uri)
  (preprocess
   (pps
    schematic_ppx_inside
    ppx_deriving.eq
    ppx_deriving.make
+   ppx_deriving.ord
    ppx_deriving.show
    ppx_here)))
