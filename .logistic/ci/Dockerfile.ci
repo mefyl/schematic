@@ -31,7 +31,7 @@ ARG OPAM_PACKAGES
 ADD .exists *.opam.extdeps /root/
 # FIXME: With a more recent version of opam: opam switch set-invariant ocamlformat.0.20.1
 RUN opam update && \
-    (if test -f /root/*.extdeps; then  opam install --yes --deps-only /root/*.extdeps; fi) && \
+    (if find /root -name '*.extdeps'; then  opam install --yes --deps-only /root/*.extdeps; fi) && \
     opam install --yes ocamlformat.0.20.1 $OPAM_PACKAGES && \
     opam clean -a -c -s --logs -r && \
     rm -rf /root/.cache/dune
