@@ -1,5 +1,4 @@
 type uri_reference = string
-
 and uri = string
 
 and type_ =

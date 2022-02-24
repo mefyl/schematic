@@ -65,12 +65,7 @@ module Expr = struct
     { pexp_desc; pexp_loc = loc; pexp_loc_stack = []; pexp_attributes = [] }
 
   let id ~loc name = make ~loc (Pexp_ident { txt = Lident name; loc })
-
-  let bool ~loc v =
-    if v then
-      [%expr true]
-    else
-      [%expr false]
+  let bool ~loc v = if v then [%expr true] else [%expr false]
 
   let list ~loc list =
     let f m l = [%expr [%e m] :: [%e l]]
@@ -107,7 +102,6 @@ module Expr = struct
       }
 
   let some ~loc e = [%expr Some [%e e]]
-
   let none ~loc = [%expr None]
 end
 
@@ -166,7 +160,6 @@ module Warning = struct
     }
 
   let unused_var_strict ~loc = make ~loc "-unused-var-strict"
-
   let unused_rec ~loc = make ~loc "-unused-rec-flag"
 end
 
@@ -188,9 +181,7 @@ type normalized_ctor = {
 }
 
 let constructor_arguments_normalize ~loc = function
-  | Pcstr_tuple []
-  | Pcstr_record [] ->
-    None
+  | Pcstr_tuple [] | Pcstr_record [] -> None
   | Pcstr_tuple [ type_ ] ->
     let pattern f = f 0
     and value f = f 0 type_ in
@@ -290,17 +281,11 @@ let expect ~loc pattern ast = Ast_pattern.parse pattern loc ast Fn.id
 
 let rename name =
   let len = String.length name in
-  if name.[len - 1] = '_' then
-    String.sub name ~pos:0 ~len:(len - 1)
-  else
-    name
+  if name.[len - 1] = '_' then String.sub name ~pos:0 ~len:(len - 1) else name
 
 let name suffix s =
   let s = rename s in
-  if s = "t" then
-    suffix
-  else
-    s ^ "_" ^ suffix
+  if s = "t" then suffix else s ^ "_" ^ suffix
 
 let suffix_id ~loc suffix = function
   | Lident n -> Lident (name suffix n)
@@ -319,13 +304,8 @@ module Source = struct
     | Generic of 'a
     | Schematic of 'a
 
-  let value = function
-    | Generic v
-    | Schematic v ->
-      v
-
+  let value = function Generic v | Schematic v -> v
   let generic v = Generic v
-
   let schematic v = Schematic v
 
   let merge ~loc name l r =
@@ -388,9 +368,8 @@ module Attributes = struct
         "schematic-ppx: unknown schematic annotation %s" name
     | None -> ()
 
-  let rec extract
-      ?(alias = false) ?(computed = false) ?(name = false) ?(union_key = false)
-      =
+  let rec extract ?(alias = false) ?(computed = false) ?(name = false)
+      ?(union_key = false) =
     let merge name loc old v =
       match old with
       | None -> Some v
@@ -498,9 +477,7 @@ and type_ =
 
 module type EXPANSION = sig
   type closed
-
   type configuration
-
   type expanded
 
   val close :
@@ -532,17 +509,12 @@ end
 let expand_field
     { pld_attributes; pld_loc = loc; pld_name = { txt = name; _ }; pld_type; _ }
     =
-  let read_attribute
-      (attrs : Attributes.field) { attr_name; attr_loc = loc; attr_payload } =
+  let read_attribute (attrs : Attributes.field)
+      { attr_name; attr_loc = loc; attr_payload } =
     let default f req omit =
       match attr_payload with
       | PStr [%str [%e? exp]] ->
-        let default =
-          if req then
-            [%expr Some [%e exp]]
-          else
-            exp
-        in
+        let default = if req then [%expr Some [%e exp]] else exp in
         {
           attrs with
           specs =
@@ -664,16 +636,12 @@ let expand_field
         Ast_pattern.(single_expr_payload (estring __))
         loc attr_payload
         (fun alias -> { attrs with alias = Some alias })
-    | ("schematic.inline" as attr)
-    | ("schematic.inline_try" as attr) -> (
+    | ("schematic.inline" as attr) | ("schematic.inline_try" as attr) -> (
       match attr_payload with
       | PStr [] ->
         if Option.is_none attrs.inline then
           let v =
-            if String.(attr = "schematic.inline") then
-              Inline
-            else
-              Inline_try
+            if String.(attr = "schematic.inline") then Inline else Inline_try
           in
           { attrs with inline = Some v }
         else
@@ -685,8 +653,7 @@ let expand_field
       if Option.is_some attrs.sqml_primary then
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: duplicate schematic.sqml annotation"
-      else
-        { attrs with sqml_primary = Some true }
+      else { attrs with sqml_primary = Some true }
     | "schematic.sqml.type" ->
       if Option.is_some attrs.sqml_type then
         Ppxlib.Location.raise_errorf ~loc
@@ -706,7 +673,6 @@ let expand_field
 
 module Schema = struct
   type closed = value_binding * value_binding
-
   type configuration = unit
 
   type expanded =
@@ -718,13 +684,11 @@ module Schema = struct
     | Expression of expression
 
   let schema_name s = name "schema" s
-
   let schema_name_versioned s = name "schema_versioned" s
-
   let schema_id_versioned ~loc = suffix_id ~loc "schema_versioned"
 
-  let expanded_of_descriptor
-      ~loc ?(id = [%expr None]) ?(parametric = [%expr None]) descriptor =
+  let expanded_of_descriptor ~loc ?(id = [%expr None])
+      ?(parametric = [%expr None]) descriptor =
     Components { descriptor; id; parametric }
 
   let schema_of_expanded ~loc = function
@@ -880,8 +844,8 @@ module Schema = struct
   and expand_record ~context ~type_context fields =
     _expand_record false ~context ~type_context fields
 
-  and _expand_record
-      as_tuple ~context ~type_context (fields : Attributes.field list) =
+  and _expand_record as_tuple ~context ~type_context
+      (fields : Attributes.field list) =
     let loc = type_context.loc in
     let type_ =
       (* This type is used to explicitely disambiguate mapped values in case of
@@ -895,9 +859,8 @@ module Schema = struct
     in
     let fields_schema =
       let init = [%expr FieldEnd] in
-      let f
-          Attributes.{ alias; inline; loc; name; schema; specs; type_; _ } rest
-          =
+      let f Attributes.{ alias; inline; loc; name; schema; specs; type_; _ }
+          rest =
         let requirement, type_ =
           match type_ with
           | {
@@ -1106,8 +1069,7 @@ module Schema = struct
             if Option.is_none type_context.attributes.union_key then
               expanded_of_descriptor ~loc
                 [%expr String_const [%e Expr.string ~loc name]]
-            else
-              expanded_of_descriptor ~loc [%expr Object FieldEnd]
+            else expanded_of_descriptor ~loc [%expr Object FieldEnd]
           in
           (schema, None, None, None, None)
         | Some { ctor_pattern; ctor_value; pattern; type_; value; _ } ->
@@ -1130,35 +1092,26 @@ module Schema = struct
         let pattern =
           {
             ppat_desc =
-              (if poly then
-                Ppat_variant (txt, pattern)
-              else
-                Ppat_construct ({ txt = Lident txt; loc }, ctor_pattern));
+              (if poly then Ppat_variant (txt, pattern)
+              else Ppat_construct ({ txt = Lident txt; loc }, ctor_pattern));
             ppat_loc = loc;
             ppat_loc_stack = [];
             ppat_attributes = [];
           }
         and value = Option.value ~default:[%expr ()] value in
-        [%expr
-          function
-          | [%p pattern] -> Some [%e value]
-          | _ -> None]
+        [%expr function [%p pattern] -> Some [%e value] | _ -> None]
       and destruct =
         let value =
           {
             pexp_desc =
-              (if poly then
-                Pexp_variant (txt, value)
-              else
-                Pexp_construct ({ txt = Lident txt; loc }, ctor_value));
+              (if poly then Pexp_variant (txt, value)
+              else Pexp_construct ({ txt = Lident txt; loc }, ctor_value));
             pexp_loc = loc;
             pexp_loc_stack = [];
             pexp_attributes = [];
           }
         and pattern = Option.value ~default:[%pat? ()] pattern in
-        [%expr
-          function
-          | [%p pattern] -> [%e value]]
+        [%expr function [%p pattern] -> [%e value]]
       in
       [%expr
         Schema.Case
@@ -1299,8 +1252,7 @@ module Schema = struct
                               ~key:__schematic_version ~data:__schematic_self;
                           [%e c.descriptor])
                     | Some schema -> schema]
-                else
-                  params_wrap c.descriptor]
+                else params_wrap c.descriptor]
             and id = [%e id] in
             Schema.
               {
@@ -1341,8 +1293,7 @@ module Schema = struct
               ref (Base.Map.empty (module Schematic.Version.Option))
             in
             [%e body]]
-      else
-        body
+      else body
     in
     let pattern, pattern_versioned =
       ( Pattern.make ~loc
@@ -1382,7 +1333,6 @@ end
 
 module Jsoo_type = struct
   type closed = type_declaration list
-
   type configuration = { functions : bool }
 
   type expanded =
@@ -1483,12 +1433,9 @@ module Jsoo_type = struct
     if
       Option.is_some
       @@ List.find
-           ~f:(function
-             | _, Pcstr_tuple [], _, _ -> false
-             | _ -> true)
+           ~f:(function _, Pcstr_tuple [], _, _ -> false | _ -> true)
            options
-    then
-      [%type: Js_of_ocaml.Js.Unsafe.any]
+    then [%type: Js_of_ocaml.Js.Unsafe.any]
     else
       {
         ptyp_desc = Ptyp_constr ({ txt = Lident "string_js"; loc }, []);
@@ -1673,15 +1620,12 @@ module Jsoo_type = struct
               let of_js_exn = [%e of_js_exn] in
               (to_js, of_js, of_js_exn)]
     and type_ = { pstr_desc = Pstr_type (Recursive, items); pstr_loc = loc } in
-    if functions then
-      type_ :: List.filter_map ~f:converters items
-    else
-      [ type_ ]
+    if functions then type_ :: List.filter_map ~f:converters items
+    else [ type_ ]
 end
 
 module Sqml_binding = struct
   type closed = structure_item list
-
   type configuration = { name : string }
 
   type expanded = {
@@ -1768,10 +1712,7 @@ module Sqml_binding = struct
     Ppxlib.Location.raise_errorf ~loc:type_context.loc
       "schematic-ppx: SQML can only bind record types"
 
-  let close
-      ~configuration:{ name }
-      ~context:_
-      ~type_context
+  let close ~configuration:{ name } ~context:_ ~type_context
       {
         column_explosions;
         columns;
@@ -1787,7 +1728,6 @@ module Sqml_binding = struct
       [%str
         include Sqml.Table.Meta (struct
           let name = [%e Expr.string ~loc name]
-
           let __schematic_version = None
 
           include
@@ -1806,7 +1746,6 @@ module Sqml_binding = struct
         type mapped = [%t Type.id ~loc:type_context.loc type_context.name]
 
         let map [%p columns_pattern] = [%e record]
-
         let unmap [%p record_pattern] = Acid.Hlist.([%e columns_list])
 
         module Import (Table : Sqml.Table.S with type Meta.columns = columns) =
@@ -1889,10 +1828,7 @@ let expand ~ctxt ~inside (recursive, types) jsoo sqml =
     and code_path = Ppxlib.Expansion_context.Deriver.code_path ctxt in
     let types =
       let f { ptype_name; _ } = ptype_name.txt in
-      if recursive then
-        List.map ~f types
-      else
-        []
+      if recursive then List.map ~f types else []
     in
     { code_path; inside; loc; types; recursive }
   in
@@ -1910,9 +1846,7 @@ let expand ~ctxt ~inside (recursive, types) jsoo sqml =
       in
       let () =
         match (type_context.attributes.union_key, t.ptype_kind) with
-        | None, _
-        | Some _, Ptype_variant _ ->
-          ()
+        | None, _ | Some _, Ptype_variant _ -> ()
         | _ ->
           Ppxlib.Location.raise_errorf ~loc:t.ptype_loc
             "schematic-ppx: union_key is only valid on variants"
@@ -1955,8 +1889,7 @@ let expand ~ctxt ~inside (recursive, types) jsoo sqml =
     let contents =
       match jsoo with
       | None -> []
-      | Some [%expr jsoo]
-      | Some [%expr true] ->
+      | Some [%expr jsoo] | Some [%expr true] ->
         Jsoo_type_expander.expand ~configuration:{ functions = true } ~context
           types
       | Some [%expr false] ->

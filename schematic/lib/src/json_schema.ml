@@ -79,7 +79,6 @@ let empty =
   }
 
 type ids = (string, String.comparator_witness) Set.t
-
 type date_tuple = int * int * int [@@deriving schema]
 
 let of_schema schema =
@@ -104,8 +103,7 @@ let of_schema schema =
       | Schema.Float ->
         { validation_empty with type_ = Some (Either.first Number) }
       | Schema.Ignore -> validation_empty
-      | Schema.Int
-      | Schema.Int64 ->
+      | Schema.Int | Schema.Int64 ->
         { validation_empty with type_ = Some (Either.first Integer) }
       | Schema.List _ ->
         { validation_empty with type_ = Some (Either.first Array) }
@@ -151,12 +149,8 @@ let of_schema schema =
       | Schema.Bool -> (marks, Some applicator_empty)
       | Schema.Date -> applicator marks date_tuple_schema.descriptor
       | Fixpoint s -> applicator marks (Lazy.force s)
-      | Schema.Float
-      | Schema.Ignore ->
-        (marks, Some applicator_empty)
-      | Schema.Int
-      | Schema.Int64 ->
-        (marks, Some applicator_empty)
+      | Schema.Float | Schema.Ignore -> (marks, Some applicator_empty)
+      | Schema.Int | Schema.Int64 -> (marks, Some applicator_empty)
       | Schema.List schema ->
         let marks, schema = of_schema marks schema in
         ( marks,
@@ -196,8 +190,7 @@ let of_schema schema =
               } -> (
             let marks, fields =
               match schema with
-              | Inline schema
-              | Inline_try schema -> (
+              | Inline schema | Inline_try schema -> (
                 match applicator marks schema.descriptor with
                 | marks, Some applicator ->
                   (marks, Option.value ~default:[] applicator.properties)

@@ -15,64 +15,27 @@ module Json_coding : Coding.S with type t = Ezjsonm.value = struct
     | `Null -> "null"
 
   let ( >>= ) = Result.( >>= )
-
   let ( >>| ) = Result.( >>| )
-
-  let is_null = function
-    | `Null -> true
-    | _ -> false
-
+  let is_null = function `Null -> true | _ -> false
   let null () = `Null
-
   let of_bool b = `Bool b
-
   let of_fields f = `O f
-
   let of_float f = `Float f
-
   let of_int i = `Float (Float.of_int i)
-
   let of_int64 i = `Float (Float.of_int64 i)
-
   let of_json v = v
-
   let of_list l = `A l
-
   let of_string s = `String s
-
   let of_time t = `String (Ptime.to_rfc3339 t)
-
   let of_time_local (t, tz_offset_s) = `String (Ptime.to_rfc3339 ~tz_offset_s t)
-
-  let to_bool = function
-    | `Bool v -> Some v
-    | _ -> None
-
-  let to_fields = function
-    | `O fields -> Some fields
-    | _ -> None
-
-  let to_float = function
-    | `Float v -> Some v
-    | _ -> None
-
-  let to_int = function
-    | `Float v -> Some (Float.to_int v)
-    | _ -> None
-
-  let to_int64 = function
-    | `Float v -> Some (Float.to_int64 v)
-    | _ -> None
-
+  let to_bool = function `Bool v -> Some v | _ -> None
+  let to_fields = function `O fields -> Some fields | _ -> None
+  let to_float = function `Float v -> Some v | _ -> None
+  let to_int = function `Float v -> Some (Float.to_int v) | _ -> None
+  let to_int64 = function `Float v -> Some (Float.to_int64 v) | _ -> None
   let to_json v = v
-
-  let to_list = function
-    | `A l -> Some l
-    | _ -> None
-
-  let to_string = function
-    | `String v -> Some v
-    | _ -> None
+  let to_list = function `A l -> Some l | _ -> None
+  let to_string = function `String v -> Some v | _ -> None
 
   let to_time_ = function
     | `String s ->
@@ -99,9 +62,7 @@ module Make (Impl : Impl) = struct
     | exception Ezjsonm.Parse_error (_, msg) -> Result.fail msg
 
   let of_string s = Impl.of_string s
-
   let to_channel chan t = Ezjsonm.value_to_channel ~minify:true chan t
-
   let to_string t = Impl.to_string t
 
   let rec pp f json =

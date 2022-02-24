@@ -87,51 +87,28 @@ module Default_walk (Default : WALK_DEFAULT) :
   include Default
 
   let schema _ _ _ = t
-
   let parametric _ _ _ _ = t
-
   let fields_empty _ = fields
-
   let field_inline _ _ f = f
-
   let field_outline _ _ _ f = f
-
   let object_ _ = t
-
   let case _ _ _ = t
-
   let union _ = t
-
   let any _ = t
-
   let bool _ = t
-
   let float _ = t
-
   let date _ = t
-
   let mapping _ = t
-
   let int _ = t
-
   let ignore _ = t
-
   let int64 _ = t
-
   let list _ = t
-
   let null _ = t
-
   let nullable t = t
-
   let string _ = t
-
   let string_const _ = t
-
   let time _ = t
-
   let time_local _ = t
-
   let tuple _ = t
 end
 
@@ -314,10 +291,7 @@ let assoc_compare compare l r =
   let f (key, l) =
     match List.Assoc.find ~equal:String.equal r key with
     | None -> Some 1
-    | Some r -> (
-      match compare l r with
-      | 0 -> None
-      | v -> Some v)
+    | Some r -> ( match compare l r with 0 -> None | v -> Some v)
   in
   Option.value ~default:0 @@ List.find_map ~f l
 
@@ -348,9 +322,7 @@ let compare schema =
     | Fixpoint s -> compare (Lazy.force s)
     | Float -> Base.Poly.compare
     | Ignore -> Base.Poly.compare
-    | Int
-    | Int64 ->
-      Base.Poly.compare
+    | Int | Int64 -> Base.Poly.compare
     | List schema -> Base.List.compare (compare schema.descriptor)
     | Map (_, map, v) -> fun l r -> compare v (map l) (map r)
     | Mapping schema -> assoc_compare (compare schema.descriptor)
@@ -361,18 +333,13 @@ let compare schema =
     | Time -> Ptime.compare
     | Time_local -> (
       fun (l, lz) (r, rz) ->
-        match Int.compare lz rz with
-        | 0 -> Ptime.compare l r
-        | v -> v)
+        match Int.compare lz rz with 0 -> Ptime.compare l r | v -> v)
     | Object fields ->
       let rec compare_fields : type u. u field -> u -> u -> int = function
         | Field { schema; requirement; rest; _ } ->
           let schema = extract_field_schema schema in
-          let f
-              (type field req)
-              (schema : field t)
-              (requirement : (field, req) requirement)
-              ((l : req), lr)
+          let f (type field req) (schema : field t)
+              (requirement : (field, req) requirement) ((l : req), lr)
               ((r : req), rr) =
             let c =
               match requirement with
@@ -380,9 +347,7 @@ let compare schema =
               | Default _ -> compare schema.descriptor l r
               | Optional -> Option.compare (compare schema.descriptor) l r
             in
-            match c with
-            | 0 -> compare_fields rest lr rr
-            | v -> v
+            match c with 0 -> compare_fields rest lr rr | v -> v
           in
           f schema requirement
         | FieldEnd -> fun () () -> 0
@@ -420,9 +385,7 @@ type 'res unpacker = { unpack : 't. 't t -> 'res }
 let unpack { unpack } (Pack schema) = unpack schema
 
 let name_combine schema name =
-  match schema.id with
-  | Some id -> id ^ "-" ^ name
-  | None -> name
+  match schema.id with Some id -> id ^ "-" ^ name | None -> name
 
 let make ?id ?parametric descriptor = { id; descriptor; parametric }
 

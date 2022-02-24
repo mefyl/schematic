@@ -3,9 +3,7 @@ open Poly
 open Schematic.Schema.Schemas
 
 let ( let* ) = Result.( >>= )
-
 let ( let+ ) = Result.( >>| )
-
 let root = Caml.Filename.dirname @@ Caml.Sys.executable_name
 
 let json_schema schema =
@@ -49,8 +47,7 @@ let test ?(validate = true) ?decoded name test schema value j =
         (String.escaped @@ Schematic.Json.to_string @@ encoded)
     in
     if Caml.Sys.command cmd <> 0 then
-      Alcotest.check json (Fmt.str "%s: schema validation" name) schema encoded
-  )
+      Alcotest.check json (Fmt.str "%s: schema validation" name) schema encoded)
 
 (* Failure *)
 
@@ -59,10 +56,8 @@ let failure () =
     try
       test "int atom" Alcotest.int int_schema 28 "29";
       true
-    with
-    | _ -> false
-  then
-    Alcotest.fail "failure test failed"
+    with _ -> false
+  then Alcotest.fail "failure test failed"
 
 (* Atoms *)
 
@@ -148,9 +143,7 @@ let pp_version fmt { major; minor; subminor } =
 let test_version = Alcotest.testable pp_version ( = )
 
 let v1 = { major = 0; minor = 1; subminor = 2 }
-
 and v2 = { major = 3; minor = 4; subminor = 5 }
-
 and v3 = { major = 6; minor = 7; subminor = 8 }
 
 let record () =
@@ -414,11 +407,9 @@ module Recursive = struct
 end
 
 type mutually_a = { next_b : mutually_b option }
-
 and mutually_b = { next_a : mutually_a option } [@@deriving schema]
 
 let rec pp_mutually_a fmt { next_b } = Fmt.option pp_mutally_b fmt next_b
-
 and pp_mutally_b fmt { next_a } = Fmt.option pp_mutually_a fmt next_a
 
 let test_mutually_a = Alcotest.testable pp_mutually_a ( = )
@@ -485,11 +476,8 @@ module Inline = struct
   [@@deriving eq, schema, show]
 
   let inline = Alcotest.testable pp_inline equal_inline
-
   let inlined = Alcotest.testable pp_inlined equal_inlined
-
   let variant_inline = Alcotest.testable pp_variant_inline equal_variant_inline
-
   let inline_variant = Alcotest.testable pp_inline_variant equal_inline_variant
 
   let inline_maybe a =
@@ -509,7 +497,8 @@ module Inline = struct
       Alcotest.(
         check
           (list @@ list string)
-          "the list of mandatory fields" [ [ "a"; "b"; "c"; "d" ] ]
+          "the list of mandatory fields"
+          [ [ "a"; "b"; "c"; "d" ] ]
         @@ descriptor_fields inline_schema.descriptor)
     in
     test "coding" inline inline_schema
@@ -614,7 +603,6 @@ let pp_event_local fmt e =
   Caml.Format.fprintf fmt "%a-%a" pp e.start_local pp e.end_local
 
 let test_time = Alcotest.testable pp_event ( = )
-
 let test_time_local = Alcotest.testable pp_event_local ( = )
 
 let make_time s =
@@ -922,7 +910,6 @@ end
 (* Phantom types *)
 
 type _ id = string [@@deriving schema]
-
 type some_id = int id [@@deriving schema]
 
 type identified = { id : identified id [@schematic.schema id_schema ()] }
@@ -934,7 +921,6 @@ let root_schema = schema
 
 module Names = struct
   type foo = int [@@deriving schema]
-
   type t = int [@@deriving schema]
 
   let deduced () =
@@ -1029,10 +1015,7 @@ module Version = struct
     let decode = function
       | None -> Result.return None
       | Some i -> Result.return (Some (Int i))
-    and encode = function
-      | Some (Int i) -> Some i
-      | _ -> None
-    in
+    and encode = function Some (Int i) -> Some i | _ -> None in
     Schematic.Schema.make
     @@ Map (decode, encode, Nullable Schematic.Schema.Schemas.int_schema)
 

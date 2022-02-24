@@ -20,7 +20,6 @@ module rec Mark :
     type t = string * (typescript * Marks.t) Lazy.t
 
     let sexp_of_t (id, _) = Sexp.Atom id
-
     let compare (l, _) (r, _) = String.compare l r
   end
 
@@ -32,33 +31,21 @@ and Marks : sig
   type t
 
   val empty : t
-
   val make : string -> (unit -> typescript * Marks.t) -> t
-
   val add : t -> Mark.t -> t
-
   val fold : t -> init:'a -> f:('a -> Mark.t -> 'a) -> 'a
-
   val has : t -> Mark.t -> bool
-
   val merge : t list -> t
-
   val of_list : Mark.t list -> t
 end = struct
   type t = (Mark.t, Mark.comparator_witness) Set.t
 
   let empty = Set.empty (module Mark)
-
   let make id f = Set.of_list (module Mark) [ (id, lazy (f ())) ]
-
   let add = Set.add
-
   let fold = Set.fold
-
   let has = Set.mem
-
   let merge = Set.union_list (module Mark)
-
   let of_list = Set.of_list (module Mark)
 end
 
@@ -71,9 +58,7 @@ let name s =
 
 module Of = Schema.Walk (struct
   type res = t * Marks.t
-
   type fields = (string * t * bool) list list * Marks.t
-
   type t = res
 
   (* Schema *)
@@ -107,11 +92,8 @@ module Of = Schema.Walk (struct
       Marks.add (Marks.merge marks) mark )
 
   let make name = (Atom name, Marks.empty)
-
   let any () = make "any"
-
   let bool () = make "boolean"
-
   let fields_empty () = ([ [] ], Marks.empty)
 
   let field_inline inline_required cases (rest, rest_marks) =
@@ -135,22 +117,16 @@ module Of = Schema.Walk (struct
       Marks.merge [ marks; rest_marks ] )
 
   let float () = make "number"
-
   let date () = make "Date"
-
   let int = float
-
   let ignore () = make "null"
-
   let int64 = float
-
   let list (s, marks) = (Template { name = "Array"; args = [ s ] }, marks)
 
   let mapping (elt, marks) =
     (Template { name = "Record"; args = [ Atom "string"; elt ] }, marks)
 
   let null () = make "null"
-
   let nullable (t, marks) = (Union [ t; Atom "null" ], marks)
 
   let object_ (fields_cases, marks) =
@@ -161,9 +137,7 @@ module Of = Schema.Walk (struct
     | cases -> (Union (List.map ~f cases), marks)
 
   let string () = make "string"
-
   let time () = make "Date"
-
   let time_local = time
 
   let tuple items =
@@ -187,8 +161,7 @@ module Of = Schema.Walk (struct
 end)
 
 let rec of_mark marks mark =
-  if Marks.has marks mark then
-    ([], marks)
+  if Marks.has marks mark then ([], marks)
   else
     let res, deps =
       let res, deps = Lazy.force @@ snd mark in
@@ -231,9 +204,7 @@ let of_schemas ?(exclude = []) schemas =
   of_schemas_state marks schemas |> fst
 
 let of_schema schema = of_schema Marks.empty schema |> fst
-
 let of_descriptor d = Of.descriptor d |> fst
-
 let break sp id fmt _ = Caml.Format.pp_print_break fmt sp id
 
 let custom_break fits breaks fmt _ =
@@ -253,13 +224,7 @@ let pp ?(indent = 2) fmt ts =
           let pp =
             box ~indent
             @@ Fmt.pair
-                 ~sep:
-                   (const string
-                      (if required then
-                        ":"
-                      else
-                        "?:")
-                   ++ sp)
+                 ~sep:(const string (if required then ":" else "?:") ++ sp)
                  Dump.string (hvbox pp)
           in
           pp f (name, v)

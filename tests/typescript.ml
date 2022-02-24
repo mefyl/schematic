@@ -14,7 +14,6 @@ and inline_variant = {
 }
 
 and nullable = bool option
-
 and tuple = string * int64 * unit
 
 and variant =
@@ -79,7 +78,6 @@ module Generate_types = struct
       @@ Schematic.Typescript.of_schema t)
 
   let nullable () = test nullable_schema [ ("Nullable", "boolean | null") ]
-
   let record () = test record_schema [ record_typescript ]
 
   type string_or_int = (string, int) Either.t [@@deriving schema]

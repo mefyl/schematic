@@ -15,64 +15,37 @@ type 'a customizable =
   ]
 
 type 't key_get = ('t -> string -> ('t option, string) Result.t) customizable
-
 type 't key_set = ('t -> string -> 't -> ('t, string) Result.t) customizable
 
 module type S = sig
   type t
 
   val is_null : t -> bool
-
   val key_get : t key_get
-
   val key_set : t key_set
-
   val null : unit -> t
-
   val of_bool : bool -> t
-
   val of_date : (Ptime.date -> t) customizable
-
   val of_fields : (string * t) list -> t
-
   val of_float : float -> t
-
   val of_int : int -> t
-
   val of_int64 : int64 -> t
-
   val of_json : Ezjsonm.value -> t
-
   val of_list : t list -> t
-
   val of_string : string -> t
-
   val of_time : Ptime.t -> t
-
   val of_time_local : Ptime.t * int -> t
-
   val to_bool : t -> bool option
-
   val to_date : (t -> Ptime.date option) customizable
-
   val to_fields : t -> (string * t) list option
-
   val to_float : t -> float option
-
   val to_int : t -> int option
-
   val to_int64 : t -> int64 option
-
   val to_json : t -> Ezjsonm.value
-
   val to_list : t -> t list option
-
   val to_string : t -> string option
-
   val to_time : t -> (Ptime.t, string) Result.t
-
   val to_time_local : t -> (Ptime.t * int, string) Result.t
-
   val type_name : t -> string
 end
 
@@ -85,11 +58,8 @@ let type_error expected effective =
 
 module Defaults = struct
   let key_get = `Generic
-
   let key_set = `Generic
-
   let of_date = `Generic
-
   let to_date = `Generic
 end
 
@@ -119,14 +89,11 @@ module Make (Coding : S) = struct
       |> Result.map_error ~f:(fun reason -> E.{ path; schema; reason })
     | `Generic ->
       let* fields = Coding.to_fields o |> type_error schema path "object" v in
-      Result.return (Coding.of_fields @@ (f, v) :: fields)
+      Result.return (Coding.of_fields @@ ((f, v) :: fields))
 
-  let requirement_return
-      (type a req) (req : (a, req) Schema.requirement) (v : a) : req =
-    match req with
-    | Required -> v
-    | Default _ -> v
-    | Optional -> Some v
+  let requirement_return (type a req) (req : (a, req) Schema.requirement)
+      (v : a) : req =
+    match req with Required -> v | Default _ -> v | Optional -> Some v
 
   let decode schema =
     let rec decode_field :
@@ -149,8 +116,7 @@ module Make (Coding : S) = struct
       | Default default -> (
         function
         | Some v -> (
-          if omit then
-            Result.return default
+          if omit then Result.return default
           else
             match (Coding.is_null v, schema.descriptor) with
             | true, Nullable nullable -> (
@@ -209,10 +175,8 @@ module Make (Coding : S) = struct
         map_results ~f fields
       | Null -> Option.some_if (Coding.is_null v) () |> type_error "null"
       | Nullable s ->
-        if Coding.is_null v then
-          Result.return None
-        else
-          decode s.id ids s.descriptor v |> Result.map ~f:Option.return
+        if Coding.is_null v then Result.return None
+        else decode s.id ids s.descriptor v |> Result.map ~f:Option.return
       | Object fields_schema ->
         let* fields = Coding.to_fields v |> type_error "object" in
         let rec decode_object :
@@ -271,11 +235,7 @@ module Make (Coding : S) = struct
                     (missing, Some v)
                   | Inline_try schema ->
                     let missing, inlinable = inline schema in
-                    ( missing,
-                      if inlinable then
-                        Some v
-                      else
-                        outline () )
+                    (missing, if inlinable then Some v else outline ())
                   | Outline _ -> (false, outline ())
                 in
                 if missing then
@@ -338,8 +298,7 @@ module Make (Coding : S) = struct
               Option.return
               @@ let* v = decode id ids schema.descriptor v in
                  Result.return (decoder v)
-            else
-              None
+            else None
           in
           match List.find_map ~f:conv cases with
           | Some res -> res
@@ -377,9 +336,7 @@ module Make (Coding : S) = struct
       | Map (_, decons, schema) -> encode schema @@ decons v
       | Null -> Coding.null ()
       | Nullable s -> (
-        match v with
-        | None -> Coding.null ()
-        | Some v -> encode s.descriptor v)
+        match v with None -> Coding.null () | Some v -> encode s.descriptor v)
       | Mapping fields_schema ->
         Coding.of_fields
           (List.map
@@ -404,8 +361,7 @@ module Make (Coding : S) = struct
                 (field, encoded) :: tl
               in
               match field_schema with
-              | Inline schema
-              | Inline_try schema -> (
+              | Inline schema | Inline_try schema -> (
                 match
                   Schema.inline_v schema.descriptor hd
                     { f = (fun fields v -> encode_object v fields) }
@@ -441,8 +397,8 @@ module Make (Coding : S) = struct
             match key with
             | Some key -> (
               match
-                key_set None [ (* FIXME: context *) ] v key
-                  (Coding.of_string name)
+                key_set None [ (* FIXME: context *) ]
+                  v key (Coding.of_string name)
               with
               | Result.Ok v -> Some v
               | Result.Error _ -> Some v)

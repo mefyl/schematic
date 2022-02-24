@@ -24,7 +24,6 @@ module Pretty_print = struct
     check "false" (`Bool false) "false"
 
   let float () = check "float" (`Float 123.45) "123.45"
-
   let string () = check "string" (`String "foobar") {|"foobar"|}
 
   let array () =

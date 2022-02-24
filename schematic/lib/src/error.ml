@@ -6,11 +6,7 @@ type decoding = {
 [@@deriving eq]
 
 let pp_decoding formatter { path; schema; reason } =
-  let path =
-    match path with
-    | [] -> None
-    | _ -> Some (List.rev path)
-  in
+  let path = match path with [] -> None | _ -> Some (List.rev path) in
   Fmt.(
     pf formatter "%a%a%s"
       (option
@@ -26,7 +22,6 @@ let decoding_to_string = Fmt.to_to_string pp_decoding
 type parsing = string [@@deriving eq]
 
 let pp_parsing = Fmt.string
-
 let parsing_to_string = Fmt.to_to_string pp_parsing
 
 type 'formats t =
@@ -36,7 +31,6 @@ type 'formats t =
 [@@deriving eq]
 
 let of_decoding fmt e = `Decoding (fmt, e)
-
 let of_parsing e = `Parsing e
 
 let pp fmt = function

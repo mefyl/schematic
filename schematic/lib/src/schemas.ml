@@ -4,7 +4,6 @@ module Schema = Schema
 type ignore = unit
 
 let pp_ignore _ () = ()
-
 let equal_ignore () () = true
 
 type any = Ezjsonm.value
@@ -21,52 +20,30 @@ let rec equal_any l r =
       let l = Map.of_alist_exn (module String) l
       and r = Map.of_alist_exn (module String) r in
       Map.equal equal_any l r
-    with
-    | _ -> false)
+    with _ -> false)
   | _ -> false
 
 let any_schema = Schema.make Any
-
 let any_schema_versioned (_ : Version.t option) = any_schema
-
 let bool_schema = Schema.make Bool
-
 let bool_schema_versioned (_ : Version.t option) = bool_schema
-
 let float_schema = Schema.make Float
-
 let float_schema_versioned (_ : Version.t option) = float_schema
-
 let ignore_schema = Schema.make Ignore
-
 let ignore_schema_versioned (_ : Version.t option) = ignore_schema
-
 let int64_schema = Schema.make Int64
-
 let int64_schema_versioned (_ : Version.t option) = int64_schema
-
 let int_schema = Schema.make Int
-
 let int_schema_versioned (_ : Version.t option) = int_schema
-
 let list_schema schema = Schema.make (List schema)
-
 let list_schema_versioned _ = list_schema
-
 let mapping_schema schema = Schema.make (Mapping schema)
-
 let option_schema s = Schema.make (Nullable s)
-
 let option_schema_versioned _ = option_schema
-
 let string_const_schema s = Schema.make (String_const s)
-
 let string_schema = Schema.make String
-
 let string_schema_versioned (_ : Version.t option) = string_schema
-
 let unit_schema = Schema.make Null
-
 let unit_schema_versioned (_ : Version.t option) = unit_schema
 
 module Either = struct
@@ -82,20 +59,14 @@ module Either = struct
                 {
                   name = "first";
                   schema = first;
-                  encoder =
-                    (function
-                    | First x -> Some x
-                    | Second _ -> None);
+                  encoder = (function First x -> Some x | Second _ -> None);
                   decoder = Either.first;
                 };
               Case
                 {
                   name = "second";
                   schema = second;
-                  encoder =
-                    (function
-                    | Second x -> Some x
-                    | First _ -> None);
+                  encoder = (function Second x -> Some x | First _ -> None);
                   decoder = Either.second;
                 };
             ];
@@ -141,10 +112,7 @@ module Result = struct
                 {
                   name = "t";
                   schema = t;
-                  encoder =
-                    (function
-                    | Ok x -> Some x
-                    | Error _ -> None);
+                  encoder = (function Ok x -> Some x | Error _ -> None);
                   decoder = Result.return;
                 };
               Case
@@ -152,9 +120,7 @@ module Result = struct
                   name = "error";
                   schema = error_schema;
                   encoder =
-                    (function
-                    | Result.Error x -> Some x
-                    | Result.Ok _ -> None);
+                    (function Result.Error x -> Some x | Result.Ok _ -> None);
                   decoder = Result.fail;
                 };
             ];
@@ -187,17 +153,13 @@ module Ptime = struct
   include Ptime
 
   let schema = Schema.make Time
-
   let schema_versioned (_ : Version.t option) = schema
 
   type local = Ptime.t * Ptime.tz_offset_s
 
   let local_schema = Schema.make Time_local
-
   let local_schema_versioned (_ : Version.t option) = local_schema
-
   let date_schema = Schema.make Date
-
   let date_schema_versioned (_ : Version.t option) = date_schema
 
   let span_schema =
