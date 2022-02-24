@@ -4,7 +4,7 @@ OCAML_VERSION ?= $(shell ocamlc --version)
 
 build: lint
 	dune subst
-	dune build
+	dune build --ignore-promoted-rules
 
 lint:
 	dune build @fmt
@@ -35,6 +35,9 @@ ci/image:
 		if test -n "$(IMAGE_CI)$(VARIANT)" && docker pull "$(IMAGE_CI)$(VARIANT)"; then \
 			echo "using remote $(CI_COMMIT_REF_NAME) cache";  \
 	                CACHE='--cache-from "$(IMAGE_CI)$(VARIANT)"' ; \
+		elif test -n "$(VARIANT)" && docker pull "$(IMAGE_CI_MASTER)$(VARIANT)"; then \
+			echo "using remote master$(VARIANT) cache"; \
+			CACHE='--cache-from "$(IMAGE_CI_MASTER)$(VARIANT)"'; \
 		elif test -n "$(IMAGE_CI_MASTER)" && docker pull "$(IMAGE_CI_MASTER)"; then \
 			echo "using remote master cache"; \
 			CACHE='--cache-from "$(IMAGE_CI_MASTER)"'; \
@@ -53,7 +56,7 @@ image/%:
 	if test -n "$(FROM_SCRATCH)"; then CACHE="--no-cache"; \
 	else if docker pull "$(IMAGE)/$*"; then CACHE="--cache-from $(IMAGE)/$*"; fi; \
 	fi; \
-	docker build -f "$(dir $(MAKEFILE_LIST))Dockerfile.$*" . --tag "$(IMAGE)/$*" $$CACHE
+	docker build -f "$(dir $(MAKEFILE_LIST))Dockerfile.$*" . --tag "$(IMAGE)/$*" $$CACHE --build-arg PACKAGES="$(PACKAGES)"
 
 opam:
 	$(DIR)/opam-publish
