@@ -1,4 +1,4 @@
-module V0_11_0 = struct
+module V0_12_0 = struct
   module Error = Error
 
   module Json = struct
@@ -6,10 +6,8 @@ module V0_11_0 = struct
     module Schema = Json_schema
   end
 
-  module Schema = struct
-    include Schema
-    module Schemas = Schemas
-  end
+  module Schema = Schema
+  module Schemas = Schemas
 
   type 'a schema = 'a Schema.t
 

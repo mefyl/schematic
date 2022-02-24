@@ -1924,7 +1924,7 @@ let expand ~ctxt ~inside (recursive, types) jsoo sqml =
     @ contents
   else
     [%str
-      open Schematic.Schema.Schemas
+      open Schematic.Schemas
 
       let _ = unit_schema]
     @ contents

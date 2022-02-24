@@ -1,6 +1,6 @@
 open Base
 open Poly
-open Schematic.Schema.Schemas
+open Schematic.Schemas
 
 let ( let* ) = Result.( >>= )
 let ( let+ ) = Result.( >>| )
@@ -102,7 +102,7 @@ let nullable_option () =
 module Option = struct
   include Option
 
-  let schema_versioned = Schematic.Schema.Schemas.option_schema_versioned
+  let schema_versioned = Schematic.Schemas.option_schema_versioned
 
   let pp pp =
     Fmt.(option ~none:(const string "None") (const string "Some " ++ pp))
@@ -330,7 +330,7 @@ module Recursive = struct
   [@@schematic.name "recursive-parametric"] [@@deriving eq, schema, show]
 
   include struct
-    open Schematic.Schema.Schemas
+    open Schematic.Schemas
 
     let parametric_schema a_schema =
       let rec descriptor a_schema =
@@ -451,7 +451,7 @@ module Inline = struct
     coin : inlined; [@schematic.inline]
     d : int;
     (* Check ignored fields can be inlined *)
-    ignored : Schematic.Schema.Schemas.ignore; [@schematic.inline]
+    ignored : Schematic.Schemas.ignore; [@schematic.inline]
   }
 
   and variant_inline =
@@ -460,7 +460,7 @@ module Inline = struct
         coin : inlined; [@schematic.inline]
         d : int;
         (* Check ignored fields can be inlined *)
-        ignored : Schematic.Schema.Schemas.ignore; [@schematic.inline]
+        ignored : Schematic.Schemas.ignore; [@schematic.inline]
       }
     | Dummy of { dummy : int }
 
@@ -561,8 +561,7 @@ module Inline = struct
   [@@deriving eq, schema, show]
 
   type parametric = {
-    inlined : Schematic.Schema.Schemas.ignore inline_parametric;
-        [@schematic.inline]
+    inlined : Schematic.Schemas.ignore inline_parametric; [@schematic.inline]
         (* inlined : string option inline_parametric; [@schematic.inline] *)
   }
   [@@deriving eq, schema, show]
@@ -978,7 +977,7 @@ let collision () =
       {|{"collision_a": 725, "collision_b": "725"}|}
   and () =
     test "collision_2" collision_2
-      (collision_2_schema Schematic.Schema.Schemas.string_schema)
+      (collision_2_schema Schematic.Schemas.string_schema)
       ({ collision_a = 725; collision_b = "725" } : string collision_2)
       {|{"collision_a": 725, "collision_b": "725"}|}
   in
@@ -1017,7 +1016,7 @@ module Version = struct
       | Some i -> Result.return (Some (Int i))
     and encode = function Some (Int i) -> Some i | _ -> None in
     Schematic.Schema.make
-    @@ Map (decode, encode, Nullable Schematic.Schema.Schemas.int_schema)
+    @@ Map (decode, encode, Nullable Schematic.Schemas.int_schema)
 
   type t = { v : v Option.t [@schematic.schema legacy < "0.6.1"] }
   [@@deriving eq, schema, show]

@@ -1,7 +1,7 @@
 module Impl_js = Json.Impl_js
 open Base
 open Js_of_ocaml
-include Schematic.Schema.Schemas
+include Schematic.Schemas
 
 let date_of_js (date : Js.Unsafe.any) =
   if Js.instanceof date Js.date_ms then

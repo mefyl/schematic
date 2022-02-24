@@ -1,4 +1,4 @@
-include Schematic.Schema.Schemas
+include Schematic.Schemas
 
 type bool_js = bool Js_of_ocaml.Js.t
 type int_js = Js_of_ocaml.Js.number Js_of_ocaml.Js.t
@@ -8,19 +8,19 @@ type unit_js = Js_of_ocaml.Js.Unsafe.any Js_of_ocaml.Js.Opt.t
 type ignore_js = Js_of_ocaml.Js.Unsafe.any
 
 module Either = struct
-  include Schematic.Schema.Schemas.Either
+  include Either
 
   type (_, _) js = Js_of_ocaml.Js.Unsafe.any
 end
 
 module Result = struct
-  include Schematic.Schema.Schemas.Result
+  include Result
 
   type (_, _) js = Js_of_ocaml.Js.Unsafe.any
 end
 
 module Ptime = struct
-  include Schematic.Schema.Schemas.Ptime
+  include Ptime
 
   type js = Js_of_ocaml.Js.date Js_of_ocaml.Js.t
   type date_js = Js_of_ocaml.Js.date Js_of_ocaml.Js.t
@@ -28,7 +28,7 @@ module Ptime = struct
 end
 
 module Uri = struct
-  include Schematic.Schema.Schemas.Uri
+  include Uri
 
   type js = Js_of_ocaml.Js.js_string Js_of_ocaml.Js.t
 end
