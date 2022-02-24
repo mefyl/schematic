@@ -40,7 +40,7 @@
   ppx_deriving
   ppx_here
   (ptime
-   (>= 0.8.5))
+   (>= 1.0.0))
   semver2
   uri))
 

@@ -26,7 +26,7 @@ depends: [
   "ppxlib"
   "ppx_deriving"
   "ppx_here"
-  "ptime" {>= "0.8.5"}
+  "ptime" {>= "1.0.0"}
   "semver2"
   "uri"
   "odoc" {with-doc}
