@@ -99,7 +99,8 @@ build: [
 ]
 dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"
 pin-depends: [
-  "schematic.0.11.11" "git+ssh://git@gitlab.routine.co/routine/schematic"
+  "schematic.0.11.11"
+  "git+ssh://git@gitlab.routine.co/routine/schematic#master"
 ]
 url {
   src: "git+file:///home/mefyl/dev/routine/schematic#master"
