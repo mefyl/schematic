@@ -163,6 +163,8 @@ module Warning = struct
   let unused_rec ~loc = make ~loc "-unused-rec-flag"
 end
 
+let param_prefix = "__schematic_param_"
+
 (* Caml variant constructor of the form [Foo of int * int] surprisingly do not
    have one tuple argument, but two individual int arguments, while [Foo of (int
    * int)] has a single tuple argument. Map the first case to the second and
@@ -287,9 +289,9 @@ let name suffix s =
   let s = rename s in
   if s = "t" then suffix else s ^ "_" ^ suffix
 
-let suffix_id ~loc suffix = function
-  | Lident n -> Lident (name suffix n)
-  | Ldot (q, n) -> Ldot (q, name suffix n)
+let suffix_id ~loc ?(prefix = "") suffix = function
+  | Lident n -> Lident (prefix ^ name suffix n)
+  | Ldot (q, n) -> Ldot (q, prefix ^ name suffix n)
   | Lapply (_, _) ->
     Ppxlib.Location.raise_errorf ~loc "Functor application found as a type"
 
@@ -685,7 +687,9 @@ module Schema = struct
 
   let schema_name s = name "schema" s
   let schema_name_versioned s = name "schema_versioned" s
-  let schema_id_versioned ~loc = suffix_id ~loc "schema_versioned"
+
+  let schema_id_versioned ?prefix ~loc =
+    suffix_id ~loc ?prefix "schema_versioned"
 
   let expanded_of_descriptor ~loc ?(id = [%expr None])
       ?(parametric = [%expr None]) descriptor =
@@ -769,7 +773,9 @@ module Schema = struct
       expanded_of_descriptor ~loc body
     (* Type variable *)
     | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ } ->
-      Expression (expr_id ~loc (schema_id_versioned ~loc (Lident name)))
+      Expression
+        (expr_id ~loc
+           (schema_id_versioned ~loc ~prefix:param_prefix (Lident name)))
     (* Polymorphic variant *)
     | { ptyp_desc = Ptyp_variant (fields, _, _); _ } ->
       expand_polymorphic_variant ~context ~type_context fields
@@ -1170,7 +1176,9 @@ module Schema = struct
         match arg with
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
           [%expr
-            fun [%p pattern_id ~loc @@ schema_name_versioned name] -> [%e exp]]
+            fun [%p
+                  pattern_id ~loc @@ param_prefix ^ schema_name_versioned name] ->
+              [%e exp]]
         | { ptyp_desc = Ptyp_any; _ }, _ -> [%expr fun _ -> [%e exp]]
         | t, _ ->
           Ppxlib.Location.raise_errorf ~loc
@@ -1181,7 +1189,9 @@ module Schema = struct
       let wrap f arg =
         match arg with
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
-          [%expr [%e f] [%e Expr.id ~loc @@ schema_name_versioned name]]
+          [%expr
+            [%e f]
+              [%e Expr.id ~loc @@ param_prefix ^ schema_name_versioned name]]
         | { ptyp_desc = Ptyp_any; _ }, _ -> [%expr [%e f] ()]
         | t, _ ->
           Ppxlib.Location.raise_errorf ~loc
@@ -1196,7 +1206,7 @@ module Schema = struct
           | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
             [%expr
               Schematic.Schema.name_combine
-                [%e Expr.id ~loc (schema_name_versioned name)]
+                [%e Expr.id ~loc (param_prefix ^ schema_name_versioned name)]
                 [%e exp]]
           | { ptyp_desc = Ptyp_any; _ }, _ -> exp
           | t, _ ->
@@ -1224,9 +1234,10 @@ module Schema = struct
                   Parametric
                     {
                       name = [%e Expr.string ~loc name];
-                      parameter = [%e Expr.id ~loc schema_name];
+                      parameter =
+                        [%e Expr.id ~loc @@ param_prefix ^ schema_name];
                       next =
-                        (fun [%p Pattern.id ~loc schema_name] ->
+                        (fun [%p Pattern.id ~loc (param_prefix ^ schema_name)] ->
                           [%e parametric]);
                     }]
               | t, _ ->
@@ -1262,7 +1273,14 @@ module Schema = struct
               }],
           cache )
       | Expression e ->
-        ([%expr { ([%e e]) with id = [%e Expr.some ~loc id] }], false)
+        let e =
+          if context.inside then
+            [%expr { ([%e e]) with Schema.id = [%e Expr.some ~loc id] }]
+          else
+            [%expr
+              { ([%e e]) with Schematic.Schema.id = [%e Expr.some ~loc id] }]
+        in
+        (e, false)
     in
     let name, name_versioned =
       (schema_name type_context.name, schema_name_versioned type_context.name)

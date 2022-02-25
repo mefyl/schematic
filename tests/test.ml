@@ -1039,6 +1039,11 @@ module Version = struct
       { v = Some (String "3") } ~decoded:{ v = None } {|{"v": null}|}
 end
 
+module Compile_check = struct
+  (* Name conflict between parameter and type *)
+  type 't t = { items : 't list } [@@deriving schema]
+end
+
 (* Driver *)
 
 let () =
