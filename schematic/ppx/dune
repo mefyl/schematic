@@ -24,7 +24,7 @@
 
 (executable
  (name pp)
- (package schematic)
+ (package schematic-cli)
  (public_name schematic-ppx)
  (modules pp)
  (libraries schematic_ppx ppxlib))
