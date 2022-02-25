@@ -32,98 +32,6 @@ module Ast_pattern = struct
     of_func f
 end
 
-let ppat ~loc ~desc =
-  {
-    ppat_desc = desc;
-    ppat_loc = loc;
-    ppat_loc_stack = [];
-    ppat_attributes = [];
-  }
-
-let ptyp ~loc ~desc =
-  {
-    ptyp_desc = desc;
-    ptyp_loc = loc;
-    ptyp_loc_stack = [];
-    ptyp_attributes = [];
-  }
-
-module Expr = struct
-  let make ~loc pexp_desc =
-    { pexp_desc; pexp_loc = loc; pexp_loc_stack = []; pexp_attributes = [] }
-
-  let id ~loc name = make ~loc (Pexp_ident { txt = Lident name; loc })
-  let bool ~loc v = if v then [%expr true] else [%expr false]
-
-  let list ~loc list =
-    let f m l = [%expr [%e m] :: [%e l]]
-    and init = [%expr []] in
-    List.fold_right ~f ~init list
-
-  let string ~loc txt =
-    {
-      pexp_desc = Pexp_constant (Pconst_string (txt, loc, None));
-      pexp_loc = loc;
-      pexp_loc_stack = [];
-      pexp_attributes = [];
-    }
-
-  let tuple ~loc = function
-    | [] -> [%expr ()]
-    | [ v ] -> v
-    | exps ->
-      {
-        pexp_desc = Pexp_tuple exps;
-        pexp_loc = loc;
-        pexp_loc_stack = [];
-        pexp_attributes = [];
-      }
-
-  let apply ~loc f = function
-    | [] -> f
-    | args ->
-      {
-        pexp_desc = Pexp_apply (f, List.map ~f:(fun a -> (Nolabel, a)) args);
-        pexp_loc = loc;
-        pexp_loc_stack = [];
-        pexp_attributes = [];
-      }
-
-  let some ~loc e = [%expr Some [%e e]]
-  let none ~loc = [%expr None]
-end
-
-module Pattern = struct
-  let make ~loc ppat_desc =
-    { ppat_desc; ppat_loc = loc; ppat_loc_stack = []; ppat_attributes = [] }
-
-  let id ~loc name = make ~loc (Ppat_var { txt = name; loc })
-
-  let list ~loc list =
-    let f m l = [%pat? [%p m] :: [%p l]]
-    and init = [%pat? []] in
-    List.fold_right ~f ~init list
-
-  let tuple ~loc = function
-    | [] -> [%pat? ()]
-    | [ v ] -> v
-    | patterns ->
-      {
-        ppat_desc = Ppat_tuple patterns;
-        ppat_loc = loc;
-        ppat_loc_stack = [];
-        ppat_attributes = [];
-      }
-end
-
-module Type = struct
-  let make ~loc ptyp_desc =
-    { ptyp_desc; ptyp_loc_stack = []; ptyp_loc = loc; ptyp_attributes = [] }
-
-  let id ~loc ?(parameters = []) name =
-    make ~loc @@ Ptyp_constr ({ loc; txt = Lident name }, parameters)
-end
-
 module Warning = struct
   let make ~loc n =
     {
@@ -170,7 +78,9 @@ type normalized_ctor = {
   type_ : core_type;
 }
 
-let constructor_arguments_normalize ~loc = function
+let constructor_arguments_normalize ~loc =
+  let module Ast = (val Ast_builder.make loc) in
+  function
   | Pcstr_tuple [] | Pcstr_record [] -> None
   | Pcstr_tuple [ type_ ] ->
     let pattern f = f 0
@@ -185,11 +95,11 @@ let constructor_arguments_normalize ~loc = function
         value;
       }
   | Pcstr_tuple types ->
-    let type_ = ptyp ~loc ~desc:(Ptyp_tuple types)
+    let type_ = Ast.ptyp_tuple types
     and pattern f =
       let f i _ = f i in
-      Pattern.tuple ~loc (List.mapi ~f types)
-    and value f = Expr.tuple ~loc (List.mapi ~f types) in
+      Ast.ppat_tuple (List.mapi ~f types)
+    and value f = Ast.pexp_tuple (List.mapi ~f types) in
     Some
       {
         count = List.length types;
@@ -204,21 +114,18 @@ let constructor_arguments_normalize ~loc = function
       let f { pld_type; _ } = pld_type in
       List.map ~f fields
     and ctor_pattern f =
-      ppat ~loc
-        ~desc:
-          (Ppat_record
-             ( List.mapi
-                 ~f:(fun i v -> ({ txt = Lident v.pld_name.txt; loc }, f i))
-                 fields,
-               Closed ))
+      Ast.ppat_record
+        (List.mapi
+           ~f:(fun i v -> ({ txt = Lident v.pld_name.txt; loc }, f i))
+           fields)
+        Closed
     and ctor_value f =
-      Expr.make ~loc
-        (Pexp_record
-           ( List.mapi
-               ~f:(fun i { pld_name; pld_type; pld_loc = loc; _ } ->
-                 ({ txt = Lident pld_name.txt; loc }, f i pld_type))
-               fields,
-             None ))
+      Ast.pexp_record
+        (List.mapi
+           ~f:(fun i { pld_name; pld_type; pld_loc = loc; _ } ->
+             ({ txt = Lident pld_name.txt; loc }, f i pld_type))
+           fields)
+        None
     in
     let type_, pattern, value =
       match types with
@@ -229,9 +136,9 @@ let constructor_arguments_normalize ~loc = function
       | types ->
         let pattern f =
           let f i _ = f i in
-          Pattern.tuple ~loc (List.mapi ~f types)
-        and value f = Expr.tuple ~loc (List.mapi ~f types) in
-        (ptyp ~loc ~desc:(Ptyp_tuple types), pattern, value)
+          Ast.ppat_tuple (List.mapi ~f types)
+        and value f = Ast.pexp_tuple (List.mapi ~f types) in
+        (Ast.ptyp_tuple types, pattern, value)
     in
     Some
       {
@@ -840,16 +747,15 @@ module Schema = struct
 
   and _expand_record as_tuple ~context ~type_context
       (fields : Attributes.field list) =
+    let module Ast = (val Ast_builder.make type_context.loc) in
     let loc = type_context.loc in
     let type_ =
       (* This type is used to explicitely disambiguate mapped values in case of
          record field name conflicts, otherwise a schema can end up manipulating
          a completely different type. *)
-      ptyp ~loc
-        ~desc:
-          (Ptyp_constr
-             ( { txt = Lident type_context.name; loc },
-               List.map ~f:fst type_context.params ))
+      Ast.ptyp_constr
+        (Ast.Located.lident type_context.name)
+        (List.map ~f:fst type_context.params)
     in
     let fields_schema =
       let init = [%expr FieldEnd] in
@@ -920,14 +826,15 @@ module Schema = struct
         [%expr
           Field
             {
-              description = [%e expr_option ~loc Expr.string specs.description];
-              examples = [%e Expr.list ~loc specs.examples];
-              field =
+              description =
                 [%e
-                  Expr.string ~loc (rename @@ Option.value ~default:name alias)];
+                  expr_option ~loc Ast_builder.Default.estring specs.description];
+              examples = [%e Ast.elist specs.examples];
+              field =
+                [%e Ast.estring (rename @@ Option.value ~default:name alias)];
               maximum = [%e expr_option ~loc expr_int specs.maximum];
               minimum = [%e expr_option ~loc expr_int specs.minimum];
-              omit = [%e Expr.bool ~loc specs.omit];
+              omit = [%e Ast.ebool specs.omit];
               requirement = [%e requirement];
               rest = [%e rest];
               schema = [%e schema];
@@ -1052,8 +959,10 @@ module Schema = struct
     expand_any_variant ~context ~type_context true @@ List.map ~f options
 
   and expand_any_variant ~context ~type_context poly options =
+    let module Ast = (val Ast_builder.make type_context.loc) in
     let loc = type_context.loc in
     let f (txt, pcd_args, loc, attrs) =
+      let module Ast = (val Ast_builder.make loc) in
       let Attributes.{ alias; _ } = Attributes.extract ~alias:true attrs in
       let name = Option.value ~default:(String.lowercase txt) alias in
       let schema, ctor_pattern, ctor_value, pattern, value =
@@ -1062,13 +971,13 @@ module Schema = struct
           let schema =
             if Option.is_none type_context.attributes.union_key then
               expanded_of_descriptor ~loc
-                [%expr String_const [%e Expr.string ~loc name]]
+                [%expr String_const [%e Ast.estring name]]
             else expanded_of_descriptor ~loc [%expr Object FieldEnd]
           in
           (schema, None, None, None, None)
         | Some { ctor_pattern; ctor_value; pattern; type_; value; _ } ->
-          let p i = Pattern.id ~loc (Fmt.str "f%i" i)
-          and v i _ = Expr.id ~loc (Fmt.str "f%i" i) in
+          let p i = Ast.pvar (Fmt.str "f%i" i)
+          and v i _ = Ast.evar (Fmt.str "f%i" i) in
           let schema =
             match pcd_args with
             | Pcstr_record fields ->
@@ -1110,7 +1019,7 @@ module Schema = struct
       [%expr
         Schema.Case
           {
-            name = [%e Expr.string ~loc name];
+            name = [%e Ast.estring name];
             schema = [%e schema_of_expanded ~loc schema];
             encoder = [%e construct];
             decoder = [%e destruct];
@@ -1118,17 +1027,18 @@ module Schema = struct
     and key =
       match type_context.attributes.union_key with
       | None -> [%expr None]
-      | Some name -> [%expr Some [%e Expr.string ~loc name]]
+      | Some name -> [%expr Some [%e Ast.estring name]]
     in
     expanded_of_descriptor ~loc
       [%expr
         Schema.Union
-          { cases = [%e Expr.list ~loc (List.map ~f options)]; key = [%e key] }]
+          { cases = [%e Ast.elist (List.map ~f options)]; key = [%e key] }]
 
   let expand_abstract_type ~context ~type_context t =
     encode_type ~context ~type_context t
 
   let close ~configuration:_ ~context ~type_context schema =
+    let module Ast = (val Ast_builder.make type_context.loc) in
     let loc = type_context.loc in
     let schema_id =
       let default =
@@ -1144,7 +1054,7 @@ module Schema = struct
             @@ Ppxlib.Code_path.submodule_path context.code_path
           | name -> name
         in
-        Expr.string ~loc str
+        Ast.estring str
       in
       Option.value ~default type_context.attributes.name
     in
@@ -1152,7 +1062,7 @@ module Schema = struct
       let wrap param t =
         match param with
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
-          [%type: [%t Type.make ~loc @@ Ptyp_var name] Schema.t -> [%t t]]
+          [%type: [%t Ast.ptyp_var name] Schema.t -> [%t t]]
         | { ptyp_desc = Ptyp_any; _ }, _ -> [%type: _ -> [%t t]]
         | t, _ ->
           Ppxlib.Location.raise_errorf ~loc
@@ -1178,8 +1088,7 @@ module Schema = struct
         match arg with
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
           [%expr
-            [%e f]
-              [%e Expr.id ~loc @@ param_prefix ^ schema_name_versioned name]]
+            [%e f] [%e Ast.evar @@ param_prefix ^ schema_name_versioned name]]
         | { ptyp_desc = Ptyp_any; _ }, _ -> [%expr [%e f] ()]
         | t, _ ->
           Ppxlib.Location.raise_errorf ~loc
@@ -1194,7 +1103,7 @@ module Schema = struct
           | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
             [%expr
               Schematic.Schema.name_combine
-                [%e Expr.id ~loc (param_prefix ^ schema_name_versioned name)]
+                [%e Ast.evar (param_prefix ^ schema_name_versioned name)]
                 [%e exp]]
           | { ptyp_desc = Ptyp_any; _ }, _ -> exp
           | t, _ ->
@@ -1209,7 +1118,7 @@ module Schema = struct
         let descriptor = params_apply [%expr descriptor] in
         let parametric =
           match type_context.params with
-          | [] -> Expr.none ~loc
+          | [] -> [%expr None]
           | _ ->
             let init =
               [%expr
@@ -1221,11 +1130,10 @@ module Schema = struct
                 [%expr
                   Parametric
                     {
-                      name = [%e Expr.string ~loc name];
-                      parameter =
-                        [%e Expr.id ~loc @@ param_prefix ^ schema_name];
+                      name = [%e Ast.estring name];
+                      parameter = [%e Ast.evar @@ param_prefix ^ schema_name];
                       next =
-                        (fun [%p Pattern.id ~loc (param_prefix ^ schema_name)] ->
+                        (fun [%p Ast.pvar @@ param_prefix ^ schema_name] ->
                           [%e parametric]);
                     }]
               | t, _ ->
@@ -1233,7 +1141,7 @@ module Schema = struct
                   "schematic-ppx: unsupported type parameter %a"
                   Pprintast.core_type t
             in
-            Expr.some ~loc @@ List.fold_right ~f ~init type_context.params
+            [%expr Some [%e List.fold_right ~f ~init type_context.params]]
         in
         let cache = List.is_empty type_context.params in
         ( [%expr
@@ -1263,10 +1171,8 @@ module Schema = struct
       | Expression e ->
         let e =
           if context.inside then
-            [%expr { ([%e e]) with Schema.id = [%e Expr.some ~loc id] }]
-          else
-            [%expr
-              { ([%e e]) with Schematic.Schema.id = [%e Expr.some ~loc id] }]
+            [%expr { ([%e e]) with Schema.id = Some [%e id] }]
+          else [%expr { ([%e e]) with Schematic.Schema.id = Some [%e id] }]
         in
         (e, false)
     in
@@ -1274,7 +1180,7 @@ module Schema = struct
       (schema_name type_context.name, schema_name_versioned type_context.name)
     in
     let body =
-      params_wrap (params_apply [%expr [%e Expr.id ~loc name_versioned] None])
+      params_wrap (params_apply [%expr [%e Ast.evar name_versioned] None])
     and body_versioned =
       let body =
         if context.inside then
@@ -1302,17 +1208,15 @@ module Schema = struct
       else body
     in
     let pattern, pattern_versioned =
-      ( Pattern.make ~loc
-          (Ppat_constraint
-             ( Pattern.id ~loc name,
-               type_wrap
-                 [%type:
-                   [%t
-                     Type.id ~loc
-                       ~parameters:(List.map ~f:fst type_context.params)
-                       type_context.name]
-                   Schema.t] )),
-        Pattern.id ~loc name_versioned )
+      ( Ast.ppat_constraint (Ast.pvar name)
+          (type_wrap
+             [%type:
+               [%t
+                 Ast.ptyp_constr
+                   (Ast.Located.lident type_context.name)
+                   (List.map ~f:fst type_context.params)]
+               Schema.t]),
+        Ast.pvar name_versioned )
     in
     ( {
         pvb_pat = pattern_versioned;
@@ -1454,6 +1358,7 @@ module Jsoo_type = struct
     Type (expand_type ~loc:type_context.loc ~context t)
 
   let close ~configuration:_ ~context:_ ~type_context =
+    let module Ast = (val Ast_builder.make type_context.loc) in
     let loc = type_context.loc in
     function
     | Type manifest ->
@@ -1499,9 +1404,10 @@ module Jsoo_type = struct
                         txt = Ldot (Ldot (Lident "Js_of_ocaml", "Js"), "t");
                       },
                       [
-                        Type.id ~loc
-                          ~parameters:(List.map ~f:fst type_context.params)
-                          (name "js_fields" type_context.name);
+                        Ast.ptyp_constr
+                          (Ast.Located.lident
+                             (name "js_fields" type_context.name))
+                          (List.map ~f:fst type_context.params);
                       ] );
                 ptyp_attributes = [];
                 ptyp_loc = loc;
@@ -1513,6 +1419,7 @@ module Jsoo_type = struct
       ]
 
   let combine ~loc { functions } items =
+    let module Ast = (val Ast_builder.make loc) in
     let items = List.concat items in
     let converters { ptype_name = { txt; _ }; ptype_params; _ } =
       match String.chop_suffix ~suffix:"js" txt with
@@ -1566,13 +1473,13 @@ module Jsoo_type = struct
           in
           let apply e =
             let args =
-              let f (loc, name) = Expr.id ~loc name in
+              let f (loc, name) = Ast_builder.Default.evar ~loc name in
               List.map ~f params
             in
-            Expr.apply ~loc e args
+            Ast.eapply e args
           and parametrize e =
             let f (loc, name) f =
-              let pattern = Pattern.id ~loc name in
+              let pattern = Ast.pvar name in
               [%expr fun [%p pattern] -> [%e f]]
             in
             List.fold_right ~init:e ~f params
@@ -1646,14 +1553,16 @@ module Sqml_binding = struct
   }
 
   let expand_record ~context ~type_context (fields : Attributes.field list) =
+    let module Ast = (val Ast_builder.make type_context.loc) in
     let loc = type_context.loc
     and column_name s = "column_" ^ s in
     let column_explosion_of_field (field : Attributes.field) =
       [%stri
         let Sqml.Expression.Column.List.(
-              [%p Pattern.id ~loc:field.loc field.name] :: rest) =
+              [%p Ast_builder.Default.pvar ~loc:field.loc field.name] :: rest) =
           rest]
     and column_of_field (field : Attributes.field) =
+      let module Ast = (val Ast_builder.make field.loc) in
       let loc = field.loc in
       let column_type =
         match field.sqml_type with
@@ -1666,48 +1575,43 @@ module Sqml_binding = struct
                   schema_of_expanded ~loc:field.loc
                   @@ encode_type ~context ~type_context field.type_)]]
       and primary =
-        Expr.bool ~loc (Option.value ~default:false field.sqml_primary)
+        Ast.ebool (Option.value ~default:false field.sqml_primary)
       in
       [%stri
-        let [%p Pattern.id ~loc:field.loc (column_name field.name)] =
-          Sqml.Column.make ~primary:[%e primary]
-            [%e Expr.string ~loc:field.loc field.name]
+        let [%p Ast.pvar (column_name field.name)] =
+          Sqml.Column.make ~primary:[%e primary] [%e Ast.estring field.name]
             [%e column_type]]
     and column_type_of_field (field : Attributes.field) tail =
       [%type: [%t field.type_] * [%t tail]]
     and expr_explosion_of_field (field : Attributes.field) =
       [%stri
         let Sqml.Expression.List.(
-              [%p Pattern.id ~loc:field.loc field.name] :: rest) =
+              [%p Ast_builder.Default.pvar ~loc:field.loc field.name] :: rest) =
           rest]
     and id_of_field (field : Attributes.field) =
-      Expr.id ~loc:field.loc (column_name field.name)
+      Ast_builder.Default.evar ~loc:field.loc (column_name field.name)
     and pattern_of_field (field : Attributes.field) =
-      Pattern.id ~loc:field.loc (column_name field.name)
+      Ast_builder.Default.pvar ~loc:field.loc (column_name field.name)
     and record_field_of_field (field : Attributes.field) =
       ( { txt = Lident field.name; loc = field.loc },
-        Expr.id ~loc:field.loc (column_name field.name) )
+        Ast_builder.Default.evar ~loc:field.loc (column_name field.name) )
     and record_pattern_of_field (field : Attributes.field) =
       ( { txt = Lident field.name; loc = field.loc },
-        Pattern.id ~loc:field.loc (column_name field.name) )
+        Ast_builder.Default.pvar ~loc:field.loc (column_name field.name) )
     in
     {
       columns = List.map ~f:column_of_field fields;
       column_explosions = List.map ~f:column_explosion_of_field fields;
-      columns_list = Expr.list ~loc (List.map ~f:id_of_field fields);
+      columns_list = Ast.elist (List.map ~f:id_of_field fields);
       columns_pattern =
         [%pat?
-          Acid.Hlist.(
-            [%p Pattern.list ~loc (List.map ~f:pattern_of_field fields)])];
+          Acid.Hlist.([%p Ast.plist (List.map ~f:pattern_of_field fields)])];
       columns_type =
         List.fold_right ~init:[%type: unit] ~f:column_type_of_field fields;
       expr_explosions = List.map ~f:expr_explosion_of_field fields;
-      record =
-        Expr.make ~loc
-          (Pexp_record (List.map ~f:record_field_of_field fields, None));
+      record = Ast.pexp_record (List.map ~f:record_field_of_field fields) None;
       record_pattern =
-        Pattern.make ~loc
-          (Ppat_record (List.map ~f:record_pattern_of_field fields, Closed));
+        Ast.ppat_record (List.map ~f:record_pattern_of_field fields) Closed;
     }
 
   and expand_variant ~context:_ ~type_context _ =
@@ -1729,11 +1633,12 @@ module Sqml_binding = struct
         record;
         record_pattern;
       } =
+    let module Ast = (val Ast_builder.make type_context.loc) in
     let loc = type_context.loc in
     let meta =
       [%str
         include Sqml.Table.Meta (struct
-          let name = [%e Expr.string ~loc name]
+          let name = [%e Ast.estring name]
           let __schematic_version = None
 
           include
@@ -1749,7 +1654,8 @@ module Sqml_binding = struct
           let columns = Sqml.Column.List.([%e columns_list])
         end)
 
-        type mapped = [%t Type.id ~loc:type_context.loc type_context.name]
+        type mapped =
+          [%t Ast.ptyp_constr (Ast.Located.lident type_context.name) []]
 
         let map [%p columns_pattern] = [%e record]
         let unmap [%p record_pattern] = Acid.Hlist.([%e columns_list])
