@@ -30,18 +30,6 @@ module Ast_pattern = struct
   let drop =
     let f _ _ _ cont = cont in
     of_func f
-
-  let econstraint expression type_ =
-    let expression = to_func expression
-    and type_ = to_func type_ in
-    let f context loc pl cont =
-      match pl with
-      | { pexp_desc = Pexp_constraint (exp, t); _ } ->
-        expression context exp.pexp_loc exp (fun exp ->
-            type_ context t.ptyp_loc t (fun t -> cont exp t))
-      | _ -> Location.raise_errorf ~loc "type constraint expected"
-    in
-    of_func f
 end
 
 let ppat ~loc ~desc =
@@ -405,7 +393,7 @@ module Attributes = struct
                 single_expr_payload
                   (pexp_record
                      (many
-                        (pair (loc (lident __)) (econstraint __ __ |> pack2)
+                        (pair (loc (lident __)) (pexp_constraint __ __ |> pack2)
                         |> pack2))
                      drop))
               attr_payload
