@@ -49,6 +49,7 @@
 (rule
  (mode
   (promote (until-clean)))
+ (deps schematic.opam)
  (target schematic.opam.locked)
  (action
   (run %{bin:opam} lock schematic)))
@@ -68,6 +69,7 @@
 (rule
  (mode
   (promote (until-clean)))
+ (deps schematic-jsoo.opam)
  (target schematic-jsoo.opam.locked)
  (action
   (run %{bin:opam} lock schematic-jsoo)))
@@ -87,6 +89,7 @@
 (rule
  (mode
   (promote (until-clean)))
+ (deps schematic-sqml.opam)
  (target schematic-sqml.opam.locked)
  (action
   (run %{bin:opam} lock schematic-sqml)))
@@ -106,6 +109,7 @@
 (rule
  (mode
   (promote (until-clean)))
+ (deps schematic-cli.opam)
  (target schematic-cli.opam.locked)
  (action
   (run %{bin:opam} lock schematic-cli)))
