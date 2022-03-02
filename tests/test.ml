@@ -18,14 +18,8 @@ let make_error ?(path = []) ?schema reason =
 let decoding_error =
   Alcotest.testable Schematic.Error.pp_decoding Schematic.Error.equal_decoding
 
-let json_of_string s =
-  match Schematic.Json.of_string s with
-  | Result.Ok parsed -> parsed
-  | Result.Error _ -> Alcotest.fail "invalid JSON expectation"
-
 let test ?(validate = true) ?decoded name test schema value j =
   let encoded = Schematic.Json.encode schema value in
-  let j = json_of_string j in
   Alcotest.check json (Fmt.str "%s: encoded JSON" name) j encoded;
   let () =
     match Schematic.Json.decode schema j with
@@ -54,18 +48,18 @@ let test ?(validate = true) ?decoded name test schema value j =
 let failure () =
   if
     try
-      test "int atom" Alcotest.int int_schema 28 "29";
+      test "int atom" Alcotest.int int_schema 28 [%ezjsonm 29];
       true
     with _ -> false
   then Alcotest.fail "failure test failed"
 
 (* Atoms *)
 
-let atom_int () = test "int atom" Alcotest.int int_schema 28 "28"
+let atom_int () = test "int atom" Alcotest.int int_schema 28 [%ezjsonm 28]
 
 let atom_string () =
-  test "int atom" Alcotest.string string_schema "trente trois"
-    "\"trente trois\""
+  test "string atom" Alcotest.string string_schema "trente trois"
+    [%ezjsonm "trente trois"]
 
 (* Option *)
 
@@ -73,9 +67,11 @@ let options () =
   let () =
     test "some int"
       Alcotest.(option int)
-      (option_schema int_schema) (Some 28) "28"
+      (option_schema int_schema) (Some 28) [%ezjsonm 28]
   and () =
-    test "none int" Alcotest.(option int) (option_schema int_schema) None "null"
+    test "none int"
+      Alcotest.(option int)
+      (option_schema int_schema) None [%ezjsonm None]
   in
   ()
 
@@ -87,13 +83,13 @@ let nullable_option = Alcotest.testable pp_nullable_option equal_nullable_option
 
 let nullable_option () =
   let () =
-    test "omitted" nullable_option nullable_option_schema { no = None } "{}"
+    test "omitted" nullable_option nullable_option_schema { no = None } (`O [])
   and () =
     test "null" nullable_option nullable_option_schema { no = Some None }
-      {|{ "no" : null }|}
+      [%ezjsonm { no = None }]
   and () =
     test "specified" nullable_option nullable_option_schema
-      { no = Some (Some 74) } {|{ "no" : 74 }|}
+      { no = Some (Some 74) } [%ezjsonm { no = 74 }]
   in
   ()
 
@@ -114,13 +110,14 @@ type default_option = { oo : int Option.t Option.t [@default None] }
 let default_option = Alcotest.(testable pp_default_option equal_default_option)
 
 let default_option () =
-  let () = test "none" default_option default_option_schema { oo = None } "{}"
+  let () =
+    test "none" default_option default_option_schema { oo = None } (`O [])
   and () =
     test "some none" default_option default_option_schema { oo = Some None }
-      {|{"oo": null}|}
+      [%ezjsonm { oo = None }]
   and () =
     test "some some" default_option default_option_schema
-      { oo = Some (Some 877) } {|{"oo": 877}|}
+      { oo = Some (Some 877) } [%ezjsonm { oo = 877 }]
   in
   ()
 
@@ -148,7 +145,7 @@ and v3 = { major = 6; minor = 7; subminor = 8 }
 
 let record () =
   test "record" test_version version_schema v1
-    "{\"major\": 0, \"minor\": 1, \"subminor\": 2}"
+    [%ezjsonm { major = 0; minor = 1; subminor = 2 }]
 
 (* Alias *)
 
@@ -156,7 +153,7 @@ type version_alias = version [@@deriving schema]
 
 let alias () =
   test "record" test_version version_alias_schema v2
-    "{\"major\": 3, \"minor\": 4, \"subminor\": 5}"
+    [%ezjsonm { major = 3; minor = 4; subminor = 5 }]
 
 (* Tuple *)
 
@@ -173,8 +170,12 @@ let test_range = Alcotest.testable pp_range ( = )
 
 let tuple () =
   test "tuple" test_range range_schema (v1, v2, 83)
-    "[{\"major\": 0, \"minor\": 1, \"subminor\": 2}, {\"major\": 3, \"minor\": \
-     4, \"subminor\": 5}, 83]"
+    [%ezjsonm
+      [
+        { major = 0; minor = 1; subminor = 2 };
+        { major = 3; minor = 4; subminor = 5 };
+        83;
+      ]]
 
 (* Variant *)
 
@@ -196,16 +197,22 @@ let test_expectation = Alcotest.testable pp_expectation ( = )
 let variant () =
   test "variant" test_expectation expectation_schema
     (Exact { major = 1; minor = 2; subminor = 3 })
-    "{\"major\": 1, \"minor\": 2, \"subminor\": 3}";
+    [%ezjsonm { major = 1; minor = 2; subminor = 3 }];
   test "variant" test_expectation expectation_schema
     (Range
        ( { major = 1; minor = 2; subminor = 3 },
          { major = 4; minor = 5; subminor = 6 },
          108 ))
-    "[{\"major\": 1, \"minor\": 2, \"subminor\": 3}, {\"major\": 4, \"minor\": \
-     5, \"subminor\": 6}, 108]";
-  test "variant" test_expectation expectation_schema Nothing "\"nothing\"";
-  test "variant" test_expectation expectation_schema Aliased "\"aktually\""
+    [%ezjsonm
+      [
+        { major = 1; minor = 2; subminor = 3 };
+        { major = 4; minor = 5; subminor = 6 };
+        108;
+      ]];
+  test "variant" test_expectation expectation_schema Nothing
+    [%ezjsonm "nothing"];
+  test "variant" test_expectation expectation_schema Aliased
+    [%ezjsonm "aktually"]
 
 (* Polymorphic variant *)
 
@@ -223,12 +230,13 @@ type day =
 let test_day = Alcotest.testable pp_day equal_day
 
 let polymorphic_variant () =
-  test "polymorphic variant" test_day day_schema `Mon {|"mon"|};
-  test "polymorphic variant alias" test_day day_schema `Tue {|"tuesday"|};
-  test "polymorphic variant payload" test_day day_schema (`Wed 160) {|160|};
+  test "polymorphic variant" test_day day_schema `Mon [%ezjsonm "mon"];
+  test "polymorphic variant alias" test_day day_schema `Tue [%ezjsonm "tuesday"];
+  test "polymorphic variant payload" test_day day_schema (`Wed 160)
+    [%ezjsonm 160];
   test "polymorphic variant composite payload" test_day day_schema
     (`Thu (true, false))
-    {|[true, false]|}
+    [%ezjsonm [ true; false ]]
 
 (* List *)
 
@@ -237,12 +245,12 @@ module List = struct
     test "list"
       (Alcotest.list test_version)
       (list_schema version_schema)
-      [] "[]";
+      [] [%ezjsonm []];
     test "list"
       (Alcotest.list test_version)
       (list_schema version_schema)
       [ { major = 0; minor = 1; subminor = 2 } ]
-      "[{\"major\": 0.000000, \"minor\": 1.000000, \"subminor\": 2.000000}].";
+      [%ezjsonm [ { major = 0; minor = 1; subminor = 2 } ]];
     test "list"
       (Alcotest.list test_version)
       (list_schema version_schema)
@@ -251,27 +259,30 @@ module List = struct
         { major = 3; minor = 4; subminor = 5 };
         { major = 6; minor = 7; subminor = 8 };
       ]
-      "[{\"major\": 0, \"minor\": 1, \"subminor\": 2},{\"major\": 3, \
-       \"minor\": 4, \"subminor\": 5.00000},{\"major\": 6, \"minor\": 7, \
-       \"subminor\": 8}]."
+      [%ezjsonm
+        [
+          { major = 0; minor = 1; subminor = 2 };
+          { major = 3; minor = 4; subminor = 5 };
+          { major = 6; minor = 7; subminor = 8 };
+        ]]
 
   let option () =
     test "list"
       Alcotest.(list (option int))
       (list_schema (option_schema int_schema))
-      [] "[]";
+      [] [%ezjsonm []];
     test "list"
       Alcotest.(list (option int))
       (list_schema (option_schema int_schema))
-      [ Some 1; Some 2; Some 3 ] "[1, 2, 3]";
+      [ Some 1; Some 2; Some 3 ] [%ezjsonm [ 1; 2; 3 ]];
     test "list"
       Alcotest.(list (option int))
       (list_schema (option_schema int_schema))
-      [ None; None; None ] "[null, null, null]";
+      [ None; None; None ] [%ezjsonm [ None; None; None ]];
     test "list"
       Alcotest.(list (option int))
       (list_schema (option_schema int_schema))
-      [ Some 1; None; Some 3 ] "[1, null, 3]"
+      [ Some 1; None; Some 3 ] [%ezjsonm [ 1; None; 3 ]]
 end
 
 (* Parametric *)
@@ -283,8 +294,11 @@ let parametric_type () =
     (Alcotest.pair test_version test_version)
     (pair_schema version_schema)
     (v1, v3)
-    "[{\"major\": 0, \"minor\": 1, \"subminor\": 2},{\"major\": 6, \"minor\": \
-     7, \"subminor\": 8}]."
+    [%ezjsonm
+      [
+        { major = 0; minor = 1; subminor = 2 };
+        { major = 6; minor = 7; subminor = 8 };
+      ]]
 
 (* Escape *)
 
@@ -302,7 +316,7 @@ let test_escape = Alcotest.testable pp_escape ( = )
 let escape () =
   test "escape" test_escape escape_schema
     { special_char = 128; keyword = "coin" }
-    "{\"'char$\": 128, \"type\": \"coin\"}"
+    (`O [ ("'char$", `Float 128.); ("type", `String "coin") ])
 
 (* Recursive *)
 
@@ -321,7 +335,7 @@ module Recursive = struct
   let plain () =
     test "recursive" test_recursive schema
       { value = 0; next = Some { value = 1; next = None } }
-      "{\"value\": 0, \"next\": {\"value\": 1}}"
+      [%ezjsonm { value = 0; next = { value = 1 } }]
 
   type 'a parametric = {
     value : 'a;
@@ -403,7 +417,7 @@ module Recursive = struct
     test "recursive" (parametric Alcotest.int)
       (parametric_schema int_schema)
       { value = 0; next = Some { value = 1; next = None } }
-      "{\"value\": 0, \"next\": {\"value\": 1}}"
+      [%ezjsonm { value = 0; next = { value = 1 } }]
 end
 
 type mutually_a = { next_b : mutually_b option }
@@ -417,7 +431,7 @@ let test_mutually_a = Alcotest.testable pp_mutually_a ( = )
 let mutually () =
   test "mutually recursive" test_mutually_a mutually_a_schema
     { next_b = Some { next_a = Some { next_b = None } } }
-    "{\"next_b\": {\"next_a\": {}}}"
+    [%ezjsonm { next_b = { next_a = [%aq `O []] } }]
 
 (* Ignored *)
 
@@ -431,7 +445,7 @@ let ignored () =
   let ignored = Alcotest.(testable pp_ignored equal_ignored) in
   test "missing ignored fields are accepted" ignored ignored_schema
     { ignored = (); not_ignored = () }
-    "{\"not_ignored\": null}"
+    [%ezjsonm { not_ignored = None }]
 
 module Inline = struct
   type inlined = {
@@ -503,7 +517,7 @@ module Inline = struct
     in
     test "coding" inline inline_schema
       { a = 0; coin = { b = 1; c = 2 }; d = 3; ignored = () }
-      "{\"a\": 0.000000, \"b\": 1.000000, \"c\": 2.000000, \"d\": 3.000000}"
+      [%ezjsonm { a = 0; b = 1; c = 2; d = 3 }]
 
   let variant_payload () =
     let () =
@@ -516,7 +530,7 @@ module Inline = struct
     in
     test "coding" variant_inline variant_inline_schema
       (Ctor { a = 0; coin = { b = 1; c = 2 }; d = 3; ignored = () })
-      "{\"a\": 0.000000, \"b\": 1.000000, \"c\": 2.000000, \"d\": 3.000000}"
+      [%ezjsonm { a = 0; b = 1; c = 2; d = 3 }]
 
   let inline_variant () =
     let () =
@@ -531,23 +545,23 @@ module Inline = struct
       (* FIXME: json schema of inlined variant not handled yet *)
       test ~validate:false "coding of Foo" inline_variant inline_variant_schema
         { x = 362; pan = Foo { b = 363; c = 364 } }
-        "{\"x\": 362.000000, \"b\": 363.000000, \"c\": 364.000000 }"
+        [%ezjsonm { x = 362; b = 363; c = 364 }]
     in
     (* FIXME: json schema of inlined variant not handled yet *)
     test ~validate:false "coding of Bar" inline_variant inline_variant_schema
       { x = 369; pan = Bar { d = 370; e = 371 } }
-      "{\"x\": 369.000000, \"d\": 370.000000, \"e\": 371.000000 }"
+      [%ezjsonm { x = 369; d = 370; e = 371 }]
 
   let inline_try () =
     test "inlinable" (inline_maybe inlined)
       (inline_maybe_schema inlined_schema)
       { maybe = true; inline = { b = 411; c = 412 } }
-      "{\"maybe\": true, \"b\": 411.000000, \"c\": 412.000000 }";
+      [%ezjsonm { maybe = true; b = 411; c = 412 }];
     test ~validate:false "not inlinable"
       (inline_maybe Alcotest.int)
       (inline_maybe_schema int_schema)
       { maybe = true; inline = 416 }
-      "{\"maybe\": true, \"inline\": 416.000000 }"
+      [%ezjsonm { maybe = true; inline = 416 }]
 
   type 'a inline_parametric =
     | A of {
@@ -577,14 +591,14 @@ module Inline = struct
   let inline_parametric () =
     test ~validate:false "parametric inlinable" parametric parametric_schema
       { inlined = A { value = 457; param = () } }
-      {|{"value": 457.000000 }|}
+      [%ezjsonm { value = 457 }]
 end
 
 (* Time *)
 
 type event = {
   start : Ptime.t;
-  end_ : Ptime.t;
+  endd_ : Ptime.t;
 }
 
 and event_local = {
@@ -595,7 +609,7 @@ and event_local = {
 
 let pp_event fmt e =
   let pp = Ptime.pp_rfc3339 () in
-  Caml.Format.fprintf fmt "%a-%a" pp e.start pp e.end_
+  Caml.Format.fprintf fmt "%a-%a" pp e.start pp e.endd_
 
 let pp_event_local fmt e =
   let pp fmt (t, tz) = Ptime.pp_rfc3339 ~tz_offset_s:tz () fmt t in
@@ -618,21 +632,23 @@ let time () =
   test "time" test_time event_schema
     {
       start = make_time "2020-05-08T23:48:34+02:00";
-      end_ = make_time "2020-05-08T23:48:47+02:00";
+      endd_ = make_time "2020-05-08T23:48:47+02:00";
     }
-    {| {
-         "start" : "2020-05-08T21:48:34-00:00",
-         "end" : "2020-05-08T21:48:47-00:00"
-       } |};
+    [%ezjsonm
+      {
+        start = "2020-05-08T21:48:34-00:00";
+        endd = "2020-05-08T21:48:47-00:00";
+      }];
   test "time-local" test_time_local event_local_schema
     {
       start_local = make_time_local "2020-05-08T23:48:34+02:00";
       end_local = make_time_local "2020-05-08T23:48:47+02:00";
     }
-    {| {
-         "start_local" : "2020-05-08T23:48:34+02:00",
-         "end_local" : "2020-05-08T23:48:47+02:00"
-       } |}
+    [%ezjsonm
+      {
+        start_local = "2020-05-08T23:48:34+02:00";
+        end_local = "2020-05-08T23:48:47+02:00";
+      }]
 
 (* Optional inline *)
 
@@ -654,13 +670,13 @@ and optional_inline_wrapper = {
 let optional_inline () =
   let t = Alcotest.testable pp_optional_inline_wrapper ( = ) in
   test "missing optional inline" t optional_inline_wrapper_schema
-    { inline = None; c = 377 } {|{"c":377}|};
+    { inline = None; c = 377 } [%ezjsonm { c = 377 }];
   test "filled optional inline" t optional_inline_wrapper_schema
     {
       inline = Some { a = 375; b = 376; inline2 = { d = 378 }; missing = None };
       c = 377;
     }
-    {|{"a":375,"b":376,"d":378,"c":377}|}
+    [%ezjsonm { a = 375; b = 376; d = 378; c = 377 }]
 
 type keyed =
   | Paragraph_ of { content : string } [@schematic.as "paragraph"]
@@ -669,7 +685,7 @@ type keyed =
       level : int;
     }
 [@@schematic.name "keyed"] (* Check multiple attributes work *)
-[@@schematic.union_key "type"]
+[@@schematic.union_key "typ"]
 [@@deriving eq, schema, show]
 
 let keyed () =
@@ -679,31 +695,29 @@ let keyed () =
   let () =
     test ~validate:false "paragraph" tester keyed_schema
       (Paragraph_ { content = "text" })
-      {| { "content": "text", "type": "paragraph" } |}
+      [%ezjsonm { content = "text"; typ = "paragraph" }]
   and () =
     test ~validate:false "header" tester keyed_schema
       (Header { content = "text"; level = 411 })
-      {| { "content": "text", "level": 411, "type": "header" } |}
+      [%ezjsonm { content = "text"; level = 411; typ = "header" }]
   and () =
-    let json = json_of_string {| { "content": "text", "level": 411 } |} in
+    let json = [%ezjsonm { content = "text"; level = 411 }] in
     Alcotest.(
       check
         (result tester decoding_error)
         "values are rejected if the key is missing"
-        (make_error ~schema:"keyed" {|missing key field "type"|})
+        (make_error ~schema:"keyed" {|missing key field "typ"|})
         (Schematic.Json.decode keyed_schema json))
   and () =
-    let json =
-      json_of_string {| { "content": "text", "level": 411, "type": "fumble" } |}
-    in
+    let json = [%ezjsonm { content = "text"; level = 411; typ = "fumble" }] in
     Alcotest.(
       check
         (result tester decoding_error)
         "values are rejected if the key not recognized"
-        (make_error ~schema:"keyed" {|invalid key field "type" = "fumble"|})
+        (make_error ~schema:"keyed" {|invalid key field "typ" = "fumble"|})
         (Schematic.Json.decode keyed_schema json))
   and () =
-    let json = json_of_string {| { "type": "header", "content": "text" } |} in
+    let json = [%ezjsonm { typ = "header"; content = "text" }] in
     Alcotest.(
       check
         (result tester decoding_error)
@@ -802,12 +816,12 @@ module Metadata = struct
        }|};
     let tester = Alcotest.(testable pp_default ( = )) in
     test "default-int" tester default_schema { a = 358; b = "---" }
-      {| { "b": "---" } |};
+      [%ezjsonm { b = "---" }];
     test "default-string" tester default_schema { a = 359; b = "359" }
-      {| { "a": 359 } |};
-    test "default-both" tester default_schema { a = 358; b = "359" } {| {} |};
-    test "default-none" tester default_schema { a = 395; b = "---" }
-      {| { "a": 395, "b": "---" } |}
+      [%ezjsonm { a = 359 }];
+    test "default-both" tester default_schema { a = 358; b = "359" } (`O []);
+    test "default-none" tester default_schema { a = 359; b = "---" }
+      [%ezjsonm { a = 359; b = "---" }]
 end
 
 module Comparison = struct
@@ -974,12 +988,12 @@ let collision () =
   let () =
     test "collision_1" collision_1 collision_1_schema
       ({ collision_a = 725; collision_b = "725" } : collision_1)
-      {|{"collision_a": 725, "collision_b": "725"}|}
+      [%ezjsonm { collision_a = 725; collision_b = "725" }]
   and () =
     test "collision_2" collision_2
       (collision_2_schema Schematic.Schemas.string_schema)
       ({ collision_a = 725; collision_b = "725" } : string collision_2)
-      {|{"collision_a": 725, "collision_b": "725"}|}
+      [%ezjsonm { collision_a = 725; collision_b = "725" }]
   in
   ()
 
@@ -998,8 +1012,9 @@ module Computed = struct
 
   let computed () =
     test "computed" t schema { x = 1; y = 2 }
-      {|{"x": 1, "y": 2, "sum": 3, "opposite": -1}|};
-    test "computed optional" t schema { x = 0; y = 0 } {|{"x": 0, "sum": 0}|}
+      [%ezjsonm { x = 1; y = 2; sum = 3; opposite = -1 }];
+    test "computed optional" t schema { x = 0; y = 0 }
+      [%ezjsonm { x = 0; sum = 0 }]
 end
 
 (* Version *)
@@ -1024,19 +1039,21 @@ module Version = struct
   let t = Alcotest.testable pp equal
 
   let test () =
-    test ~validate:false "latest none" t schema { v = None } {|{"v":null}|};
-    test ~validate:false "latest int" t schema { v = Some (Int 3) } {|{"v": 3}|};
+    test ~validate:false "latest none" t schema { v = None }
+      [%ezjsonm { v = None }];
+    test ~validate:false "latest int" t schema { v = Some (Int 3) }
+      [%ezjsonm { v = 3 }];
     test ~validate:false "latest string" t schema { v = Some (String "3") }
-      {|{"v": "3"}|};
+      [%ezjsonm { v = "3" }];
     test ~validate:false "old none" t
       (schema_versioned @@ Some (Schematic.Version.make 0 6 0))
-      { v = None } {|{"v": null}|};
+      { v = None } [%ezjsonm { v = None }];
     test ~validate:false "old int" t
       (schema_versioned @@ Some (Schematic.Version.make 0 6 0))
-      { v = Some (Int 3) } {|{"v": 3}|};
+      { v = Some (Int 3) } [%ezjsonm { v = 3 }];
     test ~validate:false "old string" t
       (schema_versioned @@ Some (Schematic.Version.make 0 6 0))
-      { v = Some (String "3") } ~decoded:{ v = None } {|{"v": null}|}
+      { v = Some (String "3") } ~decoded:{ v = None } [%ezjsonm { v = None }]
 end
 
 module Compile_check = struct

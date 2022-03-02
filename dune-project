@@ -39,6 +39,8 @@
   ppxlib
   ppx_deriving
   ppx_here
+  (ppx_yojson
+   (>= 1.2.0))
   (ptime
    (>= 1.0.0))
   semver2
