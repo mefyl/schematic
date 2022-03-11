@@ -31,6 +31,8 @@
     :with-test))
   (base
    (>= 0.13.1))
+  (base64
+   (>= 3.5.0))
   (ezjsonm
    (>= 1.1.0))
   (ocaml-base-compiler
