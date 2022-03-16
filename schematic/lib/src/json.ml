@@ -1,7 +1,7 @@
 open Base
 include Json_intf
 
-module Json_coding : Coding.S with type t = Ezjsonm.value = struct
+module Json_coding : Coding.IMPL with type t = Ezjsonm.value = struct
   type t = Ezjsonm.value
 
   include Coding.Defaults
@@ -120,4 +120,6 @@ module Impl_ezjsonm = struct
   let to_string t = Ezjsonm.value_to_string ~minify:true t
 end
 
-include Make (Impl_ezjsonm)
+module T = Make (Impl_ezjsonm)
+include T
+module String = Coding.Make_string (T)
