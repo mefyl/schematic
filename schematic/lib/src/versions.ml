@@ -1,5 +1,6 @@
-module V0_12_0 = struct
+module V0_12 = struct
   module Error = Error
+  module Base64 = B64
 
   module Json = struct
     include Json
@@ -14,9 +15,4 @@ module V0_12_0 = struct
   module Coding = Coding
   module Typescript = Typescript
   module Version = Version
-end
-
-module V0_12_1 = struct
-  include V0_12_0
-  module Base64 = B64
 end
