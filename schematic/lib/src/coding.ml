@@ -17,7 +17,7 @@ type 'a customizable =
 type 't key_get = ('t -> string -> ('t option, string) Result.t) customizable
 type 't key_set = ('t -> string -> 't -> ('t, string) Result.t) customizable
 
-module type S = sig
+module type IMPL = sig
   type t
 
   val is_null : t -> bool
@@ -63,7 +63,15 @@ module Defaults = struct
   let to_date = `Generic
 end
 
-module Make (Coding : S) = struct
+module type S = sig
+  type t
+
+  val encode : 'a Schema.t -> 'a -> t
+  val decode : 'a Schema.t -> t -> ('a, E.decoding) Result.t
+end
+
+module Make (Coding : IMPL) : S with type t = Coding.t = struct
+  type t = Coding.t
   type date_tuple = int * int * int [@@deriving schema]
 
   let ( let* ) = Result.( >>= )
@@ -410,4 +418,26 @@ module Make (Coding : S) = struct
         | None -> failwith "unmatched variant schema case")
     in
     encode schema.Schema.descriptor
+end
+
+module type STR = sig
+  include S
+
+  val of_string : string -> (t, E.parsing) Base.Result.t
+  val to_string : t -> string
+end
+
+module Make_string (C : STR) : STR with type t = string = struct
+  type t = string
+
+  let encode schema t = C.encode schema t |> C.to_string
+
+  let decode schema s =
+    match C.of_string s with
+    | Result.Ok t -> C.decode schema t
+    | Result.Error msg ->
+      Result.Error E.{ path = []; schema = None; reason = msg }
+
+  let to_string s = s
+  let of_string s = Result.return s
 end

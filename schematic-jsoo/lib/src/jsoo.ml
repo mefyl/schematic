@@ -1,18 +1,13 @@
-module Impl_js = Json.Impl_js
 open Base
 open Js_of_ocaml
 include Schematic.Schemas
+include Jsoo_intf
 
 let date_of_js (date : Js.Unsafe.any) =
   if Js.instanceof date Js.date_ms then
     let (date : Js.date Js.t) = Js.Unsafe.coerce date in
     Some (date##getFullYear, date##getMonth + 1, date##getDate)
   else None
-
-let ptime_of_js (date : Js.date Js.t) =
-  match Ptime.of_float_s (date##getTime /. 1000.) with
-  | Some time -> time
-  | None -> failwith ("invalid time: " ^ Float.to_string date##getTime)
 
 let js_of_date (y, m, d) : Js.Unsafe.any =
   new%js Js.date_day y (m - 1) d |> Js.Unsafe.coerce
@@ -21,7 +16,7 @@ let js_of_ptime t = new%js Js.date_fromTimeValue (Ptime.to_float_s t *. 1000.)
 let ( == ) = Base.phys_equal
 let ( let+ ) = Option.( >>| )
 
-module Jsoo_coding : Schematic.Coding.S with type t = Js.Unsafe.any = struct
+module Jsoo_coding : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
   type t = Js.Unsafe.any
 
   let type_name o = Js_of_ocaml.Js.typeof o |> Js.to_string
@@ -134,11 +129,6 @@ let helpers name schema =
               (Fmt.str "invalid %s: %a" name Schematic.Error.pp_decoding e))
   in
   (to_js, of_js, of_js_exn)
-
-module type JS = sig
-  type t
-  type js
-end
 
 let helpers_typed (module _ : JS with type t = 't and type js = 'js) name schema
     =

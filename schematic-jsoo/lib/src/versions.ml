@@ -1,4 +1,4 @@
-module V0_10_0 = struct
+module V0_12 = struct
   module Json = Json
   module Jsoo = Jsoo
   module Schemas = Schemas

@@ -1,5 +1,6 @@
-module V0_12_0 = struct
+module V0_12 = struct
   module Error = Error
+  module Base64 = B64
 
   module Json = struct
     include Json
