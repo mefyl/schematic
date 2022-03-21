@@ -1,16 +1,18 @@
 open Base
 
+(** A TypeScript type expression. *)
 type t =
-  | Atom of string
-  | Intersection of t list
+  | Atom of string  (** An identifier. *)
+  | Intersection of t list  (** [X & Y & ... ] *)
   | Object of { fields : (string * t * bool) list }
-  | String of string
+      (** An object, with fields defined as [(name, type, required)] *)
+  | String of string  (** A string literal *)
   | Template of {
       name : string;
       args : t list;
-    }
-  | Tuple of t list
-  | Union of t list
+    }  (** [Template<T1, T2, ..., TN>] *)
+  | Tuple of t list  (** [\[T1, T2, ..., TN \]]*)
+  | Union of t list  (** [T1 | T2 | ... | TN] *)
 
 type typescript = t
 
