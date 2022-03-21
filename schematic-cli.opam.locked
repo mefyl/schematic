@@ -14,6 +14,7 @@ depends: [
   "base-bytes" {= "base"}
   "base-threads" {= "base"}
   "base-unix" {= "base"}
+  "base64" {= "3.5.0"}
   "bigarray-compat" {= "1.1.0"}
   "bigstringaf" {= "0.8.0"}
   "cmdliner" {= "1.1.0"}
@@ -68,9 +69,9 @@ build: [
 ]
 dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"
 pin-depends: [
-  "schematic.0.12.0" "git+ssh://git@gitlab.routine.co/routine/schematic"
+  "schematic.0.12.0"
+  "git+ssh://git@gitlab.routine.co/routine/schematic#master"
 ]
 url {
-  src:
-    "git+file:///home/mefyl/dev/routine/schematic#fix/inline-keyed-variants"
+  src: "git+file:///home/mefyl/dev/routine/schematic#master"
 }

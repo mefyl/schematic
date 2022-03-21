@@ -17,6 +17,7 @@ depends: [
   "base-bytes" {= "base"}
   "base-threads" {= "base"}
   "base-unix" {= "base"}
+  "base64" {= "3.5.0"}
   "bigarray-compat" {= "1.1.0"}
   "bigstringaf" {= "0.8.0"}
   "biniou" {= "1.2.1"}
