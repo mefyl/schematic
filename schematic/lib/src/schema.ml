@@ -126,41 +126,30 @@ let rec inline :
   | Union { cases; key } ->
     List.map
       ~f:(fun (Case { schema; name; _ }) ->
-        match key with
-        | None -> inline schema.descriptor f
-        | Some key ->
-          let inner : _ field =
-            Field
-              {
-                field = "inner";
-                schema = Inline schema;
-                rest = FieldEnd;
-                description = None;
-                examples = [];
-                maximum = None;
-                minimum = None;
-                omit = false;
-                requirement = Required;
-                title = None;
-              }
-          in
-          let d : _ descriptor =
-            Object
-              (Field
-                 {
-                   field = key;
-                   schema = Outline (make (String_const name));
-                   rest = inner;
-                   description = None;
-                   examples = [];
-                   maximum = None;
-                   minimum = None;
-                   omit = false;
-                   requirement = Required;
-                   title = None;
-                 })
-          in
-          inline d f)
+        let f =
+          match key with
+          | None -> f
+          | Some key ->
+            {
+              f =
+                (fun fields ->
+                  f.f
+                    (Field
+                       {
+                         field = key;
+                         schema = Outline (make (String_const name));
+                         rest = fields;
+                         description = None;
+                         examples = [];
+                         maximum = None;
+                         minimum = None;
+                         omit = false;
+                         requirement = Required;
+                         title = None;
+                       }));
+            }
+        in
+        inline schema.descriptor f)
       cases
     |> Result.all |> Result.map ~f:List.concat
   | s ->
