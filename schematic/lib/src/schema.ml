@@ -1,6 +1,8 @@
 open Utils
 include Schema_intf
 
+let make ?id ?parametric descriptor = { id; descriptor; parametric }
+
 let required : type a b. (a, b) requirement -> bool = function
   | Required -> true
   | _ -> false
@@ -121,8 +123,34 @@ let rec inline :
   | Map (_, _, d) -> inline d f
   | Nullable d -> inline d.descriptor f
   | Object o -> Result.return [ f.f o ]
-  | Union { cases; _ } ->
-    List.map ~f:(fun (Case { schema; _ }) -> inline schema.descriptor f) cases
+  | Union { cases; key } ->
+    List.map
+      ~f:(fun (Case { schema; name; _ }) ->
+        let f =
+          match key with
+          | None -> f
+          | Some key ->
+            {
+              f =
+                (fun fields ->
+                  f.f
+                    (Field
+                       {
+                         field = key;
+                         schema = Outline (make (String_const name));
+                         rest = fields;
+                         description = None;
+                         examples = [];
+                         maximum = None;
+                         minimum = None;
+                         omit = false;
+                         requirement = Required;
+                         title = None;
+                       }));
+            }
+        in
+        inline schema.descriptor f)
+      cases
     |> Result.all |> Result.map ~f:List.concat
   | s ->
     Result.fail (Fmt.str "inline field is not an object: %a" pp_descriptor s)
@@ -386,8 +414,6 @@ let unpack { unpack } (Pack schema) = unpack schema
 
 let name_combine schema name =
   match schema.id with Some id -> id ^ "-" ^ name | None -> name
-
-let make ?id ?parametric descriptor = { id; descriptor; parametric }
 
 let fixpoint f =
   let rec self = Fixpoint (lazy (f self)) in

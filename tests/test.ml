@@ -1056,6 +1056,54 @@ module Version = struct
       { v = Some (String "3") } ~decoded:{ v = None } [%ezjsonm { v = None }]
 end
 
+module VersionCascade = struct
+  type inner = { content : string } [@@deriving eq, schema, show]
+
+  type t_ = {
+    id : string;
+    content : inner;
+  }
+  [@@deriving eq, schema, show]
+
+  let legacy : t_ Schema.t =
+    let decode (inner : inner) : (t_, string) Result.t =
+      Result.return { id = "glouglou"; content = inner }
+    and encode ({ content = { content }; _ } : t_) : inner = { content } in
+    let descriptor =
+      Schematic.Schema.Map (decode, encode, inner_schema.descriptor)
+    in
+    Schematic.Schema.make descriptor
+
+  type t = {
+    t_ : t_;
+        [@schematic.schema legacy < "1.0.0"]
+        [@schematic.schema schema]
+        [@schematic.inline]
+  }
+  [@@deriving eq, schema, show]
+
+  let testable = Alcotest.testable pp equal
+
+  let test () =
+    let () =
+      let value = { id = "glouglou"; content = { content = "foo" } } in
+      let value = { t_ = value } in
+      let json =
+        [%ezjsonm { id = "glouglou"; content = { content = "foo" } }]
+      in
+      test ~validate:false "latest" testable schema value json
+    in
+
+    let () =
+      let value = { id = "glouglou"; content = { content = "foo" } } in
+      let value = { t_ = value } in
+      let json = [%ezjsonm { content = "foo" }] in
+      let schema = schema_versioned @@ Some (Schematic.Version.make 0 9 0) in
+      test ~validate:false "legacy" testable schema value json
+    in
+    ()
+end
+
 module Compile_check = struct
   (* Name conflict between parameter and type *)
   type 't t = { items : 't list } [@@deriving schema]
@@ -1103,6 +1151,7 @@ let () =
           test_case "collisions" `Quick collision;
           test_case "computed" `Quick Computed.computed;
           test_case "version" `Quick Version.test;
+          test_case "version_cascade" `Quick VersionCascade.test;
         ] );
       ( "comparison",
         [
