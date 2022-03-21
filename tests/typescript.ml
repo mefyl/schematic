@@ -39,6 +39,12 @@ and rec_b = {
 }
 [@@deriving schema]
 
+type inline_keyed_variant = {
+  coin : string;
+  pan : keyed_variant; [@schematic.inline]
+}
+[@@deriving schema]
+
 module ShouldInlineOptions = struct
   (* nested inline optional while hiding type with a functor *)
 
@@ -125,6 +131,15 @@ module Generate_types = struct
         );
       ]
 
+  let inline_keyed_variant () =
+    test inline_keyed_variant_schema
+      [
+        ( "InlineKeyedVariant",
+          {|{ "coin": string; "a": number; "b"?: number; "c": string } & { "kind": "krecord" } |
+{ "coin": string; "i": number } & { "kind": "kotherwise" } |}
+        );
+      ]
+
   type 'a inline_try = {
     maybe : bool;
     inline : 'a; [@schematic.inline_try]
@@ -174,5 +189,7 @@ let () =
           test_case "inline-variant" `Quick Generate_types.inline_variant;
           test_case "inline-try" `Quick Generate_types.inline_try;
           test_case "inline-option" `Quick Generate_types.hidden_inline_optional;
+          test_case "inline-keyed-variant" `Quick
+            Generate_types.inline_keyed_variant;
         ] );
     ]
