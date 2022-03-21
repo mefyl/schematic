@@ -1,3 +1,10 @@
+(alias
+ (name default)
+ (deps
+  (alias_rec schematic/all)
+  (alias_rec schematic-jsoo/all)
+  (alias_rec schematic-sqml/all)))
+
 (rule
  (target schematic.%{version:schematic}.opam)
  (deps
@@ -58,6 +65,7 @@
  (mode
   (promote (until-clean)))
  (target schematic.opam.extdeps)
+ (alias extdeps)
  (action
   (with-stdout-to
    %{target}
@@ -78,6 +86,7 @@
  (mode
   (promote (until-clean)))
  (target schematic-jsoo.opam.extdeps)
+ (alias extdeps)
  (action
   (with-stdout-to
    %{target}
@@ -98,6 +107,7 @@
  (mode
   (promote (until-clean)))
  (target schematic-sqml.opam.extdeps)
+ (alias extdeps)
  (action
   (with-stdout-to
    %{target}
@@ -118,6 +128,7 @@
  (mode
   (promote (until-clean)))
  (target schematic-cli.opam.extdeps)
+ (alias extdeps)
  (action
   (with-stdout-to
    %{target}
