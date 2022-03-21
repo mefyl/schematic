@@ -27,8 +27,8 @@ depends: [
   "fmt" {= "0.9.0"}
   "hex" {= "1.4.0"}
   "jsonm" {= "1.0.1"}
-  "ocaml" {= "4.13.1"}
-  "ocaml-base-compiler" {= "4.13.1"}
+  "ocaml" {= "4.12.0"}
+  "ocaml-base-compiler" {= "4.12.0"}
   "ocaml-compiler-libs" {= "v0.12.4"}
   "ocaml-config" {= "2"}
   "ocaml-options-vanilla" {= "1"}
@@ -39,7 +39,7 @@ depends: [
   "ppx_deriving" {= "5.2.1"}
   "ppx_here" {= "v0.14.0"}
   "ppx_yojson" {= "1.2.0"}
-  "ppxlib" {= "0.24.0"}
+  "ppxlib" {= "0.25.0"}
   "ptime" {= "1.0.0"}
   "result" {= "1.5"}
   "schematic" {= "0.12.0"}
@@ -68,9 +68,9 @@ build: [
 ]
 dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"
 pin-depends: [
-  "schematic.0.12.0"
-  "git+ssh://git@gitlab.routine.co/routine/schematic#master"
+  "schematic.0.12.0" "git+ssh://git@gitlab.routine.co/routine/schematic"
 ]
 url {
-  src: "git+file:///home/mefyl/dev/routine/schematic#master"
+  src:
+    "git+file:///home/mefyl/dev/routine/schematic#fix/inline-keyed-variants"
 }
