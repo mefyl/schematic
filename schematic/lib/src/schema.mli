@@ -10,8 +10,13 @@ val extract_field_schema : 'a field_schema -> 'a t
     required to decode an object with fields [fields]. *)
 val object_fields : 'a field -> string list list
 
+(** A ['res inline] maps a field to a ['res]. *)
 type 'res inline = { f : 't. 't field -> 'res }
 
+(** [inline descriptor inline] attemps to inline [descriptor] according to
+    [inline].
+
+    This can only succeed on a non-leaf descriptor. *)
 val inline : 't descriptor -> 'res inline -> ('res list, string) Result.t
 
 type 'res inline_v = { f : 't. 't field -> 't -> 'res }

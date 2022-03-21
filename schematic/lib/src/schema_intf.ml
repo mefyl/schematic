@@ -17,6 +17,7 @@ and 'a field_schema =
   | Inline of 'a t
   | Inline_try of 'a t
 
+(** A [_ field] can describe any number of object fields. *)
 and _ field =
   | FieldEnd : unit field
   | Field : {
@@ -41,6 +42,7 @@ and _ tuple =
     }
       -> ('a * 'b) tuple
 
+(** A descriptor describes the structure of a type. *)
 and _ descriptor =
   | Any : Ezjsonm.value descriptor
   | Bool : bool descriptor
@@ -106,7 +108,10 @@ module type WALK = sig
 
   (* Schema *)
 
+  (** [schema id parametric schema] *)
   val schema : string option -> (unit -> t) option -> (unit -> t) -> t
+
+  (** [parametric template_name arg_names effective_args t] *)
   val parametric : string -> string list -> t list -> t -> t
 
   (* Object *)
