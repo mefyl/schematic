@@ -135,8 +135,8 @@ module Generate_types = struct
     test inline_keyed_variant_schema
       [
         ( "InlineKeyedVariant",
-          {|{ "coin": string; "a": number; "b"?: number; "c": string } & { "kind": "krecord" } |
-{ "coin": string; "i": number } & { "kind": "kotherwise" } |}
+          {|{ "coin": string; "kind": "krecord"; "a": number; "b"?: number; "c": string } |
+{ "coin": string; "kind": "kotherwise"; "i": number }|}
         );
       ]
 
