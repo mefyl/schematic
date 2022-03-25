@@ -82,6 +82,17 @@
    (= :version))))
 
 (package
+ (name schematic-http)
+ (synopsis "HTTP client with schematic encoding")
+ (depends
+  (cohttp-lwt
+   (and
+    (>= 5.0.0)
+    (< 5.1.0)))
+  (schematic
+   (= :version))))
+
+(package
  (name schematic-cli)
  (synopsis "Schematic CLI tools")
  (depends

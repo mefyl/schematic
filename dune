@@ -1,7 +1,13 @@
 (alias
  (name default)
  (deps
+  schematic-cli.opam
+  schematic-http.opam
+  schematic-jsoo.opam
+  schematic-sqml.opam
+  schematic.opam
   (alias_rec schematic/all)
+  (alias_rec schematic-http/all)
   (alias_rec schematic-jsoo/all)
   (alias_rec schematic-sqml/all)))
 
@@ -113,7 +119,7 @@
    %{target}
    (run
     %{bin:awk}
-    "/^build: / { exit 0 }; !/^  \"(acid|ocaml|schematic|sqml|timmy)/ { print($0) }"
+    "/^build: / { exit 0 }; !/^  \"(ocaml|schematic|sqml|timmy)/ { print($0) }"
     %{dep:schematic-sqml.opam.locked}))))
 
 (rule
@@ -134,5 +140,26 @@
    %{target}
    (run
     %{bin:awk}
-    "/^build: / { exit 0 }; !/^  \"(acid|ocaml|schematic|sqml|timmy)/ { print($0) }"
+    "/^build: / { exit 0 }; !/^  \"(ocaml|schematic|sqml|timmy)/ { print($0) }"
     %{dep:schematic-cli.opam.locked}))))
+
+(rule
+ (mode
+  (promote (until-clean)))
+ (deps (universe))
+ (target schematic-http.opam.locked)
+ (action
+  (run %{bin:opam} lock schematic-http)))
+
+(rule
+ (mode
+  (promote (until-clean)))
+ (target schematic-http.opam.extdeps)
+ (alias extdeps)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    %{bin:awk}
+    "/^build: / { exit 0 }; !/^  \"(ocaml|schematic)/ { print($0) }"
+    %{dep:schematic-http.opam.locked}))))

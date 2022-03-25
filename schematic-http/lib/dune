@@ -1,0 +1,8 @@
+(include_subdirs unqualified)
+
+(library
+ (name schematic_http)
+ (public_name schematic-http)
+ (libraries cohttp-lwt schematic)
+ (preprocess
+  (pps lwt_ppx ppx_deriving.make)))
