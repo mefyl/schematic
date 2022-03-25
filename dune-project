@@ -42,7 +42,9 @@
   ppx_deriving
   ppx_here
   (ppx_yojson
-   (>= 1.2.0))
+   (and
+    (>= 1.2.0)
+    :with-test))
   (ptime
    (>= 1.0.0))
   semver2
