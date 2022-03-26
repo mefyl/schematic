@@ -1,5 +1,7 @@
 include module type of Client_intf
-module Make (Handler : HANDLER) : S with type 'a t = 'a Handler.response
+
+module Make (Handler : HANDLER) :
+  S with type 'a t = 'a Handler.response and type error = Handler.error
 
 module Cohttp
     (Client : Cohttp_lwt.S.Client)
