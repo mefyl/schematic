@@ -17,6 +17,7 @@ module Lwt_result = struct
 end
 
 let ( let* ) = Lwt.bind
+let empty = Schematic.Schema.make Ignore
 
 module Make (Handler : HANDLER) = struct
   include Handler
@@ -25,18 +26,24 @@ module Make (Handler : HANDLER) = struct
   type error = Handler.error
 
   let encode (schema, value) = Coding.encode schema value |> Body.of_string
+  let empty = empty
 
-  let call ?headers ?body method_ uri response =
+  let call (type response) ?headers ?body method_ uri
+      (response : response Schematic.Schema.t) =
     let body = Option.map encode body in
     Handler.Monad.bind (raw ?headers ?body method_ uri) ~f:(fun (resp, body) ->
         let* body = Body.to_string body in
-        match Coding.decode response body with
-        | Result.Ok r -> Handler.Monad.return r
-        | Result.Error e ->
-          Lwt_result.fail
-            (Error.make ~method_
-               ~status:(Cohttp.Response.status resp)
-               ~reason:(Decoding e) uri))
+        match response with
+        | { descriptor = Ignore; _ } when response == empty ->
+          Handler.Monad.return (() : response)
+        | response -> (
+          match Coding.decode response body with
+          | Result.Ok r -> Handler.Monad.return r
+          | Result.Error e ->
+            Lwt_result.fail
+              (Error.make ~method_
+                 ~status:(Cohttp.Response.status resp)
+                 ~reason:(Decoding e) uri)))
 end
 
 module Cohttp_ = Cohttp

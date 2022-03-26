@@ -24,6 +24,8 @@ module type S = sig
     Uri.t ->
     ((Cohttp.Response.t * Body.t) t, error Error.t) Lwt_result.t
 
+  val empty : unit Schematic.Schema.t
+
   val call :
     ?headers:(string * string) list ->
     ?body:'body Schematic.schema * 'body ->
