@@ -17,7 +17,6 @@ module Lwt_result = struct
 end
 
 let ( let* ) = Lwt.bind
-let ( and* ) = Lwt.both
 
 module Make (Handler : HANDLER) = struct
   include Handler
@@ -53,13 +52,20 @@ struct
     Coding.encode schema value |> Cohttp_lwt.Body.of_string
 
   let raw ?headers ?body method_ uri =
-    let body = Option.map encode body
-    and headers = Option.map Cohttp.Header.of_list headers in
     let f () =
       let* () =
         Logs.info (fun m ->
             m "%s %a" Cohttp.Code.(string_of_method method_) Uri.pp uri)
-      and* resp, body = Client.call ?headers ?body method_ uri in
+      in
+      let* () =
+        let f (h, v) =
+          Logs.debug (fun m -> m "  %s: %s" (Base.String.capitalize h) v)
+        in
+        Lwt_list.iter_s f (Option.value ~default:[] headers)
+      in
+      let body = Option.map encode body
+      and headers = Option.map Cohttp.Header.of_list headers in
+      let* resp, body = Client.call ?headers ?body method_ uri in
       match Cohttp.Response.status resp with
       | `Code 0 as status ->
         (* CORS or connectivity issue *)
