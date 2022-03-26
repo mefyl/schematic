@@ -25,11 +25,15 @@ module Make (Handler : HANDLER) = struct
   type 'a t = 'a response
 
   let call ?headers ?body method_ uri response =
-    Handler.Monad.bind (raw ?headers ?body method_ uri) ~f:(fun (_, body) ->
+    Handler.Monad.bind (raw ?headers ?body method_ uri) ~f:(fun (resp, body) ->
         let* body = Cohttp_lwt.Body.to_string body in
         match Coding.decode response body with
         | Result.Ok r -> Handler.Monad.return r
-        | Result.Error e -> Lwt_result.fail (`Coding e))
+        | Result.Error e ->
+          Lwt_result.fail
+            (Error.make ~method_
+               ~status:(Cohttp.Response.status resp)
+               ~reason:(`Coding e) uri))
 end
 
 module Cohttp_ = Cohttp
@@ -57,13 +61,17 @@ struct
       match Cohttp.Response.status resp with
       | `Code 0 as status ->
         (* CORS or connectivity issue *)
-        Lwt_result.fail @@ `Networking (Error.make_http ~method_ ~status uri)
+        Lwt_result.fail Error.(make ~method_ ~status ~reason:`Networking uri)
       | _ -> Lwt_result.return (resp, body)
     and catch (_ : exn) =
       Lwt_result.fail
-      @@ `Assert
-           (Fmt.str "fatal error requesting %s: %s" (Uri.to_string uri)
-              "unkown exception escaped")
+        Error.(
+          make ~method_
+            ~reason:
+              (`Assert
+                (Fmt.str "fatal error requesting %s: %s" (Uri.to_string uri)
+                   "unkown exception escaped"))
+            uri)
     in
     Lwt.catch f catch
 end

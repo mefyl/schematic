@@ -6,7 +6,9 @@ module type S = sig
     ?body:'body Schematic.schema * 'body ->
     Cohttp.Code.meth ->
     Uri.t ->
-    ((Cohttp.Response.t * Cohttp_lwt.Body.t) t, [> Error.t ]) Lwt_result.t
+    ( (Cohttp.Response.t * Cohttp_lwt.Body.t) t,
+      [> Error.reason ] Error.t )
+    Lwt_result.t
 
   val call :
     ?headers:(string * string) list ->
@@ -14,7 +16,7 @@ module type S = sig
     Cohttp.Code.meth ->
     Uri.t ->
     'response Schematic.schema ->
-    ('response t, [> Error.t ]) Lwt_result.t
+    ('response t, [> Error.reason ] Error.t) Lwt_result.t
 end
 
 module type RATE_LIMIT = sig
@@ -36,6 +38,6 @@ module type HANDLER = sig
     Cohttp.Code.meth ->
     Uri.t ->
     ( (Cohttp.Response.t * Cohttp_lwt.Body.t) response,
-      [> Error.t ] )
+      [> Error.reason ] Error.t )
     Lwt_result.t
 end
