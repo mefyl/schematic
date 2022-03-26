@@ -24,9 +24,12 @@ module Make (Handler : HANDLER) = struct
   type 'a t = 'a response
   type error = Handler.error
 
+  let encode (schema, value) = Coding.encode schema value |> Body.of_string
+
   let call ?headers ?body method_ uri response =
+    let body = Option.map encode body in
     Handler.Monad.bind (raw ?headers ?body method_ uri) ~f:(fun (resp, body) ->
-        let* body = Cohttp_lwt.Body.to_string body in
+        let* body = Body.to_string body in
         match Coding.decode response body with
         | Result.Ok r -> Handler.Monad.return r
         | Result.Error e ->
@@ -47,9 +50,7 @@ struct
 
   module Coding = Coding
   module Monad = Lwt_result
-
-  let encode (schema, value) =
-    Coding.encode schema value |> Cohttp_lwt.Body.of_string
+  module Body = Cohttp_lwt.Body
 
   let raw ?headers ?body method_ uri =
     let f () =
@@ -63,8 +64,7 @@ struct
         in
         Lwt_list.iter_s f (Option.value ~default:[] headers)
       in
-      let body = Option.map encode body
-      and headers = Option.map Cohttp.Header.of_list headers in
+      let headers = Option.map Cohttp.Header.of_list headers in
       let* resp, body = Client.call ?headers ?body method_ uri in
       match Cohttp.Response.status resp with
       | `Code 0 as status ->
