@@ -23,6 +23,7 @@ module Make (Handler : HANDLER) = struct
   include Handler
 
   type 'a t = 'a response
+  type error = Handler.error
 
   let call ?headers ?body method_ uri response =
     Handler.Monad.bind (raw ?headers ?body method_ uri) ~f:(fun (resp, body) ->
@@ -33,7 +34,7 @@ module Make (Handler : HANDLER) = struct
           Lwt_result.fail
             (Error.make ~method_
                ~status:(Cohttp.Response.status resp)
-               ~reason:(`Coding e) uri))
+               ~reason:(Decoding e) uri))
 end
 
 module Cohttp_ = Cohttp
@@ -43,6 +44,7 @@ module Cohttp
     (Coding : Schematic.Coding.S with type t = string) =
 struct
   type 'a response = 'a
+  type error = Error.never
 
   module Coding = Coding
   module Monad = Lwt_result
@@ -61,17 +63,15 @@ struct
       match Cohttp.Response.status resp with
       | `Code 0 as status ->
         (* CORS or connectivity issue *)
-        Lwt_result.fail Error.(make ~method_ ~status ~reason:`Networking uri)
+        Lwt_result.fail Error.(make ~method_ ~status ~reason:Networking uri)
       | _ -> Lwt_result.return (resp, body)
-    and catch (_ : exn) =
-      Lwt_result.fail
-        Error.(
-          make ~method_
-            ~reason:
-              (`Assert
-                (Fmt.str "fatal error requesting %s: %s" (Uri.to_string uri)
-                   "unkown exception escaped"))
-            uri)
+    and catch (e : exn) =
+      let* () =
+        Logs.err (fun m ->
+            m "fatal error requesting %a: exception escaped: %a" Uri.pp uri
+              Base.Exn.pp e)
+      in
+      raise e
     in
     Lwt.catch f catch
 end
@@ -168,4 +168,34 @@ module Optional (Handler : HANDLER) = struct
         match Cohttp_.Response.status resp with
         | `Not_found -> None
         | _ -> Some r)
+end
+
+module Check_status (Status : STATUS) (Handler : HANDLER) = struct
+  include Handler
+
+  type 'a response = 'a Handler.response
+  type error = (Status.error, Handler.error) Error.status
+
+  let raw ?headers ?body method_ uri =
+    let f ((resp, _) as r) =
+      let status = Cohttp_.Response.status resp in
+      match Status.check status with
+      | Some error ->
+        let* () =
+          Logs.warn (fun m ->
+              m "unexpected status %s querying %a"
+                (Cohttp_.Code.string_of_status status)
+                Uri.pp uri)
+        in
+        Lwt_result.fail
+          Error.(
+            make ~method_ ~status ~reason:(Http (Unexpected_status error)) uri)
+      | None -> Monad.return r
+    in
+    Handler.raw ?headers ?body method_ uri
+    |> Lwt_result.map_err (function
+         | Error.{ reason = Error.Http e; _ } as error ->
+           { error with reason = Error.(Http (Valid_status e)) }
+         | { reason = Decoding _ | Networking; _ } as error -> error)
+    |> Handler.Monad.bind ~f
 end
