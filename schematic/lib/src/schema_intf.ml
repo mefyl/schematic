@@ -53,8 +53,11 @@ and _ descriptor =
   | Int : int descriptor
   | Int64 : int64 descriptor
   | List : 'a t -> 'a list descriptor
-  | Map :
-      ('a -> ('b, string) Result.t) * ('b -> 'a) * 'a descriptor
+  | Map : {
+      decode : 'a -> ('b, string) Result.t;
+      encode : 'b -> 'a;
+      descriptor : 'a descriptor;
+    }
       -> 'b descriptor
   | Mapping : 'a t -> (string * 'a) list descriptor
   | Null : unit descriptor

@@ -25,8 +25,8 @@ let rec type_of_descriptor :
         decode = Fn.compose Result.return Timmy.Time.to_ptime;
       }
   | Time_local -> failwith "FIXME"
-  | Map (decode, encode, repr) ->
-    Custom { decode; encode; repr = type_of_descriptor repr }
+  | Map { decode; encode; descriptor } ->
+    Custom { decode; encode; repr = type_of_descriptor descriptor }
   | Mapping _ -> failwith "schematic-sqml: cannot bind Mapping schema"
   | Nullable schema -> Nullable (type_of_descriptor schema.descriptor)
   | String_const _ -> failwith "schematic-sqml: cannot bind String_const schema"

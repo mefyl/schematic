@@ -1,7 +1,10 @@
 include module type of Schema_intf
 
 val required : (_, _) requirement -> bool
-val map : ('a -> ('b, string) Result.t) -> ('b -> 'a) -> 'a t -> 'b t
+
+val map :
+  decode:('a -> ('b, string) Result.t) -> encode:('b -> 'a) -> 'a t -> 'b t
+
 val pp : Format.formatter -> _ t -> unit
 val pp_descriptor : Format.formatter -> _ descriptor -> unit
 val extract_field_schema : 'a field_schema -> 'a t

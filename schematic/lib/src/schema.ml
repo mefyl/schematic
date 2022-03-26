@@ -7,8 +7,12 @@ let required : type a b. (a, b) requirement -> bool = function
   | Required -> true
   | _ -> false
 
-let map cons decons { descriptor; _ } =
-  { id = None; descriptor = Map (cons, decons, descriptor); parametric = None }
+let map ~decode ~encode { descriptor; _ } =
+  {
+    id = None;
+    descriptor = Map { decode; encode; descriptor };
+    parametric = None;
+  }
 
 let extract_field_schema = function
   | Inline schema -> schema
@@ -36,7 +40,7 @@ let rec pp_descriptor : type u. u descriptor Fmt.t =
       @@ const string "[" ++ sp
          ++ (box @@ const pp schema)
          ++ sp ++ const string "]"
-    | Map (_, _, d) -> const pp_descriptor d
+    | Map { descriptor; _ } -> const pp_descriptor descriptor
     | Mapping schema -> const pp schema
     | Null -> const string "Null"
     | Nullable s ->
@@ -120,7 +124,7 @@ let rec inline :
   match d with
   | Ignore -> Result.return [ f.f FieldEnd ]
   | Fixpoint d -> inline (Lazy.force d) f
-  | Map (_, _, d) -> inline d f
+  | Map { descriptor; _ } -> inline descriptor f
   | Nullable d -> inline d.descriptor f
   | Object o -> Result.return [ f.f o ]
   | Union { cases; key } ->
@@ -163,7 +167,7 @@ let rec inline_v :
   match d with
   | Ignore -> Result.return (f.f FieldEnd v)
   | Fixpoint d -> inline_v (Lazy.force d) v f
-  | Map (_, e, d) -> inline_v d (e v) f
+  | Map { encode; descriptor; _ } -> inline_v descriptor (encode v) f
   | Nullable d -> (
     match v with
     | Some v -> inline_v d.descriptor v f
@@ -199,7 +203,7 @@ module Walk (W : WALK) = struct
     | String -> W.string ()
     | Time -> W.time ()
     | Time_local -> W.time_local ()
-    | Map (_, _, d) -> descriptor d
+    | Map { descriptor = d; _ } -> descriptor d
     | Mapping s -> W.mapping (schema s)
     | Nullable s -> W.nullable (schema s)
     | String_const s -> W.string_const s
@@ -352,7 +356,8 @@ let compare schema =
     | Ignore -> Base.Poly.compare
     | Int | Int64 -> Base.Poly.compare
     | List schema -> Base.List.compare (compare schema.descriptor)
-    | Map (_, map, v) -> fun l r -> compare v (map l) (map r)
+    | Map { encode; descriptor; _ } ->
+      fun l r -> compare descriptor (encode l) (encode r)
     | Mapping schema -> assoc_compare (compare schema.descriptor)
     | Null -> fun () () -> 0
     | Nullable s -> fun l r -> Base.Option.compare (compare s.descriptor) l r

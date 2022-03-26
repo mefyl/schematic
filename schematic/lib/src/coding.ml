@@ -171,8 +171,8 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       | List items_schema ->
         let* v = Coding.to_list v |> type_error "array" in
         map_results ~f:(decode None ids items_schema.descriptor) v
-      | Map (cons, _, schema) ->
-        decode id ids schema v >>= fun value ->
+      | Map { decode = cons; descriptor; _ } ->
+        decode id ids descriptor v >>= fun value ->
         cons value |> Result.map_error ~f:(fun reason -> error "%s" reason)
       | Mapping fields_schema ->
         let* fields = Coding.to_fields v |> type_error "mapping" in
@@ -341,7 +341,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       | Int64 -> Coding.of_int64 v
       | List items_schema ->
         Coding.of_list (List.map ~f:(encode items_schema.descriptor) v)
-      | Map (_, decons, schema) -> encode schema @@ decons v
+      | Map { encode = decons; descriptor; _ } -> encode descriptor @@ decons v
       | Null -> Coding.null ()
       | Nullable s -> (
         match v with None -> Coding.null () | Some v -> encode s.descriptor v)

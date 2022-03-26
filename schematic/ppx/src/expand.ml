@@ -740,7 +740,13 @@ module Schema = struct
         pexp_attributes = [];
       }
     in
-    [%expr Schema.Map ([%e construct], [%e deconstruct], [%e obj])]
+    [%expr
+      Schema.Map
+        {
+          decode = [%e construct];
+          encode = [%e deconstruct];
+          descriptor = [%e obj];
+        }]
 
   and expand_record ~context ~type_context fields =
     _expand_record false ~context ~type_context fields

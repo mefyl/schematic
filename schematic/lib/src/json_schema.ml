@@ -107,7 +107,7 @@ let of_schema schema =
         { validation_empty with type_ = Some (Either.first Integer) }
       | Schema.List _ ->
         { validation_empty with type_ = Some (Either.first Array) }
-      | Schema.Map (_, _, schema) -> validation schema
+      | Schema.Map { descriptor; _ } -> validation descriptor
       | Schema.Mapping _ -> validation_empty
       | Schema.Null ->
         { validation_empty with type_ = Some (Either.first Null) }
@@ -155,7 +155,7 @@ let of_schema schema =
         let marks, schema = of_schema marks schema in
         ( marks,
           Some { applicator_empty with items = Some (Items_schema schema) } )
-      | Schema.Map (_, _, schema) -> applicator marks schema
+      | Schema.Map { descriptor; _ } -> applicator marks descriptor
       | Schema.Mapping schema ->
         let marks, schema = of_schema marks schema in
         ( marks,

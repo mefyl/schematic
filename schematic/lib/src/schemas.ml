@@ -165,9 +165,12 @@ module Ptime = struct
   let span_schema =
     Schema.make ~id:"duration"
       (Map
-         ( (fun s -> Result.return @@ Span.of_int_s s),
-           (fun span -> Option.value_exn ~here:[%here] (Span.to_int_s span)),
-           Int ))
+         {
+           decode = (fun s -> Result.return @@ Span.of_int_s s);
+           encode =
+             (fun span -> Option.value_exn ~here:[%here] (Span.to_int_s span));
+           descriptor = Int;
+         })
 
   let span_schema_versioned (_ : Version.t option) = span_schema
 end
@@ -177,7 +180,12 @@ module Uri = struct
 
   let schema =
     Schema.make
-      (Map ((fun s -> Result.return @@ Uri.of_string s), Uri.to_string, String))
+      (Map
+         {
+           decode = (fun s -> Result.return @@ Uri.of_string s);
+           encode = Uri.to_string;
+           descriptor = String;
+         })
 
   let schema_versioned (_ : Version.t option) = schema
 end
