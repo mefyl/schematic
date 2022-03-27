@@ -19,6 +19,17 @@ end
 let ( let* ) = Lwt.bind
 let empty = Schematic.Schema.make Ignore
 
+let stream =
+  Schematic.Schema.make
+    (Map
+       {
+         decode = (fun () -> Result.Ok Lwt_stream.(of_list []));
+         encode = (fun _ -> ());
+         descriptor = Ignore;
+       })
+
+let string = Schematic.Schema.make String
+
 module Make (Handler : HANDLER) = struct
   include Handler
 
@@ -27,16 +38,33 @@ module Make (Handler : HANDLER) = struct
 
   let encode (schema, value) = Coding.encode schema value |> Body.of_string
   let empty = empty
+  let stream = stream
+  let string = string
 
-  let call (type response) ?headers ?body method_ uri
+  let call (type body response) ?headers
+      ?(body : (body Schematic.Schema.t * body) option) method_ uri
       (response : response Schematic.Schema.t) =
-    let body = Option.map encode body in
+    let body =
+      match body with
+      | Some (schema, s) when Obj.magic schema == stream ->
+        Some Body.(of_stream (Obj.magic s))
+      | Some (({ descriptor = String; _ } as schema), s) when schema == string
+        ->
+        Some Body.(of_string s)
+      | Some body -> Some (encode body)
+      | None -> None
+    in
     Handler.Monad.bind (raw ?headers ?body method_ uri) ~f:(fun (resp, body) ->
-        let* body = Body.to_string body in
         match response with
         | { descriptor = Ignore; _ } when response == empty ->
           Handler.Monad.return (() : response)
+        | schema when Obj.magic schema == stream ->
+          Handler.Monad.return (Obj.magic (Body.to_stream body))
+        | { descriptor = String; _ } as schema when schema == string ->
+          let* body = Body.to_string body in
+          Handler.Monad.return body
         | response -> (
+          let* body = Body.to_string body in
           match Coding.decode response body with
           | Result.Ok r -> Handler.Monad.return r
           | Result.Error e ->

@@ -17,14 +17,9 @@ module type S = sig
 
   module Body : BODY
 
-  val raw :
-    ?headers:(string * string) list ->
-    ?body:Body.t ->
-    Cohttp.Code.meth ->
-    Uri.t ->
-    ((Cohttp.Response.t * Body.t) t, error Error.t) Lwt_result.t
-
   val empty : unit Schematic.Schema.t
+  val stream : string Lwt_stream.t Schematic.Schema.t
+  val string : string Schematic.Schema.t
 
   val call :
     ?headers:(string * string) list ->
