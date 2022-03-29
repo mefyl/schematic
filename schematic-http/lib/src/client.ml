@@ -248,3 +248,14 @@ module Status_success = struct
     if Cohttp_.Code.(is_success (code_of_status status)) then None
     else Some status
 end
+
+let check_status_is expected =
+  let expected = Cohttp_.Code.code_of_status expected in
+  (module struct
+    type error = Cohttp_.Code.status_code
+
+    let check status =
+      if Cohttp_.Code.code_of_status status = expected then None
+      else Some status
+  end : STATUS
+    with type error = Cohttp_.Code.status_code)

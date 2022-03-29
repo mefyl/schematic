@@ -20,6 +20,10 @@ module Check_status (Status : STATUS) (Handler : HANDLER) :
 
 module Status_success : STATUS with type error = Cohttp.Code.status_code
 
+val check_status_is :
+  Cohttp.Code.status_code ->
+  (module STATUS with type error = Cohttp.Code.status_code)
+
 module Cohttp
     (Client : Cohttp_lwt.S.Client)
     (Coding : Schematic.Coding.S with type t = string) :
