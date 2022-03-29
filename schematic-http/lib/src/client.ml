@@ -240,3 +240,11 @@ module Check_status (Status : STATUS) (Handler : HANDLER) = struct
          | { reason = Decoding _ | Networking; _ } as error -> error)
     |> Handler.Monad.bind ~f
 end
+
+module Status_success = struct
+  type error = Cohttp_.Code.status_code
+
+  let check status =
+    if Cohttp_.Code.(is_success (code_of_status status)) then None
+    else Some status
+end
