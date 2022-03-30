@@ -61,8 +61,6 @@
      "url {\n  src: \"git://git@gitlab.routine.co:routine/schematic-cli#%{version:schematic-cli}\"\n}\n")))))
 
 (rule
- (mode
-  (promote (until-clean)))
  (deps (universe))
  (target schematic.opam.locked)
  (action
@@ -82,8 +80,6 @@
     %{dep:schematic.opam.locked}))))
 
 (rule
- (mode
-  (promote (until-clean)))
  (deps (universe))
  (target schematic-jsoo.opam.locked)
  (action
@@ -103,8 +99,6 @@
     %{dep:schematic-jsoo.opam.locked}))))
 
 (rule
- (mode
-  (promote (until-clean)))
  (deps (universe))
  (target schematic-sqml.opam.locked)
  (action
@@ -124,8 +118,6 @@
     %{dep:schematic-sqml.opam.locked}))))
 
 (rule
- (mode
-  (promote (until-clean)))
  (deps (universe))
  (target schematic-cli.opam.locked)
  (action
@@ -145,8 +137,6 @@
     %{dep:schematic-cli.opam.locked}))))
 
 (rule
- (mode
-  (promote (until-clean)))
  (deps (universe))
  (target schematic-http.opam.locked)
  (action
