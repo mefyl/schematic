@@ -42,8 +42,8 @@ module Make (Handler : HANDLER) = struct
   let string = string
 
   let call (type body response) ?headers
-      ?(body : (body Schematic.Schema.t * body) option) method_ uri
-      (response : response Schematic.Schema.t) =
+      ?(body : (body Schematic.Schema.t * body) option)
+      (response : response Schematic.Schema.t) method_ uri =
     let body =
       match body with
       | Some (schema, s) when Obj.magic schema == stream ->
@@ -72,6 +72,18 @@ module Make (Handler : HANDLER) = struct
               (Error.make ~method_
                  ~status:(Cohttp.Response.status resp)
                  ~reason:(`Decoding e) uri)))
+
+  let delete ?headers ?body response uri =
+    call ?headers ?body response `DELETE uri
+
+  let get ?headers ?body response uri = call ?headers ?body response `GET uri
+  let head ?headers ?body response uri = call ?headers ?body response `HEAD uri
+
+  let patch ?headers ?body response uri =
+    call ?headers ?body response `PATCH uri
+
+  let post ?headers ?body response uri = call ?headers ?body response `POST uri
+  let put ?headers ?body response uri = call ?headers ?body response `PUT uri
 end
 
 module Cohttp_ = Cohttp

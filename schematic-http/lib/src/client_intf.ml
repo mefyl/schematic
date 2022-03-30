@@ -11,6 +11,12 @@ module type BODY = sig
   val of_stream : string Lwt_stream.t -> t
 end
 
+type ('a, 'body, 'response) request =
+  ?headers:(string * string) list ->
+  ?body:'body Schematic.schema * 'body ->
+  'response Schematic.schema ->
+  'a
+
 module type S = sig
   type 'a t
   type error
@@ -22,12 +28,48 @@ module type S = sig
   val string : string Schematic.Schema.t
 
   val call :
-    ?headers:(string * string) list ->
-    ?body:'body Schematic.schema * 'body ->
-    Cohttp.Code.meth ->
-    Uri.t ->
-    'response Schematic.schema ->
-    ('response t, [> error Error.reason ] Error.t) Lwt_result.t
+    ( Cohttp.Code.meth ->
+      Uri.t ->
+      ('response t, [> error Error.reason ] Error.t) Lwt_result.t,
+      'body,
+      'response )
+    request
+
+  val delete :
+    ( Uri.t -> ('response t, [> error Error.reason ] Error.t) Lwt_result.t,
+      'body,
+      'response )
+    request
+
+  val get :
+    ( Uri.t -> ('response t, [> error Error.reason ] Error.t) Lwt_result.t,
+      'body,
+      'response )
+    request
+
+  val head :
+    ( Uri.t -> ('response t, [> error Error.reason ] Error.t) Lwt_result.t,
+      'body,
+      'response )
+    request
+
+  val patch :
+    ( Uri.t -> ('response t, [> error Error.reason ] Error.t) Lwt_result.t,
+      'body,
+      'response )
+    request
+
+  val post :
+    ( Uri.t -> ('response t, [> error Error.reason ] Error.t) Lwt_result.t,
+      'body,
+      'response )
+    request
+
+  val put :
+    ( Uri.t -> ('response t, [> error Error.reason ] Error.t) Lwt_result.t,
+      'body,
+      'response )
+    request
 end
 
 module type RATE_LIMIT = sig
