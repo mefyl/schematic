@@ -27,7 +27,7 @@ module type S = sig
     Cohttp.Code.meth ->
     Uri.t ->
     'response Schematic.schema ->
-    ('response t, error Error.t) Lwt_result.t
+    ('response t, [> error Error.reason ] Error.t) Lwt_result.t
 end
 
 module type RATE_LIMIT = sig
@@ -56,5 +56,7 @@ module type HANDLER = sig
     ?body:Body.t ->
     Cohttp.Code.meth ->
     Uri.t ->
-    ((Cohttp.Response.t * Body.t) response, error Error.t) Lwt_result.t
+    ( (Cohttp.Response.t * Body.t) response,
+      [> error Error.reason ] Error.t )
+    Lwt_result.t
 end

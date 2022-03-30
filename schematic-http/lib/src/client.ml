@@ -71,7 +71,7 @@ module Make (Handler : HANDLER) = struct
             Lwt_result.fail
               (Error.make ~method_
                  ~status:(Cohttp.Response.status resp)
-                 ~reason:(Decoding e) uri)))
+                 ~reason:(`Decoding e) uri)))
 end
 
 module Cohttp_ = Cohttp
@@ -104,7 +104,7 @@ struct
       match Cohttp.Response.status resp with
       | `Code 0 as status ->
         (* CORS or connectivity issue *)
-        Lwt_result.fail Error.(make ~method_ ~status ~reason:Networking uri)
+        Lwt_result.fail Error.(make ~method_ ~status ~reason:`Networking uri)
       | _ -> Lwt_result.return (resp, body)
     and catch (e : exn) =
       let* () =
@@ -230,14 +230,14 @@ module Check_status (Status : STATUS) (Handler : HANDLER) = struct
         in
         Lwt_result.fail
           Error.(
-            make ~method_ ~status ~reason:(Http (Unexpected_status error)) uri)
+            make ~method_ ~status ~reason:(`Http (Unexpected_status error)) uri)
       | None -> Monad.return r
     in
     Handler.raw ?headers ?body method_ uri
     |> Lwt_result.map_err (function
-         | Error.{ reason = Error.Http e; _ } as error ->
-           { error with reason = Error.(Http (Valid_status e)) }
-         | { reason = Decoding _ | Networking; _ } as error -> error)
+         | Error.{ reason = `Http e; _ } as error ->
+           { error with reason = `Http Error.(Valid_status e) }
+         | { reason = `Decoding _ | `Networking; _ } as error -> error)
     |> Handler.Monad.bind ~f
 end
 

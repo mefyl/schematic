@@ -1,13 +1,14 @@
 type never = |
 
 type 'a reason =
-  | Decoding of Schematic.Error.decoding
-  | Http of 'a
-  | Networking
+  [ `Decoding of Schematic.Error.decoding
+  | `Http of 'a
+  | `Networking
+  ]
 
 type 'a t = {
   method_ : Cohttp.Code.meth;
-  reason : 'a reason;
+  reason : 'a;
   status : Cohttp.Code.status_code option;
   uri : Uri.t; [@main]
 }
@@ -26,16 +27,16 @@ let pp_status unexpected valid f =
 let pp_reason pp f =
   let open Fmt in
   function
-  | Decoding e -> pf f "decoding error: %a" Schematic.Error.pp_decoding e
-  | Http e -> pp f e
-  | Networking -> string f "connectivity or CORS error"
+  | `Decoding e -> pf f "decoding error: %a" Schematic.Error.pp_decoding e
+  | `Http e -> pp f e
+  | `Networking -> string f "connectivity or CORS error"
 
-let pp pp f { method_; reason; status = _; uri } =
+let pp pp_reason f { method_; reason; status = _; uri } =
   let printer =
     let open Fmt in
     box ~indent:2
     @@ const string Cohttp.Code.(string_of_method method_)
        ++ const char ' ' ++ const Uri.pp uri ++ const char ':' ++ sp
-       ++ const (pp_reason pp) reason
+       ++ const pp_reason reason
   in
   printer f ()
