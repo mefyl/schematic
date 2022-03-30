@@ -350,36 +350,41 @@ module Recursive = struct
       let rec descriptor a_schema =
         let f self =
           Schema.Map
-            ( (fun (value, (next, ())) ->
-                Result.Ok ({ value; next } : 'a parametric)),
-              (fun ({ value; next } : 'a parametric) -> (value, (next, ()))),
-              Object
-                (Field
-                   {
-                     description = None;
-                     examples = [];
-                     field = "value";
-                     maximum = None;
-                     minimum = None;
-                     omit = false;
-                     requirement = Required;
-                     rest =
-                       Field
-                         {
-                           description = None;
-                           examples = [];
-                           field = "next";
-                           maximum = None;
-                           minimum = None;
-                           omit = false;
-                           requirement = Optional;
-                           rest = FieldEnd;
-                           schema = Outline (schema self);
-                           title = None;
-                         };
-                     schema = Outline a_schema;
-                     title = None;
-                   }) )
+            {
+              decode =
+                (fun (value, (next, ())) ->
+                  Result.Ok ({ value; next } : 'a parametric));
+              encode =
+                (fun ({ value; next } : 'a parametric) -> (value, (next, ())));
+              descriptor =
+                Object
+                  (Field
+                     {
+                       description = None;
+                       examples = [];
+                       field = "value";
+                       maximum = None;
+                       minimum = None;
+                       omit = false;
+                       requirement = Required;
+                       rest =
+                         Field
+                           {
+                             description = None;
+                             examples = [];
+                             field = "next";
+                             maximum = None;
+                             minimum = None;
+                             omit = false;
+                             requirement = Optional;
+                             rest = FieldEnd;
+                             schema = Outline (schema self);
+                             title = None;
+                           };
+                       schema = Outline a_schema;
+                       title = None;
+                     });
+            }
         in
         Schema.fixpoint f
       and id = Schematic.Schema.name_combine a_schema "recursive-parametric"
@@ -729,7 +734,13 @@ let keyed () =
 
 let map_error () =
   let schema =
-    Schematic.Schema.make (Map ((fun s -> Result.fail s), Fn.id, String))
+    Schematic.Schema.make
+      (Map
+         {
+           decode = (fun s -> Result.fail s);
+           encode = Fn.id;
+           descriptor = String;
+         })
   in
   Alcotest.(
     check
@@ -1031,7 +1042,8 @@ module Version = struct
       | Some i -> Result.return (Some (Int i))
     and encode = function Some (Int i) -> Some i | _ -> None in
     Schematic.Schema.make
-    @@ Map (decode, encode, Nullable Schematic.Schemas.int_schema)
+    @@ Map
+         { decode; encode; descriptor = Nullable Schematic.Schemas.int_schema }
 
   type t = { v : v Option.t [@schematic.schema legacy < "0.6.1"] }
   [@@deriving eq, schema, show]
@@ -1070,7 +1082,8 @@ module VersionCascade = struct
       Result.return { id = "glouglou"; content = inner }
     and encode ({ content = { content }; _ } : t_) : inner = { content } in
     let descriptor =
-      Schematic.Schema.Map (decode, encode, inner_schema.descriptor)
+      Schematic.Schema.Map
+        { decode; encode; descriptor = inner_schema.descriptor }
     in
     Schematic.Schema.make descriptor
 
