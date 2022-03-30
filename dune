@@ -9,7 +9,8 @@
   (alias_rec schematic/all)
   (alias_rec schematic-http/all)
   (alias_rec schematic-jsoo/all)
-  (alias_rec schematic-sqml/all)))
+  (alias_rec schematic-sqml/all)
+  (alias_rec runtest)))
 
 (rule
  (target schematic.%{version:schematic}.opam)
