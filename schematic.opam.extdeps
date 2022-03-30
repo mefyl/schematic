@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic"
-version: "0.12.0"
+version: "0.13.0"
 synopsis: "Derive schemas from Ocaml types"
 description: """\
 Schematic lets you derive type meta informations using a ppx_deriving
@@ -41,7 +41,7 @@ depends: [
   "ppx_derivers" {= "1.2.1"}
   "ppx_deriving" {= "5.2.1"}
   "ppx_here" {= "v0.14.0"}
-  "ppx_yojson" {= "1.2.0"}
+  "ppx_yojson" {= "1.2.0" & with-test}
   "ppxlib" {= "0.25.0"}
   "ptime" {= "1.0.0"}
   "re" {= "1.10.3" & with-test}
