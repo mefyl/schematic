@@ -423,6 +423,7 @@ end
 module type STR = sig
   include S
 
+  val content_type : string
   val of_string : string -> (t, E.parsing) Base.Result.t
   val to_string : t -> string
 end
@@ -438,6 +439,7 @@ module Make_string (C : STR) : STR with type t = string = struct
     | Result.Error msg ->
       Result.Error E.{ path = []; schema = None; reason = msg }
 
+  let content_type = C.content_type
   let to_string s = s
   let of_string s = Result.return s
 end

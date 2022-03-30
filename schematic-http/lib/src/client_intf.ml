@@ -88,7 +88,7 @@ module type HANDLER = sig
   type error
 
   module Body : BODY
-  module Coding : Schematic.Coding.S with type t = string
+  module Coding : Schematic.Coding.STR with type t = string
 
   module Monad :
     Base.Monad.S2 with type ('a, 'error) t = ('a response, 'error) Lwt_result.t

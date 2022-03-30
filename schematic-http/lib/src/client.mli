@@ -26,5 +26,5 @@ val check_status_is :
 
 module Cohttp
     (Client : Cohttp_lwt.S.Client)
-    (Coding : Schematic.Coding.S with type t = string) :
+    (Coding : Schematic.Coding.STR with type t = string) :
   HANDLER with type 'a response = 'a and type error = Error.never

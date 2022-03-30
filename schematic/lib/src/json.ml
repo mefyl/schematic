@@ -61,6 +61,7 @@ module Make (Impl : Impl) = struct
     | v -> Result.return v
     | exception Ezjsonm.Parse_error (_, msg) -> Result.fail msg
 
+  let content_type = "application/json"
   let of_string s = Impl.of_string s
   let to_channel chan t = Ezjsonm.value_to_channel ~minify:true chan t
   let to_string t = Impl.to_string t

@@ -41,7 +41,7 @@ module Make (Handler : HANDLER) = struct
   let stream = stream
   let string = string
 
-  let call (type body response) ?headers
+  let call (type body response) ?(headers = [])
       ?(body : (body Schematic.Schema.t * body) option)
       (response : response Schematic.Schema.t) method_ uri =
     let body =
@@ -53,8 +53,12 @@ module Make (Handler : HANDLER) = struct
         Some Body.(of_string s)
       | Some body -> Some (encode body)
       | None -> None
+    and headers =
+      match body with
+      | None -> headers
+      | Some _ -> ("Content-Type", Handler.Coding.content_type) :: headers
     in
-    Handler.Monad.bind (raw ?headers ?body method_ uri) ~f:(fun (resp, body) ->
+    Handler.Monad.bind (raw ~headers ?body method_ uri) ~f:(fun (resp, body) ->
         match response with
         | { descriptor = Ignore; _ } when response == empty ->
           Handler.Monad.return (() : response)
@@ -90,7 +94,7 @@ module Cohttp_ = Cohttp
 
 module Cohttp
     (Client : Cohttp_lwt.S.Client)
-    (Coding : Schematic.Coding.S with type t = string) =
+    (Coding : Schematic.Coding.STR with type t = string) =
 struct
   type 'a response = 'a
   type error = Error.never
