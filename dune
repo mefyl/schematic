@@ -58,7 +58,7 @@
    (progn
     (cat %{opam})
     (echo
-     "url {\n  src: \"git://git@gitlab.routine.co:routine/schematic-cli#%{version:schematic-cli}\"\n}\n")))))
+     "url {\n  src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-cli}\"\n}\n")))))
 
 (rule
  (target schematic-http.%{version:schematic}.opam)
@@ -70,7 +70,7 @@
    (progn
     (cat %{opam})
     (echo
-     "url {\n  src: \"git://git@gitlab.routine.co:routine/schematic-http#%{version:schematic}\"\n}\n")))))
+     "url {\n  src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic}\"\n}\n")))))
 
 (rule
  (deps (universe))
