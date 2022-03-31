@@ -578,12 +578,11 @@ module Schema = struct
           [%e Ast.pexp_ident @@ { loc; txt = schema_id_versioned ~loc txt }]
             __schematic_version]
     (* Lists *)
-    | { ptyp_desc = Ptyp_constr ({ txt = Lident "list"; loc }, [ arg ]); _ } ->
+    | [%type: [%t? t] list] ->
       expanded_of_descriptor ~loc
         [%expr
           Schema.List
-            [%e
-              schema_of_expanded ~loc @@ encode_type ~context ~type_context arg]]
+            [%e schema_of_expanded ~loc @@ encode_type ~context ~type_context t]]
     (* Parametric type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } ->
       let schema_f = Ast.pexp_ident { loc; txt = schema_id_versioned ~loc txt }
@@ -709,12 +708,8 @@ module Schema = struct
           rest =
         let requirement, type_ =
           match type_ with
-          | {
-           ptyp_desc = Ptyp_constr ({ txt = Lident "option"; _ }, [ type_ ]);
-           _;
-          } ->
-            ([%expr Optional], type_)
-          | type_ -> (
+          | [%type: [%t? t] option] -> ([%expr Optional], t)
+          | t -> (
             match specs.default with
             | Some default ->
               ( [%expr
@@ -722,7 +717,7 @@ module Schema = struct
                   | Some default -> Default default
                   | None -> Required],
                 type_ )
-            | None -> ([%expr Required], type_))
+            | None -> ([%expr Required], t))
         in
         let schema =
           let f next = function
@@ -963,7 +958,7 @@ module Schema = struct
         match param with
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
           [%type: [%t Ast.ptyp_var name] Schema.t -> [%t t]]
-        | { ptyp_desc = Ptyp_any; _ }, _ -> [%type: _ -> [%t t]]
+        | [%type: _], _ -> [%type: _ -> [%t t]]
         | t, _ ->
           Ppxlib.Location.raise_errorf ~loc
             "schematic-ppx: unsupported type parameter %a" Pprintast.core_type t
@@ -978,7 +973,7 @@ module Schema = struct
                   Ast.ppat_var
                     { txt = param_prefix ^ schema_name_versioned name; loc }] ->
               [%e exp]]
-        | { ptyp_desc = Ptyp_any; _ }, _ -> [%expr fun _ -> [%e exp]]
+        | [%type: _], _ -> [%expr fun _ -> [%e exp]]
         | t, _ ->
           Ppxlib.Location.raise_errorf ~loc
             "schematic-ppx: unsupported type parameter %a" Pprintast.core_type t
@@ -990,7 +985,7 @@ module Schema = struct
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
           [%expr
             [%e f] [%e Ast.evar @@ param_prefix ^ schema_name_versioned name]]
-        | { ptyp_desc = Ptyp_any; _ }, _ -> [%expr [%e f] ()]
+        | [%type: _], _ -> [%expr [%e f] ()]
         | t, _ ->
           Ppxlib.Location.raise_errorf ~loc
             "schematic-ppx: unsupported type parameter %a" Pprintast.core_type t
@@ -1006,7 +1001,7 @@ module Schema = struct
               Schematic.Schema.name_combine
                 [%e Ast.evar (param_prefix ^ schema_name_versioned name)]
                 [%e exp]]
-          | { ptyp_desc = Ptyp_any; _ }, _ -> exp
+          | [%type: _], _ -> exp
           | t, _ ->
             Ppxlib.Location.raise_errorf ~loc
               "schematic-ppx: unsupported type parameter %a" Pprintast.core_type
@@ -1236,13 +1231,7 @@ module Jsoo_type = struct
            ~f:(function _, Pcstr_tuple [], _, _ -> false | _ -> true)
            options
     then [%type: Js_of_ocaml.Js.Unsafe.any]
-    else
-      {
-        ptyp_desc = Ptyp_constr ({ txt = Lident "string_js"; loc }, []);
-        ptyp_loc = loc;
-        ptyp_loc_stack = [];
-        ptyp_attributes = [];
-      }
+    else [%type: string_js]
 
   let expand_abstract_type ~context ~type_context t =
     Type (expand_type ~loc:type_context.loc ~context t)
@@ -1311,22 +1300,15 @@ module Jsoo_type = struct
         and js =
           Ast.ptyp_constr
             { txt = Lident (name "js"); loc }
-            (List.map
-               ~f:(fun _ ->
-                 {
-                   ptyp_desc = Ptyp_any;
-                   ptyp_loc = loc;
-                   ptyp_loc_stack = [];
-                   ptyp_attributes = [];
-                 })
-               ptype_params)
+            (List.map ~f:(fun _ -> [%type: _]) ptype_params)
         in
         let apply, parametrize =
           let params =
-            let f ({ ptyp_desc; ptyp_loc = loc; _ }, _) =
-              match ptyp_desc with
-              | Ptyp_any -> None
-              | Ptyp_var n -> Some (loc, Fmt.str "%s_schema" n)
+            let f (t, _) =
+              match t with
+              | [%type: _] -> None
+              | { ptyp_desc = Ptyp_var n; _ } ->
+                Some (loc, Fmt.str "%s_schema" n)
               | _ ->
                 Ppxlib.Location.raise_errorf ~loc
                   "schematic-ppx: unsupported type parameter"
