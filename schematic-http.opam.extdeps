@@ -18,7 +18,7 @@ depends: [
   "bigarray-compat" {= "1.1.0"}
   "bigstringaf" {= "0.8.0"}
   "biniou" {= "1.2.1"}
-  "cmdliner" {= "1.1.0"}
+  "cmdliner" {= "1.1.1"}
   "cohttp" {= "5.0.0"}
   "cohttp-lwt" {= "5.0.0"}
   "conf-pkg-config" {= "2"}

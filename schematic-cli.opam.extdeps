@@ -17,7 +17,7 @@ depends: [
   "base64" {= "3.5.0"}
   "bigarray-compat" {= "1.1.0"}
   "bigstringaf" {= "0.8.0"}
-  "cmdliner" {= "1.1.0"}
+  "cmdliner" {= "1.1.1"}
   "conf-pkg-config" {= "2"}
   "cppo" {= "1.6.8"}
   "csexp" {= "1.5.1"}
