@@ -999,14 +999,8 @@ module Schema = struct
       in
       let construct =
         let pattern =
-          {
-            ppat_desc =
-              (if poly then Ppat_variant (txt, pattern)
-              else Ppat_construct ({ txt = Lident txt; loc }, ctor_pattern));
-            ppat_loc = loc;
-            ppat_loc_stack = [];
-            ppat_attributes = [];
-          }
+          if poly then Ast.ppat_variant txt pattern
+          else Ast.ppat_construct { txt = Lident txt; loc } ctor_pattern
         and value = Option.value ~default:[%expr ()] value in
         [%expr function [%p pattern] -> Some [%e value] | _ -> None]
       and destruct =
