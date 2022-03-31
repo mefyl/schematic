@@ -34,26 +34,10 @@ end
 
 module Warning = struct
   let make ~loc n =
-    {
-      attr_name = { txt = "warning"; loc };
-      attr_payload =
-        PStr
-          [
-            {
-              pstr_desc =
-                Pstr_eval
-                  ( {
-                      pexp_desc = Pexp_constant (Pconst_string (n, loc, None));
-                      pexp_loc = loc;
-                      pexp_loc_stack = [];
-                      pexp_attributes = [];
-                    },
-                    [] );
-              pstr_loc = loc;
-            };
-          ];
-      attr_loc = loc;
-    }
+    let module Ast = (val Ast_builder.make loc) in
+    Ast.attribute ~name:{ txt = "warning"; loc }
+      ~payload:
+        (PStr [ { pstr_desc = Pstr_eval (Ast.estring n, []); pstr_loc = loc } ])
 
   let unused_var_strict ~loc = make ~loc "-unused-var-strict"
   let unused_rec ~loc = make ~loc "-unused-rec-flag"
@@ -149,30 +133,6 @@ let constructor_arguments_normalize ~loc =
         type_;
         value;
       }
-
-let pattern_id ~loc txt =
-  {
-    ppat_desc = Ppat_var { txt; loc };
-    ppat_loc = loc;
-    ppat_loc_stack = [];
-    ppat_attributes = [];
-  }
-
-let expr_id ~loc txt =
-  {
-    pexp_desc = Pexp_ident { txt; loc };
-    pexp_loc = loc;
-    pexp_loc_stack = [];
-    pexp_attributes = [];
-  }
-
-let expr_int ~loc i =
-  {
-    pexp_desc = Pexp_constant (Pconst_integer (Int.to_string i, None));
-    pexp_loc = loc;
-    pexp_loc_stack = [];
-    pexp_attributes = [];
-  }
 
 let expect ~loc pattern ast = Ast_pattern.parse pattern loc ast Fn.id
 
@@ -603,6 +563,7 @@ module Schema = struct
 
   let rec encode_type ~context ~type_context =
     let loc = type_context.loc in
+    let module Ast = (val Ast_builder.make loc) in
     function
     (* Mapping *)
     | [%type: (string * [%t? t]) list] ->
@@ -614,7 +575,8 @@ module Schema = struct
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
       Expression
         [%expr
-          [%e expr_id ~loc @@ schema_id_versioned ~loc txt] __schematic_version]
+          [%e Ast.pexp_ident @@ { loc; txt = schema_id_versioned ~loc txt }]
+            __schematic_version]
     (* Lists *)
     | { ptyp_desc = Ptyp_constr ({ txt = Lident "list"; loc }, [ arg ]); _ } ->
       expanded_of_descriptor ~loc
@@ -624,42 +586,27 @@ module Schema = struct
               schema_of_expanded ~loc @@ encode_type ~context ~type_context arg]]
     (* Parametric type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } ->
-      let schema_f = expr_id ~loc (schema_id_versioned ~loc txt)
+      let schema_f = Ast.pexp_ident { loc; txt = schema_id_versioned ~loc txt }
       and f t =
         ( Nolabel,
           schema_of_expanded ~loc @@ encode_type ~context ~type_context t )
       in
       Expression
-        {
-          pexp_desc =
-            Pexp_apply
-              ( schema_f,
-                (Nolabel, [%expr __schematic_version]) :: List.map ~f args );
-          pexp_loc = loc;
-          pexp_loc_stack = [];
-          pexp_attributes = [];
-        }
+        (Ast.pexp_apply schema_f
+           ((Nolabel, [%expr __schematic_version]) :: List.map ~f args))
     (* Tuple *)
     | { ptyp_desc = Ptyp_tuple types; _ } ->
       let field_name i { ptyp_loc = loc; _ } = (loc, "e" ^ Int.to_string i)
       and field_value i { ptyp_loc = loc; _ } =
-        expr_id ~loc @@ Lident ("e" ^ Int.to_string i)
+        Ast.pexp_ident { loc; txt = Lident ("e" ^ Int.to_string i) }
       and constructed =
-        let f i _ = expr_id ~loc (Lident ("e" ^ Int.to_string i)) in
-        {
-          pexp_desc = Pexp_tuple (List.mapi ~f types);
-          pexp_loc = loc;
-          pexp_loc_stack = [];
-          pexp_attributes = [];
-        }
+        let f i _ =
+          Ast.pexp_ident { loc; txt = Lident ("e" ^ Int.to_string i) }
+        in
+        Ast.pexp_tuple (List.mapi ~f types)
       and deconstructed =
-        let f i _ = pattern_id ~loc ("e" ^ Int.to_string i) in
-        {
-          ppat_desc = Ppat_tuple (List.mapi ~f types);
-          ppat_loc = loc;
-          ppat_loc_stack = [];
-          ppat_attributes = [];
-        }
+        let f i _ = Ast.ppat_var { loc; txt = "e" ^ Int.to_string i } in
+        Ast.ppat_tuple (List.mapi ~f types)
       in
       let body =
         combinator ~loc types field_name field_value constructed deconstructed
@@ -669,8 +616,11 @@ module Schema = struct
     (* Type variable *)
     | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ } ->
       Expression
-        (expr_id ~loc
-           (schema_id_versioned ~loc ~prefix:param_prefix (Lident name)))
+        (Ast.pexp_ident
+           {
+             loc;
+             txt = schema_id_versioned ~loc ~prefix:param_prefix (Lident name);
+           })
     (* Polymorphic variant *)
     | { ptyp_desc = Ptyp_variant (fields, _, _); _ } ->
       expand_polymorphic_variant ~context ~type_context fields
@@ -705,11 +655,12 @@ module Schema = struct
       expression ->
       expression =
    fun ~loc fields field_name field_value constructed deconstructed obj ->
+    let module Ast = (val Ast_builder.make loc) in
     let construct =
       let pattern =
         let pattern i f =
-          let loc, name = field_name i f in
-          pattern_id ~loc name
+          let loc, txt = field_name i f in
+          Ast.ppat_var { loc; txt }
         in
         let f i tl field =
           let pattern = pattern i field in
@@ -717,13 +668,7 @@ module Schema = struct
         in
         List.fold_righti ~f ~init:[%pat? ()] fields
       in
-      {
-        pexp_desc =
-          Pexp_fun (Nolabel, None, pattern, [%expr Result.Ok [%e constructed]]);
-        pexp_loc = loc;
-        pexp_loc_stack = [];
-        pexp_attributes = [];
-      }
+      Ast.pexp_fun Nolabel None pattern [%expr Result.Ok [%e constructed]]
     and deconstruct =
       let value =
         let expr i f = field_value i f in
@@ -733,12 +678,7 @@ module Schema = struct
         in
         List.fold_righti ~f ~init:[%expr ()] fields
       in
-      {
-        pexp_desc = Pexp_fun (Nolabel, None, deconstructed, value);
-        pexp_loc = loc;
-        pexp_loc_stack = [];
-        pexp_attributes = [];
-      }
+      Ast.pexp_fun Nolabel None deconstructed value
     in
     [%expr
       Schema.Map
@@ -838,8 +778,10 @@ module Schema = struct
               examples = [%e Ast.elist specs.examples];
               field =
                 [%e Ast.estring (rename @@ Option.value ~default:name alias)];
-              maximum = [%e expr_option ~loc expr_int specs.maximum];
-              minimum = [%e expr_option ~loc expr_int specs.minimum];
+              maximum =
+                [%e expr_option ~loc Ast_builder.Default.eint specs.maximum];
+              minimum =
+                [%e expr_option ~loc Ast_builder.Default.eint specs.minimum];
               omit = [%e Ast.ebool specs.omit];
               requirement = [%e requirement];
               rest = [%e rest];
@@ -851,18 +793,11 @@ module Schema = struct
     and field_name _ (field : Attributes.field) = (field.loc, field.name)
     and field_value _ (field : Attributes.field) =
       match field.computed with
-      | None -> expr_id ~loc @@ Lident field.name
+      | None -> Ast.pexp_ident { loc; txt = Lident field.name }
       | Some computed -> computed
     and constructed =
       let f (field : Attributes.field) =
-        let value =
-          {
-            pexp_desc = Pexp_ident { txt = Lident field.name; loc };
-            pexp_loc = field.loc;
-            pexp_loc_stack = [];
-            pexp_attributes = [];
-          }
-        in
+        let value = Ast.pexp_ident { txt = Lident field.name; loc } in
         match field.computed with
         | None -> Some ({ txt = Lident field.name; loc }, value)
         | Some _ -> None
@@ -876,23 +811,10 @@ module Schema = struct
             Ppxlib.Location.raise_errorf ~loc
               "schematic-ppx: unexpected empty record")
         | _ ->
-          {
-            pexp_desc =
-              Pexp_tuple
-                (List.filter_map ~f:(fun x -> f x |> Option.map ~f:snd) fields);
-            pexp_loc = loc;
-            pexp_loc_stack = [];
-            pexp_attributes = [];
-          }
+          Ast.pexp_tuple
+            (List.filter_map ~f:(fun x -> f x |> Option.map ~f:snd) fields)
       else
-        let constructed =
-          {
-            pexp_desc = Pexp_record (List.filter_map ~f fields, None);
-            pexp_loc = loc;
-            pexp_loc_stack = [];
-            pexp_attributes = [];
-          }
-        in
+        let constructed = Ast.pexp_record (List.filter_map ~f fields) None in
         [%expr ([%e constructed] : [%t type_])]
     and deconstructed =
       let f (field : Attributes.field) =
@@ -901,12 +823,7 @@ module Schema = struct
         | None ->
           Some
             ( { txt = Lident field.name; loc },
-              {
-                ppat_desc = Ppat_var { txt = field.name; loc };
-                ppat_loc = field.loc;
-                ppat_loc_stack = [];
-                ppat_attributes = [];
-              } )
+              Ast.ppat_var { txt = field.name; loc } )
       in
       if as_tuple then
         match fields with
@@ -917,22 +834,11 @@ module Schema = struct
             Ppxlib.Location.raise_errorf ~loc
               "schematic-ppx: unexpected empty record")
         | _ ->
-          {
-            ppat_desc =
-              Ppat_tuple
-                (List.filter_map ~f:(fun x -> f x |> Option.map ~f:snd) fields);
-            ppat_loc = loc;
-            ppat_loc_stack = [];
-            ppat_attributes = [];
-          }
+          Ast.ppat_tuple
+            (List.filter_map ~f:(fun x -> f x |> Option.map ~f:snd) fields)
       else
         let deconstructed =
-          {
-            ppat_desc = Ppat_record (List.filter_map ~f fields, Closed);
-            ppat_loc = loc;
-            ppat_loc_stack = [];
-            ppat_attributes = [];
-          }
+          Ast.ppat_record (List.filter_map ~f fields) Closed
         in
         [%pat? ([%p deconstructed] : [%t type_])]
     in
@@ -1005,14 +911,8 @@ module Schema = struct
         [%expr function [%p pattern] -> Some [%e value] | _ -> None]
       and destruct =
         let value =
-          {
-            pexp_desc =
-              (if poly then Pexp_variant (txt, value)
-              else Pexp_construct ({ txt = Lident txt; loc }, ctor_value));
-            pexp_loc = loc;
-            pexp_loc_stack = [];
-            pexp_attributes = [];
-          }
+          if poly then Ast.pexp_variant txt value
+          else Ast.pexp_construct { txt = Lident txt; loc } ctor_value
         and pattern = Option.value ~default:[%pat? ()] pattern in
         [%expr function [%p pattern] -> [%e value]]
       in
@@ -1075,7 +975,8 @@ module Schema = struct
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
           [%expr
             fun [%p
-                  pattern_id ~loc @@ param_prefix ^ schema_name_versioned name] ->
+                  Ast.ppat_var
+                    { txt = param_prefix ^ schema_name_versioned name; loc }] ->
               [%e exp]]
         | { ptyp_desc = Ptyp_any; _ }, _ -> [%expr fun _ -> [%e exp]]
         | t, _ ->
@@ -1277,6 +1178,7 @@ module Jsoo_type = struct
 
   and expand_record ~context ~type_context fields =
     let loc = type_context.loc in
+    let module Ast = (val Ast_builder.make loc) in
     let f Attributes.{ alias; inline; loc; name; type_; _ } =
       let desc =
         match Option.value ~default:Outline inline with
@@ -1285,15 +1187,9 @@ module Jsoo_type = struct
           | Ptyp_constr (id, parameters) ->
             Some
               (Oinherit
-                 {
-                   ptyp_desc =
-                     Ptyp_constr
-                       ( { txt = suffix_id ~loc "js_fields" id.txt; loc },
-                         List.map ~f:(expand_type ~loc ~context) parameters );
-                   ptyp_loc = loc;
-                   ptyp_loc_stack = [];
-                   ptyp_attributes = [];
-                 })
+                 (Ast.ptyp_constr
+                    { txt = suffix_id ~loc "js_fields" id.txt; loc }
+                    (List.map ~f:(expand_type ~loc ~context) parameters)))
           | _ -> None)
         | Inline_try -> None
         | Outline ->
@@ -1305,13 +1201,7 @@ module Jsoo_type = struct
         ~f:(fun pof_desc -> { pof_desc; pof_loc = loc; pof_attributes = [] })
         desc
     in
-    Object
-      {
-        ptyp_desc = Ptyp_object (List.filter_map ~f fields, Closed);
-        ptyp_attributes = [];
-        ptyp_loc = loc;
-        ptyp_loc_stack = [];
-      }
+    Object (Ast.ptyp_object (List.filter_map ~f fields) Closed)
 
   and expand_variant ~context ~type_context options =
     let f
@@ -1396,23 +1286,13 @@ module Jsoo_type = struct
           ptype_private = Public;
           ptype_manifest =
             Some
-              {
-                ptyp_desc =
-                  Ptyp_constr
-                    ( {
-                        loc;
-                        txt = Ldot (Ldot (Lident "Js_of_ocaml", "Js"), "t");
-                      },
-                      [
-                        Ast.ptyp_constr
-                          (Ast.Located.lident
-                             (name "js_fields" type_context.name))
-                          (List.map ~f:fst type_context.params);
-                      ] );
-                ptyp_attributes = [];
-                ptyp_loc = loc;
-                ptyp_loc_stack = [];
-              };
+              (Ast.ptyp_constr
+                 { loc; txt = Ldot (Ldot (Lident "Js_of_ocaml", "Js"), "t") }
+                 [
+                   Ast.ptyp_constr
+                     (Ast.Located.lident (name "js_fields" type_context.name))
+                     (List.map ~f:fst type_context.params);
+                 ]);
           ptype_loc = type_context.loc;
           ptype_attributes = [];
         };
@@ -1426,38 +1306,20 @@ module Jsoo_type = struct
       | None -> None
       | Some prefix ->
         let name s = prefix ^ s in
-        let fname n =
-          {
-            ppat_attributes = [];
-            ppat_desc = Ppat_var { txt = name n; loc };
-            ppat_loc = loc;
-            ppat_loc_stack = [];
-          }
-        and schema =
-          {
-            pexp_attributes = [];
-            pexp_desc = Pexp_ident { txt = Lident (name "schema"); loc };
-            pexp_loc = loc;
-            pexp_loc_stack = [];
-          }
+        let fname n = Ast.ppat_var { txt = name n; loc }
+        and schema = Ast.pexp_ident { txt = Lident (name "schema"); loc }
         and js =
-          {
-            ptyp_attributes = [];
-            ptyp_desc =
-              Ptyp_constr
-                ( { txt = Lident (name "js"); loc },
-                  List.map
-                    ~f:(fun _ ->
-                      {
-                        ptyp_desc = Ptyp_any;
-                        ptyp_loc = loc;
-                        ptyp_loc_stack = [];
-                        ptyp_attributes = [];
-                      })
-                    ptype_params );
-            ptyp_loc = loc;
-            ptyp_loc_stack = [];
-          }
+          Ast.ptyp_constr
+            { txt = Lident (name "js"); loc }
+            (List.map
+               ~f:(fun _ ->
+                 {
+                   ptyp_desc = Ptyp_any;
+                   ptyp_loc = loc;
+                   ptyp_loc_stack = [];
+                   ptyp_attributes = [];
+                 })
+               ptype_params)
         in
         let apply, parametrize =
           let params =
