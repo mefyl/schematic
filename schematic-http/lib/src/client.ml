@@ -44,16 +44,18 @@ module Make (Handler : HANDLER) = struct
   let call (type body response) ?(headers = [])
       ?(body : (body Schematic.Schema.t * body) option)
       (response : response Schematic.Schema.t) method_ uri =
-    let body =
+    let body, headers =
       match body with
       | Some (schema, s) when Obj.magic schema == stream ->
-        Some Body.(of_stream (Obj.magic s))
+        (Some Body.(of_stream (Obj.magic s)), headers)
       | Some (({ descriptor = String; _ } as schema), s) when schema == string
         ->
-        Some Body.(of_string s)
-      | Some body -> Some (encode body)
-      | None -> None
-    and headers =
+        ( Some Body.(of_string s),
+          ("Content-Length", Int.to_string (String.length s)) :: headers )
+      | Some body -> (Some (encode body), headers)
+      | None -> (None, headers)
+    in
+    let headers =
       match body with
       | Some _
         when Option.is_none
