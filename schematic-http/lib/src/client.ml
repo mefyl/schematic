@@ -55,8 +55,13 @@ module Make (Handler : HANDLER) = struct
       | None -> None
     and headers =
       match body with
-      | None -> headers
-      | Some _ -> ("Content-Type", Handler.Coding.content_type) :: headers
+      | Some _
+        when Option.is_none
+               ((List.find_opt (fun (name, _) ->
+                     String.(lowercase_ascii name = "content-type")))
+                  headers) ->
+        ("Content-Type", Handler.Coding.content_type) :: headers
+      | _ -> headers
     in
     Handler.Monad.bind (raw ~headers ?body method_ uri) ~f:(fun (resp, body) ->
         match response with
