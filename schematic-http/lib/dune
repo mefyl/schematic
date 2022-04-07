@@ -5,4 +5,4 @@
  (public_name schematic-http)
  (libraries cohttp-lwt schematic)
  (preprocess
-  (pps lwt_ppx ppx_deriving.make)))
+  (pps ppx_deriving.make)))
