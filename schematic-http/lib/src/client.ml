@@ -68,6 +68,7 @@ module Make (Handler : HANDLER) = struct
     Handler.Monad.bind (raw ~headers ?body method_ uri) ~f:(fun (resp, body) ->
         match response with
         | { descriptor = Ignore; _ } when response == empty ->
+          let* () = Body.drain body in
           Handler.Monad.return (() : response)
         | schema when Obj.magic schema == stream ->
           Handler.Monad.return (Obj.magic (Body.to_stream body))
@@ -108,7 +109,12 @@ struct
 
   module Coding = Coding
   module Monad = Lwt_result
-  module Body = Cohttp_lwt.Body
+
+  module Body = struct
+    include Cohttp_lwt.Body
+
+    let drain = drain_body
+  end
 
   let raw ?headers ?body method_ uri =
     let f () =
