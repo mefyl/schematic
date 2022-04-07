@@ -275,3 +275,15 @@ let check_status_is expected =
       else Some status
   end : STATUS
     with type error = Cohttp_.Code.status_code)
+
+module With_headers (Headers : sig
+  val headers : (string * string) list
+end)
+(Handler : HANDLER) =
+struct
+  include Handler
+
+  let raw ?(headers = []) ?body method_ uri =
+    let headers = Headers.headers @ headers in
+    Handler.raw ~headers ?body method_ uri
+end

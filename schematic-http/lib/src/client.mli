@@ -24,6 +24,14 @@ val check_status_is :
   Cohttp.Code.status_code ->
   (module STATUS with type error = Cohttp.Code.status_code)
 
+module With_headers (Headers : sig
+  val headers : (string * string) list
+end)
+(Handler : HANDLER) :
+  HANDLER
+    with type 'a response = 'a Handler.response
+     and type error = Handler.error
+
 module Cohttp
     (Client : Cohttp_lwt.S.Client)
     (Coding : Schematic.Coding.STR with type t = string) :
