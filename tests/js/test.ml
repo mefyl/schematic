@@ -18,6 +18,7 @@ type o = {
   opt_nullable : bool option option;
   a : Namespace.int_alias list;
   pair : bool * bool;
+  def : int; [@default 0]
 }
 
 and variant =
@@ -40,7 +41,12 @@ let decode_error coding =
       Fmt.str "%s decode error: %a" coding Schematic.Error.pp_decoding e)
 
 (** Check inlining works in the expanded JSOO type *)
-let f (o : o_js) : Js.js_string Js.t = o##.s
+let f (o : o_js) =
+  let (_ : Js.js_string Js.t) = o##.s
+  and (_ : bool Js.t Js.Optdef.t) = o##.opt
+  and (_ : bool Js.t Js.Opt.t Js.Optdef.t) = o##.opt_nullable
+  and (_ : Js.number Js.t Js.Optdef.t) = o##.def in
+  ()
 
 let () =
   Js.export_all

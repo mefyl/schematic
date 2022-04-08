@@ -210,6 +210,25 @@ module Attributes = struct
   }
   [@@deriving make]
 
+  type requirement =
+    | Default_opt of expression
+    | Optional
+    | Required
+
+  let requirement { loc; specs = { default; _ }; type_; _ } =
+    match type_ with
+    | [%type: [%t? t] option] -> (Optional, t)
+    | t -> (
+      match default with
+      | Some default ->
+        ( Default_opt
+            [%expr
+              match [%e Source.value default] with
+              | Some default -> Default default
+              | None -> Required],
+          t )
+      | None -> (Required, t))
+
   type t = {
     alias : string option;
     computed :
@@ -704,20 +723,15 @@ module Schema = struct
     in
     let fields_schema =
       let init = [%expr FieldEnd] in
-      let f Attributes.{ alias; inline; loc; name; schema; specs; type_; _ }
-          rest =
-        let requirement, type_ =
-          match type_ with
-          | [%type: [%t? t] option] -> ([%expr Optional], t)
-          | t -> (
-            match specs.default with
-            | Some default ->
-              ( [%expr
-                  match [%e Source.value default] with
-                  | Some default -> Default default
-                  | None -> Required],
-                type_ )
-            | None -> ([%expr Required], t))
+      let f
+          Attributes.(
+            { alias; inline; loc; name; schema; specs; _ } as attributes) rest =
+        let requirement, type_ = Attributes.requirement attributes in
+        let requirement =
+          match requirement with
+          | Optional -> [%expr Optional]
+          | Default_opt e -> e
+          | Required -> [%expr Required]
         in
         let schema =
           let f next = function
@@ -1174,7 +1188,7 @@ module Jsoo_type = struct
   and expand_record ~context ~type_context fields =
     let loc = type_context.loc in
     let module Ast = (val Ast_builder.make loc) in
-    let f Attributes.{ alias; inline; loc; name; type_; _ } =
+    let f Attributes.({ alias; inline; loc; name; type_; _ } as attributes) =
       let desc =
         match Option.value ~default:Outline inline with
         | Inline -> (
@@ -1188,8 +1202,17 @@ module Jsoo_type = struct
           | _ -> None)
         | Inline_try -> None
         | Outline ->
-          let t = expand_type ~loc ~context type_ in
-          let t = [%type: [%t t] Js_of_ocaml.Js.readonly_prop] in
+          let t =
+            match Attributes.requirement attributes with
+            | Required, type_ ->
+              [%type:
+                [%t expand_type ~loc ~context type_]
+                Js_of_ocaml.Js.readonly_prop]
+            | (Default_opt _ | Optional), type_ ->
+              [%type:
+                [%t expand_type ~loc ~context type_] Js_of_ocaml.Js.Optdef.t
+                Js_of_ocaml.Js.readonly_prop]
+          in
           Some (Otag ({ loc; txt = Option.value ~default:name alias }, t))
       in
       Option.map
