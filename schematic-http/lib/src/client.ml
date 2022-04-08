@@ -74,9 +74,11 @@ module Make (Handler : HANDLER) = struct
           Handler.Monad.return (Obj.magic (Body.to_stream body))
         | { descriptor = String; _ } as schema when schema == string ->
           let* body = Body.to_string body in
+          let* () = Logs.debug (fun m -> m "response body:\n%s" body) in
           Handler.Monad.return body
         | response -> (
           let* body = Body.to_string body in
+          let* () = Logs.debug (fun m -> m "response body:\n%s" body) in
           match Coding.decode response body with
           | Result.Ok r -> Handler.Monad.return r
           | Result.Error e ->
@@ -124,7 +126,7 @@ struct
       in
       let* () =
         let f (h, v) =
-          Logs.debug (fun m -> m "  %s: %s" (Base.String.capitalize h) v)
+          Logs.info (fun m -> m "  %s: %s" (Base.String.capitalize h) v)
         in
         Lwt_list.iter_s f (Option.value ~default:[] headers)
       in
