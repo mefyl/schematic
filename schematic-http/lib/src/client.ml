@@ -251,7 +251,26 @@ module Check_status (Status : STATUS) (Handler : HANDLER) = struct
     let f ((resp, body) as r) =
       let status = Cohttp_.Response.status resp in
       match Status.check status with
-      | Some error ->
+      | `Body_error schema -> (
+        let* () =
+          Logs.warn (fun m ->
+              m "unexpected status %s querying %a"
+                (Cohttp_.Code.string_of_status status)
+                Uri.pp uri)
+        and* body = Body.to_string body in
+        match Handler.Coding.decode schema body with
+        | Result.Ok error ->
+          Lwt_result.fail
+            Error.(
+              make ~method_ ~status ~reason:(`Http (Unexpected_status error))
+                uri)
+        | Result.Error e ->
+          let e =
+            { e with reason = Fmt.str "while decoding error body: %s" e.reason }
+          in
+          Lwt_result.fail
+            Error.(make ~method_ ~status ~reason:(`Decoding e) uri))
+      | `Error error ->
         let* () =
           Logs.warn (fun m ->
               m "unexpected status %s querying %a"
@@ -261,7 +280,7 @@ module Check_status (Status : STATUS) (Handler : HANDLER) = struct
         Lwt_result.fail
           Error.(
             make ~method_ ~status ~reason:(`Http (Unexpected_status error)) uri)
-      | None -> Monad.return r
+      | `Ok -> Monad.return r
     in
     Handler.raw ?headers ?body method_ uri
     |> Lwt_result.map_err (function
@@ -275,8 +294,8 @@ module Status_success = struct
   type error = Cohttp_.Code.status_code
 
   let check status =
-    if Cohttp_.Code.(is_success (code_of_status status)) then None
-    else Some status
+    if Cohttp_.Code.(is_success (code_of_status status)) then `Ok
+    else `Error status
 end
 
 let check_status_is expected =
@@ -285,8 +304,8 @@ let check_status_is expected =
     type error = Cohttp_.Code.status_code
 
     let check status =
-      if Cohttp_.Code.code_of_status status = expected then None
-      else Some status
+      if Cohttp_.Code.code_of_status status = expected then `Ok
+      else `Error status
   end : STATUS
     with type error = Cohttp_.Code.status_code)
 
