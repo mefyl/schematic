@@ -17,6 +17,7 @@ module Lwt_result = struct
 end
 
 let ( let* ) = Lwt.bind
+let ( and* ) = Lwt.both
 let empty = Schematic.Schema.make Ignore
 
 let stream =
@@ -247,7 +248,7 @@ module Check_status (Status : STATUS) (Handler : HANDLER) = struct
   type error = (Status.error, Handler.error) Error.status
 
   let raw ?headers ?body method_ uri =
-    let f ((resp, _) as r) =
+    let f ((resp, body) as r) =
       let status = Cohttp_.Response.status resp in
       match Status.check status with
       | Some error ->
@@ -256,7 +257,7 @@ module Check_status (Status : STATUS) (Handler : HANDLER) = struct
               m "unexpected status %s querying %a"
                 (Cohttp_.Code.string_of_status status)
                 Uri.pp uri)
-        in
+        and* () = Body.drain body in
         Lwt_result.fail
           Error.(
             make ~method_ ~status ~reason:(`Http (Unexpected_status error)) uri)
