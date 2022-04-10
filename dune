@@ -6,11 +6,10 @@
   schematic-jsoo.opam
   schematic-sqml.opam
   schematic.opam
-  (alias_rec schematic/all)
-  (alias_rec schematic-http/all)
-  (alias_rec schematic-jsoo/all)
-  (alias_rec schematic-sqml/all)
-  (alias_rec runtest)))
+  (alias_rec schematic/default)
+  (alias_rec schematic-http/default)
+  (alias_rec schematic-jsoo/default)
+  (alias_rec schematic-sqml/default)))
 
 (rule
  (target schematic.%{version:schematic}.opam)
