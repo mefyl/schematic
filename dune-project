@@ -35,7 +35,7 @@
    (>= 3.5.0))
   (ezjsonm
    (>= 1.1.0))
-  (ocaml-base-compiler
+  (ocaml
    (>= 4.12.0))
   fmt
   ppxlib
