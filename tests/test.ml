@@ -698,11 +698,11 @@ let keyed () =
   (* FIXME: we should validate but our json schema does not support keyed unions
      yet *)
   let () =
-    test ~validate:false "paragraph" tester keyed_schema
+    test "paragraph" tester keyed_schema
       (Paragraph_ { content = "text" })
       [%ezjsonm { content = "text"; typ = "paragraph" }]
   and () =
-    test ~validate:false "header" tester keyed_schema
+    test "header" tester keyed_schema
       (Header { content = "text"; level = 411 })
       [%ezjsonm { content = "text"; level = 411; typ = "header" }]
   and () =

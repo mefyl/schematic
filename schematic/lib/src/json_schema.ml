@@ -1,6 +1,86 @@
 open Base
 include Json_schema_intf
 
+let make_applicator ?additionalItems ?additionalProperties ?allOf ?anyOf
+    ?contains ?dependentSchema ?else_ ?if_ ?items ?not ?oneOf ?patternProperties
+    ?properties ?propertyNames ?then_ ?unevaluatedItems ?unevaluatedProperties
+    () =
+  {
+    additionalItems;
+    unevaluatedItems;
+    items;
+    contains;
+    additionalProperties;
+    unevaluatedProperties;
+    properties;
+    patternProperties;
+    dependentSchema;
+    propertyNames;
+    if_;
+    then_;
+    else_;
+    not;
+    allOf;
+    anyOf;
+    oneOf;
+  }
+
+let make_core ?anchor ?comment ?defs ?id ?recursive_anchor ?recursive_ref ?ref
+    ?schema ?vocabulary () =
+  {
+    id;
+    schema;
+    anchor;
+    ref;
+    recursive_ref;
+    recursive_anchor;
+    vocabulary;
+    comment;
+    defs;
+  }
+
+and make_metadata ?title ?description ?default ?(deprecated = false)
+    ?(readOnly = false) ?(writeOnly = false) ?(examples = []) () =
+  { title; description; default; deprecated; readOnly; writeOnly; examples }
+
+let make_validation ?const ?dependentRequired ?enum ?exclusiveMaximum
+    ?exclusiveMinimum ?maxContains ?maxItems ?maxLength ?maxProperties ?maximum
+    ?minContains ?minItems ?minLength ?minProperties ?minimum ?multipleOf
+    ?pattern ?required ?type_ ?uniqueItems () =
+  {
+    multipleOf;
+    maximum;
+    exclusiveMaximum;
+    minimum;
+    exclusiveMinimum;
+    maxLength;
+    minLength;
+    pattern;
+    maxItems;
+    minItems;
+    uniqueItems;
+    maxContains;
+    minContains;
+    maxProperties;
+    minProperties;
+    required;
+    dependentRequired;
+    const;
+    enum;
+    type_;
+  }
+
+let string_const_validation v =
+  make_validation ~type_:(Either.first String) ~const:(`String v) ()
+
+let string_const v =
+  {
+    applicator = make_applicator ();
+    core = make_core ();
+    metadata = make_metadata ();
+    validation = string_const_validation v;
+  }
+
 let applicator_empty =
   {
     additionalItems = None;
@@ -127,12 +207,7 @@ let of_schema schema =
           })
       | Schema.String ->
         { validation_empty with type_ = Some (Either.first String) }
-      | Schema.String_const v ->
-        {
-          validation_empty with
-          type_ = Some (Either.first String);
-          const = Some (`String v);
-        }
+      | Schema.String_const v -> string_const_validation v
       | Schema.Time ->
         { validation_empty with type_ = Some (Either.first String) }
       | Schema.Time_local ->
@@ -246,9 +321,30 @@ let of_schema schema =
         let marks, fields = tuple_applicator marks items in
         ( marks,
           Some { applicator_empty with items = Some (Tuple_schema fields) } )
-      | Schema.Union { cases; _ } ->
-        let f (Schema.Case { schema; _ }) (marks, l) =
+      | Schema.Union { cases; key } ->
+        let f (Schema.Case { name; schema; _ }) (marks, l) =
           let marks, schema = of_schema marks schema in
+          let schema =
+            match (key, schema) with
+            | ( Some key,
+                {
+                  validation = { type_ = Some (Either.First Object); _ };
+                  applicator = { properties; _ };
+                  _;
+                } ) ->
+              {
+                schema with
+                applicator =
+                  {
+                    schema.applicator with
+                    properties =
+                      Some
+                        ((key, string_const name)
+                        :: Option.value ~default:[] properties);
+                  };
+              }
+            | _ -> schema
+          in
           (marks, schema :: l)
         in
         let marks, schemas = List.fold_right ~f ~init:(marks, []) cases in
