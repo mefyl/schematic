@@ -1653,8 +1653,13 @@ let expand ~ctxt ~inside ?version (recursive, types) jsoo sqml =
         }
       in
       let () =
-        match (type_context.attributes.union_key, t.ptype_kind) with
-        | None, _ | Some _, Ptype_variant _ -> ()
+        match
+          (type_context.attributes.union_key, t.ptype_kind, t.ptype_manifest)
+        with
+        | None, _, _
+        | Some _, Ptype_variant _, _
+        | Some _, Ptype_abstract, Some { ptyp_desc = Ptyp_variant _; _ } ->
+          ()
         | _ ->
           Ppxlib.Location.raise_errorf ~loc:t.ptype_loc
             "schematic-ppx: union_key is only valid on variants"
