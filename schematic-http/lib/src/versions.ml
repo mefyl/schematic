@@ -1,9 +1,11 @@
 module Cohttp_ = Cohttp
 
-module V0_13_1 = struct
+module V0_13_2 = struct
   include Client
   module Error = Error
 end
+
+module V0_13_1 = V0_13_2
 
 module V0_13_0 = struct
   include V0_13_1
