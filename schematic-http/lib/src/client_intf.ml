@@ -81,7 +81,9 @@ end
 module type STATUS = sig
   type error
 
-  val check : Cohttp.Code.status_code -> error option
+  val check :
+    Cohttp.Code.status_code ->
+    [ `Body_error of error Schematic.Schema.t | `Error of error | `Ok ]
 end
 
 module type HANDLER = sig

@@ -31,6 +31,11 @@ and poly =
   ]
 [@@deriving schema ~jsoo]
 
+type keyed =
+  | Key_a of { i : int }
+  | Key_b of { s : string }
+[@@schematic.union_key "type_key"] [@@deriving schema ~jsoo]
+
 let of_result = function
   | Result.Ok v -> v
   | Result.Error e ->
@@ -46,6 +51,10 @@ let f (o : o_js) =
   and (_ : bool Js.t Js.Optdef.t) = o##.opt
   and (_ : bool Js.t Js.Opt.t Js.Optdef.t) = o##.opt_nullable
   and (_ : Js.number Js.t Js.Optdef.t) = o##.def in
+  ()
+
+let g (o : keyed_js) =
+  let (_ : Js.js_string Js.t) = o##.type_key in
   ()
 
 let () =

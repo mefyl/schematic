@@ -10,7 +10,7 @@
 
 (authors "mefyl <mefyl@gruntech.org>")
 
-(version 0.13.1)
+(version 0.13.2)
 
 (homepage https://gitlab.routine.co/routine/schematic)
 
@@ -35,7 +35,7 @@
    (>= 3.5.0))
   (ezjsonm
    (>= 1.1.0))
-  (ocaml-base-compiler
+  (ocaml
    (>= 4.12.0))
   fmt
   ppxlib

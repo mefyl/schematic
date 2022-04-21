@@ -336,6 +336,7 @@ type context = {
   loc : location;
   recursive : bool;
   types : string list;
+  version : Semver.t option;
 }
 
 type type_context = {
@@ -1155,6 +1156,9 @@ module Jsoo_type = struct
   type closed = type_declaration list
   type configuration = { functions : bool }
 
+  let js_escape_keyword word =
+    if Keyword.is_keyword word then word ^ "_" else word
+
   type expanded =
     | Type of core_type
     | Object of core_type
@@ -1164,7 +1168,7 @@ module Jsoo_type = struct
     | Ldot (ident, m) -> Ldot (ident, name "js" m)
     | Lapply _ -> failwith "Lapply"
 
-  let rec expand_type ~loc ~context t =
+  let rec expand_type ~loc ~context ~type_context t =
     match t.ptyp_desc with
     | Ptyp_constr (name, args) ->
       {
@@ -1172,11 +1176,11 @@ module Jsoo_type = struct
         ptyp_desc =
           Ptyp_constr
             ( { name with txt = expand_ident name.txt },
-              List.map ~f:(expand_type ~loc ~context) args );
+              List.map ~f:(expand_type ~loc ~context ~type_context) args );
       }
     (* Polymorphic variant *)
     | Ptyp_variant (fields, _, _) ->
-      expand_polymorphic_variant ~loc ~context fields
+      expand_polymorphic_variant ~loc ~context ~type_context fields
     (* I don't know of any way to properly type this, so any it is *)
     | Ptyp_tuple _ -> [%type: Js_of_ocaml.Js.Unsafe.any]
     (* Type variable *)
@@ -1198,20 +1202,29 @@ module Jsoo_type = struct
               (Oinherit
                  (Ast.ptyp_constr
                     { txt = suffix_id ~loc "js_fields" id.txt; loc }
-                    (List.map ~f:(expand_type ~loc ~context) parameters)))
+                    (List.map
+                       ~f:(expand_type ~loc ~context ~type_context)
+                       parameters)))
           | _ -> None)
         | Inline_try -> None
         | Outline ->
           let t =
-            match Attributes.requirement attributes with
-            | Required, type_ ->
+            match context.version with
+            | Some { major = 0; minor = 3; patch; _ } when patch < 1 ->
               [%type:
-                [%t expand_type ~loc ~context type_]
+                [%t expand_type ~loc ~context ~type_context type_]
                 Js_of_ocaml.Js.readonly_prop]
-            | (Default_opt _ | Optional), type_ ->
-              [%type:
-                [%t expand_type ~loc ~context type_] Js_of_ocaml.Js.Optdef.t
-                Js_of_ocaml.Js.readonly_prop]
+            | _ -> (
+              match Attributes.requirement attributes with
+              | Required, type_ ->
+                [%type:
+                  [%t expand_type ~loc ~context ~type_context type_]
+                  Js_of_ocaml.Js.readonly_prop]
+              | (Default_opt _ | Optional), type_ ->
+                [%type:
+                  [%t expand_type ~loc ~context ~type_context type_]
+                  Js_of_ocaml.Js.Optdef.t
+                  Js_of_ocaml.Js.readonly_prop])
           in
           Some (Otag ({ loc; txt = Option.value ~default:name alias }, t))
       in
@@ -1233,10 +1246,10 @@ module Jsoo_type = struct
       (txt, pcd_args, loc, attrs)
     in
     Type
-      (expand_any_variant ~loc:type_context.loc ~context false
+      (expand_any_variant ~loc:type_context.loc ~context ~type_context false
       @@ List.map ~f options)
 
-  and expand_polymorphic_variant ~loc ~context options =
+  and expand_polymorphic_variant ~loc ~context ~type_context options =
     let f { prf_desc; prf_loc; prf_attributes } =
       match prf_desc with
       | Rtag ({ txt; _ }, _, types) ->
@@ -1245,19 +1258,35 @@ module Jsoo_type = struct
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: inheriting polymorphic variants not supported"
     in
-    expand_any_variant ~loc ~context true @@ List.map ~f options
+    expand_any_variant ~loc ~context ~type_context true @@ List.map ~f options
 
-  and expand_any_variant ~loc ~context:_ _ options =
+  and expand_any_variant ~loc ~context ~type_context _ options =
+    let module Ast = (val Ast_builder.make loc) in
     if
       Option.is_some
       @@ List.find
            ~f:(function _, Pcstr_tuple [], _, _ -> false | _ -> true)
            options
-    then [%type: Js_of_ocaml.Js.Unsafe.any]
+    then
+      match (context.version, type_context.attributes.union_key) with
+      | _, None | Some { major = 0; minor = 3; patch = 0; _ }, _ ->
+        [%type: Js_of_ocaml.Js.Unsafe.any]
+      | _, Some key ->
+        let fields =
+          let string_prop =
+            [%type:
+              Js_of_ocaml.Js.js_string Js_of_ocaml.Js.t
+              Js_of_ocaml.Js.readonly_prop]
+          in
+          Ast.ptyp_object
+            [ Ast.otag { txt = js_escape_keyword key; loc } string_prop ]
+            Closed
+        in
+        [%type: [%t fields] Js_of_ocaml.Js.t]
     else [%type: string_js]
 
   let expand_abstract_type ~context ~type_context t =
-    Type (expand_type ~loc:type_context.loc ~context t)
+    Type (expand_type ~loc:type_context.loc ~context ~type_context t)
 
   let close ~configuration:_ ~context:_ ~type_context =
     let module Ast = (val Ast_builder.make type_context.loc) in
@@ -1600,7 +1629,7 @@ module Jsoo_type_expander = Expander (Jsoo_type)
 module Schema_expander = Expander (Schema)
 module Sqml_binding_expander = Expander (Sqml_binding)
 
-let expand ~ctxt ~inside (recursive, types) jsoo sqml =
+let expand ~ctxt ~inside ?version (recursive, types) jsoo sqml =
   let loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt in
   let context =
     let recursive = Poly.(recursive = Recursive)
@@ -1609,7 +1638,7 @@ let expand ~ctxt ~inside (recursive, types) jsoo sqml =
       let f { ptype_name; _ } = ptype_name.txt in
       if recursive then List.map ~f types else []
     in
-    { code_path; inside; loc; types; recursive }
+    { code_path; inside; loc; types; recursive; version }
   in
   let types =
     let f t =
@@ -1624,8 +1653,13 @@ let expand ~ctxt ~inside (recursive, types) jsoo sqml =
         }
       in
       let () =
-        match (type_context.attributes.union_key, t.ptype_kind) with
-        | None, _ | Some _, Ptype_variant _ -> ()
+        match
+          (type_context.attributes.union_key, t.ptype_kind, t.ptype_manifest)
+        with
+        | None, _, _
+        | Some _, Ptype_variant _, _
+        | Some _, Ptype_abstract, Some { ptyp_desc = Ptyp_variant _; _ } ->
+          ()
         | _ ->
           Ppxlib.Location.raise_errorf ~loc:t.ptype_loc
             "schematic-ppx: union_key is only valid on variants"
@@ -1708,7 +1742,7 @@ let expand ~ctxt ~inside (recursive, types) jsoo sqml =
       let _ = unit_schema]
     @ contents
 
-let add inside =
+let add ?version inside =
   let str_type_decl =
     let open Deriving.Args in
     let arg =
@@ -1716,6 +1750,6 @@ let add inside =
       and sqml = arg "sqml" (estring __) in
       empty +> jsoo +> sqml
     in
-    Deriving.Generator.V2.make arg (expand ~inside)
+    Deriving.Generator.V2.make arg (expand ?version ~inside)
   in
   Deriving.add ~str_type_decl "schema"

@@ -216,27 +216,48 @@ let variant () =
 
 (* Polymorphic variant *)
 
-type day =
-  [ `Mon
-  | `Tue [@schematic.as "tuesday"]
-  | `Wed of int
-  | `Thu of bool * bool
-  | `Fri
-  | `Sat
-  | `Sun
-  ]
-[@@deriving eq, schema, show]
+module Polymorphic_variant = struct
+  type day =
+    [ `Mon
+    | `Tue [@schematic.as "tuesday"]
+    | `Wed of int
+    | `Thu of bool * bool
+    | `Fri
+    | `Sat
+    | `Sun
+    ]
+  [@@deriving eq, schema, show]
 
-let test_day = Alcotest.testable pp_day equal_day
+  let test_day = Alcotest.testable pp_day equal_day
 
-let polymorphic_variant () =
-  test "polymorphic variant" test_day day_schema `Mon [%ezjsonm "mon"];
-  test "polymorphic variant alias" test_day day_schema `Tue [%ezjsonm "tuesday"];
-  test "polymorphic variant payload" test_day day_schema (`Wed 160)
-    [%ezjsonm 160];
-  test "polymorphic variant composite payload" test_day day_schema
-    (`Thu (true, false))
-    [%ezjsonm [ true; false ]]
+  let payload () =
+    test "polymorphic variant" test_day day_schema `Mon [%ezjsonm "mon"];
+    test "polymorphic variant alias" test_day day_schema `Tue
+      [%ezjsonm "tuesday"];
+    test "polymorphic variant payload" test_day day_schema (`Wed 160)
+      [%ezjsonm 160];
+    test "polymorphic variant composite payload" test_day day_schema
+      (`Thu (true, false))
+      [%ezjsonm [ true; false ]]
+
+  type keyed =
+    [ `Left
+    | `Right
+    | `Center of pl
+    ]
+  [@@schematic.union_key "position"]
+
+  and pl = { stable : bool } [@@deriving eq, schema, show]
+
+  let test_keyed = Alcotest.testable pp_keyed equal_keyed
+
+  let keyed () =
+    test "keyed polymorphic variant" test_keyed keyed_schema `Left
+      [%ezjsonm { position = "left" }];
+    test "keyed polymorphic variant" test_keyed keyed_schema
+      (`Center { stable = false })
+      [%ezjsonm { position = "center"; stable = false }]
+end
 
 (* List *)
 
@@ -698,11 +719,11 @@ let keyed () =
   (* FIXME: we should validate but our json schema does not support keyed unions
      yet *)
   let () =
-    test ~validate:false "paragraph" tester keyed_schema
+    test "paragraph" tester keyed_schema
       (Paragraph_ { content = "text" })
       [%ezjsonm { content = "text"; typ = "paragraph" }]
   and () =
-    test ~validate:false "header" tester keyed_schema
+    test "header" tester keyed_schema
       (Header { content = "text"; level = 411 })
       [%ezjsonm { content = "text"; level = 411; typ = "header" }]
   and () =
@@ -1138,7 +1159,8 @@ let () =
           test_case "record" `Quick record;
           test_case "tuple" `Quick tuple;
           test_case "variant" `Quick variant;
-          test_case "polymorphic variant" `Quick polymorphic_variant;
+          test_case "polymorphic variant" `Quick Polymorphic_variant.payload;
+          test_case "keyed polymorphic variant" `Quick Polymorphic_variant.keyed;
           test_case "alias" `Quick alias;
           test_case "list" `Quick List.objects;
           test_case "option list" `Quick List.option;
