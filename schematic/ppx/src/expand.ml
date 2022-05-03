@@ -204,6 +204,7 @@ module Attributes = struct
     schema :
       (expression * (Semver.t * [ `Eq | `Gt | `Gte | `Lt | `Lte ]) option) list;
     specs : specs; [@default specs_empty]
+    sqml_foreign : expression list;
     sqml_primary : bool option;
     sqml_type : expression option;
     type_ : core_type;
@@ -526,6 +527,11 @@ let expand_field
             "schematic-ppx: inline specified multiple times"
       | _ ->
         Ppxlib.Location.raise_errorf ~loc "schematic-ppx: no payload expected")
+    | "schematic.sqml.foreign_key" ->
+      Ast_pattern.parse
+        Ast_pattern.(single_expr_payload __)
+        loc attr_payload
+        (fun pl -> { attrs with sqml_foreign = pl :: attrs.sqml_foreign })
     | "schematic.sqml.primary" ->
       if Option.is_some attrs.sqml_primary then
         Ppxlib.Location.raise_errorf ~loc
@@ -1470,13 +1476,26 @@ module Sqml_binding = struct
                 Schema.(
                   schema_of_expanded ~loc:field.loc
                   @@ encode_type ~context ~type_context field.type_)]]
+      and fk =
+        match field.sqml_foreign with
+        | [] -> [%expr None]
+        | keys ->
+          let fk =
+            List.map
+              ~f:(fun exp ->
+                let loc = exp.pexp_loc in
+                [%expr Sqml.Table.Column.Reference [%e exp]])
+              keys
+            |> Ast.elist
+          in
+          [%expr Some [%e fk]]
       and primary =
         Ast.ebool (Option.value ~default:false field.sqml_primary)
       in
       [%stri
         let [%p Ast.pvar (column_name field.name)] =
-          Sqml.Column.make ~primary:[%e primary] [%e Ast.estring field.name]
-            [%e column_type]]
+          Sqml.Column.make ~primary:[%e primary] ?foreign_keys:[%e fk]
+            [%e Ast.estring field.name] [%e column_type]]
     and column_type_of_field (field : Attributes.field) tail =
       [%type: [%t field.type_] * [%t tail]]
     and expr_explosion_of_field (field : Attributes.field) =
