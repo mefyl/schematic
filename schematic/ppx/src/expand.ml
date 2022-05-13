@@ -531,7 +531,23 @@ let expand_field
       Ast_pattern.parse
         Ast_pattern.(single_expr_payload __)
         loc attr_payload
-        (fun pl -> { attrs with sqml_foreign = pl :: attrs.sqml_foreign })
+        (fun pl ->
+          {
+            attrs with
+            sqml_foreign =
+              [%expr Sqml.Table.Column.Reference [%e pl]] :: attrs.sqml_foreign;
+          })
+    | "schematic.sqml.foreign_key_nullable" ->
+      Ast_pattern.parse
+        Ast_pattern.(single_expr_payload __)
+        loc attr_payload
+        (fun pl ->
+          {
+            attrs with
+            sqml_foreign =
+              [%expr Sqml.Table.Column.Reference_opt [%e pl]]
+              :: attrs.sqml_foreign;
+          })
     | "schematic.sqml.primary" ->
       if Option.is_some attrs.sqml_primary then
         Ppxlib.Location.raise_errorf ~loc
@@ -1479,16 +1495,7 @@ module Sqml_binding = struct
       and fk =
         match field.sqml_foreign with
         | [] -> [%expr None]
-        | keys ->
-          let fk =
-            List.map
-              ~f:(fun exp ->
-                let loc = exp.pexp_loc in
-                [%expr Sqml.Table.Column.Reference [%e exp]])
-              keys
-            |> Ast.elist
-          in
-          [%expr Some [%e fk]]
+        | keys -> [%expr Some [%e Ast.elist keys]]
       and primary =
         Ast.ebool (Option.value ~default:false field.sqml_primary)
       in
