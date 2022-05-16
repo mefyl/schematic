@@ -1,1 +1,1 @@
-val add : ?version:Semver.t -> bool -> Ppxlib.Deriving.t
+val add : version:Semver.t option ref -> bool -> Ppxlib.Deriving.t

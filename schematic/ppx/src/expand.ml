@@ -529,7 +529,7 @@ let expand_field context
         Ppxlib.Location.raise_errorf ~loc "schematic-ppx: no payload expected")
     | "schematic.sqml.foreign_key" -> (
       match context.version with
-      | Some { major = 0; minor = 3; patch; _ } when patch < 4 ->
+      | Some { major = 0; minor = 13; patch; _ } when patch < 4 ->
         Ast_pattern.parse
           Ast_pattern.(single_expr_payload __)
           loc attr_payload
@@ -1237,7 +1237,7 @@ module Jsoo_type = struct
         | Outline ->
           let t =
             match context.version with
-            | Some { major = 0; minor = 3; patch; _ } when patch < 1 ->
+            | Some { major = 0; minor = 13; patch; _ } when patch < 1 ->
               [%type:
                 [%t expand_type ~loc ~context ~type_context type_]
                 Js_of_ocaml.Js.readonly_prop]
@@ -1296,7 +1296,7 @@ module Jsoo_type = struct
            options
     then
       match (context.version, type_context.attributes.union_key) with
-      | _, None | Some { major = 0; minor = 3; patch = 0; _ }, _ ->
+      | _, None | Some { major = 0; minor = 13; patch = 0; _ }, _ ->
         [%type: Js_of_ocaml.Js.Unsafe.any]
       | _, Some key ->
         let fields =
@@ -1660,7 +1660,8 @@ module Jsoo_type_expander = Expander (Jsoo_type)
 module Schema_expander = Expander (Schema)
 module Sqml_binding_expander = Expander (Sqml_binding)
 
-let expand ~ctxt ~inside ?version (recursive, types) jsoo sqml =
+let expand ~ctxt ~inside ~version (recursive, types) jsoo sqml =
+  let version = !version in
   let loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt in
   let context =
     let recursive = Poly.(recursive = Recursive)
@@ -1773,7 +1774,7 @@ let expand ~ctxt ~inside ?version (recursive, types) jsoo sqml =
       let _ = unit_schema]
     @ contents
 
-let add ?version inside =
+let add ~version inside =
   let str_type_decl =
     let open Deriving.Args in
     let arg =
@@ -1781,6 +1782,6 @@ let add ?version inside =
       and sqml = arg "sqml" (estring __) in
       empty +> jsoo +> sqml
     in
-    Deriving.Generator.V2.make arg (expand ?version ~inside)
+    Deriving.Generator.V2.make arg (expand ~version ~inside)
   in
   Deriving.add ~str_type_decl "schema"

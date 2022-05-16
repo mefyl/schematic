@@ -13,14 +13,7 @@
  (modules ppx)
  (public_name schematic.ppx)
  (kind ppx_deriver)
- (libraries ppxlib schematic_ppx_expand))
-
-(library
- (name schematic_ppx_0_13_0)
- (modules ppx_0_13_0)
- (public_name schematic.ppx.0.13.0)
- (kind ppx_deriver)
- (libraries ppxlib schematic_ppx_expand))
+ (libraries ppxlib schematic schematic_ppx_expand))
 
 (library
  (name schematic_ppx_inside)
