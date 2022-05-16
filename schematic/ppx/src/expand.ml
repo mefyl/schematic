@@ -384,7 +384,7 @@ module type EXPANSION = sig
     expanded
 end
 
-let expand_field
+let expand_field context
     { pld_attributes; pld_loc = loc; pld_name = { txt = name; _ }; pld_type; _ }
     =
   let read_attribute (attrs : Attributes.field)
@@ -527,27 +527,32 @@ let expand_field
             "schematic-ppx: inline specified multiple times"
       | _ ->
         Ppxlib.Location.raise_errorf ~loc "schematic-ppx: no payload expected")
-    | "schematic.sqml.foreign_key" ->
-      Ast_pattern.parse
-        Ast_pattern.(single_expr_payload __)
-        loc attr_payload
-        (fun pl ->
-          {
-            attrs with
-            sqml_foreign =
-              [%expr Sqml.Table.Column.Reference [%e pl]] :: attrs.sqml_foreign;
-          })
-    | "schematic.sqml.foreign_key_nullable" ->
-      Ast_pattern.parse
-        Ast_pattern.(single_expr_payload __)
-        loc attr_payload
-        (fun pl ->
-          {
-            attrs with
-            sqml_foreign =
-              [%expr Sqml.Table.Column.Reference_opt [%e pl]]
-              :: attrs.sqml_foreign;
-          })
+    | "schematic.sqml.foreign_key" -> (
+      match context.version with
+      | Some { major = 0; minor = 3; patch; _ } when patch < 4 ->
+        Ast_pattern.parse
+          Ast_pattern.(single_expr_payload __)
+          loc attr_payload
+          (fun pl ->
+            {
+              attrs with
+              sqml_foreign =
+                [%expr Sqml.Table.Column.Reference_opt [%e pl]]
+                :: attrs.sqml_foreign;
+            })
+      | _ ->
+        Ast_pattern.parse
+          Ast_pattern.(single_expr_payload __)
+          loc attr_payload
+          (fun pl ->
+            {
+              attrs with
+              sqml_foreign =
+                [%expr
+                  let open Sqml.Table.Column.Foreign_key in
+                  [%e pl]]
+                :: attrs.sqml_foreign;
+            }))
     | "schematic.sqml.primary" ->
       if Option.is_some attrs.sqml_primary then
         Ppxlib.Location.raise_errorf ~loc
@@ -926,7 +931,7 @@ module Schema = struct
             match pcd_args with
             | Pcstr_record fields ->
               _expand_record true ~context ~type_context
-                (List.map ~f:expand_field fields)
+                (List.map ~f:(expand_field context) fields)
             | _ -> encode_type ~context ~type_context type_
           in
           ( schema,
@@ -1701,7 +1706,7 @@ let expand ~ctxt ~inside ?version (recursive, types) jsoo sqml =
       let type_ =
         match t.ptype_kind with
         | Ptype_record fields ->
-          let fields = List.map ~f:expand_field fields
+          let fields = List.map ~f:(expand_field context) fields
           and computed =
             let f (name, (value, type_)) =
               Attributes.make_field ~loc:value.pexp_loc ~type_ ~computed:value
