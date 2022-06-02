@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic-jsoo"
-version: "0.13.4"
+version: "0.13.5"
 synopsis: "Derive js_of_ocaml types and values from Ocaml types"
 description: """\
 Deduce js_of_ocaml FFI types
@@ -24,11 +24,11 @@ depends: [
   "biniou" {= "1.2.1"}
   "cmdliner" {= "1.1.1"}
   "conf-pkg-config" {= "2"}
-  "cppo" {= "1.6.8"}
+  "cppo" {= "1.6.9"}
   "csexp" {= "1.5.1"}
   "cstruct" {= "6.1.0"}
-  "dune" {= "3.1.1"}
-  "dune-configurator" {= "3.1.1"}
+  "dune" {= "3.2.0"}
+  "dune-configurator" {= "3.2.0"}
   "easy-format" {= "1.3.3"}
   "ezjsonm" {= "1.3.0"}
   "fmt" {= "0.9.0"}
