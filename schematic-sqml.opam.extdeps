@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic-sqml"
-version: "0.13.5"
+version: "0.13.6"
 synopsis: "Derive SQML bindings from Ocaml types"
 description: "Deduce SQML bindings from schematic type metadata."
 maintainer: "mefyl <mefyl@gruntech.org>"
@@ -26,9 +26,9 @@ depends: [
   "cppo" {= "1.6.9"}
   "csexp" {= "1.5.1"}
   "cstruct" {= "6.1.0"}
-  "dune" {= "3.2.0"}
-  "dune-configurator" {= "3.2.0"}
-  "easy-format" {= "1.3.3"}
+  "dune" {= "3.3.0"}
+  "dune-configurator" {= "3.3.0"}
+  "easy-format" {= "1.3.4"}
   "ezjsonm" {= "1.3.0"}
   "fmt" {= "0.9.0"}
   "hex" {= "1.5.0"}

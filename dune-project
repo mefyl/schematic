@@ -10,7 +10,7 @@
 
 (authors "mefyl <mefyl@gruntech.org>")
 
-(version 0.13.5)
+(version 0.13.6)
 
 (homepage https://gitlab.routine.co/routine/schematic)
 
@@ -38,7 +38,7 @@
   (ocaml
    (>= 4.12.0))
   fmt
-  (ppxlib 
+  (ppxlib
    (= 0.25.0))
   ppx_deriving
   ppx_here
