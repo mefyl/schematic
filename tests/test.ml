@@ -194,25 +194,35 @@ let pp_expectation fmt = function
 
 let test_expectation = Alcotest.testable pp_expectation ( = )
 
-let variant () =
-  test "variant" test_expectation expectation_schema
-    (Exact { major = 1; minor = 2; subminor = 3 })
-    [%ezjsonm { major = 1; minor = 2; subminor = 3 }];
-  test "variant" test_expectation expectation_schema
-    (Range
-       ( { major = 1; minor = 2; subminor = 3 },
-         { major = 4; minor = 5; subminor = 6 },
-         108 ))
-    [%ezjsonm
-      [
-        { major = 1; minor = 2; subminor = 3 };
-        { major = 4; minor = 5; subminor = 6 };
-        108;
-      ]];
-  test "variant" test_expectation expectation_schema Nothing
-    [%ezjsonm "nothing"];
-  test "variant" test_expectation expectation_schema Aliased
-    [%ezjsonm "aktually"]
+module Variant = struct
+  let variant () =
+    test "variant" test_expectation expectation_schema
+      (Exact { major = 1; minor = 2; subminor = 3 })
+      [%ezjsonm { major = 1; minor = 2; subminor = 3 }];
+    test "variant" test_expectation expectation_schema
+      (Range
+         ( { major = 1; minor = 2; subminor = 3 },
+           { major = 4; minor = 5; subminor = 6 },
+           108 ))
+      [%ezjsonm
+        [
+          { major = 1; minor = 2; subminor = 3 };
+          { major = 4; minor = 5; subminor = 6 };
+          108;
+        ]];
+    test "variant" test_expectation expectation_schema Nothing
+      [%ezjsonm "nothing"];
+    test "variant" test_expectation expectation_schema Aliased
+      [%ezjsonm "aktually"]
+
+  type singleton = Single [@@deriving eq, schema, show]
+
+  let singleton = Alcotest.testable pp_singleton equal_singleton
+
+  let singleton () =
+    test "singleton variant" singleton singleton_schema Single
+      [%ezjsonm "single"]
+end
 
 (* Polymorphic variant *)
 
@@ -1158,7 +1168,8 @@ let () =
           test_case "default option" `Quick default_option;
           test_case "record" `Quick record;
           test_case "tuple" `Quick tuple;
-          test_case "variant" `Quick variant;
+          test_case "variant" `Quick Variant.variant;
+          test_case "singleton variant" `Quick Variant.singleton;
           test_case "polymorphic variant" `Quick Polymorphic_variant.payload;
           test_case "keyed polymorphic variant" `Quick Polymorphic_variant.keyed;
           test_case "alias" `Quick alias;

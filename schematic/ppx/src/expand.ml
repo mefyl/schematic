@@ -945,7 +945,9 @@ module Schema = struct
           if poly then Ast.ppat_variant txt pattern
           else Ast.ppat_construct { txt = Lident txt; loc } ctor_pattern
         and value = Option.value ~default:[%expr ()] value in
-        [%expr function [%p pattern] -> Some [%e value] | _ -> None]
+        if List.length options > 1 then
+          [%expr function [%p pattern] -> Some [%e value] | _ -> None]
+        else [%expr function [%p pattern] -> Some [%e value]]
       and destruct =
         let value =
           if poly then Ast.pexp_variant txt value
