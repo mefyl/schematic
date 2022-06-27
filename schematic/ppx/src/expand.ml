@@ -1776,14 +1776,43 @@ let expand ~ctxt ~inside ~version (recursive, types) jsoo sqml =
       let _ = unit_schema]
     @ contents
 
+let expand_sig ~ctxt (_recursive, types) =
+  let loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt in
+  let module Ast = (val Ast_builder.make loc) in
+  let f { ptype_name = { txt; loc }; _ } =
+    let type_ = Ast.ptyp_constr { txt = Longident.Lident txt; loc } [] in
+    [
+      Ast.(
+        psig_value
+        @@ value_description
+             ~name:{ txt = name "schema_versioned" txt; loc }
+             ~type_:
+               [%type:
+                 Schematic.Version.t option -> [%t type_] Schematic.Schema.t]
+             ~prim:[]);
+      Ast.(
+        psig_value
+        @@ value_description
+             ~name:{ txt = name "schema" txt; loc }
+             ~type_:[%type: [%t type_] Schematic.Schema.t] ~prim:[]);
+    ]
+  in
+  List.map ~f types |> List.concat
+
 let add ~version inside =
-  let str_type_decl =
-    let open Deriving.Args in
+  let sig_type_decl =
     let arg =
+      let open Deriving.Args in
+      empty
+    in
+    Deriving.Generator.V2.make arg expand_sig
+  and str_type_decl =
+    let arg =
+      let open Deriving.Args in
       let jsoo = arg "jsoo" __
       and sqml = arg "sqml" (estring __) in
       empty +> jsoo +> sqml
     in
     Deriving.Generator.V2.make arg (expand ~version ~inside)
   in
-  Deriving.add ~str_type_decl "schema"
+  Deriving.add ~sig_type_decl ~str_type_decl "schema"
