@@ -285,7 +285,7 @@ module Check_status (Status : STATUS) (Handler : HANDLER) = struct
       | `Ok -> Monad.return r
     in
     Handler.raw ?headers ?body method_ uri
-    |> Lwt_result.map_err (function
+    |> Lwt_result.map_error (function
          | Error.{ reason = `Http e; _ } as error ->
            { error with reason = `Http Error.(Valid_status e) }
          | { reason = `Decoding _ | `Networking; _ } as error -> error)
