@@ -63,6 +63,7 @@ module Ptime : sig
       timezone and uses tuples all around. Define ours.*)
   type local = Ptime.t * Ptime.tz_offset_s
 
+  val equal_local : local -> local -> bool
   val local_schema : local Schema.t
   val local_schema_versioned : Version.t option -> local Schema.t
   val date_schema : date Schema.t
