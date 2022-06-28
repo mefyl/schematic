@@ -1,3 +1,9 @@
+module Schemas_library = struct
+  type Schematic.Schema.library += V
+
+  let v = V
+end
+
 module Model = struct
   include Sqml.Model.Make (struct
     let version = Schematic.Version.make 0 0 0

@@ -1,5 +1,11 @@
 open Base
 
+module Schemas_library = struct
+  type Schematic.Schema.library += V
+
+  let v = V
+end
+
 type record = {
   a : int;
   inline : inline; [@schematic.inline]

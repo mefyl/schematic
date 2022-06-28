@@ -2,6 +2,12 @@ open Base
 open Poly
 open Schematic.Schemas
 
+module Schemas_library = struct
+  type Schematic.Schema.library += V
+
+  let v = V
+end
+
 let ( let* ) = Result.( >>= )
 let ( let+ ) = Result.( >>| )
 let root = Caml.Filename.dirname @@ Caml.Sys.executable_name
@@ -1081,6 +1087,10 @@ module Version = struct
 
   let t = Alcotest.testable pp equal
 
+  let schema_versions = function
+    | Schemas_library.V -> Some (Schematic.Version.make 0 6 0)
+    | _ -> None
+
   let test () =
     test ~validate:false "latest none" t schema { v = None }
       [%ezjsonm { v = None }];
@@ -1089,13 +1099,13 @@ module Version = struct
     test ~validate:false "latest string" t schema { v = Some (String "3") }
       [%ezjsonm { v = "3" }];
     test ~validate:false "old none" t
-      (schema_versioned @@ Some (Schematic.Version.make 0 6 0))
+      (schema_versioned schema_versions)
       { v = None } [%ezjsonm { v = None }];
     test ~validate:false "old int" t
-      (schema_versioned @@ Some (Schematic.Version.make 0 6 0))
+      (schema_versioned schema_versions)
       { v = Some (Int 3) } [%ezjsonm { v = 3 }];
     test ~validate:false "old string" t
-      (schema_versioned @@ Some (Schematic.Version.make 0 6 0))
+      (schema_versioned schema_versions)
       { v = Some (String "3") } ~decoded:{ v = None } [%ezjsonm { v = None }]
 end
 
@@ -1139,10 +1149,14 @@ module VersionCascade = struct
     in
 
     let () =
+      let schema_versions = function
+        | Schemas_library.V -> Some (Schematic.Version.make 0 9 0)
+        | _ -> None
+      in
       let value = { id = "glouglou"; content = { content = "foo" } } in
       let value = { t_ = value } in
       let json = [%ezjsonm { content = "foo" }] in
-      let schema = schema_versioned @@ Some (Schematic.Version.make 0 9 0) in
+      let schema = schema_versioned schema_versions in
       test ~validate:false "legacy" testable schema value json
     in
     ()

@@ -789,7 +789,7 @@ module Schema = struct
                       || Schematic.Version.less_than l r]
               in
               [%expr
-                match __schematic_version with
+                match __schematic_schema_version with
                 | Some version when [%e predicate] version [%e version] ->
                   [%e schema]
                 | _ -> [%e next]]
@@ -1090,13 +1090,15 @@ module Schema = struct
                 if cache then
                   [%expr
                     match
-                      Base.Map.find !__schematic_cache __schematic_version
+                      Base.Map.find !__schematic_cache
+                        __schematic_schema_version
                     with
                     | None ->
                       Schema.fixpoint (fun __schematic_self ->
                           __schematic_cache :=
                             Base.Map.set !__schematic_cache
-                              ~key:__schematic_version ~data:__schematic_self;
+                              ~key:__schematic_schema_version
+                              ~data:__schematic_self;
                           [%e c.descriptor])
                     | Some schema -> schema]
                 else params_wrap c.descriptor]
@@ -1120,16 +1122,23 @@ module Schema = struct
       (schema_name type_context.name, schema_name_versioned type_context.name)
     in
     let body =
-      params_wrap (params_apply [%expr [%e Ast.evar name_versioned] None])
+      params_wrap
+        (params_apply [%expr [%e Ast.evar name_versioned] (fun _ -> None)])
     and body_versioned =
       let body =
         if context.inside then
           [%expr
-            fun (__schematic_version : Version.t option) ->
+            fun (__schematic_version : Schema.version) ->
+              let __schematic_schema_version =
+                __schematic_version Schemas_library.v
+              in
               [%e params_wrap schema]]
         else
           [%expr
-            fun (__schematic_version : Schematic.Version.t option) ->
+            fun (__schematic_version : Schematic.Schema.version) ->
+              let __schematic_schema_version =
+                __schematic_version Schemas_library.v
+              in
               [%e params_wrap schema]]
       in
       if cache then
@@ -1568,7 +1577,7 @@ module Sqml_binding = struct
       [%str
         include Sqml.Table.Meta (struct
           let name = [%e Ast.estring name]
-          let __schematic_version = None
+          let __schematic_version _ = None
 
           include
             [%m
@@ -1788,7 +1797,7 @@ let expand_sig ~ctxt (_recursive, types) =
              ~name:{ txt = name "schema_versioned" txt; loc }
              ~type_:
                [%type:
-                 Schematic.Version.t option -> [%t type_] Schematic.Schema.t]
+                 Schematic.Schema.version -> [%t type_] Schematic.Schema.t]
              ~prim:[]);
       Ast.(
         psig_value

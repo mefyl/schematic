@@ -1,6 +1,12 @@
 open Base
 open Js_of_ocaml
 
+module Schemas_library = struct
+  type Schematic.Schema.library += V
+
+  let v = V
+end
+
 module Namespace = struct
   type int_alias = int [@@deriving schema ~jsoo]
 end

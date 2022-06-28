@@ -24,17 +24,17 @@ let rec equal_any l r =
   | _ -> false
 
 let any_schema = Schema.make Any
-let any_schema_versioned (_ : Version.t option) = any_schema
+let any_schema_versioned (_ : Schema.version) = any_schema
 let bool_schema = Schema.make Bool
-let bool_schema_versioned (_ : Version.t option) = bool_schema
+let bool_schema_versioned (_ : Schema.version) = bool_schema
 let float_schema = Schema.make Float
-let float_schema_versioned (_ : Version.t option) = float_schema
+let float_schema_versioned (_ : Schema.version) = float_schema
 let ignore_schema = Schema.make Ignore
-let ignore_schema_versioned (_ : Version.t option) = ignore_schema
+let ignore_schema_versioned (_ : Schema.version) = ignore_schema
 let int64_schema = Schema.make Int64
-let int64_schema_versioned (_ : Version.t option) = int64_schema
+let int64_schema_versioned (_ : Schema.version) = int64_schema
 let int_schema = Schema.make Int
-let int_schema_versioned (_ : Version.t option) = int_schema
+let int_schema_versioned (_ : Schema.version) = int_schema
 let list_schema schema = Schema.make (List schema)
 let list_schema_versioned _ = list_schema
 let mapping_schema schema = Schema.make (Mapping schema)
@@ -42,9 +42,9 @@ let option_schema s = Schema.make (Nullable s)
 let option_schema_versioned _ = option_schema
 let string_const_schema s = Schema.make (String_const s)
 let string_schema = Schema.make String
-let string_schema_versioned (_ : Version.t option) = string_schema
+let string_schema_versioned (_ : Schema.version) = string_schema
 let unit_schema = Schema.make Null
-let unit_schema_versioned (_ : Version.t option) = unit_schema
+let unit_schema_versioned (_ : Schema.version) = unit_schema
 
 module Either = struct
   include Base.Either
@@ -96,7 +96,7 @@ module Either = struct
     in
     Schema.make ~parametric (descriptor first second)
 
-  let schema_versioned (_ : Version.t option) = schema
+  let schema_versioned (_ : Schema.version) = schema
 end
 
 module Result = struct
@@ -153,15 +153,15 @@ module Ptime = struct
   include Ptime
 
   let schema = Schema.make Time
-  let schema_versioned (_ : Version.t option) = schema
+  let schema_versioned (_ : Schema.version) = schema
 
   type local = Ptime.t * Ptime.tz_offset_s
 
   let equal_local (t1, o1) (t2, o2) = Ptime.equal t1 t2 && o1 = o2
   let local_schema = Schema.make Time_local
-  let local_schema_versioned (_ : Version.t option) = local_schema
+  let local_schema_versioned (_ : Schema.version) = local_schema
   let date_schema = Schema.make Date
-  let date_schema_versioned (_ : Version.t option) = date_schema
+  let date_schema_versioned (_ : Schema.version) = date_schema
 
   let span_schema =
     Schema.make ~id:"duration"
@@ -173,7 +173,7 @@ module Ptime = struct
            descriptor = Int;
          })
 
-  let span_schema_versioned (_ : Version.t option) = span_schema
+  let span_schema_versioned (_ : Schema.version) = span_schema
 end
 
 module Uri = struct
@@ -188,5 +188,5 @@ module Uri = struct
            descriptor = String;
          })
 
-  let schema_versioned (_ : Version.t option) = schema
+  let schema_versioned (_ : Schema.version) = schema
 end

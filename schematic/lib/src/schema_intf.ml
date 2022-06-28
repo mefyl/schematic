@@ -148,3 +148,6 @@ module type WALK = sig
   val time_local : unit -> t
   val tuple : t list -> t
 end
+
+type library = ..
+type version = library -> Version.t option
