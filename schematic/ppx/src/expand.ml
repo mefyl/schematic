@@ -384,7 +384,7 @@ module type EXPANSION = sig
     expanded
 end
 
-let expand_field context
+let expand_field _
     { pld_attributes; pld_loc = loc; pld_name = { txt = name; _ }; pld_type; _ }
     =
   let read_attribute (attrs : Attributes.field)
@@ -527,32 +527,19 @@ let expand_field context
             "schematic-ppx: inline specified multiple times"
       | _ ->
         Ppxlib.Location.raise_errorf ~loc "schematic-ppx: no payload expected")
-    | "schematic.sqml.foreign_key" -> (
-      match context.version with
-      | Some { major = 0; minor = 13; patch; _ } when patch < 4 ->
-        Ast_pattern.parse
-          Ast_pattern.(single_expr_payload __)
-          loc attr_payload
-          (fun pl ->
-            {
-              attrs with
-              sqml_foreign =
-                [%expr Sqml.Table.Column.Reference_opt [%e pl]]
-                :: attrs.sqml_foreign;
-            })
-      | _ ->
-        Ast_pattern.parse
-          Ast_pattern.(single_expr_payload __)
-          loc attr_payload
-          (fun pl ->
-            {
-              attrs with
-              sqml_foreign =
-                [%expr
-                  let open Sqml.Table.Column.Foreign_key in
-                  [%e pl]]
-                :: attrs.sqml_foreign;
-            }))
+    | "schematic.sqml.foreign_key" ->
+      Ast_pattern.parse
+        Ast_pattern.(single_expr_payload __)
+        loc attr_payload
+        (fun pl ->
+          {
+            attrs with
+            sqml_foreign =
+              [%expr
+                let open Sqml.Table.Column.Foreign_key in
+                [%e pl]]
+              :: attrs.sqml_foreign;
+          })
     | "schematic.sqml.primary" ->
       if Option.is_some attrs.sqml_primary then
         Ppxlib.Location.raise_errorf ~loc
@@ -1809,6 +1796,13 @@ let expand_sig ~ctxt (_recursive, types) =
   List.map ~f types |> List.concat
 
 let add ~version inside =
+  let () =
+    match !version with
+    | None | Some Semver.{ major = 0; minor = 14; _ } -> ()
+    | Some version ->
+      Fmt.failwith "schematic ppx version mismatch: expecting 0.14.x, got %a"
+        Semver.pp version Ast_pattern.parse
+  in
   let sig_type_decl =
     let arg =
       let open Deriving.Args in
