@@ -199,7 +199,7 @@ module Attributes = struct
     ('a * (Semver.t * [ `Eq | `Gt | `Gte | `Lt | `Lte ]) option) list
 
   type field = {
-    alias : string option;
+    alias : string versioned; [@default []]
     computed : expression option;
     inline : inline option;
     loc : location;
@@ -386,7 +386,7 @@ module type EXPANSION = sig
     expanded
 end
 
-let versioned plain =
+let versioned versioned unversioned =
   let open Ast_pattern in
   let versioned =
     let+ op, (schema, version) =
@@ -417,15 +417,47 @@ let versioned plain =
         of_func f
       in
       pexp_apply (op __)
-        (pair nolabel __ ^:: pair nolabel (version __) ^:: nil |> pack2)
+        (pair nolabel versioned ^:: pair nolabel (version __) ^:: nil |> pack2)
       |> pack2
     in
     (schema, Some (version, op))
-  and plain =
-    let+ expr = plain in
+  and unversioned =
+    let+ expr = unversioned in
     (expr, None)
   in
-  single_expr_payload (versioned ||| plain)
+  single_expr_payload (versioned ||| unversioned)
+
+let version_match ~loc ~f init options =
+  let f next = function
+    | schema, None -> f schema
+    | schema, Some (Semver.{ major; minor; patch; _ }, op) ->
+      let module Ast_builder = Ast_builder.Make (struct
+        let loc = loc
+      end) in
+      let version =
+        [%expr
+          Schematic.Version.make [%e Ast_builder.eint major]
+            [%e Ast_builder.eint minor] [%e Ast_builder.eint patch]]
+      and predicate =
+        match op with
+        | `Eq -> [%expr Schematic.Version.equal]
+        | `Gt -> [%expr Schematic.Version.greater_than]
+        | `Gte ->
+          [%expr
+            fun l r ->
+              Schematic.Version.equal l r || Schematic.Version.greater_than l r]
+        | `Lt -> [%expr Schematic.Version.less_than]
+        | `Lte ->
+          [%expr
+            fun l r ->
+              Schematic.Version.equal l r || Schematic.Version.less_than l r]
+      in
+      [%expr
+        match __schematic_schema_version with
+        | Some version when [%e predicate] version [%e version] -> [%e f schema]
+        | _ -> [%e next]]
+  in
+  List.fold ~init ~f options
 
 let expand_field _
     { pld_attributes; pld_loc = loc; pld_name = { txt = name; _ }; pld_type; _ }
@@ -453,7 +485,7 @@ let expand_field _
     in
     match attr_name.txt with
     | "schematic.schema" ->
-      let pattern = Ast_pattern.(versioned __) in
+      let pattern = Ast_pattern.(versioned __ __) in
       { attrs with schema = expect ~loc pattern attr_payload :: attrs.schema }
     | "default" -> default Source.generic true false
     | "schematic.default" -> default Source.schematic true false
@@ -511,8 +543,8 @@ let expand_field _
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: record payload expected")
     | "schematic.as" ->
-      let pattern = Ast_pattern.(single_expr_payload (estring __)) in
-      { attrs with alias = Some (expect ~loc pattern attr_payload) }
+      let pattern = Ast_pattern.(versioned (estring __) (estring __)) in
+      { attrs with alias = expect ~loc pattern attr_payload :: attrs.alias }
     | ("schematic.inline" as attr) | ("schematic.inline_try" as attr) -> (
       match attr_payload with
       | PStr [] ->
@@ -747,46 +779,15 @@ module Schema = struct
           | Default_opt e -> e
           | Required -> [%expr Required]
         in
-        let schema =
-          let f next = function
-            | schema, None -> schema
-            | schema, Some (Semver.{ major; minor; patch; _ }, op) ->
-              let module Ast_builder = Ast_builder.Make (struct
-                let loc = loc
-              end) in
-              let version =
-                [%expr
-                  Schematic.Version.make [%e Ast_builder.eint major]
-                    [%e Ast_builder.eint minor] [%e Ast_builder.eint patch]]
-              and predicate =
-                match op with
-                | `Eq -> [%expr Schematic.Version.equal]
-                | `Gt -> [%expr Schematic.Version.greater_than]
-                | `Gte ->
-                  [%expr
-                    fun l r ->
-                      Schematic.Version.equal l r
-                      || Schematic.Version.greater_than l r]
-                | `Lt -> [%expr Schematic.Version.less_than]
-                | `Lte ->
-                  [%expr
-                    fun l r ->
-                      Schematic.Version.equal l r
-                      || Schematic.Version.less_than l r]
-              in
-              [%expr
-                match __schematic_schema_version with
-                | Some version when [%e predicate] version [%e version] ->
-                  [%e schema]
-                | _ -> [%e next]]
-          in
-          List.fold
-            ~init:
+        let alias =
+          version_match ~loc ~f:Ast.estring (Ast.estring (rename name)) alias
+        and schema =
+          let schema =
+            version_match ~loc ~f:Fn.id
               (schema_of_expanded ~loc
               @@ encode_type ~context ~type_context type_)
-            ~f schema
-        in
-        let schema =
+              schema
+          in
           match Option.value ~default:Outline inline with
           | Inline -> [%expr Inline [%e schema]]
           | Inline_try -> [%expr Inline_try [%e schema]]
@@ -799,8 +800,7 @@ module Schema = struct
                 [%e
                   expr_option ~loc Ast_builder.Default.estring specs.description];
               examples = [%e Ast.elist specs.examples];
-              field =
-                [%e Ast.estring (rename @@ Option.value ~default:name alias)];
+              field = [%e alias];
               maximum =
                 [%e expr_option ~loc Ast_builder.Default.eint specs.maximum];
               minimum =
@@ -1249,6 +1249,10 @@ module Jsoo_type = struct
                   [%t expand_type ~loc ~context ~type_context type_]
                   Js_of_ocaml.Js.Optdef.t
                   Js_of_ocaml.Js.readonly_prop])
+          and alias =
+            List.find_map
+              ~f:(function alias, None -> Some alias | _ -> None)
+              alias
           in
           Some (Otag ({ loc; txt = Option.value ~default:name alias }, t))
       in
