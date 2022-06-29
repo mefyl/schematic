@@ -783,7 +783,8 @@ module Schema = struct
           version_match ~loc ~f:Ast.estring (Ast.estring (rename name)) alias
         and schema =
           let schema =
-            version_match ~loc ~f:Fn.id
+            version_match ~loc
+              ~f:(fun schema -> [%expr [%e schema] __schematic_version])
               (schema_of_expanded ~loc
               @@ encode_type ~context ~type_context type_)
               schema

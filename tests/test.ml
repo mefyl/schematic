@@ -973,7 +973,9 @@ end
 type _ id = string [@@deriving schema]
 type some_id = int id [@@deriving schema]
 
-type identified = { id : identified id [@schematic.schema id_schema ()] }
+type identified = {
+  id : identified id; [@schematic.schema fun v -> id_schema_versioned v ()]
+}
 [@@deriving schema]
 
 type t = int [@@deriving schema]
@@ -1073,7 +1075,7 @@ module Version = struct
     | String of string
   [@@deriving eq, schema, show]
 
-  let legacy =
+  let legacy _ =
     let decode = function
       | None -> Result.return None
       | Some i -> Result.return (Some (Int i))
@@ -1082,7 +1084,10 @@ module Version = struct
     @@ Map
          { decode; encode; descriptor = Nullable Schematic.Schemas.int_schema }
 
-  type t = { v : v Option.t [@schematic.schema legacy < "0.6.1"] }
+  type t = {
+    v : v Option.t;
+        [@schematic.schema legacy < "0.6.1"] [@schematic.as "w" < "0.6.1"]
+  }
   [@@deriving eq, schema, show]
 
   let t = Alcotest.testable pp equal
@@ -1100,28 +1105,33 @@ module Version = struct
       [%ezjsonm { v = "3" }];
     test ~validate:false "old none" t
       (schema_versioned schema_versions)
-      { v = None } [%ezjsonm { v = None }];
+      { v = None } [%ezjsonm { w = None }];
     test ~validate:false "old int" t
       (schema_versioned schema_versions)
-      { v = Some (Int 3) } [%ezjsonm { v = 3 }];
+      { v = Some (Int 3) } [%ezjsonm { w = 3 }];
     test ~validate:false "old string" t
       (schema_versioned schema_versions)
-      { v = Some (String "3") } ~decoded:{ v = None } [%ezjsonm { v = None }]
+      { v = Some (String "3") } ~decoded:{ v = None } [%ezjsonm { w = None }]
 end
 
 module VersionCascade = struct
-  type inner = { content : string } [@@deriving eq, schema, show]
+  type inner = {
+    content : string;
+        [@schematic.as "content_old" < "1.0.0"] [@schematic.as "content_new"]
+  }
+  [@@deriving eq, schema, show]
 
-  type t_ = {
+  type outer = {
     id : string;
     content : inner;
   }
   [@@deriving eq, schema, show]
 
-  let legacy : t_ Schema.t =
-    let decode (inner : inner) : (t_, string) Result.t =
+  let legacy version : outer Schema.t =
+    let inner_schema = inner_schema_versioned version in
+    let decode (inner : inner) : (outer, string) Result.t =
       Result.return { id = "glouglou"; content = inner }
-    and encode ({ content = { content }; _ } : t_) : inner = { content } in
+    and encode ({ content = { content }; _ } : outer) : inner = { content } in
     let descriptor =
       Schematic.Schema.Map
         { decode; encode; descriptor = inner_schema.descriptor }
@@ -1129,9 +1139,9 @@ module VersionCascade = struct
     Schematic.Schema.make descriptor
 
   type t = {
-    t_ : t_;
+    t_ : outer;
         [@schematic.schema legacy < "1.0.0"]
-        [@schematic.schema schema]
+        [@schematic.schema outer_schema_versioned]
         [@schematic.inline]
   }
   [@@deriving eq, schema, show]
@@ -1143,11 +1153,10 @@ module VersionCascade = struct
       let value = { id = "glouglou"; content = { content = "foo" } } in
       let value = { t_ = value } in
       let json =
-        [%ezjsonm { id = "glouglou"; content = { content = "foo" } }]
+        [%ezjsonm { id = "glouglou"; content = { content_new = "foo" } }]
       in
       test ~validate:false "latest" testable schema value json
     in
-
     let () =
       let schema_versions = function
         | Schemas_library.V -> Some (Schematic.Version.make 0 9 0)
@@ -1155,7 +1164,7 @@ module VersionCascade = struct
       in
       let value = { id = "glouglou"; content = { content = "foo" } } in
       let value = { t_ = value } in
-      let json = [%ezjsonm { content = "foo" }] in
+      let json = [%ezjsonm { content_old = "foo" }] in
       let schema = schema_versioned schema_versions in
       test ~validate:false "legacy" testable schema value json
     in
