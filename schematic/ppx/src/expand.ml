@@ -195,14 +195,16 @@ let specs_empty =
   }
 
 module Attributes = struct
+  type 'a versioned =
+    ('a * (Semver.t * [ `Eq | `Gt | `Gte | `Lt | `Lte ]) option) list
+
   type field = {
     alias : string option;
     computed : expression option;
     inline : inline option;
     loc : location;
     name : string; [@main]
-    schema :
-      (expression * (Semver.t * [ `Eq | `Gt | `Gte | `Lt | `Lte ]) option) list;
+    schema : expression versioned; [@default []]
     specs : specs; [@default specs_empty]
     sqml_foreign : expression list;
     sqml_primary : bool option;
@@ -384,6 +386,47 @@ module type EXPANSION = sig
     expanded
 end
 
+let versioned plain =
+  let open Ast_pattern in
+  let versioned =
+    let+ op, (schema, version) =
+      let version v =
+        let f context loc pl cont =
+          parse (estring __) loc pl (fun s ->
+              match Semver.of_string s with
+              | None -> Location.raise_errorf ~loc "invalid semantic version"
+              | Some version ->
+                (to_func v) context loc version (fun v -> cont v))
+        in
+        of_func f
+      and op v =
+        let f context loc pl cont =
+          let v = to_func v in
+          parse
+            (pexp_ident @@ lident __)
+            loc pl
+            (function
+              | "=" -> v context loc `Eq (fun v -> cont v)
+              | "<" -> v context loc `Lt (fun v -> cont v)
+              | "<=" -> v context loc `Lte (fun v -> cont v)
+              | ">" -> v context loc `Gt (fun v -> cont v)
+              | ">=" -> v context loc `Gte (fun v -> cont v)
+              | op ->
+                Location.raise_errorf ~loc "invalid version operator: %s" op)
+        in
+        of_func f
+      in
+      pexp_apply (op __)
+        (pair nolabel __ ^:: pair nolabel (version __) ^:: nil |> pack2)
+      |> pack2
+    in
+    (schema, Some (version, op))
+  and plain =
+    let+ expr = plain in
+    (expr, None)
+  in
+  single_expr_payload (versioned ||| plain)
+
 let expand_field _
     { pld_attributes; pld_loc = loc; pld_name = { txt = name; _ }; pld_type; _ }
     =
@@ -410,49 +453,7 @@ let expand_field _
     in
     match attr_name.txt with
     | "schematic.schema" ->
-      let pattern =
-        let open Ast_pattern in
-        let versioned =
-          let+ op, (schema, version) =
-            let version v =
-              let f context loc pl cont =
-                parse (estring __) loc pl (fun s ->
-                    match Semver.of_string s with
-                    | None ->
-                      Location.raise_errorf ~loc "invalid semantic version"
-                    | Some version ->
-                      (to_func v) context loc version (fun v -> cont v))
-              in
-              of_func f
-            and op v =
-              let f context loc pl cont =
-                let v = to_func v in
-                parse
-                  (pexp_ident @@ lident __)
-                  loc pl
-                  (function
-                    | "=" -> v context loc `Eq (fun v -> cont v)
-                    | "<" -> v context loc `Lt (fun v -> cont v)
-                    | "<=" -> v context loc `Lte (fun v -> cont v)
-                    | ">" -> v context loc `Gt (fun v -> cont v)
-                    | ">=" -> v context loc `Gte (fun v -> cont v)
-                    | op ->
-                      Location.raise_errorf ~loc "invalid version operator: %s"
-                        op)
-              in
-              of_func f
-            in
-            pexp_apply (op __)
-              (pair nolabel __ ^:: pair nolabel (version __) ^:: nil |> pack2)
-            |> pack2
-          in
-          (schema, Some (version, op))
-        and plain =
-          let+ expr = __ in
-          (expr, None)
-        in
-        single_expr_payload (versioned ||| plain)
-      in
+      let pattern = Ast_pattern.(versioned __) in
       { attrs with schema = expect ~loc pattern attr_payload :: attrs.schema }
     | "default" -> default Source.generic true false
     | "schematic.default" -> default Source.schematic true false
@@ -510,10 +511,8 @@ let expand_field _
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: record payload expected")
     | "schematic.as" ->
-      Ast_pattern.parse
-        Ast_pattern.(single_expr_payload (estring __))
-        loc attr_payload
-        (fun alias -> { attrs with alias = Some alias })
+      let pattern = Ast_pattern.(single_expr_payload (estring __)) in
+      { attrs with alias = Some (expect ~loc pattern attr_payload) }
     | ("schematic.inline" as attr) | ("schematic.inline_try" as attr) -> (
       match attr_payload with
       | PStr [] ->
