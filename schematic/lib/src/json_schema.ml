@@ -1,75 +1,6 @@
 open Base
 include Json_schema_intf
 
-let make_applicator ?additionalItems ?additionalProperties ?allOf ?anyOf
-    ?contains ?dependentSchema ?else_ ?if_ ?items ?not ?oneOf ?patternProperties
-    ?properties ?propertyNames ?then_ ?unevaluatedItems ?unevaluatedProperties
-    () =
-  {
-    additionalItems;
-    unevaluatedItems;
-    items;
-    contains;
-    additionalProperties;
-    unevaluatedProperties;
-    properties;
-    patternProperties;
-    dependentSchema;
-    propertyNames;
-    if_;
-    then_;
-    else_;
-    not;
-    allOf;
-    anyOf;
-    oneOf;
-  }
-
-let make_core ?anchor ?comment ?defs ?id ?recursive_anchor ?recursive_ref ?ref
-    ?schema ?vocabulary () =
-  {
-    id;
-    schema;
-    anchor;
-    ref;
-    recursive_ref;
-    recursive_anchor;
-    vocabulary;
-    comment;
-    defs;
-  }
-
-and make_metadata ?title ?description ?default ?(deprecated = false)
-    ?(readOnly = false) ?(writeOnly = false) ?(examples = []) () =
-  { title; description; default; deprecated; readOnly; writeOnly; examples }
-
-let make_validation ?const ?dependentRequired ?enum ?exclusiveMaximum
-    ?exclusiveMinimum ?maxContains ?maxItems ?maxLength ?maxProperties ?maximum
-    ?minContains ?minItems ?minLength ?minProperties ?minimum ?multipleOf
-    ?pattern ?required ?type_ ?uniqueItems () =
-  {
-    multipleOf;
-    maximum;
-    exclusiveMaximum;
-    minimum;
-    exclusiveMinimum;
-    maxLength;
-    minLength;
-    pattern;
-    maxItems;
-    minItems;
-    uniqueItems;
-    maxContains;
-    minContains;
-    maxProperties;
-    minProperties;
-    required;
-    dependentRequired;
-    const;
-    enum;
-    type_;
-  }
-
 let string_const_validation v =
   make_validation ~type_:(Either.first String) ~const:(`String v) ()
 
@@ -81,85 +12,12 @@ let string_const v =
     validation = string_const_validation v;
   }
 
-let applicator_empty =
-  {
-    additionalItems = None;
-    unevaluatedItems = None;
-    items = None;
-    contains = None;
-    additionalProperties = None;
-    unevaluatedProperties = None;
-    properties = None;
-    patternProperties = None;
-    dependentSchema = None;
-    propertyNames = None;
-    if_ = None;
-    then_ = None;
-    else_ = None;
-    not = None;
-    allOf = None;
-    anyOf = None;
-    oneOf = None;
-  }
-
-let core_empty =
-  {
-    id = None;
-    schema = None;
-    anchor = None;
-    ref = None;
-    recursive_ref = None;
-    recursive_anchor = None;
-    vocabulary = None;
-    comment = None;
-    defs = None;
-  }
-
-and metadata_empty =
-  {
-    title = None;
-    description = None;
-    default = None;
-    deprecated = false;
-    readOnly = false;
-    writeOnly = false;
-    examples = [];
-  }
-
-let validation_empty =
-  {
-    multipleOf = None;
-    maximum = None;
-    exclusiveMaximum = None;
-    minimum = None;
-    exclusiveMinimum = None;
-    maxLength = None;
-    minLength = None;
-    pattern = None;
-    maxItems = None;
-    minItems = None;
-    uniqueItems = None;
-    maxContains = None;
-    minContains = None;
-    maxProperties = None;
-    minProperties = None;
-    required = None;
-    dependentRequired = None;
-    const = None;
-    enum = None;
-    type_ = None;
-  }
-
-let empty =
-  {
-    applicator = applicator_empty;
-    core = core_empty;
-    metadata = metadata_empty;
-    validation = validation_empty;
-  }
-
 type ids = (string, String.comparator_witness) Set.t
 type date_tuple = int * int * int [@@deriving schema]
+
+let make ?(applicator = make_applicator ()) ?(core = make_core ())
+    ?(metadata = make_metadata ()) ?(validation = make_validation ()) () =
+  make ~applicator ~core ~metadata ~validation
 
 let of_schema schema =
   let id_name s = "#" ^ s in
@@ -167,7 +25,7 @@ let of_schema schema =
    fun marks -> function
     | { id = None; descriptor; _ } -> of_descriptor marks descriptor
     | { id = Some id; _ } when Set.mem marks id ->
-      (marks, { empty with core = { core_empty with ref = Some (id_name id) } })
+      (marks, make ~core:(make_core ~ref:(id_name id) ()) ())
     | { id = Some id; descriptor; _ } ->
       let marks = Set.add marks id in
       let marks, schema = of_descriptor marks descriptor in
@@ -175,22 +33,18 @@ let of_schema schema =
   and of_descriptor : type u. ids -> u Schema.descriptor -> ids * t =
    fun marks schema ->
     let rec validation : type t. t Schema.descriptor -> validation = function
-      | Schema.Any -> validation_empty
-      | Schema.Bool ->
-        { validation_empty with type_ = Some (Either.first Boolean) }
+      | Schema.Any -> make_validation ()
+      | Schema.Bool -> make_validation ~type_:(Either.first Boolean) ()
       | Schema.Date -> validation date_tuple_schema.descriptor
       | Fixpoint s -> validation (Lazy.force s)
-      | Schema.Float ->
-        { validation_empty with type_ = Some (Either.first Number) }
-      | Schema.Ignore -> validation_empty
+      | Schema.Float -> make_validation ~type_:(Either.first Number) ()
+      | Schema.Ignore -> make_validation ()
       | Schema.Int | Schema.Int64 ->
-        { validation_empty with type_ = Some (Either.first Integer) }
-      | Schema.List _ ->
-        { validation_empty with type_ = Some (Either.first Array) }
+        make_validation ~type_:(Either.first Integer) ()
+      | Schema.List _ -> make_validation ~type_:(Either.first Array) ()
       | Schema.Map { descriptor; _ } -> validation descriptor
-      | Schema.Mapping _ -> validation_empty
-      | Schema.Null ->
-        { validation_empty with type_ = Some (Either.first Null) }
+      | Schema.Mapping _ -> make_validation ()
+      | Schema.Null -> make_validation ~type_:(Either.first Null) ()
       | Schema.Nullable s -> (
         let next = validation s.descriptor in
         match next.type_ with
@@ -205,46 +59,38 @@ let of_schema schema =
                 (Either.second
                    (List.dedup_and_sort ~compare:Poly.compare (Null :: types)));
           })
-      | Schema.String ->
-        { validation_empty with type_ = Some (Either.first String) }
+      | Schema.String -> make_validation ~type_:(Either.first String) ()
       | Schema.String_const v -> string_const_validation v
-      | Schema.Time ->
-        { validation_empty with type_ = Some (Either.first String) }
-      | Schema.Time_local ->
-        { validation_empty with type_ = Some (Either.first String) }
-      | Schema.Object _ ->
-        { validation_empty with type_ = Some (Either.first Object) }
-      | Schema.Tuple _ ->
-        { validation_empty with type_ = Some (Either.first Array) }
-      | Schema.Union _ -> validation_empty
+      | Schema.Time -> make_validation ~type_:(Either.first String) ()
+      | Schema.Time_local -> make_validation ~type_:(Either.first String) ()
+      | Schema.Object _ -> make_validation ~type_:(Either.first Object) ()
+      | Schema.Tuple _ -> make_validation ~type_:(Either.first Array) ()
+      | Schema.Union _ -> make_validation ()
     and applicator :
         type u. ids -> u Schema.descriptor -> ids * applicator option =
      fun marks -> function
-      | Schema.Any -> (marks, Some applicator_empty)
-      | Schema.Bool -> (marks, Some applicator_empty)
+      | Schema.Any -> (marks, Some (make_applicator ()))
+      | Schema.Bool -> (marks, Some (make_applicator ()))
       | Schema.Date -> applicator marks date_tuple_schema.descriptor
       | Fixpoint s -> applicator marks (Lazy.force s)
-      | Schema.Float | Schema.Ignore -> (marks, Some applicator_empty)
-      | Schema.Int | Schema.Int64 -> (marks, Some applicator_empty)
+      | Schema.Float | Schema.Ignore -> (marks, Some (make_applicator ()))
+      | Schema.Int | Schema.Int64 -> (marks, Some (make_applicator ()))
       | Schema.List schema ->
         let marks, schema = of_schema marks schema in
-        ( marks,
-          Some { applicator_empty with items = Some (Items_schema schema) } )
+        (marks, Some (make_applicator ~items:(Items_schema schema) ()))
       | Schema.Map { descriptor; _ } -> applicator marks descriptor
       | Schema.Mapping schema ->
         let marks, schema = of_schema marks schema in
         ( marks,
           Some
-            {
-              applicator_empty with
-              additionalProperties = Some (Properties_schema schema);
-            } )
-      | Schema.Null -> (marks, Some applicator_empty)
+            (make_applicator ~additionalProperties:(Properties_schema schema) ())
+        )
+      | Schema.Null -> (marks, Some (make_applicator ()))
       | Schema.Nullable s -> applicator marks s.descriptor
-      | Schema.String -> (marks, Some applicator_empty)
-      | Schema.String_const _ -> (marks, Some applicator_empty)
-      | Schema.Time -> (marks, Some applicator_empty)
-      | Schema.Time_local -> (marks, Some applicator_empty)
+      | Schema.String -> (marks, Some (make_applicator ()))
+      | Schema.String_const _ -> (marks, Some (make_applicator ()))
+      | Schema.Time -> (marks, Some (make_applicator ()))
+      | Schema.Time_local -> (marks, Some (make_applicator ()))
       | Schema.Object o ->
         let rec get_fields :
             type u. ids -> u Schema.field -> ids * (string * t) list option =
@@ -267,8 +113,7 @@ let of_schema schema =
               match schema with
               | Inline schema | Inline_try schema -> (
                 match applicator marks schema.descriptor with
-                | marks, Some applicator ->
-                  (marks, Option.value ~default:[] applicator.properties)
+                | marks, Some applicator -> (marks, applicator.properties)
                 | marks, None -> (marks, []))
               | Outline schema ->
                 let marks, t = of_schema marks schema
@@ -300,14 +145,11 @@ let of_schema schema =
             | marks, None -> (marks, Some fields)
             | marks, Some rest -> (marks, Some (fields @ rest)))
         in
-        let marks, fields = get_fields marks o in
+        let marks, properties = get_fields marks o in
         ( marks,
           Some
-            {
-              applicator_empty with
-              properties = fields;
-              additionalProperties = Some (Allowed false);
-            } )
+            (make_applicator ?properties ~additionalProperties:(Allowed false)
+               ()) )
       | Schema.Tuple items ->
         let rec tuple_applicator : type u. ids -> u Schema.tuple -> ids * t list
             =
@@ -319,8 +161,7 @@ let of_schema schema =
             (marks, head :: tail)
         in
         let marks, fields = tuple_applicator marks items in
-        ( marks,
-          Some { applicator_empty with items = Some (Tuple_schema fields) } )
+        (marks, Some (make_applicator ~items:(Tuple_schema fields) ()))
       | Schema.Union { cases; key } ->
         let f (Schema.Case { name; schema; _ }) (marks, l) =
           let marks, schema = of_schema marks schema in
@@ -337,10 +178,7 @@ let of_schema schema =
                 applicator =
                   {
                     schema.applicator with
-                    properties =
-                      Some
-                        ((key, string_const name)
-                        :: Option.value ~default:[] properties);
+                    properties = (key, string_const name) :: properties;
                   };
               }
             | _ -> schema
@@ -348,17 +186,14 @@ let of_schema schema =
           (marks, schema :: l)
         in
         let marks, schemas = List.fold_right ~f ~init:(marks, []) cases in
-        (marks, Some { applicator_empty with oneOf = Some schemas })
+        (marks, Some (make_applicator ~oneOf:schemas ()))
     in
     ( marks,
       {
         applicator = Option.value_exn (snd @@ applicator marks schema);
         core =
-          {
-            core_empty with
-            schema = Some "https://json-schema.org/draft/2019-09/schema";
-          };
-        metadata = metadata_empty;
+          make_core ~schema:"https://json-schema.org/draft/2019-09/schema" ();
+        metadata = make_metadata ();
         validation = validation schema;
       } )
   in

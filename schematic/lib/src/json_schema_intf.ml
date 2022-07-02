@@ -10,6 +10,14 @@ and type_ =
   | Object
   | String
   | OneOf of type_ list
+
+and 't additional_properties =
+  | Properties_schema of 't
+  | Allowed of bool
+
+and 't items =
+  | Items_schema of 't
+  | Tuple_schema of 't list
 [@@deriving eq, schema]
 
 type core = {
@@ -18,39 +26,30 @@ type core = {
   anchor : string option; [@schematic.as "$anchor"]
   ref : uri_reference option; [@schematic.as "$ref"]
   recursive_ref : uri_reference option; [@schematic.as "$recursiveRef"]
-  recursive_anchor : bool option; [@schematic.as "$recursiveAnchor"]
-  vocabulary : (uri * bool) list option; [@schematic.as "$vocabulary"]
+  recursive_anchor : bool; [@schematic.as "$recursiveAnchor"] [@default false]
+  vocabulary : (uri * bool) list; [@schematic.as "$vocabulary"] [@default []]
   comment : string option; [@schematic.as "$comment"]
-  defs : (string * t) list option;
-      [@schematic.as "$defs"] [@schematic.default []]
+  defs : (string * t) list; [@schematic.as "$defs"] [@default []]
 }
-
-and additional_properties =
-  | Properties_schema of t
-  | Allowed of bool
-
-and items =
-  | Items_schema of t
-  | Tuple_schema of t list
 
 and applicator = {
   additionalItems : t option;
   unevaluatedItems : t option;
-  items : items option;
+  items : t items option;
   contains : t option;
-  additionalProperties : additional_properties option;
+  additionalProperties : t additional_properties option;
   unevaluatedProperties : t option;
-  properties : (string * t) list option;
-  patternProperties : (string * t) list option;
-  dependentSchema : (string * t) list option;
+  properties : (string * t) list; [@default []]
+  patternProperties : (string * t) list; [@default []]
+  dependentSchema : (string * t) list; [@default []]
   propertyNames : t option;
   if_ : t option;
   then_ : t option;
   else_ : t option;
   not : t option;
-  allOf : t list option;
-  anyOf : t list option;
-  oneOf : t list option;
+  allOf : t list; [@default []]
+  anyOf : t list; [@default []]
+  oneOf : t list; [@default []]
 }
 
 and validation = {
@@ -60,22 +59,20 @@ and validation = {
   minimum : int option;
   exclusiveMinimum : int option;
   maxLength : int option; [@schematic.properties { minimum = 0 }]
-  minLength : int option;
-      [@schematic.default 0] [@schematic.properties { minimum = 0 }]
+  minLength : int option; [@schematic.properties { minimum = 0 }]
   pattern : string option;
   maxItems : int option; [@schematic.properties { minimum = 0 }]
-  minItems : int option; [@default 0] [@schematic.properties { minimum = 0 }]
-  uniqueItems : bool option; [@schematic.default false]
+  minItems : int option; [@schematic.properties { minimum = 0 }]
+  uniqueItems : bool; [@default false]
   maxContains : int option; [@schematic.properties { minimum = 0 }]
-  minContains : int option; [@default 0] [@schematic.properties { minimum = 1 }]
+  minContains : int option; [@schematic.properties { minimum = 1 }]
   maxProperties : int option; [@schematic.properties { minimum = 0 }]
-  minProperties : int option;
-      [@schematic.properties { minimum = 0 }] [@default 0]
-  required : string list option;
+  minProperties : int option; [@schematic.properties { minimum = 0 }]
+  required : string list;
       [@schematic.properties { unique = true }] [@default []]
-  dependentRequired : (string * string list) list option;
+  dependentRequired : (string * string list) list; [@default []]
   const : Schemas.any option;
-  enum : Schemas.any list option;
+  enum : Schemas.any list; [@default []]
   type_ : (type_, type_ list) Schemas.Either.t option;
 }
 
@@ -83,10 +80,10 @@ and metadata = {
   title : string option;
   description : string option;
   default : Schemas.any option;
-  deprecated : bool; [@schematic.default false]
-  readOnly : bool; [@schematic.default false]
-  writeOnly : bool; [@schematic.default false]
-  examples : Schemas.any list; [@schematic.default []]
+  deprecated : bool; [@default false]
+  readOnly : bool; [@default false]
+  writeOnly : bool; [@default false]
+  examples : Schemas.any list; [@default []]
 }
 
 and t = {
@@ -95,4 +92,4 @@ and t = {
   metadata : metadata; [@schematic.inline]
   validation : validation; [@schematic.inline]
 }
-[@@deriving eq, schema]
+[@@deriving eq, make, schema]
