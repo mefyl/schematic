@@ -37,7 +37,7 @@ and applicator = {
   unevaluatedItems : t option;
   items : t items option;
   contains : t option;
-  additionalProperties : t additional_properties option;
+  additionalProperties : t additional_properties; [@default Allowed true]
   unevaluatedProperties : t option;
   properties : (string * t) list; [@default []]
   patternProperties : (string * t) list; [@default []]

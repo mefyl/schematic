@@ -66,31 +66,28 @@ let of_schema schema =
       | Schema.Object _ -> make_validation ~type_:(Either.first Object) ()
       | Schema.Tuple _ -> make_validation ~type_:(Either.first Array) ()
       | Schema.Union _ -> make_validation ()
-    and applicator :
-        type u. ids -> u Schema.descriptor -> ids * applicator option =
+    and applicator : type u. ids -> u Schema.descriptor -> ids * applicator =
      fun marks -> function
-      | Schema.Any -> (marks, Some (make_applicator ()))
-      | Schema.Bool -> (marks, Some (make_applicator ()))
+      | Schema.Any -> (marks, make_applicator ())
+      | Schema.Bool -> (marks, make_applicator ())
       | Schema.Date -> applicator marks date_tuple_schema.descriptor
       | Fixpoint s -> applicator marks (Lazy.force s)
-      | Schema.Float | Schema.Ignore -> (marks, Some (make_applicator ()))
-      | Schema.Int | Schema.Int64 -> (marks, Some (make_applicator ()))
+      | Schema.Float | Schema.Ignore -> (marks, make_applicator ())
+      | Schema.Int | Schema.Int64 -> (marks, make_applicator ())
       | Schema.List schema ->
         let marks, schema = of_schema marks schema in
-        (marks, Some (make_applicator ~items:(Items_schema schema) ()))
+        (marks, make_applicator ~items:(Items_schema schema) ())
       | Schema.Map { descriptor; _ } -> applicator marks descriptor
       | Schema.Mapping schema ->
         let marks, schema = of_schema marks schema in
         ( marks,
-          Some
-            (make_applicator ~additionalProperties:(Properties_schema schema) ())
-        )
-      | Schema.Null -> (marks, Some (make_applicator ()))
+          make_applicator ~additionalProperties:(Properties_schema schema) () )
+      | Schema.Null -> (marks, make_applicator ())
       | Schema.Nullable s -> applicator marks s.descriptor
-      | Schema.String -> (marks, Some (make_applicator ()))
-      | Schema.String_const _ -> (marks, Some (make_applicator ()))
-      | Schema.Time -> (marks, Some (make_applicator ()))
-      | Schema.Time_local -> (marks, Some (make_applicator ()))
+      | Schema.String -> (marks, make_applicator ())
+      | Schema.String_const _ -> (marks, make_applicator ())
+      | Schema.Time -> (marks, make_applicator ())
+      | Schema.Time_local -> (marks, make_applicator ())
       | Schema.Object o ->
         let rec get_fields :
             type u. ids -> u Schema.field -> ids * (string * t) list =
@@ -111,10 +108,9 @@ let of_schema schema =
               } ->
             let marks, fields =
               match schema with
-              | Inline schema | Inline_try schema -> (
-                match applicator marks schema.descriptor with
-                | marks, Some applicator -> (marks, applicator.properties)
-                | marks, None -> (marks, []))
+              | Inline schema | Inline_try schema ->
+                let marks, applicator = applicator marks schema.descriptor in
+                (marks, applicator.properties)
               | Outline schema ->
                 let marks, t = of_schema marks schema
                 and to_json v = Json.to_ezjsonm @@ Json.encode schema v in
@@ -146,9 +142,8 @@ let of_schema schema =
         in
         let marks, properties = get_fields marks o in
         ( marks,
-          Some
-            (make_applicator ~properties ~additionalProperties:(Allowed false)
-               ()) )
+          make_applicator ~properties ~additionalProperties:(Allowed false) ()
+        )
       | Schema.Tuple items ->
         let rec tuple_applicator : type u. ids -> u Schema.tuple -> ids * t list
             =
@@ -160,7 +155,7 @@ let of_schema schema =
             (marks, head :: tail)
         in
         let marks, fields = tuple_applicator marks items in
-        (marks, Some (make_applicator ~items:(Tuple_schema fields) ()))
+        (marks, make_applicator ~items:(Tuple_schema fields) ())
       | Schema.Union { cases; key } ->
         let f (Schema.Case { name; schema; _ }) (marks, l) =
           let marks, schema = of_schema marks schema in
@@ -185,11 +180,11 @@ let of_schema schema =
           (marks, schema :: l)
         in
         let marks, schemas = List.fold_right ~f ~init:(marks, []) cases in
-        (marks, Some (make_applicator ~oneOf:schemas ()))
+        (marks, make_applicator ~oneOf:schemas ())
     in
     ( marks,
       {
-        applicator = Option.value_exn (snd @@ applicator marks schema);
+        applicator = snd @@ applicator marks schema;
         core =
           make_core ~schema:"https://json-schema.org/draft/2019-09/schema" ();
         metadata = make_metadata ();
