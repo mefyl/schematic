@@ -507,18 +507,6 @@ let expand_field _
                 specs with
                 description = Some (expect Ast_pattern.(estring __) ~loc value);
               }
-            | "default" ->
-              let () =
-                Fmt.epr "%a Warning: deprecated, use @schematic.default\n"
-                  Ppxlib.Location.print loc_name
-              in
-              {
-                specs with
-                default =
-                  Some
-                    (Source.merge ~loc:loc_name "default" specs.default
-                       (Source.schematic [%expr Some [%e value]]));
-              }
             | "example" -> { specs with examples = [ value ] }
             | "minimum" ->
               {
