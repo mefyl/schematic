@@ -1016,8 +1016,12 @@ module Schema = struct
         let f param exp =
           match param with
           | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
+            let combine =
+              if context.inside then [%expr Schema.name_combine]
+              else [%expr Schematic.Schema.name_combine]
+            in
             [%expr
-              Schematic.Schema.name_combine
+              [%e combine]
                 [%e Ast.evar (param_prefix ^ schema_name_versioned name)]
                 [%e exp]]
           | [%type: _], _ -> exp
