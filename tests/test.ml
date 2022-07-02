@@ -136,12 +136,8 @@ type version = {
 }
 [@@deriving schema]
 
-(* FIXME: Base complains that Caml.format is deprecated, but does not provide
-   Base.Printf.fprintf *)
-let fprintf = Caml.Format.fprintf
-
 let pp_version fmt { major; minor; subminor } =
-  fprintf fmt "%i.%i.%i" major minor subminor
+  Fmt.pf fmt "%i.%i.%i" major minor subminor
 
 let test_version = Alcotest.testable pp_version ( = )
 
@@ -170,7 +166,7 @@ let version (major, minor, subminor) = { major; minor; subminor }
 type range = version * version * int [@@deriving schema]
 
 let pp_range fmt (l, r, i) =
-  fprintf fmt "(%a, %a, %i)" pp_version l pp_version r i
+  Fmt.pf fmt "(%a, %a, %i)" pp_version l pp_version r i
 
 let test_range = Alcotest.testable pp_range ( = )
 
@@ -194,9 +190,9 @@ type expectation =
 
 let pp_expectation fmt = function
   | Exact v -> pp_version fmt v
-  | Range (l, r, i) -> fprintf fmt "(%a, %a, %i)" pp_version l pp_version r i
-  | Nothing -> fprintf fmt "nothing"
-  | Aliased -> fprintf fmt "aliased"
+  | Range (l, r, i) -> Fmt.pf fmt "(%a, %a, %i)" pp_version l pp_version r i
+  | Nothing -> Fmt.pf fmt "nothing"
+  | Aliased -> Fmt.pf fmt "aliased"
 
 let test_expectation = Alcotest.testable pp_expectation ( = )
 
@@ -346,7 +342,7 @@ type escape = {
 [@@deriving schema]
 
 let pp_escape fmt { special_char; keyword } =
-  fprintf fmt "(%i, %s)" special_char keyword
+  Fmt.pf fmt "(%i, %s)" special_char keyword
 
 let test_escape = Alcotest.testable pp_escape ( = )
 
@@ -365,7 +361,7 @@ module Recursive = struct
   [@@schematic.name "recursive"] [@@deriving schema]
 
   let rec pp_recursive fmt { value; next } =
-    fprintf fmt "(%i, %a)" value (Fmt.option pp_recursive) next
+    Fmt.pf fmt "(%i, %a)" value (Fmt.option pp_recursive) next
 
   let test_recursive = Alcotest.testable pp_recursive ( = )
 
@@ -651,11 +647,11 @@ and event_local = {
 
 let pp_event fmt e =
   let pp = Ptime.pp_rfc3339 () in
-  Caml.Format.fprintf fmt "%a-%a" pp e.start pp e.endd_
+  Fmt.pf fmt "%a-%a" pp e.start pp e.endd_
 
 let pp_event_local fmt e =
   let pp fmt (t, tz) = Ptime.pp_rfc3339 ~tz_offset_s:tz () fmt t in
-  Caml.Format.fprintf fmt "%a-%a" pp e.start_local pp e.end_local
+  Fmt.pf fmt "%a-%a" pp e.start_local pp e.end_local
 
 let test_time = Alcotest.testable pp_event ( = )
 let test_time_local = Alcotest.testable pp_event_local ( = )
@@ -835,7 +831,7 @@ module Metadata = struct
   }
   [@@deriving schema]
 
-  let pp_default fmt { a; b } = fprintf fmt "(%i, %s)" a b
+  let pp_default fmt { a; b } = Fmt.pf fmt "(%i, %s)" a b
 
   let default () =
     test_schema default_schema
