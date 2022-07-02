@@ -93,9 +93,9 @@ let of_schema schema =
       | Schema.Time_local -> (marks, Some (make_applicator ()))
       | Schema.Object o ->
         let rec get_fields :
-            type u. ids -> u Schema.field -> ids * (string * t) list option =
+            type u. ids -> u Schema.field -> ids * (string * t) list =
          fun marks -> function
-          | Schema.FieldEnd -> (marks, None)
+          | Schema.FieldEnd -> (marks, [])
           | Schema.Field
               {
                 description;
@@ -108,7 +108,7 @@ let of_schema schema =
                 rest;
                 schema;
                 title;
-              } -> (
+              } ->
             let marks, fields =
               match schema with
               | Inline schema | Inline_try schema -> (
@@ -141,14 +141,13 @@ let of_schema schema =
                       } );
                   ] )
             in
-            match get_fields marks rest with
-            | marks, None -> (marks, Some fields)
-            | marks, Some rest -> (marks, Some (fields @ rest)))
+            let marks, rest = get_fields marks rest in
+            (marks, fields @ rest)
         in
         let marks, properties = get_fields marks o in
         ( marks,
           Some
-            (make_applicator ?properties ~additionalProperties:(Allowed false)
+            (make_applicator ~properties ~additionalProperties:(Allowed false)
                ()) )
       | Schema.Tuple items ->
         let rec tuple_applicator : type u. ids -> u Schema.tuple -> ids * t list
