@@ -18,21 +18,25 @@ and 'a field_schema =
   | Inline_try of 'a t
 
 (** A [_ field] can describe any number of object fields. *)
-and _ field =
-  | FieldEnd : unit field
+and _ fields =
+  | FieldEnd : unit fields
   | Field : {
-      description : string option;
-      examples : 'a list;
-      field : string;
-      maximum : int option;
-      minimum : int option;
-      omit : bool;
-      requirement : ('a, 'req) requirement;
-      rest : 'rest field;
-      schema : 'a field_schema;
-      title : string option;
+      field : ('t, 'req) field;
+      rest : 'rest fields;
     }
-      -> ('req * 'rest) field
+      -> ('req * 'rest) fields
+
+and ('t, 'req) field = {
+  description : string option;
+  examples : 't list;
+  maximum : int option;
+  minimum : int option;
+  name : string;
+  omit : bool;
+  requirement : ('t, 'req) requirement;
+  schema : 't field_schema;
+  title : string option;
+}
 
 and _ tuple =
   | ItemEnd : unit tuple
@@ -66,7 +70,7 @@ and _ descriptor =
   | String_const : string -> unit descriptor
   | Time : Ptime.t descriptor
   | Time_local : (Ptime.t * Ptime.tz_offset_s) descriptor
-  | Object : 't field -> 't descriptor
+  | Object : 't fields -> 't descriptor
   | Tuple : 't tuple -> 't descriptor
   | Union : {
       key : string option;

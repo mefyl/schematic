@@ -785,20 +785,24 @@ module Schema = struct
         [%expr
           Field
             {
-              description =
-                [%e
-                  expr_option ~loc Ast_builder.Default.estring specs.description];
-              examples = [%e Ast.elist specs.examples];
-              field = [%e alias];
-              maximum =
-                [%e expr_option ~loc Ast_builder.Default.eint specs.maximum];
-              minimum =
-                [%e expr_option ~loc Ast_builder.Default.eint specs.minimum];
-              omit = [%e Ast.ebool specs.omit];
-              requirement = [%e requirement];
+              field =
+                {
+                  description =
+                    [%e
+                      expr_option ~loc Ast_builder.Default.estring
+                        specs.description];
+                  examples = [%e Ast.elist specs.examples];
+                  maximum =
+                    [%e expr_option ~loc Ast_builder.Default.eint specs.maximum];
+                  minimum =
+                    [%e expr_option ~loc Ast_builder.Default.eint specs.minimum];
+                  name = [%e alias];
+                  omit = [%e Ast.ebool specs.omit];
+                  requirement = [%e requirement];
+                  schema = [%e schema];
+                  title = None;
+                };
               rest = [%e rest];
-              schema = [%e schema];
-              title = None;
             }]
       in
       List.fold_right ~f ~init fields

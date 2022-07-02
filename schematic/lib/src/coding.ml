@@ -188,16 +188,19 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       | Object fields_schema ->
         let* fields = Coding.to_fields v |> type_error "object" in
         let rec decode_object :
-            type t. t Schema.field -> (t, E.decoding) Result.t = function
+            type t. t Schema.fields -> (t, E.decoding) Result.t = function
           | FieldEnd -> Result.return ()
           | Field
               {
-                field = field_name;
-                omit;
-                requirement;
+                field =
+                  {
+                    name = field_name;
+                    omit;
+                    requirement;
+                    schema = field_schema;
+                    _;
+                  };
                 rest;
-                schema = field_schema;
-                _;
               } -> (
             match Schema.extract_field_schema field_schema with
             | { descriptor = Ignore; _ } ->
@@ -352,21 +355,31 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
              v)
       | Object fields ->
         let rec encode_object :
-            type t. t -> t Schema.field -> (string * Coding.t) list =
+            type t. t -> t Schema.fields -> (string * Coding.t) list =
          fun v -> function
           | FieldEnd -> []
-          | Field { schema = Inline { descriptor = Ignore; _ }; rest; _ } ->
+          | Field
+              {
+                field = { schema = Inline { descriptor = Ignore; _ }; _ };
+                rest;
+              } ->
             encode_object (snd v) rest
-          | Field { schema = Outline { descriptor = Ignore; _ }; rest; _ } ->
+          | Field
+              {
+                field = { schema = Outline { descriptor = Ignore; _ }; _ };
+                rest;
+              } ->
             encode_object (snd v) rest
-          | Field { field; requirement; schema = field_schema; rest; _ } -> (
+          | Field
+              { field = { name; requirement; schema = field_schema; _ }; rest }
+            -> (
             let hd, tl = v in
             let tl = encode_object tl rest in
             match encode_field requirement hd with
             | Some hd -> (
               let outline schema =
                 let encoded = encode schema.Schema.descriptor hd in
-                (field, encoded) :: tl
+                (name, encoded) :: tl
               in
               match field_schema with
               | Inline schema | Inline_try schema -> (

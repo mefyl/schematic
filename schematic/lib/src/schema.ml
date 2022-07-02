@@ -70,10 +70,10 @@ and pp_case : type u. u case Fmt.t =
  fun f (Case { name; schema; _ }) ->
   Fmt.pf f "@[@[<hv>{@ name: %S,@ schema: %a@ @]}@]" name pp schema
 
-and pp_fields : type t. t field Fmt.t =
+and pp_fields : type t. t fields Fmt.t =
  fun fmt -> function
   | FieldEnd -> ()
-  | Field { field = name; schema; rest; _ } ->
+  | Field { field = { name; schema; _ }; rest; _ } ->
     let schema = extract_field_schema schema in
     Fmt.(
       const string name ++ const string ": "
@@ -86,7 +86,7 @@ and pp : type u. u t Fmt.t =
 
 (* Inline helpers *)
 
-type 'res inline = { f : 't. 't field -> 'res }
+type 'res inline = { f : 't. 't fields -> 'res }
 
 module Default_walk (Default : WALK_DEFAULT) :
   WALK with type t = Default.t and type fields = Default.fields = struct
@@ -140,16 +140,19 @@ let rec inline :
                   f.f
                     (Field
                        {
-                         field = key;
-                         schema = Outline (make (String_const name));
+                         field =
+                           {
+                             name = key;
+                             schema = Outline (make (String_const name));
+                             description = None;
+                             examples = [];
+                             maximum = None;
+                             minimum = None;
+                             omit = false;
+                             requirement = Required;
+                             title = None;
+                           };
                          rest = fields;
-                         description = None;
-                         examples = [];
-                         maximum = None;
-                         minimum = None;
-                         omit = false;
-                         requirement = Required;
-                         title = None;
                        }));
             }
         in
@@ -159,7 +162,7 @@ let rec inline :
   | s ->
     Result.fail (Fmt.str "inline field is not an object: %a" pp_descriptor s)
 
-type 'res inline_v = { f : 't. 't field -> 't -> 'res }
+type 'res inline_v = { f : 't. 't fields -> 't -> 'res }
 
 let rec inline_v :
     type t. t descriptor -> t -> 'res inline_v -> ('res, string) Result.t =
@@ -238,24 +241,29 @@ module Walk (W : WALK) = struct
       in
       (template_name, name :: args, schema parameter :: eff_args, t)
 
-  and fields : type t. t field -> W.fields = function
+  and fields : type t. t fields -> W.fields = function
     | FieldEnd -> W.fields_empty ()
     | Field
         {
-          schema =
-            ( Outline { descriptor = Ignore; _ }
-            | Inline { descriptor = Ignore; _ }
-            | Inline_try { descriptor = Ignore; _ } );
+          field =
+            {
+              schema =
+                ( Outline { descriptor = Ignore; _ }
+                | Inline { descriptor = Ignore; _ }
+                | Inline_try { descriptor = Ignore; _ } );
+              _;
+            };
           rest;
-          _;
         } ->
       fields rest
-    | Field { omit = true; rest; _ } -> fields rest
-    | Field { field; requirement; rest; schema = Outline s; _ } ->
+    | Field { field = { omit = true; _ }; rest } -> fields rest
+    | Field { field = { name; requirement; schema = Outline s; _ }; rest } ->
       let rest = fields rest
       and schema = schema s in
-      W.field_outline field (required requirement) schema rest
-    | Field { requirement; rest; schema = Inline { descriptor; _ }; _ } ->
+      W.field_outline name (required requirement) schema rest
+    | Field
+        { field = { requirement; schema = Inline { descriptor; _ }; _ }; rest }
+      ->
       let fields =
         match inline descriptor { f = (fun f -> fields f) } with
         | Result.Ok v -> v
@@ -264,17 +272,20 @@ module Walk (W : WALK) = struct
       W.field_inline (required requirement) fields rest
     | Field
         {
-          field;
-          requirement;
+          field =
+            {
+              name;
+              requirement;
+              schema = Inline_try ({ descriptor; _ } as s);
+              _;
+            };
           rest;
-          schema = Inline_try ({ descriptor; _ } as s);
-          _;
         } -> (
       let rest = fields rest in
       match inline descriptor { f = (fun f -> fields f) } with
       | Result.Ok fields -> W.field_inline (required requirement) fields rest
       | Result.Error _ ->
-        W.field_outline field (required requirement) (schema s) rest)
+        W.field_outline name (required requirement) (schema s) rest)
 
   and tuple : type t. t tuple -> W.t list = function
     | ItemEnd -> []
@@ -286,7 +297,7 @@ module Walk (W : WALK) = struct
 end
 
 let object_fields =
-  let rec object_fields : type t. t field -> string list list =
+  let rec object_fields : type t. t fields -> string list list =
     let inline schema rest =
       let open Base.Sequence in
       descriptor_fields schema.descriptor
@@ -300,19 +311,20 @@ let object_fields =
     in
     function
     | FieldEnd -> [ [] ]
-    | Field { requirement = Default _ | Optional; rest; _ } ->
+    | Field { field = { requirement = Default _ | Optional; _ }; rest } ->
       object_fields rest
-    | Field { schema = Outline { descriptor = Ignore; _ }; rest; _ } ->
+    | Field { field = { schema = Outline { descriptor = Ignore; _ }; _ }; rest }
+      ->
       object_fields rest
-    | Field { rest; schema = Inline schema; _ } -> (
+    | Field { field = { schema = Inline schema; _ }; rest } -> (
       match inline schema rest with
       | Result.Ok v -> v
       | Result.Error e -> failwith e)
-    | Field { field; rest; schema = Inline_try schema; _ } -> (
+    | Field { field = { name; schema = Inline_try schema; _ }; rest } -> (
       match inline schema rest with
       | Result.Ok v -> v
-      | Result.Error _ -> outline field rest)
-    | Field { field; rest; _ } -> outline field rest
+      | Result.Error _ -> outline name rest)
+    | Field { field = { name; _ }; rest } -> outline name rest
   and descriptor_fields :
       type t. t descriptor -> (string list list, string) Result.t =
    fun d -> inline d { f = object_fields } |> Result.map ~f:List.concat
@@ -368,8 +380,8 @@ let compare schema =
       fun (l, lz) (r, rz) ->
         match Int.compare lz rz with 0 -> Ptime.compare l r | v -> v)
     | Object fields ->
-      let rec compare_fields : type u. u field -> u -> u -> int = function
-        | Field { schema; requirement; rest; _ } ->
+      let rec compare_fields : type u. u fields -> u -> u -> int = function
+        | Field { field = { schema; requirement; _ }; rest } ->
           let schema = extract_field_schema schema in
           let f (type field req) (schema : field t)
               (requirement : (field, req) requirement) ((l : req), lr)

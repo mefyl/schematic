@@ -393,29 +393,35 @@ module Recursive = struct
                 Object
                   (Field
                      {
-                       description = None;
-                       examples = [];
-                       field = "value";
-                       maximum = None;
-                       minimum = None;
-                       omit = false;
-                       requirement = Required;
+                       field =
+                         {
+                           description = None;
+                           examples = [];
+                           maximum = None;
+                           minimum = None;
+                           name = "value";
+                           omit = false;
+                           requirement = Required;
+                           schema = Outline a_schema;
+                           title = None;
+                         };
                        rest =
                          Field
                            {
-                             description = None;
-                             examples = [];
-                             field = "next";
-                             maximum = None;
-                             minimum = None;
-                             omit = false;
-                             requirement = Optional;
+                             field =
+                               {
+                                 description = None;
+                                 examples = [];
+                                 name = "next";
+                                 maximum = None;
+                                 minimum = None;
+                                 omit = false;
+                                 requirement = Optional;
+                                 schema = Outline (schema self);
+                                 title = None;
+                               };
                              rest = FieldEnd;
-                             schema = Outline (schema self);
-                             title = None;
                            };
-                       schema = Outline a_schema;
-                       title = None;
                      });
             }
         in

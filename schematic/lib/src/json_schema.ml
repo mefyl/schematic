@@ -90,21 +90,24 @@ let of_schema schema =
       | Schema.Time_local -> (marks, make_applicator ())
       | Schema.Object o ->
         let rec get_fields :
-            type u. ids -> u Schema.field -> ids * (string * t) list =
+            type u. ids -> u Schema.fields -> ids * (string * t) list =
          fun marks -> function
           | Schema.FieldEnd -> (marks, [])
           | Schema.Field
               {
-                description;
-                examples;
-                field;
-                maximum;
-                minimum;
-                omit = (* FIXME *) _;
-                requirement;
+                field =
+                  {
+                    description;
+                    examples;
+                    maximum;
+                    minimum;
+                    name;
+                    omit = (* FIXME *) _;
+                    requirement;
+                    schema;
+                    title;
+                  };
                 rest;
-                schema;
-                title;
               } ->
             let marks, fields =
               match schema with
@@ -116,7 +119,7 @@ let of_schema schema =
                 and to_json v = Json.to_ezjsonm @@ Json.encode schema v in
                 ( marks,
                   [
-                    ( field,
+                    ( name,
                       {
                         t with
                         metadata =
@@ -129,7 +132,7 @@ let of_schema schema =
                             description;
                             title =
                               Option.return
-                                (Option.value ~default:(String.capitalize field)
+                                (Option.value ~default:(String.capitalize name)
                                    title);
                             examples = List.map ~f:to_json examples;
                           };

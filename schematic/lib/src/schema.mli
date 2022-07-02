@@ -11,10 +11,10 @@ val extract_field_schema : 'a field_schema -> 'a t
 
 (** [objects_fields fields] is a list of alternative mandatory fields name list
     required to decode an object with fields [fields]. *)
-val object_fields : 'a field -> string list list
+val object_fields : 'a fields -> string list list
 
 (** A ['res inline] maps a field to a ['res]. *)
-type 'res inline = { f : 't. 't field -> 'res }
+type 'res inline = { f : 't. 't fields -> 'res }
 
 (** [inline descriptor inline] attemps to inline [descriptor] according to
     [inline].
@@ -22,7 +22,7 @@ type 'res inline = { f : 't. 't field -> 'res }
     This can only succeed on a non-leaf descriptor. *)
 val inline : 't descriptor -> 'res inline -> ('res list, string) Result.t
 
-type 'res inline_v = { f : 't. 't field -> 't -> 'res }
+type 'res inline_v = { f : 't. 't fields -> 't -> 'res }
 
 val inline_v : 't descriptor -> 't -> 'res inline_v -> ('res, string) Result.t
 val compare : 'a t -> 'a -> 'a -> int
