@@ -545,9 +545,9 @@ module Inline = struct
   let descriptor_fields descriptor =
     match
       Schematic.Schema.(
-        inline descriptor { f = Schematic.Schema.object_fields })
+        inline descriptor () { f = (fun () { name; _ } -> ((), name)) })
     with
-    | Result.Ok sets -> Base.List.concat sets
+    | Result.Ok ((), sets) -> sets
     | Result.Error e -> Alcotest.fail e
 
   let record () =
@@ -597,15 +597,37 @@ module Inline = struct
       [%ezjsonm { x = 369; d = 370; e = 371 }]
 
   let inline_try () =
-    test "inlinable" (inline_maybe inlined)
-      (inline_maybe_schema inlined_schema)
-      { maybe = true; inline = { b = 411; c = 412 } }
-      [%ezjsonm { maybe = true; b = 411; c = 412 }];
-    test ~validate:false "not inlinable"
-      (inline_maybe Alcotest.int)
-      (inline_maybe_schema int_schema)
-      { maybe = true; inline = 416 }
-      [%ezjsonm { maybe = true; inline = 416 }]
+    let () =
+      Alcotest.(
+        check
+          (list @@ list string)
+          "mandatory fields when inlinable"
+          [ [ "maybe"; "b"; "c" ] ]
+        @@ descriptor_fields (inline_maybe_schema inlined_schema).descriptor)
+    and () =
+      test "inlinable" (inline_maybe inlined)
+        (inline_maybe_schema inlined_schema)
+        { maybe = true; inline = { b = 411; c = 412 } }
+        [%ezjsonm { maybe = true; b = 411; c = 412 }]
+    and () =
+      let schema = inline_maybe_schema int_schema in
+      let () =
+        Alcotest.(
+          check
+            (list @@ list string)
+            "mandatory fields when not inlinable"
+            [ [ "maybe"; "inline" ] ]
+          @@ descriptor_fields schema.descriptor)
+      and () =
+        test ~validate:false "not inlinable"
+          (inline_maybe Alcotest.int)
+          schema
+          { maybe = true; inline = 416 }
+          [%ezjsonm { maybe = true; inline = 416 }]
+      in
+      ()
+    in
+    ()
 
   type 'a inline_parametric =
     | A of {

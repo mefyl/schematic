@@ -155,3 +155,8 @@ end
 
 type library = ..
 type version = library -> Version.t option
+
+(** A ['res inline] maps a field to a ['res]. *)
+type ('fold, 'res) inline = {
+  f : 't 'req. 'fold -> ('t, 'req) field -> 'fold * 'res;
+}

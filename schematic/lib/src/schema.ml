@@ -1,6 +1,8 @@
 open Utils
 include Schema_intf
 
+let ( let* ) v f = Caml.Result.bind v f
+let ( let+ ) v f = Result.map ~f v
 let make ?id ?parametric descriptor = { id; descriptor; parametric }
 
 let required : type a b. (a, b) requirement -> bool = function
@@ -86,8 +88,6 @@ and pp : type u. u t Fmt.t =
 
 (* Inline helpers *)
 
-type 'res inline = { f : 't. 't fields -> 'res }
-
 module Default_walk (Default : WALK_DEFAULT) :
   WALK with type t = Default.t and type fields = Default.fields = struct
   include Default
@@ -118,14 +118,16 @@ module Default_walk (Default : WALK_DEFAULT) :
   let tuple _ = t
 end
 
-let rec inline :
-    type t res. t descriptor -> res inline -> (res list, string) Result.t =
+type 'res walk_fields = { f : 't. 't fields -> 'res }
+
+let rec walk_fields :
+    type t res. t descriptor -> res walk_fields -> (res list, string) Result.t =
  fun d f ->
   match d with
   | Ignore -> Result.return [ f.f FieldEnd ]
-  | Fixpoint d -> inline (Lazy.force d) f
-  | Map { descriptor; _ } -> inline descriptor f
-  | Nullable d -> inline d.descriptor f
+  | Fixpoint d -> walk_fields (Lazy.force d) f
+  | Map { descriptor; _ } -> walk_fields descriptor f
+  | Nullable d -> walk_fields d.descriptor f
   | Object o -> Result.return [ f.f o ]
   | Union { cases; key } ->
     List.map
@@ -156,9 +158,93 @@ let rec inline :
                        }));
             }
         in
-        inline schema.descriptor f)
+        walk_fields schema.descriptor f)
       cases
     |> Result.all |> Result.map ~f:List.concat
+  | s ->
+    Result.fail (Fmt.str "inline field is not an object: %a" pp_descriptor s)
+
+let rec inline :
+    type t res.
+    t descriptor ->
+    'fold ->
+    ('fold, res) inline ->
+    ('fold * res list list, string) Result.t =
+ fun d acc f ->
+  match d with
+  | Ignore -> Result.return (acc, [ [] ])
+  | Fixpoint d -> inline (Lazy.force d) acc f
+  | Map { descriptor; _ } -> inline descriptor acc f
+  | Nullable d -> inline d.descriptor acc f
+  | Object fields ->
+    let rec inline_fields :
+        type t. 'fold -> t fields -> ('fold * res list list, string) Result.t =
+     fun acc -> function
+      | FieldEnd -> Result.return (acc, [ [] ])
+      | Field
+          { field = { schema = Outline { descriptor = Ignore; _ }; _ }; rest }
+        ->
+        inline_fields acc rest
+      | Field
+          {
+            field = { schema = Inline_try { descriptor = Ignore; _ }; _ };
+            rest;
+          } ->
+        inline_fields acc rest
+      | Field { field; rest } ->
+        let* acc, head =
+          match field.schema with
+          | Inline schema -> inline schema.descriptor acc f
+          | Inline_try schema -> (
+            match inline schema.descriptor acc f with
+            | Result.Ok _ as res -> res
+            | Result.Error _ ->
+              let acc, head = f.f acc field in
+              Result.return (acc, [ [ head ] ]))
+          | Outline _ ->
+            let acc, head = f.f acc field in
+            Result.return (acc, [ [ head ] ])
+        in
+        let+ acc, tail = inline_fields acc rest in
+        ( acc,
+          Sequence.(
+            cartesian_product (of_list head) (of_list tail)
+            |> map ~f:(fun (h, t) -> h @ t)
+            |> to_list) )
+    in
+    inline_fields acc fields
+  | Union { cases; key } ->
+    let f acc (Case { schema; name; _ }) =
+      let acc, key =
+        match key with
+        | None -> (acc, None)
+        | Some key ->
+          let acc, key =
+            f.f acc
+              {
+                name = key;
+                schema = Outline (make (String_const name));
+                description = None;
+                examples = [];
+                maximum = None;
+                minimum = None;
+                omit = false;
+                requirement = Required;
+                title = None;
+              }
+          in
+          (acc, Some key)
+      in
+      match inline schema.descriptor acc f with
+      | Result.Ok (acc, res) -> (
+        match key with
+        | Some key -> (acc, List.map ~f:(fun l -> key :: l) res |> Result.return)
+        | None -> (acc, Result.return res))
+      | Result.Error _ as e -> (acc, e)
+    in
+    let acc, res = List.fold_map ~init:acc ~f cases in
+    let+ res = Result.all res in
+    (acc, List.concat res)
   | s ->
     Result.fail (Fmt.str "inline field is not an object: %a" pp_descriptor s)
 
@@ -265,7 +351,7 @@ module Walk (W : WALK) = struct
         { field = { requirement; schema = Inline { descriptor; _ }; _ }; rest }
       ->
       let fields =
-        match inline descriptor { f = (fun f -> fields f) } with
+        match walk_fields descriptor { f = (fun f -> fields f) } with
         | Result.Ok v -> v
         | Result.Error e -> failwith e
       and rest = fields rest in
@@ -282,7 +368,7 @@ module Walk (W : WALK) = struct
           rest;
         } -> (
       let rest = fields rest in
-      match inline descriptor { f = (fun f -> fields f) } with
+      match walk_fields descriptor { f = (fun f -> fields f) } with
       | Result.Ok fields -> W.field_inline (required requirement) fields rest
       | Result.Error _ ->
         W.field_outline name (required requirement) (schema s) rest)
@@ -296,40 +382,16 @@ module Walk (W : WALK) = struct
     W.parametric name args eff_args t
 end
 
-let object_fields =
-  let rec object_fields : type t. t fields -> string list list =
-    let inline schema rest =
-      let open Base.Sequence in
-      descriptor_fields schema.descriptor
-      |> Result.map ~f:(fun fields ->
-             cartesian_product (of_list @@ fields)
-               (of_list @@ object_fields rest)
-             |> map ~f:(fun (l, r) -> l @ r)
-             |> to_list)
-    and outline field rest =
-      List.map ~f:(List.cons field) @@ object_fields rest
-    in
-    function
-    | FieldEnd -> [ [] ]
-    | Field { field = { requirement = Default _ | Optional; _ }; rest } ->
-      object_fields rest
-    | Field { field = { schema = Outline { descriptor = Ignore; _ }; _ }; rest }
-      ->
-      object_fields rest
-    | Field { field = { schema = Inline schema; _ }; rest } -> (
-      match inline schema rest with
-      | Result.Ok v -> v
-      | Result.Error e -> failwith e)
-    | Field { field = { name; schema = Inline_try schema; _ }; rest } -> (
-      match inline schema rest with
-      | Result.Ok v -> v
-      | Result.Error _ -> outline name rest)
-    | Field { field = { name; _ }; rest } -> outline name rest
-  and descriptor_fields :
-      type t. t descriptor -> (string list list, string) Result.t =
-   fun d -> inline d { f = object_fields } |> Result.map ~f:List.concat
+let object_fields descriptor =
+  let+ (), names =
+    inline descriptor ()
+      {
+        f =
+          (fun () { name; requirement; _ } ->
+            ((), Option.some_if (required requirement) name));
+      }
   in
-  object_fields
+  List.map ~f:(List.filter_map ~f:Fn.id) names
 
 let assoc_compare compare l r =
   let f (key, l) =

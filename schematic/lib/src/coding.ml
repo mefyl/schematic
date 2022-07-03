@@ -212,11 +212,8 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
                   let inline Schema.{ descriptor; _ } =
                     let missing =
                       let expected_sets =
-                        match
-                          Schema.inline schema.descriptor
-                            { f = Schema.object_fields }
-                        with
-                        | Result.Ok v -> List.concat v
+                        match Schema.object_fields descriptor with
+                        | Result.Ok v -> v
                         | Result.Error _ -> [ [] ]
                       in
                       let res =
@@ -234,7 +231,8 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
                       in
                       res
                     and inlinable =
-                      Schema.inline descriptor { f = ignore } |> Result.is_ok
+                      Schema.inline descriptor () { f = (fun () _ -> ((), ())) }
+                      |> Result.is_ok
                     in
                     (missing, inlinable)
                   and outline () =
