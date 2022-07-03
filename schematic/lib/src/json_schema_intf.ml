@@ -9,7 +9,6 @@ and type_ =
   | Number
   | Object
   | String
-  | OneOf of type_ list
 
 and 't additional_properties =
   | Properties_schema of 't
