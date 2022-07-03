@@ -24,6 +24,8 @@ let make_error ?(path = []) ?schema reason =
 let decoding_error =
   Alcotest.testable Schematic.Error.pp_decoding Schematic.Error.equal_decoding
 
+let dollar = String.Search_pattern.create "$"
+
 let test ?(validate = true) ?decoded name test schema value j =
   let encoded = Schematic.Json.encode schema value in
   Alcotest.check json (Fmt.str "%s: encoded JSON" name) j encoded;
@@ -42,8 +44,10 @@ let test ?(validate = true) ?decoded name test schema value j =
     let schema = json_schema schema in
     Fmt.epr "%s@." Ezjsonm.(value_to_string schema);
     let cmd =
-      Printf.sprintf "%s/validate-schema \"%s\" \"%s\"" root
-        (String.escaped @@ Schematic.Json.to_string @@ schema)
+      Printf.sprintf {|%s/validate-schema "%s" "%s"|} root
+        (String.Search_pattern.replace_all dollar
+           ~in_:(String.escaped @@ Schematic.Json.to_string @@ schema)
+           ~with_:"\\$")
         (String.escaped @@ Schematic.Json.to_string @@ encoded)
     in
     if Caml.Sys.command cmd <> 0 then
