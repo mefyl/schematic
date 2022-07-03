@@ -88,65 +88,61 @@ let of_schema schema =
       | Schema.String_const _ -> (marks, make_applicator ())
       | Schema.Time -> (marks, make_applicator ())
       | Schema.Time_local -> (marks, make_applicator ())
-      | Schema.Object o ->
-        let rec get_fields :
-            type u. ids -> u Schema.fields -> ids * (string * t) list =
-         fun marks -> function
-          | Schema.FieldEnd -> (marks, [])
-          | Schema.Field
-              {
-                field =
-                  {
-                    description;
-                    examples;
-                    maximum;
-                    minimum;
-                    name;
-                    omit = (* FIXME *) _;
-                    requirement;
-                    schema;
-                    title;
-                  };
-                rest;
-              } ->
-            let marks, fields =
-              match schema with
-              | Inline schema | Inline_try schema ->
-                let marks, applicator = applicator marks schema.descriptor in
-                (marks, applicator.properties)
-              | Outline schema ->
-                let marks, t = of_schema marks schema
-                and to_json v = Json.to_ezjsonm @@ Json.encode schema v in
-                ( marks,
-                  [
-                    ( name,
-                      {
-                        t with
-                        metadata =
-                          {
-                            t.metadata with
-                            default =
-                              (match requirement with
-                              | Schema.Default v -> Some (to_json v)
-                              | _ -> None);
-                            description;
-                            title =
-                              Option.return
-                                (Option.value ~default:(String.capitalize name)
-                                   title);
-                            examples = List.map ~f:to_json examples;
-                          };
-                        validation = { t.validation with maximum; minimum };
-                      } );
-                  ] )
-            in
-            let marks, rest = get_fields marks rest in
-            (marks, fields @ rest)
+      | Schema.Object _ as o -> (
+        let marks, properties =
+          Result.ok_or_failwith
+          @@ Schema.inline o marks
+               {
+                 f =
+                   (fun (type req t) marks
+                        ({
+                           description;
+                           examples;
+                           maximum;
+                           minimum;
+                           name;
+                           requirement;
+                           schema;
+                           title;
+                           _;
+                         } :
+                          (t, req) Schema.field) ->
+                     let schema = Schema.extract_field_schema schema in
+                     let marks, t = of_schema marks schema
+                     and to_json v = Json.to_ezjsonm @@ Json.encode schema v in
+                     ( marks,
+                       ( name,
+                         {
+                           t with
+                           metadata =
+                             {
+                               t.metadata with
+                               default =
+                                 (match requirement with
+                                 | Schema.Default v -> Some (to_json v)
+                                 | _ -> None);
+                               description;
+                               title =
+                                 Option.return
+                                   (Option.value
+                                      ~default:(String.capitalize name) title);
+                               examples = List.map ~f:to_json examples;
+                             };
+                           validation = { t.validation with maximum; minimum };
+                         } ) ));
+               }
         in
-        let marks, properties = get_fields marks o in
-        ( marks,
-          make_applicator ~properties ~additionalProperties:(Allowed false) ()
-        )
+        match
+          List.map
+            ~f:(fun properties ->
+              make_applicator ~properties ~additionalProperties:(Allowed false)
+                ())
+            properties
+        with
+        | [ app ] -> (marks, app)
+        | l ->
+          let one_of = List.map ~f:(fun applicator -> make ~applicator ()) l in
+          (marks, make_applicator ~one_of ()))
       | Schema.Tuple items ->
         let rec tuple_applicator : type u. ids -> u Schema.tuple -> ids * t list
             =
@@ -183,7 +179,7 @@ let of_schema schema =
           (marks, schema :: l)
         in
         let marks, schemas = List.fold_right ~f ~init:(marks, []) cases in
-        (marks, make_applicator ~oneOf:schemas ())
+        (marks, make_applicator ~one_of:schemas ())
     in
     ( marks,
       {

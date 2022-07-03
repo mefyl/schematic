@@ -586,13 +586,11 @@ module Inline = struct
         @@ descriptor_fields inline_variant_schema.descriptor)
     in
     let () =
-      (* FIXME: json schema of inlined variant not handled yet *)
-      test ~validate:false "coding of Foo" inline_variant inline_variant_schema
+      test "coding of Foo" inline_variant inline_variant_schema
         { x = 362; pan = Foo { b = 363; c = 364 } }
         [%ezjsonm { x = 362; b = 363; c = 364 }]
     in
-    (* FIXME: json schema of inlined variant not handled yet *)
-    test ~validate:false "coding of Bar" inline_variant inline_variant_schema
+    test "coding of Bar" inline_variant inline_variant_schema
       { x = 369; pan = Bar { d = 370; e = 371 } }
       [%ezjsonm { x = 369; d = 370; e = 371 }]
 
@@ -619,7 +617,7 @@ module Inline = struct
             [ [ "maybe"; "inline" ] ]
           @@ descriptor_fields schema.descriptor)
       and () =
-        test ~validate:false "not inlinable"
+        test "not inlinable"
           (inline_maybe Alcotest.int)
           schema
           { maybe = true; inline = 416 }
@@ -655,7 +653,7 @@ module Inline = struct
   let parametric = Alcotest.testable pp_parametric equal_parametric
 
   let inline_parametric () =
-    test ~validate:false "parametric inlinable" parametric parametric_schema
+    test "parametric inlinable" parametric parametric_schema
       { inlined = A { value = 457; param = () } }
       [%ezjsonm { value = 457 }]
 end
@@ -756,8 +754,6 @@ type keyed =
 
 let keyed () =
   let tester = Alcotest.(testable pp_keyed equal_keyed) in
-  (* FIXME: we should validate but our json schema does not support keyed unions
-     yet *)
   let () =
     test "paragraph" tester keyed_schema
       (Paragraph_ { content = "text" })
@@ -1179,7 +1175,7 @@ module VersionCascade = struct
       let json =
         [%ezjsonm { id = "glouglou"; content = { content_new = "foo" } }]
       in
-      test ~validate:false "latest" testable schema value json
+      test "latest" testable schema value json
     in
     let () =
       let schema_versions = function
@@ -1190,7 +1186,7 @@ module VersionCascade = struct
       let value = { t_ = value } in
       let json = [%ezjsonm { content_old = "foo" }] in
       let schema = schema_versioned schema_versions in
-      test ~validate:false "legacy" testable schema value json
+      test "legacy" testable schema value json
     in
     ()
 end

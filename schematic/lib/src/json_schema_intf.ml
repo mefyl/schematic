@@ -47,9 +47,9 @@ and applicator = {
   then_ : t option;
   else_ : t option;
   not : t option;
-  allOf : t list; [@default []]
-  anyOf : t list; [@default []]
-  oneOf : t list; [@default []]
+  all_of : t list; [@default []] [@schematic.as "allOf"]
+  any_of : t list; [@default []] [@schematic.as "anyOf"]
+  one_of : t list; [@default []] [@schematic.as "oneOf"]
 }
 
 and validation = {
