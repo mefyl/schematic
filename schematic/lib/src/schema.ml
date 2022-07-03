@@ -58,7 +58,11 @@ let rec pp_descriptor : type u. u descriptor Fmt.t =
       @@ (hvbox ~indent
          @@ (const string "{" ++ sp ++ const (hvbox pp_fields) fields))
          ++ sp ++ const string "}"
-    | Tuple _ -> const string "FIXME TUPLE"
+    | Tuple items ->
+      box
+      @@ (hvbox ~indent
+         @@ (const string "[" ++ sp ++ const (hvbox pp_tuple) items))
+         ++ sp ++ const string "]"
     | Union { cases; _ } ->
       box
       @@ hvbox ~indent
@@ -81,6 +85,13 @@ and pp_fields : type t. t fields Fmt.t =
       const string name ++ const string ": "
       ++ const pp_descriptor schema.descriptor
       ++ comma ++ const pp_fields rest)
+      fmt ()
+
+and pp_tuple : type t. t tuple Fmt.t =
+ fun fmt -> function
+  | ItemEnd -> ()
+  | Item { schema; rest } ->
+    Fmt.(const pp_descriptor schema.descriptor ++ comma ++ const pp_tuple rest)
       fmt ()
 
 and pp : type u. u t Fmt.t =
