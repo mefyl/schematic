@@ -190,3 +190,13 @@ module Uri = struct
 
   let schema_versioned (_ : Schema.version) = schema
 end
+
+let one_or_many_versioned schema _ =
+  let either = Either.schema schema (list_schema schema)
+  and decode = function
+    | Either.First v -> Result.return [ v ]
+    | Second l -> Result.return l
+  and encode = function [ v ] -> Either.First v | l -> Either.Second l in
+  Schema.map ~decode ~encode either
+
+let one_or_many schema = one_or_many_versioned schema None

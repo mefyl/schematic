@@ -72,7 +72,8 @@ and validation = {
   dependentRequired : (string * string list) list; [@default []]
   const : Schemas.any option;
   enum : Schemas.any list; [@default []]
-  type_ : (type_, type_ list) Schemas.Either.t option;
+  type_ : type_ list;
+      [@default []] [@schematic.schema one_or_many_versioned type_schema]
 }
 
 and metadata = {

@@ -2,7 +2,7 @@ open Base
 include Json_schema_intf
 
 let string_const_validation v =
-  make_validation ~type_:(Either.first String) ~const:(`String v) ()
+  make_validation ~type_:[ String ] ~const:(`String v) ()
 
 let string_const v =
   {
@@ -20,7 +20,7 @@ let make ?(applicator = make_applicator ()) ?(core = make_core ())
   make ~applicator ~core ~metadata ~validation
 
 let null =
-  let validation = make_validation ~type_:(Either.first Null) () in
+  let validation = make_validation ~type_:[ Null ] () in
   make ~validation ()
 
 let of_schema schema =
@@ -44,40 +44,34 @@ let of_schema schema =
    fun marks -> function
     | Schema.Any -> (marks, make ())
     | Schema.Bool ->
-      let validation = make_validation ~type_:(Either.first Boolean) () in
+      let validation = make_validation ~type_:[ Boolean ] () in
       (marks, make ~validation ())
     | Schema.Date -> of_descriptor marks date_tuple_schema.descriptor
     | Fixpoint s -> of_descriptor marks (Lazy.force s)
     | Schema.Float ->
-      let validation = make_validation ~type_:(Either.first Number) () in
+      let validation = make_validation ~type_:[ Number ] () in
       (marks, make ~validation ())
     | Schema.Ignore -> (marks, make ())
     | Schema.Int | Schema.Int64 ->
-      let validation = make_validation ~type_:(Either.first Integer) () in
+      let validation = make_validation ~type_:[ Integer ] () in
       (marks, make ~validation ())
     | Schema.List schema ->
       let marks, schema = of_schema marks schema in
       let applicator = make_applicator ~items:(Items_schema schema) ()
-      and validation = make_validation ~type_:(Either.first Array) () in
+      and validation = make_validation ~type_:[ Array ] () in
       (marks, make ~applicator ~validation ())
     | Schema.Map { descriptor; _ } -> of_descriptor marks descriptor
     | Schema.Mapping schema ->
       let marks, schema = of_schema marks schema in
       let applicator =
         make_applicator ~additionalProperties:(Properties_schema schema) ()
-      and validation = make_validation ~type_:(Either.first Object) () in
+      and validation = make_validation ~type_:[ Object ] () in
       (marks, make ~applicator ~validation ())
     | Schema.Null -> (marks, null)
     | Schema.Nullable s ->
       let marks, t = of_descriptor marks s.descriptor in
       let type_ =
-        match t.validation.type_ with
-        | None -> Some (Either.first Null)
-        | Some (Either.First t) -> Some (Either.second [ t; Null ])
-        | Some (Either.Second types) ->
-          Some
-            (Either.second
-               (List.dedup_and_sort ~compare:Poly.compare (Null :: types)))
+        Null :: t.validation.type_ |> List.dedup_and_sort ~compare:Poly.compare
       and one_of =
         match t.applicator.one_of with [] -> [] | cases -> null :: cases
       in
@@ -88,16 +82,16 @@ let of_schema schema =
           validation = { t.validation with type_ };
         } )
     | Schema.String ->
-      let validation = make_validation ~type_:(Either.first String) () in
+      let validation = make_validation ~type_:[ String ] () in
       (marks, make ~validation ())
     | Schema.String_const v ->
       let validation = string_const_validation v in
       (marks, make ~validation ())
     | Schema.Time ->
-      let validation = make_validation ~type_:(Either.first String) () in
+      let validation = make_validation ~type_:[ String ] () in
       (marks, make ~validation ())
     | Schema.Time_local ->
-      let validation = make_validation ~type_:(Either.first String) () in
+      let validation = make_validation ~type_:[ String ] () in
       (marks, make ~validation ())
     | Schema.Object _ as o -> (
       let marks, properties =
@@ -142,7 +136,7 @@ let of_schema schema =
                          validation = { t.validation with maximum; minimum };
                        } ) ));
              }
-      and validation = make_validation ~type_:(Either.first Object) () in
+      and validation = make_validation ~type_:[ Object ] () in
       match
         List.map
           ~f:(fun properties ->
@@ -165,7 +159,7 @@ let of_schema schema =
             (marks, head :: tail)
         in
         tuple_applicator marks items
-      and validation = make_validation ~type_:(Either.first Array) () in
+      and validation = make_validation ~type_:[ Array ] () in
       ( marks,
         make
           ~applicator:(make_applicator ~items:(Tuple_schema fields) ())
@@ -178,7 +172,7 @@ let of_schema schema =
             match (key, schema) with
             | ( Some key,
                 {
-                  validation = { type_ = Some (Either.First Object); _ };
+                  validation = { type_ = [ Object ]; _ };
                   applicator = { properties; _ };
                   _;
                 } ) ->
@@ -198,13 +192,11 @@ let of_schema schema =
       in
       let applicator = make_applicator ~one_of:schemas ()
       and validation =
-        let f = function
-          | { validation = { type_ = None; _ }; _ } -> []
-          | { validation = { type_ = Some (Either.First t); _ }; _ } -> [ t ]
-          | { validation = { type_ = Some (Either.Second t); _ }; _ } -> t
-        in
+        let f = function { validation = { type_; _ }; _ } -> type_ in
         make_validation
-          ~type_:(List.map ~f schemas |> List.concat |> Either.second)
+          ~type_:
+            (List.map ~f schemas |> List.concat
+            |> List.dedup_and_sort ~compare:Poly.compare)
           ()
       in
       (marks, make ~applicator ~validation ())
