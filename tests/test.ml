@@ -26,7 +26,7 @@ let decoding_error =
 
 let dollar = String.Search_pattern.create "$"
 
-let test ?(validate = true) ?decoded name test schema value j =
+let test ?decoded name test schema value j =
   let encoded = Schematic.Json.encode schema value in
   Alcotest.check json (Fmt.str "%s: encoded JSON" name) j encoded;
   let () =
@@ -40,18 +40,17 @@ let test ?(validate = true) ?decoded name test schema value j =
       Alcotest.fail
         (Fmt.str "JSON decode error: %a" Schematic.Error.pp_decoding e)
   in
-  if validate then (
-    let schema = json_schema schema in
-    Fmt.epr "%s@." Ezjsonm.(value_to_string schema);
-    let cmd =
-      Printf.sprintf {|%s/validate-schema "%s" "%s"|} root
-        (String.Search_pattern.replace_all dollar
-           ~in_:(String.escaped @@ Schematic.Json.to_string @@ schema)
-           ~with_:"\\$")
-        (String.escaped @@ Schematic.Json.to_string @@ encoded)
-    in
-    if Caml.Sys.command cmd <> 0 then
-      Alcotest.check json (Fmt.str "%s: schema validation" name) schema encoded)
+  let schema = json_schema schema in
+  Fmt.epr "%s@." Ezjsonm.(value_to_string schema);
+  let cmd =
+    Printf.sprintf {|%s/validate-schema "%s" "%s"|} root
+      (String.Search_pattern.replace_all dollar
+         ~in_:(String.escaped @@ Schematic.Json.to_string @@ schema)
+         ~with_:"\\$")
+      (String.escaped @@ Schematic.Json.to_string @@ encoded)
+  in
+  if Caml.Sys.command cmd <> 0 then
+    Alcotest.check json (Fmt.str "%s: schema validation" name) schema encoded
 
 (* Failure *)
 
@@ -1121,19 +1120,17 @@ module Version = struct
     | _ -> None
 
   let test () =
-    test ~validate:false "latest none" t schema { v = None }
-      [%ezjsonm { v = None }];
-    test ~validate:false "latest int" t schema { v = Some (Int 3) }
-      [%ezjsonm { v = 3 }];
-    test ~validate:false "latest string" t schema { v = Some (String "3") }
+    test "latest none" t schema { v = None } [%ezjsonm { v = None }];
+    test "latest int" t schema { v = Some (Int 3) } [%ezjsonm { v = 3 }];
+    test "latest string" t schema { v = Some (String "3") }
       [%ezjsonm { v = "3" }];
-    test ~validate:false "old none" t
+    test "old none" t
       (schema_versioned schema_versions)
       { v = None } [%ezjsonm { w = None }];
-    test ~validate:false "old int" t
+    test "old int" t
       (schema_versioned schema_versions)
       { v = Some (Int 3) } [%ezjsonm { w = 3 }];
-    test ~validate:false "old string" t
+    test "old string" t
       (schema_versioned schema_versions)
       { v = Some (String "3") } ~decoded:{ v = None } [%ezjsonm { w = None }]
 end

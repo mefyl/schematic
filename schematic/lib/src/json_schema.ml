@@ -19,6 +19,10 @@ let make ?(applicator = make_applicator ()) ?(core = make_core ())
     ?(metadata = make_metadata ()) ?(validation = make_validation ()) () =
   make ~applicator ~core ~metadata ~validation
 
+let null =
+  let validation = make_validation ~type_:(Either.first Null) () in
+  make ~validation ()
+
 let of_schema schema =
   let make ?(core = make_core ()) =
     let core =
@@ -63,9 +67,7 @@ let of_schema schema =
         make_applicator ~additionalProperties:(Properties_schema schema) ()
       and validation = make_validation ~type_:(Either.first Object) () in
       (marks, make ~applicator ~validation ())
-    | Schema.Null ->
-      let validation = make_validation ~type_:(Either.first Null) () in
-      (marks, make ~validation ())
+    | Schema.Null -> (marks, null)
     | Schema.Nullable s ->
       let marks, t = of_descriptor marks s.descriptor in
       let type_ =
@@ -76,8 +78,15 @@ let of_schema schema =
           Some
             (Either.second
                (List.dedup_and_sort ~compare:Poly.compare (Null :: types)))
+      and one_of =
+        match t.applicator.one_of with [] -> [] | cases -> null :: cases
       in
-      (marks, { t with validation = { t.validation with type_ } })
+      ( marks,
+        {
+          t with
+          applicator = { t.applicator with one_of };
+          validation = { t.validation with type_ };
+        } )
     | Schema.String ->
       let validation = make_validation ~type_:(Either.first String) () in
       (marks, make ~validation ())
@@ -162,29 +171,42 @@ let of_schema schema =
           ~applicator:(make_applicator ~items:(Tuple_schema fields) ())
           ~validation () )
     | Schema.Union { cases; key } ->
-      let f (Schema.Case { name; schema; _ }) (marks, l) =
-        let marks, schema = of_schema marks schema in
-        let schema =
-          match (key, schema) with
-          | ( Some key,
-              {
-                validation = { type_ = Some (Either.First Object); _ };
-                applicator = { properties; _ };
-                _;
-              } ) ->
-            {
-              schema with
-              applicator =
+      let marks, schemas =
+        let f marks (Schema.Case { name; schema; _ }) =
+          let marks, schema = of_schema marks schema in
+          let schema =
+            match (key, schema) with
+            | ( Some key,
                 {
-                  schema.applicator with
-                  properties = (key, string_const name) :: properties;
-                };
-            }
-          | _ -> schema
+                  validation = { type_ = Some (Either.First Object); _ };
+                  applicator = { properties; _ };
+                  _;
+                } ) ->
+              {
+                schema with
+                applicator =
+                  {
+                    schema.applicator with
+                    properties = (key, string_const name) :: properties;
+                  };
+              }
+            | _ -> schema
+          in
+          (marks, schema)
         in
-        (marks, schema :: l)
+        List.fold_map ~f ~init:marks cases
       in
-      let marks, schemas = List.fold_right ~f ~init:(marks, []) cases in
-      (marks, make ~applicator:(make_applicator ~one_of:schemas ()) ())
+      let applicator = make_applicator ~one_of:schemas ()
+      and validation =
+        let f = function
+          | { validation = { type_ = None; _ }; _ } -> []
+          | { validation = { type_ = Some (Either.First t); _ }; _ } -> [ t ]
+          | { validation = { type_ = Some (Either.Second t); _ }; _ } -> t
+        in
+        make_validation
+          ~type_:(List.map ~f schemas |> List.concat |> Either.second)
+          ()
+      in
+      (marks, make ~applicator ~validation ())
   in
   of_schema (Set.empty (module String)) schema |> snd
