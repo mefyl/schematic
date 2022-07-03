@@ -259,32 +259,93 @@ let rec inline :
   | s ->
     Result.fail (Fmt.str "inline field is not an object: %a" pp_descriptor s)
 
-type 'res inline_v = { f : 't. 't fields -> 't -> 'res }
-
 let rec inline_v :
-    type t. t descriptor -> t -> 'res inline_v -> ('res, string) Result.t =
+    type t res. t descriptor -> t -> res inline_v -> (res list, string) Result.t
+    =
  fun d v f ->
   match d with
-  | Ignore -> Result.return (f.f FieldEnd v)
+  | Ignore -> Result.return []
   | Fixpoint d -> inline_v (Lazy.force d) v f
-  | Map { encode; descriptor; _ } -> inline_v descriptor (encode v) f
+  | Map { descriptor; encode; _ } -> inline_v descriptor (encode v) f
   | Nullable d -> (
     match v with
     | Some v -> inline_v d.descriptor v f
-    | None -> Result.return @@ f.f FieldEnd ())
-  | Object o -> Result.return (f.f o v)
-  | Union { cases; _ } -> (
-    let f (Case { encoder; schema; _ }) =
+    | None -> Result.return [])
+  | Object fields ->
+    let rec inline_fields : type t. t -> t fields -> (res list, string) Result.t
+        =
+     fun (v : t) -> function
+      | FieldEnd -> Result.return []
+      | Field
+          { field = { schema = Outline { descriptor = Ignore; _ }; _ }; rest }
+        ->
+        inline_fields (snd v) rest
+      | Field
+          {
+            field = { schema = Inline_try { descriptor = Ignore; _ }; _ };
+            rest;
+          } ->
+        inline_fields (snd v) rest
+      | Field { field = { requirement; schema; _ } as field; rest } ->
+        let* head =
+          let v = fst v in
+          let inline =
+            match schema with
+            | Inline schema | Inline_try schema -> (
+              match requirement with
+              | Default _ -> inline_v schema.descriptor v f
+              | Required -> inline_v schema.descriptor v f
+              | Optional -> (
+                match v with
+                | None -> Result.return []
+                | Some v -> inline_v schema.descriptor v f))
+            | Outline _ -> Result.return []
+          in
+          match (schema, inline) with
+          | Inline _, _ -> inline
+          | Inline_try _, Result.Ok _ -> inline
+          | Inline_try _, Result.Error _ | Outline _, _ ->
+            Result.return [ f.f field v ]
+        in
+        let+ tail = inline_fields (snd v) rest in
+        head @ tail
+    in
+    inline_fields v fields
+  | Union { cases; key } -> (
+    let f (Case { encoder; name; schema; _ }) =
       match encoder v with
       | None -> None
-      | Some v -> Some (inline_v schema.descriptor v f)
+      | Some v -> (
+        let key =
+          match key with
+          | None -> None
+          | Some key ->
+            let key =
+              f.f
+                {
+                  name = key;
+                  schema = Outline (make (String_const name));
+                  description = None;
+                  examples = [];
+                  maximum = None;
+                  minimum = None;
+                  omit = false;
+                  requirement = Required;
+                  title = None;
+                }
+                ()
+            in
+            Some key
+        in
+        Option.return
+        @@ let+ res = inline_v schema.descriptor v f in
+           match key with Some key -> key :: res | None -> res)
     in
     match List.find_map ~f cases with
     | None -> Result.fail "no union cased matched in inline_v"
     | Some v -> v)
   | s ->
-    Result.fail
-      (Fmt.str "inlined value field is not an object: %a" pp_descriptor s)
+    Result.fail (Fmt.str "inline field is not an object: %a" pp_descriptor s)
 
 (* Walker *)
 

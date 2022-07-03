@@ -317,16 +317,22 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
     decode schema.Schema.id [] schema.descriptor
 
   let encode schema =
-    let encode_field : type t r. (t, r) Schema.requirement -> r -> t option =
-      function
-      | Required -> Option.some
-      | Default default -> (
-        function
-        | v when Poly.(v = default (* FIXME: Poly rather bold *)) -> None
-        | v -> Some v)
-      | Optional -> Fn.id
-    in
-    let rec encode : type t. t Schema.descriptor -> t -> Coding.t =
+    let rec encode_field :
+        type req t. (t, req) Schema.field -> req -> (string * Coding.t) option =
+     fun { name; requirement; schema; _ } v ->
+      match requirement with
+      | Required ->
+        Some (name, encode (Schema.extract_field_schema schema).descriptor v)
+      | Default default ->
+        if Poly.(v = default (* FIXME: Poly rather bold *)) then None
+        else
+          Some (name, encode (Schema.extract_field_schema schema).descriptor v)
+      | Optional -> (
+        match v with
+        | None -> None
+        | Some v ->
+          Some (name, encode (Schema.extract_field_schema schema).descriptor v))
+    and encode : type t. t Schema.descriptor -> t -> Coding.t =
      fun schema v ->
       match schema with
       | Any -> Coding.of_json v
@@ -351,49 +357,12 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           (List.map
              ~f:(fun (name, v) -> (name, encode fields_schema.descriptor v))
              v)
-      | Object fields ->
-        let rec encode_object :
-            type t. t -> t Schema.fields -> (string * Coding.t) list =
-         fun v -> function
-          | FieldEnd -> []
-          | Field
-              {
-                field = { schema = Inline { descriptor = Ignore; _ }; _ };
-                rest;
-              } ->
-            encode_object (snd v) rest
-          | Field
-              {
-                field = { schema = Outline { descriptor = Ignore; _ }; _ };
-                rest;
-              } ->
-            encode_object (snd v) rest
-          | Field
-              { field = { name; requirement; schema = field_schema; _ }; rest }
-            -> (
-            let hd, tl = v in
-            let tl = encode_object tl rest in
-            match encode_field requirement hd with
-            | Some hd -> (
-              let outline schema =
-                let encoded = encode schema.Schema.descriptor hd in
-                (name, encoded) :: tl
-              in
-              match field_schema with
-              | Inline schema | Inline_try schema -> (
-                match
-                  Schema.inline_v schema.descriptor hd
-                    { f = (fun fields v -> encode_object v fields) }
-                with
-                | Result.Ok v -> v @ tl
-                | Result.Error e -> (
-                  match field_schema with
-                  | Inline _ -> failwith e
-                  | _ -> outline schema))
-              | Outline schema -> outline schema)
-            | None -> tl)
+      | Object _ as o ->
+        let fields =
+          Schema.inline_v o v { f = encode_field }
+          |> Result.ok_or_failwith |> List.filter_map ~f:Fn.id
         in
-        Coding.of_fields (encode_object v fields)
+        Coding.of_fields fields
       | Tuple items ->
         let rec encode_tuple : type t. t -> t Schema.tuple -> Coding.t list =
          fun v -> function

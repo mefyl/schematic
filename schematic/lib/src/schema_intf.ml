@@ -160,3 +160,6 @@ type version = library -> Version.t option
 type ('fold, 'res) inline = {
   f : 't 'req. 'fold -> ('t, 'req) field -> 'fold * 'res;
 }
+
+(** A ['res inline] maps a field and a value for that field to a ['res]. *)
+type 'res inline_v = { f : 't 'req. ('t, 'req) field -> 'req -> 'res }
