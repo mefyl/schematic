@@ -1,3 +1,3 @@
-type Schema.library += Schematic
+type Schema.library += V
 
-let v = Schematic (* FIXME *)
+let v = V
