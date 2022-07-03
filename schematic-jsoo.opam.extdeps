@@ -16,7 +16,6 @@ depends: [
   "astring" {= "0.8.5" & with-test}
   "base" {= "v0.14.3"}
   "base-bigarray" {= "base"}
-  "base-bytes" {= "base"}
   "base-threads" {= "base"}
   "base-unix" {= "base"}
   "base64" {= "3.5.0"}

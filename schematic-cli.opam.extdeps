@@ -11,7 +11,6 @@ depends: [
   "angstrom" {= "0.15.0"}
   "base" {= "v0.14.3"}
   "base-bigarray" {= "base"}
-  "base-bytes" {= "base"}
   "base-threads" {= "base"}
   "base-unix" {= "base"}
   "base64" {= "3.5.0"}
