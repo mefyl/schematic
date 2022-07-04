@@ -13,6 +13,7 @@ module V0_14_0 = struct
   type 'a schema = 'a Schema.t
 
   module Coding = Coding
+  module Pp = Pp
   module Typescript = Typescript
   module Version = Version
 end

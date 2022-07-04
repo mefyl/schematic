@@ -347,7 +347,9 @@ let inline_v (f : ('fold, 'res) inline_v) fields =
         Result.return (fun fold (_, tl) -> tail fold tl)
       else
         let+ head = inline_field field in
-        fun fold (hd, tl) -> head fold hd @ tail fold tl
+        fun fold (hd, tl) ->
+          let head = head fold hd in
+          head @ tail fold tl
   and inline_descriptor :
       type t. t descriptor -> ('fold -> t -> 'res list, string) Result.t =
     function

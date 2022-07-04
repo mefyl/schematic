@@ -1235,6 +1235,25 @@ module Compile_check = struct
   type 't t = { items : 't list } [@@deriving schema]
 end
 
+module Pp = struct
+  let pp_version = Schematic.Pp.of_schema version_schema
+  let pp_range = Schematic.Pp.of_schema range_schema
+
+  let pp () =
+    let version = { major = 1242; minor = 1243; subminor = 1244 } in
+    Alcotest.(
+      check string "version" {|{major: 1242; minor: 1243; subminor: 1244; }|}
+        (Fmt.str "@[%a@]" pp_version version));
+    Alcotest.(
+      check string "range"
+        {|(
+  {major: 1242; minor: 1243; subminor: 1244; },
+  {major: 1242; minor: 1243; subminor: 1244; },
+  1245
+)|}
+        (Fmt.str "@[%a@]" pp_range (version, version, 1245)))
+end
+
 (* Driver *)
 
 let () =
@@ -1303,4 +1322,5 @@ let () =
           test_case "deduced names" `Quick Names.deduced;
           test_case "parametric schemas names" `Quick Names.parametric;
         ] );
+      ("pp", [ test_case "pp" `Quick Pp.pp ]);
     ]
