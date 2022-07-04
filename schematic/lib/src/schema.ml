@@ -334,15 +334,7 @@ let rec inline_v :
         =
      fun (v : t) -> function
       | FieldEnd -> Result.return []
-      | Field
-          { field = { schema = Outline { descriptor = Ignore; _ }; _ }; rest }
-        ->
-        inline_fields (snd v) rest
-      | Field
-          {
-            field = { schema = Inline_try { descriptor = Ignore; _ }; _ };
-            rest;
-          } ->
+      | Field { field; rest } when field_ignored field ->
         inline_fields (snd v) rest
       | Field { field = { requirement; schema; _ } as field; rest } ->
         let* head =
