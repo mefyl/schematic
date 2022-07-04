@@ -175,89 +175,147 @@ let rec walk_fields :
   | s ->
     Result.fail (Fmt.str "inline field is not an object: %a" pp_descriptor s)
 
-let rec inline :
-    type t res.
-    t descriptor ->
-    'fold ->
-    ('fold, res) inline ->
-    ('fold * res list list, string) Result.t =
- fun d acc f ->
-  match d with
-  | Ignore -> Result.return (acc, [ [] ])
-  | Fixpoint d -> inline (Lazy.force d) acc f
-  | Map { descriptor; _ } -> inline descriptor acc f
-  | Nullable d -> inline d.descriptor acc f
-  | Object fields ->
-    let rec inline_fields :
-        type t. 'fold -> t fields -> ('fold * res list list, string) Result.t =
-     fun acc -> function
-      | FieldEnd -> Result.return (acc, [ [] ])
-      | Field
-          { field = { schema = Outline { descriptor = Ignore; _ }; _ }; rest }
-        ->
-        inline_fields acc rest
-      | Field
-          {
-            field = { schema = Inline_try { descriptor = Ignore; _ }; _ };
-            rest;
-          } ->
-        inline_fields acc rest
-      | Field { field; rest } ->
-        let* acc, head =
-          match field.schema with
-          | Inline schema -> inline schema.descriptor acc f
-          | Inline_try schema -> (
-            match inline schema.descriptor acc f with
-            | Result.Ok _ as res -> res
-            | Result.Error _ ->
-              let acc, head = f.f acc field in
-              Result.return (acc, [ [ head ] ]))
-          | Outline _ ->
-            let acc, head = f.f acc field in
-            Result.return (acc, [ [ head ] ])
-        in
-        let+ acc, tail = inline_fields acc rest in
-        ( acc,
-          Sequence.(
-            cartesian_product (of_list head) (of_list tail)
-            |> map ~f:(fun (h, t) -> h @ t)
-            |> to_list) )
-    in
-    inline_fields acc fields
-  | Union { cases; key } ->
-    let f acc (Case { schema; name; _ }) =
-      let acc, key =
-        match key with
-        | None -> (acc, None)
-        | Some key ->
-          let acc, key =
-            f.f acc
-              {
-                name = key;
-                schema = Outline (make (String_const name));
-                description = None;
-                examples = [];
-                maximum = None;
-                minimum = None;
-                omit = false;
-                requirement = Required;
-                title = None;
-              }
+let field_ignored : type req t. (t, req) field -> bool = function
+  | { schema = Outline { descriptor = Ignore; _ }; _ } -> true
+  | { schema = Inline_try { descriptor = Ignore; _ }; _ } -> true
+  | { omit; _ } -> omit
+
+let inline desc fold f =
+  let rec inline :
+      type req res t.
+      t descriptor ->
+      (t, req) requirement ->
+      'fold ->
+      ('fold, res) inline ->
+      ('fold * res list list, string) Result.t =
+   fun d req acc f ->
+    match d with
+    | Ignore -> Result.return (acc, [ [] ])
+    | Fixpoint d -> inline (Lazy.force d) req acc f
+    | Map { descriptor; encode; _ } -> (
+      match req with
+      | Default d -> inline descriptor (Default (encode d)) acc f
+      | Optional -> inline descriptor Optional acc f
+      | Required -> inline descriptor Required acc f)
+    | Nullable d -> inline d.descriptor Optional acc f
+    | Object fields ->
+      let rec inline_fields :
+          type req t.
+          (t, req) requirement ->
+          'fold ->
+          t fields ->
+          ('fold * res list list, string) Result.t =
+       fun req acc -> function
+        | FieldEnd -> Result.return (acc, [ [] ])
+        | Field { field; rest } when field_ignored field -> (
+          match req with
+          | Default (_, tail) -> inline_fields (Default tail) acc rest
+          | Optional -> inline_fields Optional acc rest
+          | Required -> inline_fields Required acc rest)
+        | Field { field; rest } ->
+          let* acc, head =
+            let inline =
+              match field.schema with
+              | Inline schema | Inline_try schema -> (
+                match (field.requirement, req) with
+                | Default _, _ | Optional, _ | Required, Required ->
+                  inline schema.descriptor field.requirement acc f
+                | Required, Default (head, _) -> (
+                  match field.requirement with
+                  | Default default ->
+                    inline schema.descriptor (Default default) acc f
+                  | Required -> inline schema.descriptor (Default head) acc f
+                  | Optional -> inline schema.descriptor Optional acc f)
+                | Required, Optional -> inline schema.descriptor Optional acc f)
+              | Outline _ -> Result.fail "unused"
+            in
+            match (field.schema, inline) with
+            | Inline _, _ -> inline
+            | Inline_try _, Result.Ok _ -> inline
+            | Inline_try _, Result.Error _ | Outline _, _ ->
+              let acc, head =
+                match (field.requirement, req) with
+                | Default _, _ | Optional, _ | Required, Required ->
+                  f.f acc field
+                | Required, Optional ->
+                  f.f acc
+                    {
+                      description = field.description;
+                      examples = field.examples;
+                      maximum = field.maximum;
+                      minimum = field.minimum;
+                      name = field.name;
+                      omit = field.omit;
+                      requirement = Optional;
+                      schema = field.schema;
+                      title = field.title;
+                    }
+                | Required, Default (head, _) ->
+                  f.f acc
+                    {
+                      description = field.description;
+                      examples = field.examples;
+                      maximum = field.maximum;
+                      minimum = field.minimum;
+                      name = field.name;
+                      omit = field.omit;
+                      requirement = Default head;
+                      schema = field.schema;
+                      title = field.title;
+                    }
+              in
+              Result.return (acc, [ [ head ] ])
           in
-          (acc, Some key)
+          let+ acc, tail =
+            match req with
+            | Default (_, tail) -> inline_fields (Default tail) acc rest
+            | Optional -> inline_fields Optional acc rest
+            | Required -> inline_fields Required acc rest
+          in
+          ( acc,
+            Sequence.(
+              cartesian_product (of_list head) (of_list tail)
+              |> map ~f:(fun (h, t) -> h @ t)
+              |> to_list) )
       in
-      match inline schema.descriptor acc f with
-      | Result.Ok (acc, res) -> (
-        match key with
-        | Some key -> (acc, List.map ~f:(fun l -> key :: l) res |> Result.return)
-        | None -> (acc, Result.return res))
-      | Result.Error _ as e -> (acc, e)
-    in
-    let acc, res = List.fold_map ~init:acc ~f cases in
-    let+ res = Result.all res in
-    (acc, List.concat res)
-  | s ->
-    Result.fail (Fmt.str "inline field is not an object: %a" pp_descriptor s)
+      inline_fields req acc fields
+    | Union { cases; key } ->
+      let f acc (Case { schema; name; _ }) =
+        let acc, key =
+          match key with
+          | None -> (acc, None)
+          | Some key ->
+            let acc, key =
+              f.f acc
+                {
+                  name = key;
+                  schema = Outline (make (String_const name));
+                  description = None;
+                  examples = [];
+                  maximum = None;
+                  minimum = None;
+                  omit = false;
+                  requirement = Required;
+                  title = None;
+                }
+            in
+            (acc, Some key)
+        in
+        match inline schema.descriptor Required acc f with
+        | Result.Ok (acc, res) -> (
+          match key with
+          | Some key ->
+            (acc, List.map ~f:(fun l -> key :: l) res |> Result.return)
+          | None -> (acc, Result.return res))
+        | Result.Error _ as e -> (acc, e)
+      in
+      let acc, res = List.fold_map ~init:acc ~f cases in
+      let+ res = Result.all res in
+      (acc, List.concat res)
+    | s ->
+      Result.fail (Fmt.str "inline field is not an object: %a" pp_descriptor s)
+  in
+  inline desc Required fold f
 
 let rec inline_v :
     type t res. t descriptor -> t -> res inline_v -> (res list, string) Result.t

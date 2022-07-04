@@ -647,18 +647,39 @@ module Inline = struct
   }
   [@@deriving eq, schema, show]
 
-  (* let inline_parametric a =
-   *   Alcotest.(
-   *     testable
-   *       (pp_inline_parametric @@ pp a)
-   *       (equal_inline_parametric @@ equal a)) *)
-
   let parametric = Alcotest.testable pp_parametric equal_parametric
 
   let inline_parametric () =
     test "parametric inlinable" parametric parametric_schema
       { inlined = A { value = 457; param = () } }
       [%ezjsonm { value = 457 }]
+
+  type inline_nested_optional = {
+    inline_nested : inline_nested; [@schematic.inline]
+  }
+
+  and inline_nested = { inlined : inlined option [@schematic.inline] }
+  [@@deriving eq, schema, show]
+
+  let inline_nested_optional =
+    Alcotest.testable pp_inline_nested_optional equal_inline_nested_optional
+
+  let inline_nested_optional () =
+    Alcotest.(
+      check
+        (result (list (list string)) string)
+        "fields"
+        (Result.Ok [ [] ])
+        Schematic.Schema.(
+          object_fields inline_nested_optional_schema.descriptor));
+    test "optional inline filled" inline_nested_optional
+      inline_nested_optional_schema
+      { inline_nested = { inlined = Some { b = 665; c = 666 } } }
+      [%ezjsonm { b = 665; c = 666 }];
+    test "optional inline empty" inline_nested_optional
+      inline_nested_optional_schema
+      { inline_nested = { inlined = None } }
+      (`O [])
 end
 
 (* Time *)
@@ -1230,6 +1251,8 @@ let () =
           test_case "inline-variant" `Quick Inline.inline_variant;
           test_case "inline-try" `Quick Inline.inline_try;
           test_case "inline-parametric" `Quick Inline.inline_parametric;
+          test_case "inline-nested-optional" `Quick
+            Inline.inline_nested_optional;
           test_case "time" `Quick time;
           test_case "json-schema-metadata-description" `Quick
             Metadata.description;
