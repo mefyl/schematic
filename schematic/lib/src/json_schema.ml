@@ -112,7 +112,7 @@ let of_schema schema =
                          _;
                        } :
                         (t, req) Schema.field) ->
-                   let schema = Schema.extract_field_schema schema in
+                   let schema = Schema.field_schema schema in
                    let marks, t = of_schema marks schema
                    and to_json v = Json.to_ezjsonm @@ Json.encode schema v in
                    ( marks,

@@ -220,7 +220,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
                   };
                 rest;
               } -> (
-            match Schema.extract_field_schema field_schema with
+            match Schema.field_schema field_schema with
             | { descriptor = Ignore; _ } ->
               let* rest = decode_object rest in
               Result.Ok (requirement_return requirement (), rest)
@@ -316,20 +316,19 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
 
   let encode schema =
     let rec encode_field :
-        type req t. (t, req) Schema.field -> req -> (string * Coding.t) option =
-     fun { name; requirement; schema; _ } v ->
+        type req t.
+        (t, req) Schema.field -> unit -> req -> (string * Coding.t) option =
+     fun { name; requirement; schema; _ } () v ->
       match requirement with
-      | Required ->
-        Some (name, encode (Schema.extract_field_schema schema).descriptor v)
+      | Required -> Some (name, encode (Schema.field_schema schema).descriptor v)
       | Default default ->
         if Poly.(v = default (* FIXME: Poly rather bold *)) then None
-        else
-          Some (name, encode (Schema.extract_field_schema schema).descriptor v)
+        else Some (name, encode (Schema.field_schema schema).descriptor v)
       | Optional -> (
         match v with
         | None -> None
-        | Some v ->
-          Some (name, encode (Schema.extract_field_schema schema).descriptor v))
+        | Some v -> Some (name, encode (Schema.field_schema schema).descriptor v)
+        )
     and encode : type t. t Schema.descriptor -> t -> Coding.t =
      fun schema v ->
       match schema with
@@ -355,10 +354,12 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           (List.map
              ~f:(fun (name, v) -> (name, encode fields_schema.descriptor v))
              v)
-      | Object _ as o ->
+      | Object o ->
         let fields =
-          Schema.inline_v o v { f = encode_field }
-          |> Result.ok_or_failwith |> List.filter_map ~f:Fn.id
+          let f =
+            Schema.inline_v { f = encode_field } o |> Result.ok_or_failwith
+          in
+          f () v |> List.filter_map ~f:Fn.id
         in
         Coding.of_fields fields
       | Tuple items ->

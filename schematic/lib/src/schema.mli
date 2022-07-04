@@ -7,7 +7,6 @@ val map :
 
 val pp : Format.formatter -> _ t -> unit
 val pp_descriptor : Format.formatter -> _ descriptor -> unit
-val extract_field_schema : 'a field_schema -> 'a t
 
 (** [objects_fields fields] is a list of alternative mandatory fields name set
     required to decode an object with fields [fields]. *)
@@ -24,8 +23,12 @@ val inline :
   ('fold * 'res list list, string) Result.t
 
 val inline_v :
-  't descriptor -> 't -> 'res inline_v -> ('res list, string) Result.t
+  ('fold, 'res) inline_v ->
+  't fields ->
+  ('fold -> 't -> 'res list, string) result
 
+val field_ignored : ('t, 'req) field -> bool
+val field_schema : 't field_schema -> 't t
 val compare : 'a t -> 'a -> 'a -> int
 
 type pack

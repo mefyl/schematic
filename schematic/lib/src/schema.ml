@@ -16,7 +16,7 @@ let map ~decode ~encode { descriptor; _ } =
     parametric = None;
   }
 
-let extract_field_schema = function
+let field_schema = function
   | Inline schema -> schema
   | Inline_try schema -> schema
   | Outline schema -> schema
@@ -80,7 +80,7 @@ and pp_fields : type t. t fields Fmt.t =
  fun fmt -> function
   | FieldEnd -> ()
   | Field { field = { name; schema; _ }; rest; _ } ->
-    let schema = extract_field_schema schema in
+    let schema = field_schema schema in
     Fmt.(
       const string name ++ const string ": "
       ++ const pp_descriptor schema.descriptor
@@ -317,85 +317,89 @@ let inline desc fold f =
   in
   inline desc Required fold f
 
-let rec inline_v :
-    type t res. t descriptor -> t -> res inline_v -> (res list, string) Result.t
-    =
- fun d v f ->
-  match d with
-  | Ignore -> Result.return []
-  | Fixpoint d -> inline_v (Lazy.force d) v f
-  | Map { descriptor; encode; _ } -> inline_v descriptor (encode v) f
-  | Nullable d -> (
-    match v with
-    | Some v -> inline_v d.descriptor v f
-    | None -> Result.return [])
-  | Object fields ->
-    let rec inline_fields : type t. t -> t fields -> (res list, string) Result.t
-        =
-     fun (v : t) -> function
-      | FieldEnd -> Result.return []
-      | Field { field; rest } when field_ignored field ->
-        inline_fields (snd v) rest
-      | Field { field = { requirement; schema; _ } as field; rest } ->
-        let* head =
-          let v = fst v in
-          let inline =
-            match schema with
-            | Inline schema | Inline_try schema -> (
-              match requirement with
-              | Default _ -> inline_v schema.descriptor v f
-              | Required -> inline_v schema.descriptor v f
-              | Optional -> (
-                match v with
-                | None -> Result.return []
-                | Some v -> inline_v schema.descriptor v f))
-            | Outline _ -> Result.return []
+let inline_v (f : ('fold, 'res) inline_v) fields =
+  let rec inline_field :
+      type req t. (t, req) field -> ('fold -> req -> 'res list, string) Result.t
+      =
+   fun field ->
+    let inline : ('fold -> req -> 'res list, string) Result.t =
+      match field.schema with
+      | Inline schema | Inline_try schema -> (
+        let+ f = inline_descriptor schema.descriptor in
+        match field.requirement with
+        | Required -> (fun fold v -> f fold v : 'fold -> req -> 'res list)
+        | Default _ -> fun fold v -> f fold v
+        | Optional -> ( fun fold -> function Some v -> f fold v | None -> []))
+      | Outline _ -> Result.fail "unused"
+    in
+    match (field.schema, inline) with
+    | Inline _, _ -> inline
+    | Inline_try _, Result.Ok _ -> inline
+    | Inline_try _, Result.Error _ | Outline _, _ ->
+      let f = f.f field in
+      Result.return @@ fun fold v -> [ f fold v ]
+  and inline_fields :
+      type t. t fields -> ('fold -> t -> 'res list, string) Result.t = function
+    | FieldEnd -> Result.return (fun _ () -> [])
+    | Field { field; rest } ->
+      let* tail = inline_fields rest in
+      if field_ignored field then
+        Result.return (fun fold (_, tl) -> tail fold tl)
+      else
+        let+ head = inline_field field in
+        fun fold (hd, tl) -> head fold hd @ tail fold tl
+  and inline_descriptor :
+      type t. t descriptor -> ('fold -> t -> 'res list, string) Result.t =
+    function
+    | Ignore -> Result.return (fun _ () -> [])
+    | Fixpoint d -> inline_descriptor (Lazy.force d)
+    | Map { descriptor; encode; _ } ->
+      let+ f = inline_descriptor descriptor in
+      fun fold v -> f fold (encode v)
+    | Nullable schema -> (
+      let+ f = inline_descriptor schema.descriptor in
+      fun fold -> function Some v -> f fold v | None -> [])
+    | Object fields -> inline_fields fields
+    | Union { cases; key } -> (
+      let+ cases =
+        let f (Case { encoder; name; schema; _ }) =
+          let+ res = inline_descriptor schema.descriptor in
+          let key =
+            match key with
+            | None -> None
+            | Some key ->
+              Some
+                (f.f
+                   {
+                     name = key;
+                     schema = Outline (make (String_const name));
+                     description = None;
+                     examples = [];
+                     maximum = None;
+                     minimum = None;
+                     omit = false;
+                     requirement = Required;
+                     title = None;
+                   })
           in
-          match (schema, inline) with
-          | Inline _, _ -> inline
-          | Inline_try _, Result.Ok _ -> inline
-          | Inline_try _, Result.Error _ | Outline _, _ ->
-            Result.return [ f.f field v ]
+          fun fold v ->
+            match encoder v with
+            | None -> None
+            | Some v -> (
+              match key with
+              | None -> Some (res fold v)
+              | Some key -> Some (key fold () :: res fold v))
         in
-        let+ tail = inline_fields (snd v) rest in
-        head @ tail
-    in
-    inline_fields v fields
-  | Union { cases; key } -> (
-    let f (Case { encoder; name; schema; _ }) =
-      match encoder v with
-      | None -> None
-      | Some v -> (
-        let key =
-          match key with
-          | None -> None
-          | Some key ->
-            let key =
-              f.f
-                {
-                  name = key;
-                  schema = Outline (make (String_const name));
-                  description = None;
-                  examples = [];
-                  maximum = None;
-                  minimum = None;
-                  omit = false;
-                  requirement = Required;
-                  title = None;
-                }
-                ()
-            in
-            Some key
-        in
-        Option.return
-        @@ let+ res = inline_v schema.descriptor v f in
-           match key with Some key -> key :: res | None -> res)
-    in
-    match List.find_map ~f cases with
-    | None -> Result.fail "no union cased matched in inline_v"
-    | Some v -> v)
-  | s ->
-    Result.fail (Fmt.str "inline field is not an object: %a" pp_descriptor s)
+        List.map ~f cases |> Result.all
+      in
+      fun fold v ->
+        match List.find_map cases ~f:(fun case -> case fold v) with
+        | Some case -> case
+        | None -> failwith "no union cased matched in inline_f")
+    | s ->
+      Result.fail (Fmt.str "inline field is not an object: %a" pp_descriptor s)
+  in
+  inline_fields fields
 
 (* Walker *)
 
@@ -566,7 +570,7 @@ let compare schema =
     | Object fields ->
       let rec compare_fields : type u. u fields -> u -> u -> int = function
         | Field { field = { schema; requirement; _ }; rest } ->
-          let schema = extract_field_schema schema in
+          let schema = field_schema schema in
           let f (type field req) (schema : field t)
               (requirement : (field, req) requirement) ((l : req), lr)
               ((r : req), rr) =
