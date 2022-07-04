@@ -654,30 +654,47 @@ module Inline = struct
       { inlined = A { value = 457; param = () } }
       [%ezjsonm { value = 457 }]
 
+  type 'a hide = 'a [@@deriving eq, schema, show]
+
   type inline_nested_optional = {
-    inline_nested : inline_nested; [@schematic.inline]
+    inline_nested : inline_nested_opt; [@schematic.inline]
   }
 
-  and inline_nested = { inlined : inlined option [@schematic.inline] }
+  and inline_nested_opt = { inlined : inlined option [@schematic.inline] }
   [@@deriving eq, schema, show]
 
-  let inline_nested_optional =
-    Alcotest.testable pp_inline_nested_optional equal_inline_nested_optional
+  type inline_nested_default = {
+    inline_nested : inline_nested_def; [@schematic.inline]
+  }
+
+  and inline_nested_def = {
+    inlined : inlined option hide; [@schematic.default None] [@schematic.inline]
+  }
+  [@@deriving eq, schema, show]
 
   let inline_nested_optional () =
-    Alcotest.(
-      check
-        (result (list (list string)) string)
-        "fields"
-        (Result.Ok [ [] ])
-        Schematic.Schema.(
-          object_fields inline_nested_optional_schema.descriptor));
+    let inline_nested_optional =
+      Alcotest.testable pp_inline_nested_optional equal_inline_nested_optional
+    in
     test "optional inline filled" inline_nested_optional
       inline_nested_optional_schema
       { inline_nested = { inlined = Some { b = 665; c = 666 } } }
       [%ezjsonm { b = 665; c = 666 }];
     test "optional inline empty" inline_nested_optional
       inline_nested_optional_schema
+      { inline_nested = { inlined = None } }
+      (`O [])
+
+  let inline_nested_default () =
+    let inline_nested_default =
+      Alcotest.testable pp_inline_nested_default equal_inline_nested_default
+    in
+    test "default inline filled" inline_nested_default
+      inline_nested_default_schema
+      { inline_nested = { inlined = Some { b = 665; c = 666 } } }
+      [%ezjsonm { b = 665; c = 666 }];
+    test "default inline empty" inline_nested_default
+      inline_nested_default_schema
       { inline_nested = { inlined = None } }
       (`O [])
 end
@@ -1253,6 +1270,7 @@ let () =
           test_case "inline-parametric" `Quick Inline.inline_parametric;
           test_case "inline-nested-optional" `Quick
             Inline.inline_nested_optional;
+          test_case "inline-nested-default" `Quick Inline.inline_nested_default;
           test_case "time" `Quick time;
           test_case "json-schema-metadata-description" `Quick
             Metadata.description;

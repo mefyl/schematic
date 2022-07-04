@@ -103,6 +103,24 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       (v : a) : req =
     match req with Required -> v | Default _ -> v | Optional -> Some v
 
+  let missing descriptor fields =
+    let rec unroll : type t. t Schema.descriptor -> string list list = function
+      | Fixpoint descriptor -> unroll (Lazy.force descriptor)
+      | Nullable schema -> unroll schema.descriptor
+      | Map { descriptor; _ } -> unroll descriptor
+      | descriptor -> (
+        match Schema.object_fields descriptor with
+        | Result.Ok v -> v
+        | Result.Error _ -> [ [] ])
+    in
+    unroll descriptor
+    |> List.find ~f:(fun expected ->
+           Option.is_none
+           @@ List.find
+                ~f:(fun f -> not (List.Assoc.mem ~equal:String.equal fields f))
+                expected)
+    |> Option.is_none
+
   let decode schema =
     let rec decode_field :
         type t r.
@@ -208,28 +226,9 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
               Result.Ok (requirement_return requirement (), rest)
             | schema ->
               let field =
-                let missing, value =
+                let value =
                   let inline Schema.{ descriptor; _ } =
-                    let missing =
-                      let expected_sets =
-                        match Schema.object_fields descriptor with
-                        | Result.Ok v -> v
-                        | Result.Error _ -> [ [] ]
-                      in
-                      let res =
-                        List.find
-                          ~f:(fun expected ->
-                            Option.is_none
-                            @@ List.find
-                                 ~f:(fun f ->
-                                   not
-                                     (List.Assoc.mem ~equal:String.equal fields
-                                        f))
-                                 expected)
-                          expected_sets
-                        |> Option.is_none
-                      in
-                      res
+                    let missing = missing descriptor fields
                     and inlinable =
                       Schema.inline descriptor () { f = (fun () _ -> ((), ())) }
                       |> Result.is_ok
@@ -241,16 +240,15 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
                   match field_schema with
                   | Inline schema ->
                     let missing, _inlinable = inline schema in
-                    (missing, Some v)
+                    if missing then None else Some v
                   | Inline_try schema ->
                     let missing, inlinable = inline schema in
-                    (missing, if inlinable then Some v else outline ())
-                  | Outline _ -> (false, outline ())
+                    if missing then None
+                    else if inlinable then Some v
+                    else outline ()
+                  | Outline _ -> outline ()
                 in
-                if missing then
-                  decode_field omit id ids field_name schema requirement None
-                else
-                  decode_field omit id ids field_name schema requirement value
+                decode_field omit id ids field_name schema requirement value
               in
               Result.Let_syntax.Let_syntax.both field (decode_object rest))
         in
