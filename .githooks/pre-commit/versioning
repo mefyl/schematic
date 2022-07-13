@@ -12,3 +12,4 @@ check () {
 
 check "schematic/lib/src/versions.ml"
 check "schematic-jsoo/lib/src/versions.ml"
+check "schematic-http/lib/src/versions.ml"
