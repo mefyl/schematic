@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic-jsoo"
-version: "0.14.0"
+version: "0.14.1"
 synopsis: "Derive js_of_ocaml types and values from Ocaml types"
 description: """\
 Deduce js_of_ocaml FFI types
