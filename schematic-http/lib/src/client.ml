@@ -202,7 +202,7 @@ module Rate_limit (Rate : RATE_LIMIT) (Handler : HANDLER) = struct
       Handler.Monad.bind (Handler.raw ?headers ?body method_ uri)
         ~f:(fun ((resp, _) as r) ->
           match Cohttp_.Response.status resp with
-          | `Too_many_requests ->
+          | `Service_unavailable | `Too_many_requests ->
             let* backoff = backoff errors uri resp in
             let* () = Rate.sleep (Float.of_int backoff) in
             raw (errors + 1) ()
