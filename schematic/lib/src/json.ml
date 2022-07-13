@@ -1,6 +1,9 @@
 open Base
 include Json_intf
 
+let schema = Schema.make Any
+let schema_versioned (_ : Schema.version) = schema
+
 module Json_coding : Coding.IMPL with type t = Ezjsonm.value = struct
   type t = Ezjsonm.value
 
