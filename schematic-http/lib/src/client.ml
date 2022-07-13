@@ -162,17 +162,16 @@ let pp_retry =
 module Rate_limit (Rate : RATE_LIMIT) (Handler : HANDLER) = struct
   include Handler
 
-  let errors = ref 0
   let retry_after = "retry-after"
 
-  let backoff uri resp =
+  let backoff errors uri resp =
     let log pv v =
       Logs.warn (fun m ->
           m "429 Too Many Requests querying %a%a, backing off %a" Uri.pp uri
-            pp_retry !errors pv v)
+            pp_retry errors pv v)
     in
     let default () =
-      let v = Rate.backoff !errors in
+      let v = Rate.backoff errors in
       let* () = log Fmt.(fmt "for %i seconds") v in
       Lwt.return v
     in
@@ -199,18 +198,17 @@ module Rate_limit (Rate : RATE_LIMIT) (Handler : HANDLER) = struct
         default ())
 
   let raw ?headers ?body method_ uri =
-    let rec raw () =
+    let rec raw errors () =
       Handler.Monad.bind (Handler.raw ?headers ?body method_ uri)
         ~f:(fun ((resp, _) as r) ->
           match Cohttp_.Response.status resp with
           | `Too_many_requests ->
-            let () = errors := !errors + 1 in
-            let* backoff = backoff uri resp in
+            let* backoff = backoff errors uri resp in
             let* () = Rate.sleep (Float.of_int backoff) in
-            raw ()
+            raw (errors + 1) ()
           | _ -> Handler.Monad.return r)
     in
-    raw ()
+    raw 0 ()
 end
 
 module Optional (Handler : HANDLER) = struct
