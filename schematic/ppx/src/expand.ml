@@ -596,6 +596,9 @@ module Schema = struct
   let schema_name s = name "schema" s
   let schema_name_versioned s = name "schema_versioned" s
 
+  let schema_anonymous_name_versioned i =
+    schema_name_versioned @@ Fmt.str "%i_any" i
+
   let schema_id_versioned ?prefix ~loc =
     suffix_id ~loc ?prefix "schema_versioned"
 
@@ -981,14 +984,15 @@ module Schema = struct
         match param with
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
           [%type: [%t Ast.ptyp_var name] Schema.t -> [%t t]]
-        | [%type: _], _ -> [%type: _ -> [%t t]]
+        | { ptyp_desc = Ptyp_any; ptyp_loc = loc; _ }, _ -> [%type: _ -> [%t t]]
         | t, _ ->
           Ppxlib.Location.raise_errorf ~loc
-            "schematic-ppx: unsupported type parameter %a" Pprintast.core_type t
+            "schematic-ppx: unsupported type parameter A %a" Pprintast.core_type
+            t
       in
       List.fold_right ~f:wrap ~init:t type_context.params
     and params_wrap body =
-      let wrap arg exp =
+      let wrap i exp arg =
         match arg with
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
           [%expr
@@ -996,22 +1000,32 @@ module Schema = struct
                   Ast.ppat_var
                     { txt = param_prefix ^ schema_name_versioned name; loc }] ->
               [%e exp]]
-        | [%type: _], _ -> [%expr fun _ -> [%e exp]]
+        | { ptyp_desc = Ptyp_any; ptyp_loc = loc; _ }, _ ->
+          [%expr
+            fun [%p
+                  Ast.ppat_var
+                    {
+                      txt = param_prefix ^ schema_anonymous_name_versioned i;
+                      loc;
+                    }] ->
+              [%e exp]]
         | t, _ ->
           Ppxlib.Location.raise_errorf ~loc
-            "schematic-ppx: unsupported type parameter %a" Pprintast.core_type t
+            "schematic-ppx: unsupported type parameter B %a" Pprintast.core_type
+            t
       in
-      List.fold_right ~f:wrap ~init:body type_context.params
+      type_context.params |> List.rev |> List.foldi ~f:wrap ~init:body
     and params_apply f =
       let wrap f arg =
         match arg with
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
           [%expr
             [%e f] [%e Ast.evar @@ param_prefix ^ schema_name_versioned name]]
-        | [%type: _], _ -> [%expr [%e f] ()]
+        | [%type: _], _ -> [%expr [%e f] Schematic.Schemas.any_schema]
         | t, _ ->
           Ppxlib.Location.raise_errorf ~loc
-            "schematic-ppx: unsupported type parameter %a" Pprintast.core_type t
+            "schematic-ppx: unsupported type parameter C %a" Pprintast.core_type
+            t
       in
       List.fold_left ~f:wrap ~init:f type_context.params
     in
@@ -1031,8 +1045,8 @@ module Schema = struct
           | [%type: _], _ -> exp
           | t, _ ->
             Ppxlib.Location.raise_errorf ~loc
-              "schematic-ppx: unsupported type parameter %a" Pprintast.core_type
-              t
+              "schematic-ppx: unsupported type parameter D %a"
+              Pprintast.core_type t
         in
         List.fold_right ~init:schema_id ~f type_context.params
       in
@@ -1046,7 +1060,7 @@ module Schema = struct
             let init =
               [%expr
                 Plain { name = [%e schema_id]; descriptor = [%e descriptor] }]
-            and f arg parametric =
+            and f i parametric arg =
               match arg with
               | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
                 let schema_name = schema_name_versioned name in
@@ -1059,12 +1073,24 @@ module Schema = struct
                         (fun [%p Ast.pvar @@ param_prefix ^ schema_name] ->
                           [%e parametric]);
                     }]
+              | { ptyp_desc = Ptyp_any; ptyp_loc = loc; _ }, _ ->
+                let schema_name = schema_anonymous_name_versioned i in
+                [%expr
+                  Parametric
+                    {
+                      name = [%e Ast.estring (Fmt.str "anonymous_%i" i)];
+                      parameter = [%e Ast.evar @@ param_prefix ^ schema_name];
+                      next =
+                        (fun [%p Ast.pvar @@ param_prefix ^ schema_name] ->
+                          [%e parametric]);
+                    }]
               | t, _ ->
                 Ppxlib.Location.raise_errorf ~loc
-                  "schematic-ppx: unsupported type parameter %a"
+                  "schematic-ppx: unsupported type parameter E %a"
                   Pprintast.core_type t
             in
-            [%expr Some [%e List.fold_right ~f ~init type_context.params]]
+            [%expr
+              Some [%e type_context.params |> List.rev |> List.foldi ~f ~init]]
         in
         let cache = List.is_empty type_context.params in
         ( [%expr

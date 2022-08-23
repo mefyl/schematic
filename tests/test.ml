@@ -323,18 +323,27 @@ end
 
 (* Parametric *)
 
-type 'a pair = 'a * 'a [@@deriving schema]
+module Parametric = struct
+  type 'a pair = 'a * 'a [@@deriving schema]
 
-let parametric_type () =
-  test "parametric_type"
-    (Alcotest.pair test_version test_version)
-    (pair_schema version_schema)
-    (v1, v3)
-    [%ezjsonm
-      [
-        { major = 0; minor = 1; subminor = 2 };
-        { major = 6; minor = 7; subminor = 8 };
-      ]]
+  let simple () =
+    test "parametric_type"
+      (Alcotest.pair test_version test_version)
+      (pair_schema version_schema)
+      (v1, v3)
+      [%ezjsonm
+        [
+          { major = 0; minor = 1; subminor = 2 };
+          { major = 6; minor = 7; subminor = 8 };
+        ]]
+
+  type _ anonymous = int [@@deriving schema]
+
+  let anonymous () =
+    test "anonymous parameter" Alcotest.int
+      (anonymous_schema version_schema)
+      345 [%ezjsonm 345]
+end
 
 (* Escape *)
 
@@ -1276,7 +1285,8 @@ let () =
           test_case "alias" `Quick alias;
           test_case "list" `Quick List.objects;
           test_case "option list" `Quick List.option;
-          test_case "parametric_type" `Quick parametric_type;
+          test_case "parametric_type" `Quick Parametric.simple;
+          test_case "anonymous_parameter" `Quick Parametric.anonymous;
           test_case "escape" `Quick escape;
           test_case "recursive" `Quick Recursive.plain;
           test_case "recursive_parametric" `Quick Recursive.parametric;
