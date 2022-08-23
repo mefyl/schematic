@@ -1064,18 +1064,21 @@ module Schema = struct
       in
       type_context.params |> List.rev |> List.foldi ~f:wrap ~init:body
     and params_apply f =
-      let wrap f arg =
+      let wrap i f arg =
         match arg with
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
           [%expr
             [%e f] [%e Ast.evar @@ param_prefix ^ schema_name_versioned name]]
-        | [%type: _], _ -> [%expr [%e f] Schematic.Schemas.any_schema]
+        | { ptyp_desc = Ptyp_any; ptyp_loc = loc; _ }, _ ->
+          [%expr
+            [%e f]
+              [%e Ast.evar @@ param_prefix ^ schema_anonymous_name_versioned i]]
         | t, _ ->
           Ppxlib.Location.raise_errorf ~loc
             "schematic-ppx: unsupported type parameter C %a" Pprintast.core_type
             t
       in
-      List.fold_left ~f:wrap ~init:f type_context.params
+      List.foldi ~f:wrap ~init:f type_context.params
     in
     let schema, cache =
       let id =
