@@ -238,6 +238,7 @@ module Attributes = struct
       (string, expression * core_type, String.comparator_witness) Map.t;
     gadt_variant : string option;
     name : expression option;
+    schema : expression option;
     union_key : string option;
   }
 
@@ -249,7 +250,7 @@ module Attributes = struct
     | None -> ()
 
   let rec extract ?(alias = false) ?(computed = false) ?(gadt_variant = false)
-      ?(name = false) ?(union_key = false) =
+      ?(name = false) ?(schema = false) ?(union_key = false) =
     let merge name ~loc old v =
       match old with
       | None -> Some v
@@ -322,6 +323,13 @@ module Attributes = struct
         | _ ->
           Ppxlib.Location.raise_errorf ~loc
             "schematic-ppx: duplicate schematic.name annotation on schema")
+      | "schematic.schema" when schema ->
+        {
+          attrs with
+          schema =
+            merge "schema" ~loc attrs.schema
+            @@ expect ~loc Ast_pattern.(single_expr_payload __) attr_payload;
+        }
       | "schematic.union_key" when union_key ->
         {
           attrs with
@@ -339,6 +347,7 @@ module Attributes = struct
         alias = None;
         computed = Map.empty (module String);
         gadt_variant = None;
+        schema = None;
         name = None;
         union_key = None;
       }
@@ -496,12 +505,25 @@ let expand_field _
           "schematic-ppx: expression payload expected"
     in
     match attr_name.txt with
-    | "schematic.schema" ->
-      let pattern = Ast_pattern.(versioned __ __) in
-      { attrs with schema = expect ~loc pattern attr_payload :: attrs.schema }
     | "default" -> default Source.generic true false
+    | "schematic.as" ->
+      let pattern = Ast_pattern.(versioned (estring __) (estring __)) in
+      { attrs with alias = expect ~loc pattern attr_payload :: attrs.alias }
     | "schematic.default" -> default Source.schematic true false
     | "schematic.default_opt" -> default Source.schematic false false
+    | ("schematic.inline" as attr) | ("schematic.inline_try" as attr) -> (
+      match attr_payload with
+      | PStr [] ->
+        if Option.is_none attrs.inline then
+          let v =
+            if String.(attr = "schematic.inline") then Inline else Inline_try
+          in
+          { attrs with inline = Some v }
+        else
+          Ppxlib.Location.raise_errorf ~loc
+            "schematic-ppx: inline specified multiple times"
+      | _ ->
+        Ppxlib.Location.raise_errorf ~loc "schematic-ppx: no payload expected")
     | "schematic.omit" -> default Source.schematic true true
     | "schematic.omit_opt" -> default Source.schematic false true
     | "schematic.properties" -> (
@@ -542,22 +564,9 @@ let expand_field _
       | _ ->
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: record payload expected")
-    | "schematic.as" ->
-      let pattern = Ast_pattern.(versioned (estring __) (estring __)) in
-      { attrs with alias = expect ~loc pattern attr_payload :: attrs.alias }
-    | ("schematic.inline" as attr) | ("schematic.inline_try" as attr) -> (
-      match attr_payload with
-      | PStr [] ->
-        if Option.is_none attrs.inline then
-          let v =
-            if String.(attr = "schematic.inline") then Inline else Inline_try
-          in
-          { attrs with inline = Some v }
-        else
-          Ppxlib.Location.raise_errorf ~loc
-            "schematic-ppx: inline specified multiple times"
-      | _ ->
-        Ppxlib.Location.raise_errorf ~loc "schematic-ppx: no payload expected")
+    | "schematic.schema" ->
+      let pattern = Ast_pattern.(versioned __ __) in
+      { attrs with schema = expect ~loc pattern attr_payload :: attrs.schema }
     | "schematic.sqml.foreign_key" ->
       Ast_pattern.parse
         Ast_pattern.(single_expr_payload __)
@@ -629,72 +638,81 @@ module Schema = struct
           }]
     | Expression e -> e
 
-  let rec encode_type ~context ~type_context =
+  let rec encode_type ~context ~type_context core_type =
+    let Attributes.{ schema; _ } =
+      Attributes.extract ~schema:true core_type.ptyp_attributes
+    in
     let loc = type_context.loc in
-    let module Ast = (val Ast_builder.make loc) in
-    function
-    (* Mapping *)
-    | [%type: (string * [%t? t]) list] ->
-      expanded_of_descriptor ~loc
-        [%expr
-          Schema.Mapping
-            [%e schema_of_expanded ~loc @@ encode_type ~context ~type_context t]]
-    (* Plain type *)
-    | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
-      Expression
-        [%expr
-          [%e Ast.pexp_ident @@ { loc; txt = schema_id_versioned ~loc txt }]
-            __schematic_version]
-    (* Lists *)
-    | [%type: [%t? t] list] ->
-      expanded_of_descriptor ~loc
-        [%expr
-          Schema.List
-            [%e schema_of_expanded ~loc @@ encode_type ~context ~type_context t]]
-    (* Parametric type *)
-    | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } ->
-      let schema_f = Ast.pexp_ident { loc; txt = schema_id_versioned ~loc txt }
-      and f t =
-        ( Nolabel,
-          schema_of_expanded ~loc @@ encode_type ~context ~type_context t )
-      in
-      Expression
-        (Ast.pexp_apply schema_f
-           ((Nolabel, [%expr __schematic_version]) :: List.map ~f args))
-    (* Tuple *)
-    | { ptyp_desc = Ptyp_tuple types; _ } ->
-      let field_name i { ptyp_loc = loc; _ } = (loc, "e" ^ Int.to_string i)
-      and field_value i { ptyp_loc = loc; _ } =
-        Ast.pexp_ident { loc; txt = Lident ("e" ^ Int.to_string i) }
-      and constructed =
-        let f i _ =
-          Ast.pexp_ident { loc; txt = Lident ("e" ^ Int.to_string i) }
+    match schema with
+    | Some schema -> Expression [%expr [%e schema] __schematic_version]
+    | None -> (
+      let module Ast = (val Ast_builder.make loc) in
+      match core_type with
+      (* Mapping *)
+      | [%type: (string * [%t? t]) list] ->
+        expanded_of_descriptor ~loc
+          [%expr
+            Schema.Mapping
+              [%e
+                schema_of_expanded ~loc @@ encode_type ~context ~type_context t]]
+      (* Plain type *)
+      | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
+        Expression
+          [%expr
+            [%e Ast.pexp_ident @@ { loc; txt = schema_id_versioned ~loc txt }]
+              __schematic_version]
+      (* Lists *)
+      | [%type: [%t? t] list] ->
+        expanded_of_descriptor ~loc
+          [%expr
+            Schema.List
+              [%e
+                schema_of_expanded ~loc @@ encode_type ~context ~type_context t]]
+      (* Parametric type *)
+      | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } ->
+        let schema_f =
+          Ast.pexp_ident { loc; txt = schema_id_versioned ~loc txt }
+        and f t =
+          ( Nolabel,
+            schema_of_expanded ~loc @@ encode_type ~context ~type_context t )
         in
-        Ast.pexp_tuple (List.mapi ~f types)
-      and deconstructed =
-        let f i _ = Ast.ppat_var { loc; txt = "e" ^ Int.to_string i } in
-        Ast.ppat_tuple (List.mapi ~f types)
-      in
-      let body =
-        combinator ~loc types field_name field_value constructed deconstructed
-          (tuple_descriptor ~context ~type_context types)
-      in
-      expanded_of_descriptor ~loc body
-    (* Type variable *)
-    | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ } ->
-      Expression
-        (Ast.pexp_ident
-           {
-             loc;
-             txt = schema_id_versioned ~loc ~prefix:param_prefix (Lident name);
-           })
-    (* Polymorphic variant *)
-    | { ptyp_desc = Ptyp_variant (fields, _, _); _ } ->
-      expand_polymorphic_variant ~context ~type_context fields
-    (* Unsupported *)
-    | core_type ->
-      Ppxlib.Location.raise_errorf ~loc "schematic-ppx: unsupported type %a"
-        Pprintast.core_type core_type
+        Expression
+          (Ast.pexp_apply schema_f
+             ((Nolabel, [%expr __schematic_version]) :: List.map ~f args))
+      (* Tuple *)
+      | { ptyp_desc = Ptyp_tuple types; _ } ->
+        let field_name i { ptyp_loc = loc; _ } = (loc, "e" ^ Int.to_string i)
+        and field_value i { ptyp_loc = loc; _ } =
+          Ast.pexp_ident { loc; txt = Lident ("e" ^ Int.to_string i) }
+        and constructed =
+          let f i _ =
+            Ast.pexp_ident { loc; txt = Lident ("e" ^ Int.to_string i) }
+          in
+          Ast.pexp_tuple (List.mapi ~f types)
+        and deconstructed =
+          let f i _ = Ast.ppat_var { loc; txt = "e" ^ Int.to_string i } in
+          Ast.ppat_tuple (List.mapi ~f types)
+        in
+        let body =
+          combinator ~loc types field_name field_value constructed deconstructed
+            (tuple_descriptor ~context ~type_context types)
+        in
+        expanded_of_descriptor ~loc body
+      (* Type variable *)
+      | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ } ->
+        Expression
+          (Ast.pexp_ident
+             {
+               loc;
+               txt = schema_id_versioned ~loc ~prefix:param_prefix (Lident name);
+             })
+      (* Polymorphic variant *)
+      | { ptyp_desc = Ptyp_variant (fields, _, _); _ } ->
+        expand_polymorphic_variant ~context ~type_context fields
+      (* Unsupported *)
+      | core_type ->
+        Ppxlib.Location.raise_errorf ~loc "schematic-ppx: unsupported type %a"
+          Pprintast.core_type core_type)
 
   and tuple_descriptor ~context ~type_context types =
     let loc = type_context.loc in
