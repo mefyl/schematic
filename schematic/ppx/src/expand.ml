@@ -236,6 +236,7 @@ module Attributes = struct
     alias : string option;
     computed :
       (string, expression * core_type, String.comparator_witness) Map.t;
+    gadt_variant : string option;
     name : expression option;
     union_key : string option;
   }
@@ -247,9 +248,9 @@ module Attributes = struct
         "schematic-ppx: unknown schematic annotation %s" name
     | None -> ()
 
-  let rec extract ?(alias = false) ?(computed = false) ?(name = false)
-      ?(union_key = false) =
-    let merge name loc old v =
+  let rec extract ?(alias = false) ?(computed = false) ?(gadt_variant = false)
+      ?(name = false) ?(union_key = false) =
+    let merge name ~loc old v =
       match old with
       | None -> Some v
       | Some _ ->
@@ -300,6 +301,15 @@ module Attributes = struct
           attrs with
           computed = Map.merge_skewed ~combine attrs.computed computed;
         }
+      | "schematic.gadt" when gadt_variant ->
+        {
+          attrs with
+          gadt_variant =
+            merge "gadt" ~loc attrs.gadt_variant
+            @@ expect ~loc
+                 Ast_pattern.(single_expr_payload (pexp_ident (lident __)))
+                 attr_payload;
+        }
       | "schematic.name" when name -> (
         match attrs with
         | { name = None; _ } ->
@@ -316,7 +326,7 @@ module Attributes = struct
         {
           attrs with
           union_key =
-            merge "union_key" loc attrs.union_key
+            merge "union_key" ~loc attrs.union_key
             @@ expect ~loc
                  Ast_pattern.(single_expr_payload (estring __))
                  attr_payload;
@@ -328,6 +338,7 @@ module Attributes = struct
       {
         alias = None;
         computed = Map.empty (module String);
+        gadt_variant = None;
         name = None;
         union_key = None;
       }
@@ -335,6 +346,7 @@ end
 
 type context = {
   code_path : Ppxlib.Code_path.t;
+  gadt_variant : string option;
   inside : bool;
   loc : location;
   recursive : bool;
@@ -892,9 +904,23 @@ module Schema = struct
   and expand_any_variant ~context ~type_context poly options =
     let module Ast = (val Ast_builder.make type_context.loc) in
     let loc = type_context.loc in
-    let f (txt, pcd_args, loc, attrs) =
+    let options =
+      let f (txt, pcd_args, loc, attrs) =
+        let (Attributes.{ gadt_variant; _ } as attrs) =
+          Attributes.extract ~alias:true
+            ~gadt_variant:(Option.is_some context.gadt_variant)
+            attrs
+        in
+        match (context.gadt_variant, gadt_variant) with
+        | Some _, None -> None
+        | Some expected, Some effective when String.(expected <> effective) ->
+          None
+        | _ -> Some (txt, pcd_args, loc, attrs)
+      in
+      List.filter_map ~f options
+    in
+    let f (txt, pcd_args, loc, Attributes.{ alias; _ }) =
       let module Ast = (val Ast_builder.make loc) in
-      let Attributes.{ alias; _ } = Attributes.extract ~alias:true attrs in
       let name = Option.value ~default:(String.lowercase txt) alias in
       let schema, ctor_pattern, ctor_value, pattern, value =
         match constructor_arguments_normalize ~loc pcd_args with
@@ -937,14 +963,15 @@ module Schema = struct
         and pattern = Option.value ~default:[%pat? ()] pattern in
         [%expr function [%p pattern] -> [%e value]]
       in
-      [%expr
-        Schema.Case
-          {
-            name = [%e Ast.estring name];
-            schema = [%e schema_of_expanded ~loc schema];
-            encoder = [%e construct];
-            decoder = [%e destruct];
-          }]
+      Some
+        [%expr
+          Schema.Case
+            {
+              name = [%e Ast.estring name];
+              schema = [%e schema_of_expanded ~loc schema];
+              encoder = [%e construct];
+              decoder = [%e destruct];
+            }]
     and key =
       match type_context.attributes.union_key with
       | None -> [%expr None]
@@ -953,7 +980,10 @@ module Schema = struct
     expanded_of_descriptor ~loc
       [%expr
         Schema.Union
-          { cases = [%e Ast.elist (List.map ~f options)]; key = [%e key] }]
+          {
+            cases = [%e Ast.elist (List.filter_map ~f options)];
+            key = [%e key];
+          }]
 
   let expand_abstract_type ~context ~type_context t =
     encode_type ~context ~type_context t
@@ -1128,7 +1158,12 @@ module Schema = struct
         (e, false)
     in
     let name, name_versioned =
-      (schema_name type_context.name, schema_name_versioned type_context.name)
+      let name =
+        match context.gadt_variant with
+        | None -> type_context.name
+        | Some variant -> Fmt.str "%s_%s" variant type_context.name
+      in
+      (schema_name name, schema_name_versioned name)
     in
     let body =
       params_wrap
@@ -1684,8 +1719,7 @@ module Jsoo_type_expander = Expander (Jsoo_type)
 module Schema_expander = Expander (Schema)
 module Sqml_binding_expander = Expander (Sqml_binding)
 
-let expand ~ctxt ~inside ~version (recursive, types) jsoo sqml =
-  let version = !version in
+let expand ~ctxt ~inside ~version (recursive, types) gadt jsoo sqml =
   let loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt in
   let context =
     let recursive = Poly.(recursive = Recursive)
@@ -1694,109 +1728,124 @@ let expand ~ctxt ~inside ~version (recursive, types) jsoo sqml =
       let f { ptype_name; _ } = ptype_name.txt in
       if recursive then List.map ~f types else []
     in
-    { code_path; inside; loc; types; recursive; version }
+    {
+      code_path;
+      gadt_variant = None;
+      inside;
+      loc;
+      types;
+      recursive;
+      version = !version;
+    }
   in
-  let types =
-    let f t =
-      let type_context =
-        {
-          attributes =
-            Attributes.extract ~computed:true ~name:true ~union_key:true
-              t.ptype_attributes;
-          loc = t.ptype_loc;
-          name = t.ptype_name.txt;
-          params = t.ptype_params;
-        }
-      in
-      let () =
-        match
-          (type_context.attributes.union_key, t.ptype_kind, t.ptype_manifest)
-        with
-        | None, _, _
-        | Some _, Ptype_variant _, _
-        | Some _, Ptype_abstract, Some { ptyp_desc = Ptyp_variant _; _ } ->
-          ()
-        | _ ->
-          Ppxlib.Location.raise_errorf ~loc:t.ptype_loc
-            "schematic-ppx: union_key is only valid on variants"
-      and () =
-        match t.ptype_kind with
-        | Ptype_record _ -> ()
-        | _ when Map.length type_context.attributes.computed = 0 -> ()
-        | _ ->
-          Ppxlib.Location.raise_errorf ~loc:t.ptype_loc
-            "schematic-ppx: computed is only valid on records"
-      in
-      let loc = t.ptype_loc in
-      let type_ =
-        match t.ptype_kind with
-        | Ptype_record fields ->
-          let fields = List.map ~f:(expand_field context) fields
-          and computed =
-            let f (name, (value, type_)) =
-              Attributes.make_field ~loc:value.pexp_loc ~type_ ~computed:value
-                name
+  let expand context =
+    let types =
+      let f t =
+        let type_context =
+          {
+            attributes =
+              Attributes.extract ~computed:true ~name:true ~union_key:true
+                t.ptype_attributes;
+            loc = t.ptype_loc;
+            name = t.ptype_name.txt;
+            params = t.ptype_params;
+          }
+        in
+        let () =
+          match
+            (type_context.attributes.union_key, t.ptype_kind, t.ptype_manifest)
+          with
+          | None, _, _
+          | Some _, Ptype_variant _, _
+          | Some _, Ptype_abstract, Some { ptyp_desc = Ptyp_variant _; _ } ->
+            ()
+          | _ ->
+            Ppxlib.Location.raise_errorf ~loc:t.ptype_loc
+              "schematic-ppx: union_key is only valid on variants"
+        and () =
+          match t.ptype_kind with
+          | Ptype_record _ -> ()
+          | _ when Map.length type_context.attributes.computed = 0 -> ()
+          | _ ->
+            Ppxlib.Location.raise_errorf ~loc:t.ptype_loc
+              "schematic-ppx: computed is only valid on records"
+        in
+        let loc = t.ptype_loc in
+        let type_ =
+          match t.ptype_kind with
+          | Ptype_record fields ->
+            let fields = List.map ~f:(expand_field context) fields
+            and computed =
+              let f (name, (value, type_)) =
+                Attributes.make_field ~loc:value.pexp_loc ~type_ ~computed:value
+                  name
+              in
+              Map.to_sequence type_context.attributes.computed
+              |> Sequence.map ~f |> Sequence.to_list
             in
-            Map.to_sequence type_context.attributes.computed
-            |> Sequence.map ~f |> Sequence.to_list
-          in
-          Record (fields @ computed)
-        | Ptype_abstract -> (
-          match t.ptype_manifest with
-          | Some type_ -> Core type_
-          | None -> Abstract)
-        | Ptype_open ->
-          Ppxlib.Location.raise_errorf ~loc
-            "schematic-ppx: unsupported Ptype_open"
-        | Ptype_variant options -> Variant options
+            Record (fields @ computed)
+          | Ptype_abstract -> (
+            match t.ptype_manifest with
+            | Some type_ -> Core type_
+            | None -> Abstract)
+          | Ptype_open ->
+            Ppxlib.Location.raise_errorf ~loc
+              "schematic-ppx: unsupported Ptype_open"
+          | Ptype_variant options -> Variant options
+        in
+        (type_, type_context)
       in
-      (type_, type_context)
-    in
-    List.map ~f types
-  in
-  let contents =
-    let contents =
-      match jsoo with
-      | None -> []
-      | Some [%expr jsoo] | Some [%expr true] ->
-        Jsoo_type_expander.expand ~configuration:{ functions = true } ~context
-          types
-      | Some [%expr false] ->
-        Jsoo_type_expander.expand
-          ~configuration:Jsoo_type.{ functions = false }
-          ~context types
-      | Some exp ->
-        Ppxlib.Location.raise_errorf ~loc:exp.pexp_loc
-          "schematic-ppx: invalid ~jsoo argument value: %a" Pprintast.expression
-          exp
+      List.map ~f types
     in
     let contents =
-      match sqml with
-      | None -> contents
-      | Some name ->
-        Sqml_binding_expander.expand ~configuration:{ name } ~context types
-        @ contents
+      let contents =
+        match jsoo with
+        | None -> []
+        | Some [%expr jsoo] | Some [%expr true] ->
+          Jsoo_type_expander.expand ~configuration:{ functions = true } ~context
+            types
+        | Some [%expr false] ->
+          Jsoo_type_expander.expand
+            ~configuration:Jsoo_type.{ functions = false }
+            ~context types
+        | Some exp ->
+          Ppxlib.Location.raise_errorf ~loc:exp.pexp_loc
+            "schematic-ppx: invalid ~jsoo argument value: %a"
+            Pprintast.expression exp
+      in
+      let contents =
+        match sqml with
+        | None -> contents
+        | Some name ->
+          Sqml_binding_expander.expand ~configuration:{ name } ~context types
+          @ contents
+      in
+      Schema_expander.expand ~configuration:() ~context types @ contents
     in
-    Schema_expander.expand ~configuration:() ~context types @ contents
+    if Option.is_some jsoo then
+      [%str
+        open Schematic_jsoo.Schemas
+
+        let _ = fun (_ : int_js) -> ()]
+      @ contents
+    else if inside then
+      [%str
+        open Schemas
+
+        let _ = unit_schema]
+      @ contents
+    else
+      [%str
+        open Schematic.Schemas
+
+        let _ = unit_schema]
+      @ contents
   in
-  if Option.is_some jsoo then
-    [%str
-      open Schematic_jsoo.Schemas
-
-      let _ = fun (_ : int_js) -> ()]
-    @ contents
-  else if inside then
-    [%str
-      open Schemas
-
-      let _ = unit_schema]
-    @ contents
-  else
-    [%str
-      open Schematic.Schemas
-
-      let _ = unit_schema]
-    @ contents
+  match gadt with
+  | Some variants ->
+    let f variant = expand { context with gadt_variant = Some variant } in
+    List.map ~f variants |> List.concat
+  | None -> expand context
 
 let expand_sig ~ctxt (_recursive, types) =
   let loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt in
@@ -1838,9 +1887,10 @@ let add ~version inside =
   and str_type_decl =
     let arg =
       let open Deriving.Args in
-      let jsoo = arg "jsoo" __
+      let gadt = arg "gadt" (elist (pexp_ident (lident __)))
+      and jsoo = arg "jsoo" __
       and sqml = arg "sqml" (estring __) in
-      empty +> jsoo +> sqml
+      empty +> gadt +> jsoo +> sqml
     in
     Deriving.Generator.V2.make arg (expand ~version ~inside)
   in

@@ -345,6 +345,47 @@ module Parametric = struct
       345 [%ezjsonm 345]
 end
 
+(* GADT *)
+
+module Gadt = struct
+  type _ simple = Int : int simple [@@deriving eq, schema, show]
+
+  let simple = Alcotest.testable pp_simple equal_simple
+
+  let simple () =
+    test "simple GADT" simple
+      (simple_schema version_schema)
+      Int [%ezjsonm "int"]
+
+  type _ complex =
+    | Int : int complex [@schematic.gadt int]
+    | String : string -> string complex [@schematic.gadt string]
+  [@@deriving schema ~gadt:[ int; string ]]
+
+  let pp_complex (type t) f (complex : t complex) =
+    match complex with
+    | Int -> Fmt.string f "Int"
+    | String s -> Fmt.pf f "String %S" s
+
+  let equal_complex (type l r) (l : l complex) (r : r complex) =
+    match (l, r) with
+    | Int, Int -> true
+    | String l, String r -> String.equal l r
+    | _ -> false
+
+  let complex () = Alcotest.testable pp_complex equal_complex
+
+  let complex () =
+    let () =
+      test "complex GADT" (complex ())
+        (int_complex_schema int_schema)
+        Int [%ezjsonm "int"]
+    in
+    test "complex GADT" (complex ())
+      (string_complex_schema string_schema)
+      (String "386") [%ezjsonm "386"]
+end
+
 (* Escape *)
 
 type escape = {
@@ -1287,6 +1328,8 @@ let () =
           test_case "option list" `Quick List.option;
           test_case "parametric_type" `Quick Parametric.simple;
           test_case "anonymous_parameter" `Quick Parametric.anonymous;
+          test_case "simple GADT" `Quick Gadt.simple;
+          test_case "complex GADT" `Quick Gadt.complex;
           test_case "escape" `Quick escape;
           test_case "recursive" `Quick Recursive.plain;
           test_case "recursive_parametric" `Quick Recursive.parametric;
