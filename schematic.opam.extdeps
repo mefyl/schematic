@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic"
-version: "0.14.1"
+version: "0.14.2"
 synopsis: "Derive schemas from Ocaml types"
 description: """\
 Schematic lets you derive type meta informations using a ppx_deriving
@@ -21,6 +21,7 @@ depends: [
   "astring" {= "0.8.5" & with-test}
   "base" {= "v0.14.3"}
   "base-bigarray" {= "base"}
+  "base-bytes" {= "base"}
   "base-threads" {= "base"}
   "base-unix" {= "base"}
   "base64" {= "3.5.0"}

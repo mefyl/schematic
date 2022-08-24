@@ -1,15 +1,22 @@
 #!/bin/sh
 
-VERSION=$(sed -n 's/(version \(.*\))/\1/p' dune-project)
+staged () {
+    git show ":$1"
+}
+
+VERSION=$(staged dune-project | sed -n 's/(version \(.*\))/\1/p')
 VERSION="V${VERSION//./_}"
 
 check () {
-    if ! grep -q "$VERSION" "$1"; then
+    if ! staged "$1" | grep -q "$VERSION"; then
         echo "missing module $VERSION in $1" 1>&2
         exit 1
     fi
 }
 
+check "schematic/lib/src/schematic.ml"
 check "schematic/lib/src/versions.ml"
+check "schematic-jsoo/lib/src/schematic_jsoo.ml"
 check "schematic-jsoo/lib/src/versions.ml"
+check "schematic-http/lib/src/schematic_http.ml"
 check "schematic-http/lib/src/versions.ml"

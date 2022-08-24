@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic-cli"
-version: "0.14.1"
+version: "0.14.2"
 synopsis: "Schematic CLI tools"
 maintainer: "mefyl <mefyl@gruntech.org>"
 authors: "mefyl <mefyl@gruntech.org>"
@@ -11,6 +11,7 @@ depends: [
   "angstrom" {= "0.15.0"}
   "base" {= "v0.14.3"}
   "base-bigarray" {= "base"}
+  "base-bytes" {= "base"}
   "base-threads" {= "base"}
   "base-unix" {= "base"}
   "base64" {= "3.5.0"}
