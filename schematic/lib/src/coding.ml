@@ -101,7 +101,11 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
 
   let requirement_return (type a req) (req : (a, req) Schema.requirement)
       (v : a) : req =
-    match req with Required -> v | Default _ -> v | Optional -> Some v
+    match req with
+    | Computed -> Some v
+    | Default _ -> v
+    | Optional -> Some v
+    | Required -> v
 
   let missing descriptor fields =
     let rec unroll : type t. t Schema.descriptor -> string list list = function
@@ -135,10 +139,6 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
      fun omit id ids field schema ->
       let ids_next = field :: ids in
       function
-      | Required -> (
-        function
-        | Some v -> decode schema.id ids_next schema.descriptor v
-        | None -> Result.fail (fail id ids "missing required field %S" field))
       | Default default -> (
         function
         | Some v -> (
@@ -151,6 +151,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
               | Result.Error _ -> decode schema.id ids_next schema.descriptor v)
             | _ -> decode schema.id ids_next schema.descriptor v)
         | None -> Result.return default)
+      | Computed -> fun _ -> Result.Ok None
       | Optional -> (
         function
         | Some v when Coding.is_null v -> (
@@ -161,6 +162,10 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           Result.map ~f:Option.return
           @@ decode schema.id ids_next schema.descriptor v
         | None -> Result.return None)
+      | Required -> (
+        function
+        | Some v -> decode schema.id ids_next schema.descriptor v
+        | None -> Result.fail (fail id ids "missing required field %S" field))
     and decode :
         type t.
         string option ->
@@ -319,16 +324,18 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         type req t.
         (t, req) Schema.field -> unit -> req -> (string * Coding.t) option =
      fun { name; requirement; schema; _ } () v ->
-      match requirement with
-      | Required -> Some (name, encode (Schema.field_schema schema).descriptor v)
-      | Default default ->
-        if Poly.(v = default (* FIXME: Poly rather bold *)) then None
-        else Some (name, encode (Schema.field_schema schema).descriptor v)
-      | Optional -> (
+      let optional v =
         match v with
         | None -> None
         | Some v -> Some (name, encode (Schema.field_schema schema).descriptor v)
-        )
+      in
+      match requirement with
+      | Computed -> optional v
+      | Default default ->
+        if Poly.(v = default (* FIXME: Poly rather bold *)) then None
+        else Some (name, encode (Schema.field_schema schema).descriptor v)
+      | Optional -> optional v
+      | Required -> Some (name, encode (Schema.field_schema schema).descriptor v)
     and encode : type t. t Schema.descriptor -> t -> Coding.t =
      fun schema v ->
       match schema with

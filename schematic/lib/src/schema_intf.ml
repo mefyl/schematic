@@ -1,6 +1,7 @@
 type (_, _) requirement =
-  | Required : ('a, 'a) requirement
+  | Computed : ('a, 'a option) requirement
   | Default : 'a -> ('a, 'a) requirement
+  | Required : ('a, 'a) requirement
   | Optional : ('a, 'a option) requirement
 
 type _ case =

@@ -214,23 +214,25 @@ module Attributes = struct
   [@@deriving make]
 
   type requirement =
+    | Computed
     | Default_opt of expression
     | Optional
     | Required
 
-  let requirement { loc; specs = { default; _ }; type_; _ } =
+  let requirement { computed; loc; specs = { default; _ }; type_; _ } =
     match type_ with
-    | [%type: [%t? t] option] -> (Optional, t)
+    | [%type: [%t? t] option] when Option.is_none computed -> (Optional, t)
     | t -> (
-      match default with
-      | Some default ->
+      match (default, computed) with
+      | Some default, _ ->
         ( Default_opt
             [%expr
               match [%e Source.value default] with
               | Some default -> Default default
               | None -> Required],
           t )
-      | None -> (Required, t))
+      | None, Some _ -> (Computed, t)
+      | None, None -> (Required, t))
 
   type t = {
     alias : string option;
@@ -241,6 +243,14 @@ module Attributes = struct
     schema : expression option;
     union_key : string option;
   }
+
+  let field_of_computed ~loc (name, (value, type_)) =
+    make_field ~loc:value.pexp_loc ~type_ ~computed:[%expr Some [%e value]] name
+
+  let fields_of_computed ~loc computed =
+    Map.to_sequence computed
+    |> Sequence.map ~f:(field_of_computed ~loc)
+    |> Sequence.to_list
 
   let check_unknown_attribute ~loc name =
     match String.chop_prefix ~prefix:"schematic." name with
@@ -796,8 +806,9 @@ module Schema = struct
         let requirement, type_ = Attributes.requirement attributes in
         let requirement =
           match requirement with
-          | Optional -> [%expr Optional]
+          | Computed -> [%expr Computed]
           | Default_opt e -> e
+          | Optional -> [%expr Optional]
           | Required -> [%expr Required]
         in
         let alias =
@@ -959,11 +970,7 @@ module Schema = struct
             match pcd_args with
             | Pcstr_record fields ->
               let computed_fields =
-                let f (name, (value, type_)) =
-                  Attributes.make_field ~loc:value.pexp_loc ~type_
-                    ~computed:value name
-                in
-                Map.to_sequence computed |> Sequence.map ~f |> Sequence.to_list
+                Attributes.fields_of_computed ~loc computed
               in
               _expand_record true ~context ~type_context
                 (List.map ~f:(expand_field context) fields @ computed_fields)
@@ -1328,7 +1335,7 @@ module Jsoo_type = struct
                 Js_of_ocaml.Js.readonly_prop]
             | _ -> (
               match Attributes.requirement attributes with
-              | Required, type_ ->
+              | (Computed | Required), type_ ->
                 [%type:
                   [%t expand_type ~loc ~context ~type_context type_]
                   Js_of_ocaml.Js.readonly_prop]
@@ -1796,12 +1803,8 @@ let expand ~ctxt ~inside ~version (recursive, types) gadt jsoo sqml =
           | Ptype_record fields ->
             let fields = List.map ~f:(expand_field context) fields
             and computed =
-              let f (name, (value, type_)) =
-                Attributes.make_field ~loc:value.pexp_loc ~type_ ~computed:value
-                  name
-              in
-              Map.to_sequence type_context.attributes.computed
-              |> Sequence.map ~f |> Sequence.to_list
+              Attributes.fields_of_computed ~loc
+                type_context.attributes.computed
             in
             Record (fields @ computed)
           | Ptype_abstract -> (
