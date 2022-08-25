@@ -103,6 +103,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       (v : a) : req =
     match req with
     | Computed -> Some v
+    | Computed_optional -> Some (Some v)
     | Default _ -> v
     | Optional -> Some v
     | Required -> v
@@ -152,6 +153,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
             | _ -> decode schema.id ids_next schema.descriptor v)
         | None -> Result.return default)
       | Computed -> fun _ -> Result.Ok None
+      | Computed_optional -> fun _ -> Result.Ok None
       | Optional -> (
         function
         | Some v when Coding.is_null v -> (
@@ -331,6 +333,8 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       in
       match requirement with
       | Computed -> optional v
+      | Computed_optional -> (
+        match v with None -> None | Some v -> optional v)
       | Default default ->
         if Poly.(v = default (* FIXME: Poly rather bold *)) then None
         else Some (name, encode (Schema.field_schema schema).descriptor v)

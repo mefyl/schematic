@@ -36,6 +36,7 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
           let pp = Schema.field_schema field.schema |> of_schema in
           match field.requirement with
           | Computed -> option pp
+          | Computed_optional -> option (option pp)
           | Default _ -> pp
           | Required -> pp
           | Optional -> option pp

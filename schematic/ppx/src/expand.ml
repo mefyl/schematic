@@ -215,6 +215,7 @@ module Attributes = struct
 
   type requirement =
     | Computed
+    | Computed_optional
     | Default_opt of expression
     | Optional
     | Required
@@ -222,6 +223,7 @@ module Attributes = struct
   let requirement { computed; loc; specs = { default; _ }; type_; _ } =
     match type_ with
     | [%type: [%t? t] option] when Option.is_none computed -> (Optional, t)
+    | [%type: [%t? t] option] -> (Computed_optional, t)
     | t -> (
       match (default, computed) with
       | Some default, _ ->
@@ -807,6 +809,7 @@ module Schema = struct
         let requirement =
           match requirement with
           | Computed -> [%expr Computed]
+          | Computed_optional -> [%expr Computed_optional]
           | Default_opt e -> e
           | Optional -> [%expr Optional]
           | Required -> [%expr Required]
@@ -1339,7 +1342,7 @@ module Jsoo_type = struct
                 [%type:
                   [%t expand_type ~loc ~context ~type_context type_]
                   Js_of_ocaml.Js.readonly_prop]
-              | (Default_opt _ | Optional), type_ ->
+              | (Computed_optional | Default_opt _ | Optional), type_ ->
                 [%type:
                   [%t expand_type ~loc ~context ~type_context type_]
                   Js_of_ocaml.Js.Optdef.t

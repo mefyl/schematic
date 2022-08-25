@@ -195,6 +195,7 @@ let inline desc fold f =
     | Map { descriptor; encode; _ } -> (
       match req with
       | Computed -> inline descriptor Computed acc f
+      | Computed_optional -> inline descriptor Computed_optional acc f
       | Default d -> inline descriptor (Default (encode d)) acc f
       | Optional -> inline descriptor Optional acc f
       | Required -> inline descriptor Required acc f)
@@ -211,6 +212,7 @@ let inline desc fold f =
         | Field { field; rest } when field_ignored field -> (
           match req with
           | Computed -> inline_fields Computed acc rest
+          | Computed_optional -> inline_fields Computed_optional acc rest
           | Default (_, tail) -> inline_fields (Default tail) acc rest
           | Optional -> inline_fields Optional acc rest
           | Required -> inline_fields Required acc rest)
@@ -220,13 +222,15 @@ let inline desc fold f =
               match field.schema with
               | Inline schema | Inline_try schema -> (
                 match (field.requirement, req) with
-                | Computed, _ | Default _, _ | Optional, _ | Required, Required
-                  ->
+                | (Computed | Computed_optional | Default _ | Optional), _
+                | Required, Required ->
                   inline schema.descriptor field.requirement acc f
                 | Required, Default (head, _) ->
                   inline schema.descriptor (Default head) acc f
                 | Required, ((Computed | Optional) as requirement) ->
-                  inline schema.descriptor requirement acc f)
+                  inline schema.descriptor requirement acc f
+                | Required, Computed_optional ->
+                  inline schema.descriptor Computed_optional acc f)
               | Outline _ -> Result.fail "unused"
             in
             match (field.schema, inline) with
@@ -235,10 +239,23 @@ let inline desc fold f =
             | Inline_try _, Result.Error _ | Outline _, _ ->
               let acc, head =
                 match (field.requirement, req) with
-                | Computed, _ | Default _, _ | Optional, _ | Required, Required
-                  ->
+                | (Computed | Computed_optional | Default _ | Optional), _
+                | Required, Required ->
                   f.f acc field
                 | Required, ((Computed | Optional) as requirement) ->
+                  f.f acc
+                    {
+                      description = field.description;
+                      examples = field.examples;
+                      maximum = field.maximum;
+                      minimum = field.minimum;
+                      name = field.name;
+                      omit = field.omit;
+                      requirement;
+                      schema = field.schema;
+                      title = field.title;
+                    }
+                | Required, (Computed_optional as requirement) ->
                   f.f acc
                     {
                       description = field.description;
@@ -270,6 +287,7 @@ let inline desc fold f =
           let+ acc, tail =
             match req with
             | Computed -> inline_fields Computed acc rest
+            | Computed_optional -> inline_fields Computed_optional acc rest
             | Default (_, tail) -> inline_fields (Default tail) acc rest
             | Optional -> inline_fields Optional acc rest
             | Required -> inline_fields Required acc rest
@@ -332,6 +350,8 @@ let inline_v (f : ('fold, 'res) inline_v) fields =
         | Required -> (fun fold v -> f fold v : 'fold -> req -> 'res list)
         | Default _ -> fun fold v -> f fold v
         | Computed -> ( fun fold -> function Some v -> f fold v | None -> [])
+        | Computed_optional -> (
+          fun fold -> function Some (Some v) -> f fold v | _ -> [])
         | Optional -> ( fun fold -> function Some v -> f fold v | None -> []))
       | Outline _ -> Result.fail "unused"
     in
@@ -582,6 +602,8 @@ let compare schema =
             let c =
               match requirement with
               | Computed -> Option.compare (compare schema.descriptor) l r
+              | Computed_optional ->
+                Option.compare (Option.compare (compare schema.descriptor)) l r
               | Default _ -> compare schema.descriptor l r
               | Optional -> Option.compare (compare schema.descriptor) l r
               | Required -> compare schema.descriptor l r

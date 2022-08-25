@@ -1,5 +1,6 @@
 type (_, _) requirement =
   | Computed : ('a, 'a option) requirement
+  | Computed_optional : ('a, 'a option option) requirement
   | Default : 'a -> ('a, 'a) requirement
   | Required : ('a, 'a) requirement
   | Optional : ('a, 'a option) requirement
