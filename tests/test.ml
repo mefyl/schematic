@@ -243,32 +243,6 @@ module Variant = struct
       computed_payload_schema
       (Computed { x = 239; y = 114 })
       [%ezjsonm { x = 239; y = 114; z = 353 }]
-
-  (* This used to fail because the computed field was expected *)
-
-  type datetime_inner = {
-    dateTime : int;
-    timeZone : string option;
-  }
-  [@@deriving eq, schema, show] [@@schematic.computed { date : unit = () }]
-
-  type date_inner = { date : int }
-  [@@deriving eq, schema, show] [@@schematic.computed { dateTime : unit = () }]
-
-  type time =
-    | Datetime of datetime_inner
-    | Date of date_inner
-  [@@deriving eq, schema, show]
-
-  let ignore_computed () =
-    let time = Alcotest.testable pp_time equal_time in
-    test "variant containing records with computed field" time time_schema
-      (Date { date = 266 })
-      [%ezjsonm { date = 266; dateTime = None }];
-    Alcotest.(check (result time decoding_error))
-      "variant containing records with missing computed field"
-      (Result.Ok (Date { date = 267 }))
-    @@ Schematic.Json.decode time_schema [%ezjsonm { date = 267 }]
 end
 
 (* Polymorphic variant *)
@@ -1217,7 +1191,12 @@ module Computed = struct
     test "computed" t schema { x = 1; y = 2 }
       [%ezjsonm { x = 1; y = 2; sum = 3; opposite = -1 }];
     test "computed optional" t schema { x = 0; y = 0 }
-      [%ezjsonm { x = 0; sum = 0 }]
+      [%ezjsonm { x = 0; sum = 0 }];
+    (* This used to fail because the computed field was expected *)
+    Alcotest.(check (result t decoding_error))
+      "variant containing records with missing computed field"
+      (Result.Ok { x = 1198; y = 33 })
+    @@ Schematic.Json.decode schema [%ezjsonm { x = 1198; y = 33 }]
 end
 
 (* Version *)
@@ -1364,8 +1343,6 @@ let () =
           test_case "variant" `Quick Variant.variant;
           test_case "singleton variant" `Quick Variant.singleton;
           test_case "computed variant field" `Quick Variant.computed;
-          test_case "variant payload computed field" `Quick
-            Variant.ignore_computed;
           test_case "polymorphic variant" `Quick Polymorphic_variant.payload;
           test_case "keyed polymorphic variant" `Quick Polymorphic_variant.keyed;
           test_case "alias" `Quick alias;
