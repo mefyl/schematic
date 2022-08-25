@@ -926,6 +926,8 @@ module Schema = struct
       let f (txt, pcd_args, loc, attrs) =
         let (Attributes.{ gadt_variant; _ } as attrs) =
           Attributes.extract ~alias:true
+            ~computed:
+              (match pcd_args with Pcstr_record _ -> true | _ -> false)
             ~gadt_variant:(Option.is_some context.gadt_variant)
             attrs
         in
@@ -937,7 +939,7 @@ module Schema = struct
       in
       List.filter_map ~f options
     in
-    let f (txt, pcd_args, loc, Attributes.{ alias; _ }) =
+    let f (txt, pcd_args, loc, Attributes.{ alias; computed; _ }) =
       let module Ast = (val Ast_builder.make loc) in
       let name = Option.value ~default:(String.lowercase txt) alias in
       let schema, ctor_pattern, ctor_value, pattern, value =
@@ -956,8 +958,15 @@ module Schema = struct
           let schema =
             match pcd_args with
             | Pcstr_record fields ->
+              let computed_fields =
+                let f (name, (value, type_)) =
+                  Attributes.make_field ~loc:value.pexp_loc ~type_
+                    ~computed:value name
+                in
+                Map.to_sequence computed |> Sequence.map ~f |> Sequence.to_list
+              in
               _expand_record true ~context ~type_context
-                (List.map ~f:(expand_field context) fields)
+                (List.map ~f:(expand_field context) fields @ computed_fields)
             | _ -> encode_type ~context ~type_context type_
           in
           ( schema,
@@ -1763,33 +1772,23 @@ let expand ~ctxt ~inside ~version (recursive, types) gadt jsoo sqml =
     let types =
       let f t =
         let type_context =
+          let computed =
+            match t.ptype_kind with Ptype_record _ -> true | _ -> false
+          and union_key =
+            match (t.ptype_kind, t.ptype_manifest) with
+            | Ptype_variant _, _
+            | Ptype_abstract, Some { ptyp_desc = Ptyp_variant _; _ } ->
+              true
+            | _ -> false
+          in
           {
             attributes =
-              Attributes.extract ~computed:true ~name:true ~union_key:true
+              Attributes.extract ~computed ~name:true ~union_key
                 t.ptype_attributes;
             loc = t.ptype_loc;
             name = t.ptype_name.txt;
             params = t.ptype_params;
           }
-        in
-        let () =
-          match
-            (type_context.attributes.union_key, t.ptype_kind, t.ptype_manifest)
-          with
-          | None, _, _
-          | Some _, Ptype_variant _, _
-          | Some _, Ptype_abstract, Some { ptyp_desc = Ptyp_variant _; _ } ->
-            ()
-          | _ ->
-            Ppxlib.Location.raise_errorf ~loc:t.ptype_loc
-              "schematic-ppx: union_key is only valid on variants"
-        and () =
-          match t.ptype_kind with
-          | Ptype_record _ -> ()
-          | _ when Map.length type_context.attributes.computed = 0 -> ()
-          | _ ->
-            Ppxlib.Location.raise_errorf ~loc:t.ptype_loc
-              "schematic-ppx: computed is only valid on records"
         in
         let loc = t.ptype_loc in
         let type_ =

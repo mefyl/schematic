@@ -227,6 +227,22 @@ module Variant = struct
   let singleton () =
     test "singleton variant" singleton singleton_schema Single
       [%ezjsonm "single"]
+
+  type computed_payload =
+    | Computed of {
+        x : int;
+        y : int;
+      } [@schematic.computed { z : int = x + y }]
+  [@@deriving eq, schema, show]
+
+  let computed_payload =
+    Alcotest.testable pp_computed_payload equal_computed_payload
+
+  let computed () =
+    test "variant payload with computed field" computed_payload
+      computed_payload_schema
+      (Computed { x = 239; y = 114 })
+      [%ezjsonm { x = 239; y = 114; z = 353 }]
 end
 
 (* Polymorphic variant *)
@@ -1321,6 +1337,7 @@ let () =
           test_case "tuple" `Quick tuple;
           test_case "variant" `Quick Variant.variant;
           test_case "singleton variant" `Quick Variant.singleton;
+          test_case "computed variant field" `Quick Variant.computed;
           test_case "polymorphic variant" `Quick Polymorphic_variant.payload;
           test_case "keyed polymorphic variant" `Quick Polymorphic_variant.keyed;
           test_case "alias" `Quick alias;
