@@ -10,7 +10,7 @@
 
 (authors "mefyl <mefyl@gruntech.org>")
 
-(version 0.14.2)
+(version 0.14.3)
 
 (homepage https://gitlab.routine.co/routine/schematic)
 

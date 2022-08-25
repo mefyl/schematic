@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic-cli"
-version: "0.14.2"
+version: "0.14.3"
 synopsis: "Schematic CLI tools"
 maintainer: "mefyl <mefyl@gruntech.org>"
 authors: "mefyl <mefyl@gruntech.org>"
