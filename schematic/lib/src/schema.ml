@@ -6,7 +6,7 @@ let ( let+ ) v f = Result.map ~f v
 let make ?id ?parametric descriptor = { id; descriptor; parametric }
 
 let required : type a b. (a, b) requirement -> bool = function
-  | Required -> true
+  | Computed | Required -> true
   | _ -> false
 
 let map ~decode ~encode { descriptor; _ } =

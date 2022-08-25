@@ -51,6 +51,19 @@ type inline_keyed_variant = {
 }
 [@@deriving schema]
 
+module Computed = struct
+  type t = {
+    x : int;
+    y : int;
+  }
+  [@@schematic.computed
+    {
+      sum : int = x + y;
+      ratio : int option = (if y <> 0 then Some (x / y) else None);
+    }]
+  [@@deriving schema]
+end
+
 module ShouldInlineOptions = struct
   (* nested inline optional while hiding type with a functor *)
 
@@ -178,6 +191,13 @@ module Generate_types = struct
         ( "Shouldinlineoptions",
           {|{ "mandatory_id"?: string; "a"?: string; "a_opt"?: string }|} );
       ]
+
+  let computed () =
+    test Computed.schema
+      [
+        ( "Computed",
+          {|{ "x": number; "y": number; "ratio"?: number; "sum": number }|} );
+      ]
 end
 
 let () =
@@ -197,5 +217,6 @@ let () =
           test_case "inline-option" `Quick Generate_types.hidden_inline_optional;
           test_case "inline-keyed-variant" `Quick
             Generate_types.inline_keyed_variant;
+          test_case "computed" `Quick Generate_types.computed;
         ] );
     ]
