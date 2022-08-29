@@ -1313,16 +1313,29 @@ module Pp = struct
   let pp () =
     let version = { major = 1242; minor = 1243; subminor = 1244 } in
     Alcotest.(
-      check string "version" {|{major: 1242; minor: 1243; subminor: 1244; }|}
+      check string "version" {|{major: 1242; minor: 1243; subminor: 1244;}|}
         (Fmt.str "@[%a@]" pp_version version));
     Alcotest.(
       check string "range"
         {|(
-  {major: 1242; minor: 1243; subminor: 1244; },
-  {major: 1242; minor: 1243; subminor: 1244; },
+  {major: 1242; minor: 1243; subminor: 1244;},
+  {major: 1242; minor: 1243; subminor: 1244;},
   1245
 )|}
-        (Fmt.str "@[%a@]" pp_range (version, version, 1245)))
+        (Fmt.str "@[%a@]" pp_range (version, version, 1245)));
+    let buffer = Buffer.create 1024 in
+    let fmt = Caml.Format.formatter_of_buffer buffer in
+    let () = Caml.Format.pp_set_margin fmt 20 in
+    let () = Fmt.pf fmt "@[%a@]" pp_version version in
+    let () = Caml.Format.pp_print_flush fmt () in
+    Alcotest.(
+      check string "version-narrow"
+        {|{
+  major: 1242;
+  minor: 1243;
+  subminor: 1244;
+}|}
+        (Buffer.contents buffer))
 end
 
 (* Driver *)

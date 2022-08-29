@@ -5,6 +5,12 @@ let composite open_ pp close =
   box ~indent:0
   @@ (hvbox ~indent:2 (const char open_ ++ cut ++ pp) ++ cut ++ const char close)
 
+let composite_object open_ pp close =
+  box
+  @@ const char open_
+     ++ (hvbox ~indent:1 @@ (cut ++ pp))
+     ++ cut ++ const char close
+
 let colon fmt x = (const char ':' ++ sp) fmt x
 
 let rec of_schema : type t. t Schema.t -> t Fmt.t = function
@@ -21,10 +27,10 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
   | Ignore -> nop
   | Int -> int
   | Int64 -> int64
-  | List schema -> composite '[' (list ~sep:semi @@ of_schema schema) ']'
+  | List schema -> composite_object '[' (list ~sep:semi @@ of_schema schema) ']'
   | Map { descriptor; encode; _ } -> using encode @@ of_descriptor descriptor
   | Mapping schema ->
-    composite '{'
+    composite_object '{'
       (list ~sep:semi @@ pair ~sep:colon Dump.string (of_schema schema))
       '}'
   | Null -> const string "()"
@@ -32,7 +38,7 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
   | Object fields ->
     let pp =
       let f (type req t) (field : (t, req) Schema.field) =
-        let pp : req Fmt.t =
+        let pp_value : req Fmt.t =
           let pp = Schema.field_schema field.schema |> of_schema in
           match field.requirement with
           | Computed -> option pp
@@ -41,11 +47,23 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
           | Required -> pp
           | Optional -> option pp
         in
-        const string field.name ++ colon ++ pp ++ semi
+        fun (first, fmt) v ->
+          let pp =
+            (if first then nop else semi)
+            ++ (box ~indent:2
+               @@ (const string field.name ++ const string ":" ++ sp ++ pp_value)
+               )
+          in
+          let () = pp fmt v in
+          ((false, fmt), ())
       in
-      Schema.inline_v { f } fields |> Result.ok_or_failwith
+      Schema.inline_v_fold { f } fields |> Result.ok_or_failwith
     in
-    composite '{' (fun fmt v -> ignore (pp fmt v)) '}'
+    composite_object '{'
+      (fun fmt v ->
+        ignore (pp (true, fmt) v);
+        char fmt ';')
+      '}'
   | String -> Dump.string
   | String_const s -> const Dump.string s
   | Time -> Ptime.pp

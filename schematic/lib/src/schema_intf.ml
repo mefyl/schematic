@@ -164,6 +164,9 @@ type ('fold, 'res) inline = {
 }
 
 (** A ['res inline] maps a field and a value for that field to a ['res]. *)
-type ('fold, 'res) inline_v = {
-  f : 't 'req. ('t, 'req) field -> 'fold -> 'req -> 'res;
+type 'res inline_v = { f : 't 'req. ('t, 'req) field -> 'req -> 'res }
+
+(** A ['res inline] maps a field and a value for that field to a ['res]. *)
+type ('fold, 'res) inline_v_fold = {
+  f : 't 'req. ('t, 'req) field -> 'fold -> 'req -> 'fold * 'res;
 }

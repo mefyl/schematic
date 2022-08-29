@@ -323,9 +323,8 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
 
   let encode schema =
     let rec encode_field :
-        type req t.
-        (t, req) Schema.field -> unit -> req -> (string * Coding.t) option =
-     fun { name; requirement; schema; _ } () v ->
+        type req t. (t, req) Schema.field -> req -> (string * Coding.t) option =
+     fun { name; requirement; schema; _ } v ->
       let optional v =
         match v with
         | None -> None
@@ -370,7 +369,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           let f =
             Schema.inline_v { f = encode_field } o |> Result.ok_or_failwith
           in
-          f () v |> List.filter_map ~f:Fn.id
+          f v |> List.filter_map ~f:Fn.id
         in
         Coding.of_fields fields
       | Tuple items ->

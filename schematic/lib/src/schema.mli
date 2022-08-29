@@ -22,10 +22,12 @@ val inline :
   ('fold, 'res) inline ->
   ('fold * 'res list list, string) Result.t
 
-val inline_v :
-  ('fold, 'res) inline_v ->
+val inline_v : 'res inline_v -> 't fields -> ('t -> 'res list, string) result
+
+val inline_v_fold :
+  ('fold, 'res) inline_v_fold ->
   't fields ->
-  ('fold -> 't -> 'res list, string) result
+  ('fold -> 't -> 'fold * 'res list, string) result
 
 val field_ignored : ('t, 'req) field -> bool
 val field_schema : 't field_schema -> 't t

@@ -337,22 +337,25 @@ let inline desc fold f =
   in
   inline desc Required fold f
 
-let inline_v (f : ('fold, 'res) inline_v) fields =
+let inline_v_fold (f : ('fold, 'res) inline_v_fold) fields =
   let rec inline_field :
-      type req t. (t, req) field -> ('fold -> req -> 'res list, string) Result.t
-      =
+      type req t.
+      (t, req) field -> ('fold -> req -> 'fold * 'res list, string) Result.t =
    fun field ->
-    let inline : ('fold -> req -> 'res list, string) Result.t =
+    let inline : ('fold -> req -> 'fold * 'res list, string) Result.t =
       match field.schema with
       | Inline schema | Inline_try schema -> (
         let+ f = inline_descriptor schema.descriptor in
         match field.requirement with
-        | Required -> (fun fold v -> f fold v : 'fold -> req -> 'res list)
+        | Required ->
+          (fun fold v -> f fold v : 'fold -> req -> 'fold * 'res list)
         | Default _ -> fun fold v -> f fold v
-        | Computed -> ( fun fold -> function Some v -> f fold v | None -> [])
+        | Computed -> (
+          fun fold -> function Some v -> f fold v | None -> (fold, []))
         | Computed_optional -> (
-          fun fold -> function Some (Some v) -> f fold v | _ -> [])
-        | Optional -> ( fun fold -> function Some v -> f fold v | None -> []))
+          fun fold -> function Some (Some v) -> f fold v | _ -> (fold, []))
+        | Optional -> (
+          fun fold -> function Some v -> f fold v | None -> (fold, [])))
       | Outline _ -> Result.fail "unused"
     in
     match (field.schema, inline) with
@@ -360,10 +363,13 @@ let inline_v (f : ('fold, 'res) inline_v) fields =
     | Inline_try _, Result.Ok _ -> inline
     | Inline_try _, Result.Error _ | Outline _, _ ->
       let f = f.f field in
-      Result.return @@ fun fold v -> [ f fold v ]
+      Result.return @@ fun fold v ->
+      let fold, res = f fold v in
+      (fold, [ res ])
   and inline_fields :
-      type t. t fields -> ('fold -> t -> 'res list, string) Result.t = function
-    | FieldEnd -> Result.return (fun _ () -> [])
+      type t. t fields -> ('fold -> t -> 'fold * 'res list, string) Result.t =
+    function
+    | FieldEnd -> Result.return (fun fold () -> (fold, []))
     | Field { field; rest } ->
       let* tail = inline_fields rest in
       if field_ignored field then
@@ -371,19 +377,20 @@ let inline_v (f : ('fold, 'res) inline_v) fields =
       else
         let+ head = inline_field field in
         fun fold (hd, tl) ->
-          let head = head fold hd in
-          head @ tail fold tl
+          let fold, head = head fold hd in
+          let fold, tail = tail fold tl in
+          (fold, head @ tail)
   and inline_descriptor :
-      type t. t descriptor -> ('fold -> t -> 'res list, string) Result.t =
-    function
-    | Ignore -> Result.return (fun _ () -> [])
+      type t. t descriptor -> ('fold -> t -> 'fold * 'res list, string) Result.t
+      = function
+    | Ignore -> Result.return (fun fold () -> (fold, []))
     | Fixpoint d -> inline_descriptor (Lazy.force d)
     | Map { descriptor; encode; _ } ->
       let+ f = inline_descriptor descriptor in
       fun fold v -> f fold (encode v)
     | Nullable schema -> (
       let+ f = inline_descriptor schema.descriptor in
-      fun fold -> function Some v -> f fold v | None -> [])
+      fun fold -> function Some v -> f fold v | None -> (fold, []))
     | Object fields -> inline_fields fields
     | Union { cases; key } -> (
       let+ cases =
@@ -413,7 +420,10 @@ let inline_v (f : ('fold, 'res) inline_v) fields =
             | Some v -> (
               match key with
               | None -> Some (res fold v)
-              | Some key -> Some (key fold () :: res fold v))
+              | Some key ->
+                let fold, key = key fold () in
+                let fold, res = res fold v in
+                Some (fold, key :: res))
         in
         List.map ~f cases |> Result.all
       in
@@ -425,6 +435,17 @@ let inline_v (f : ('fold, 'res) inline_v) fields =
       Result.fail (Fmt.str "inline field is not an object: %a" pp_descriptor s)
   in
   inline_fields fields
+
+let inline_v (f : _ inline_v) fields =
+  let inline : (_, _) inline_v_fold =
+    { f = (fun field () v -> ((), f.f field v)) }
+  in
+  match inline_v_fold inline fields with
+  | Result.Ok f ->
+    Result.return (fun t ->
+        let (), res = f () t in
+        res)
+  | Result.Error _ as error -> error
 
 (* Walker *)
 
