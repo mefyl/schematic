@@ -158,6 +158,15 @@ end
 type library = ..
 type version = library -> Version.t option
 
+(** A descriptor mapped to the simplest atomic descriptor possible *)
+type 't flatten =
+  | Flatten : {
+      descriptor : 'a descriptor;
+      decode : 'a -> ('t, string) Result.t;
+      encode : 't -> 'a;
+    }
+      -> 't flatten
+
 (** A ['res inline] maps a field to a ['res]. *)
 type ('fold, 'res) inline = {
   f : 't 'req. 'fold -> ('t, 'req) field -> 'fold * 'res;

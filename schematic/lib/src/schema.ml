@@ -180,6 +180,23 @@ let field_ignored : type req t. (t, req) field -> bool = function
   | { schema = Inline_try { descriptor = Ignore; _ }; _ } -> true
   | { omit; _ } -> omit
 
+(* FIXME: Also flatten single-case unions. *)
+(* FIXME:? Offer to flatten single field objects, tuples, ... *)
+let rec flatten : type t. t descriptor -> t flatten =
+  let open Result in
+  function
+  | Fixpoint descriptor -> Lazy.force descriptor |> flatten
+  | Map { descriptor; decode; encode } ->
+    let (Flatten { descriptor; decode = d_decode; encode = d_encode }) =
+      flatten descriptor
+    in
+    let decode v = d_decode v >>= decode
+    and encode v = encode v |> d_encode in
+    Flatten { descriptor; decode; encode }
+  | descriptor -> Flatten { descriptor; decode = Result.return; encode = Fn.id }
+
+(* Object inlining *)
+
 let inline desc fold f =
   let rec inline :
       type req res t.

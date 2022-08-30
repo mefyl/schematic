@@ -12,6 +12,9 @@ val pp_descriptor : Format.formatter -> _ descriptor -> unit
     required to decode an object with fields [fields]. *)
 val object_fields : 'a descriptor -> (string list list, string) Result.t
 
+(** Map a descriptor to the simplest atomic descriptor possible. *)
+val flatten : 't descriptor -> 't flatten
+
 (** [inline descriptor inline] attemps to inline [descriptor] according to
     [inline].
 
