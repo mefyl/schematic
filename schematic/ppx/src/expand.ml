@@ -1761,6 +1761,16 @@ module Sqml_binding_expander = Expander (Sqml_binding)
 
 let expand ~ctxt ~inside ~version (recursive, types) gadt jsoo sqml =
   let loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt in
+  let jsoo =
+    match jsoo with
+    | None -> None
+    | Some [%expr jsoo] | Some [%expr true] -> Some true
+    | Some [%expr false] -> Some false
+    | Some exp ->
+      Ppxlib.Location.raise_errorf ~loc:exp.pexp_loc
+        "schematic-ppx: invalid ~jsoo argument value: %a" Pprintast.expression
+        exp
+  in
   let context =
     let recursive = Poly.(recursive = Recursive)
     and code_path = Ppxlib.Expansion_context.Deriver.code_path ctxt in
@@ -1827,17 +1837,13 @@ let expand ~ctxt ~inside ~version (recursive, types) gadt jsoo sqml =
       let contents =
         match jsoo with
         | None -> []
-        | Some [%expr jsoo] | Some [%expr true] ->
+        | Some true ->
           Jsoo_type_expander.expand ~configuration:{ functions = true } ~context
             types
-        | Some [%expr false] ->
+        | Some false ->
           Jsoo_type_expander.expand
             ~configuration:Jsoo_type.{ functions = false }
             ~context types
-        | Some exp ->
-          Ppxlib.Location.raise_errorf ~loc:exp.pexp_loc
-            "schematic-ppx: invalid ~jsoo argument value: %a"
-            Pprintast.expression exp
       in
       let contents =
         match sqml with
