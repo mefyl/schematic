@@ -1,13 +1,13 @@
 opam-version: "2.0"
 name: "schematic-jsoo"
-version: "0.14.4"
+version: "0.14.5"
 synopsis: "Derive js_of_ocaml types and values from Ocaml types"
 description: """\
 Deduce js_of_ocaml FFI types
  and conversion functions from schematic type metadata."""
 maintainer: "mefyl <mefyl@gruntech.org>"
 authors: "mefyl <mefyl@gruntech.org>"
-license: "GPLv3"
+license: "LGPL-3.0-or-later"
 homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
@@ -25,9 +25,9 @@ depends: [
   "conf-pkg-config" {= "2"}
   "cppo" {= "1.6.9"}
   "csexp" {= "1.5.1"}
-  "cstruct" {= "6.1.0"}
-  "dune" {= "3.3.1"}
-  "dune-configurator" {= "3.3.1"}
+  "cstruct" {= "6.1.1"}
+  "dune" {= "3.4.1"}
+  "dune-configurator" {= "3.4.1"}
   "ezjsonm" {= "1.3.0"}
   "fmt" {= "0.9.0"}
   "hex" {= "1.5.0"}
@@ -54,5 +54,5 @@ depends: [
   "uchar" {= "0.0.2"}
   "uri" {= "4.2.0"}
   "uutf" {= "1.0.3"}
-  "yojson" {= "2.0.0"}
+  "yojson" {= "2.0.2"}
 ]
