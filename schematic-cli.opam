@@ -4,7 +4,7 @@ version: "0.14.4"
 synopsis: "Schematic CLI tools"
 maintainer: ["mefyl <mefyl@gruntech.org>"]
 authors: ["mefyl <mefyl@gruntech.org>"]
-license: "GPLv3"
+license: "LGPL-3.0-or-later"
 homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [

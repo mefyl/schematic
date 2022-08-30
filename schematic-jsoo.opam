@@ -7,7 +7,7 @@ Deduce js_of_ocaml FFI types
  and conversion functions from schematic type metadata."""
 maintainer: ["mefyl <mefyl@gruntech.org>"]
 authors: ["mefyl <mefyl@gruntech.org>"]
-license: "GPLv3"
+license: "LGPL-3.0-or-later"
 homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
