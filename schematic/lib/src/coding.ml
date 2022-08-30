@@ -324,87 +324,104 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
   let encode schema =
     let rec encode_field :
         type req t. (t, req) Schema.field -> req -> (string * Coding.t) option =
-     fun { name; requirement; schema; _ } v ->
+     fun { name; requirement; schema; _ } ->
       let optional v =
         match v with
         | None -> None
         | Some v -> Some (name, encode (Schema.field_schema schema).descriptor v)
       in
       match requirement with
-      | Computed -> optional v
+      | Computed -> optional
       | Computed_optional -> (
-        match v with None -> None | Some v -> optional v)
+        fun v -> match v with None -> None | Some v -> optional v)
       | Default default ->
-        if Schema.(compare (field_schema schema) v default) = 0 then None
-        else Some (name, encode (Schema.field_schema schema).descriptor v)
-      | Optional -> optional v
-      | Required -> Some (name, encode (Schema.field_schema schema).descriptor v)
+        let compare = Schema.(compare (field_schema schema)) in
+        fun v ->
+          if compare v default = 0 then None
+          else Some (name, encode (Schema.field_schema schema).descriptor v)
+      | Optional -> optional
+      | Required ->
+        fun v -> Some (name, encode (Schema.field_schema schema).descriptor v)
     and encode : type t. t Schema.descriptor -> t -> Coding.t =
-     fun schema v ->
+     fun schema ->
       match schema with
-      | Any -> Coding.of_json v
-      | Bool -> Coding.of_bool v
+      | Any -> Coding.of_json
+      | Bool -> Coding.of_bool
       | Date -> (
         match Coding.of_date with
-        | `Generic -> encode date_tuple_schema.descriptor v
-        | `Custom f -> f v)
-      | Fixpoint s -> encode (Lazy.force s) v
-      | Float -> Coding.of_float v
-      | Ignore -> Coding.null ()
-      | Int -> Coding.of_int v
-      | Int64 -> Coding.of_int64 v
+        | `Generic -> encode date_tuple_schema.descriptor
+        | `Custom f -> f)
+      | Fixpoint s -> encode (Lazy.force s)
+      | Float -> Coding.of_float
+      | Ignore -> Coding.null
+      | Int -> Coding.of_int
+      | Int64 -> Coding.of_int64
       | List items_schema ->
-        Coding.of_list (List.map ~f:(encode items_schema.descriptor) v)
-      | Map { encode = decons; descriptor; _ } -> encode descriptor @@ decons v
-      | Null -> Coding.null ()
+        let f = encode items_schema.descriptor in
+        fun v -> Coding.of_list (List.map ~f v)
+      | Map { encode = decons; descriptor; _ } ->
+        let encode = encode descriptor in
+        fun v -> encode @@ decons v
+      | Null -> Coding.null
       | Nullable s -> (
-        match v with None -> Coding.null () | Some v -> encode s.descriptor v)
+        let encode = encode s.descriptor in
+        fun v -> match v with None -> Coding.null () | Some v -> encode v)
       | Mapping fields_schema ->
-        Coding.of_fields
-          (List.map
-             ~f:(fun (name, v) -> (name, encode fields_schema.descriptor v))
-             v)
+        let encode = encode fields_schema.descriptor in
+        fun v ->
+          Coding.of_fields (List.map ~f:(fun (name, v) -> (name, encode v)) v)
       | Object o ->
-        let fields =
-          let f =
-            Schema.inline_v { f = encode_field } o |> Result.ok_or_failwith
-          in
-          f v |> List.filter_map ~f:Fn.id
+        let f =
+          Schema.inline_v { f = encode_field } o |> Result.ok_or_failwith
         in
-        Coding.of_fields fields
+        fun v ->
+          let fields = f v |> List.filter_map ~f:Fn.id in
+          Coding.of_fields fields
       | Tuple items ->
-        let rec encode_tuple : type t. t -> t Schema.tuple -> Coding.t list =
-         fun v -> function
-          | ItemEnd -> []
-          | Item { schema; rest } ->
-            let hd, tl = v in
-            let hd = encode schema.descriptor hd in
-            hd :: encode_tuple tl rest
+        let encode =
+          let rec encode_tuple : type t. t Schema.tuple -> t -> Coding.t list =
+            function
+            | ItemEnd -> fun _ -> []
+            | Item { schema; rest } ->
+              let encode = encode schema.descriptor
+              and encode_rest = encode_tuple rest in
+              fun v ->
+                let hd, tl = v in
+                let hd = encode hd in
+                hd :: encode_rest tl
+          in
+          encode_tuple items
         in
-        Coding.of_list (encode_tuple v items)
-      | String -> Coding.of_string v
-      | String_const v -> Coding.of_string v
-      | Time -> Coding.of_time v
-      | Time_local -> Coding.of_time_local v
+        fun v -> Coding.of_list (encode v)
+      | String -> Coding.of_string
+      | String_const v -> fun () -> Coding.of_string v
+      | Time -> Coding.of_time
+      | Time_local -> Coding.of_time_local
       | Union { cases; key } -> (
-        let conv (Schema.Case { encoder; name; schema; _ }) =
-          match encoder v with
-          | Some v -> (
-            let v = encode schema.descriptor v in
-            match key with
-            | Some key -> (
-              match
-                key_set None [ (* FIXME: context *) ]
-                  v key (Coding.of_string name)
-              with
-              | Result.Ok v -> Some v
-              | Result.Error _ -> Some v)
-            | None -> Some v)
-          | None -> None
+        let cases =
+          let f (Schema.Case { encoder; name; schema; _ }) =
+            let encode = encode schema.descriptor in
+            fun v ->
+              match encoder v with
+              | Some v -> (
+                let v = encode v in
+                match key with
+                | Some key -> (
+                  match
+                    key_set None [ (* FIXME: context *) ]
+                      v key (Coding.of_string name)
+                  with
+                  | Result.Ok v -> Some v
+                  | Result.Error _ -> Some v)
+                | None -> Some v)
+              | None -> None
+          in
+          List.map ~f cases
         in
-        match List.find_map ~f:conv cases with
-        | Some res -> res
-        | None -> failwith "unmatched variant schema case")
+        fun v ->
+          match List.find_map ~f:(fun case -> case v) cases with
+          | Some res -> res
+          | None -> failwith "unmatched variant schema case")
     in
     encode schema.Schema.descriptor
 end
