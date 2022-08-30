@@ -335,7 +335,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       | Computed_optional -> (
         match v with None -> None | Some v -> optional v)
       | Default default ->
-        if Poly.(v = default (* FIXME: Poly rather bold *)) then None
+        if Schema.(compare (field_schema schema) v default) = 0 then None
         else Some (name, encode (Schema.field_schema schema).descriptor v)
       | Optional -> optional v
       | Required -> Some (name, encode (Schema.field_schema schema).descriptor v)
