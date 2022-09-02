@@ -38,8 +38,7 @@
   (ocaml
    (>= 4.12.0))
   fmt
-  (ppxlib
-   (= 0.25.0))
+  ppxlib
   ppx_deriving
   ppx_here
   (ppx_yojson
