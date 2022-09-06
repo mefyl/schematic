@@ -1173,13 +1173,16 @@ module Schema = struct
                         __schematic_schema_version
                     with
                     | None ->
-                      Schema.fixpoint (fun __schematic_self ->
-                          __schematic_cache :=
-                            Base.Map.set !__schematic_cache
-                              ~key:__schematic_schema_version
-                              ~data:__schematic_self;
-                          [%e c.descriptor])
-                    | Some schema -> schema]
+                      [%e
+                        params_wrap
+                          [%expr
+                            Schema.fixpoint (fun __schematic_self ->
+                                __schematic_cache :=
+                                  Base.Map.set !__schematic_cache
+                                    ~key:__schematic_schema_version
+                                    ~data:__schematic_self;
+                                [%e c.descriptor])]]
+                    | Some schema -> [%e params_wrap [%expr schema]]]
                 else params_wrap c.descriptor]
             and id = [%e id] in
             Schema.
