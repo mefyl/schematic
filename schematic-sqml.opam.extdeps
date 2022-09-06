@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic-sqml"
-version: "0.14.5"
+version: "0.14.6"
 synopsis: "Derive SQML bindings from Ocaml types"
 description: "Deduce SQML bindings from schematic type metadata."
 maintainer: "mefyl <mefyl@gruntech.org>"
@@ -43,7 +43,7 @@ depends: [
   "ppx_deriving" {= "5.2.1"}
   "ppx_here" {= "v0.14.0"}
   "ppx_sexp_conv" {= "v0.14.3"}
-  "ppxlib" {= "0.25.0"}
+  "ppxlib" {= "0.25.1"}
   "ptime" {= "1.0.0"}
   "re" {= "1.10.4" & with-test}
   "result" {= "1.5"}

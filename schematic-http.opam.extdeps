@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic-http"
-version: "0.14.5"
+version: "0.14.6"
 synopsis: "HTTP client with schematic encoding"
 maintainer: "mefyl <mefyl@gruntech.org>"
 authors: "mefyl <mefyl@gruntech.org>"
@@ -41,7 +41,7 @@ depends: [
   "ppx_deriving" {= "5.2.1"}
   "ppx_here" {= "v0.14.0"}
   "ppx_sexp_conv" {= "v0.14.3"}
-  "ppxlib" {= "0.25.0"}
+  "ppxlib" {= "0.25.1"}
   "ptime" {= "1.0.0"}
   "re" {= "1.10.4"}
   "result" {= "1.5"}
