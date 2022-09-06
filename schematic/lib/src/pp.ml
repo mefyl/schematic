@@ -22,7 +22,9 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
   | Any -> fun f json -> Json.pp f json
   | Bool -> bool
   | Date -> fun f (year, month, day) -> pf f "%04d-%02d-%02d" year month day
-  | Fixpoint d -> of_descriptor (Lazy.force d)
+  | Fixpoint d ->
+    (* Break infinite recursion. Would be better to have a fixpoint here too. *)
+    fun fmt v -> of_descriptor (Lazy.force d) fmt v
   | Float -> float
   | Ignore -> nop
   | Int -> int

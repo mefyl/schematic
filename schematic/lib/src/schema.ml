@@ -401,7 +401,11 @@ let inline_v_fold (f : ('fold, 'res) inline_v_fold) fields =
       type t. t descriptor -> ('fold -> t -> 'fold * 'res list, string) Result.t
       = function
     | Ignore -> Result.return (fun fold () -> (fold, []))
-    | Fixpoint d -> inline_descriptor (Lazy.force d)
+    | Fixpoint d ->
+      (* Break infinite recursion. Would be better to have a fixpoint here
+         too. *)
+      Result.return (fun fold v ->
+          (inline_descriptor (Lazy.force d) |> Result.ok_or_failwith) fold v)
     | Map { descriptor; encode; _ } ->
       let+ f = inline_descriptor descriptor in
       fun fold v -> f fold (encode v)

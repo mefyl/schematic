@@ -347,7 +347,10 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         match Coding.of_date with
         | `Generic -> encode date_tuple_schema.descriptor
         | `Custom f -> f)
-      | Fixpoint s -> encode (Lazy.force s)
+      | Fixpoint s ->
+        (* Break infinite recursion. Would be better to have a fixpoint here
+           too. *)
+        fun v -> encode (Lazy.force s) v
       | Float -> Coding.of_float
       | Ignore -> Coding.null
       | Int -> Coding.of_int
