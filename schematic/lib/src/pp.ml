@@ -77,12 +77,16 @@ and of_tuple : type t. t Schema.tuple -> t Fmt.t = function
   | Item { schema; rest } -> pair ~sep:comma (of_schema schema) (of_tuple rest)
 
 and of_cases : type t. t Schema.case list -> t Fmt.t =
- fun cases fmt v ->
+ fun cases ->
   let cases =
     let f (Schema.Case { schema; encoder; _ }) =
       let pp = of_schema schema in
-      fun v -> match encoder v with None -> None | Some v -> Some (pp fmt v)
+      fun fmt v ->
+        match encoder v with None -> None | Some v -> Some (pp fmt v)
     in
     List.map ~f cases
   in
-  match List.find_map cases ~f:(fun f -> f v) with Some () -> () | None -> ()
+  fun fmt v ->
+    match List.find_map cases ~f:(fun f -> f fmt v) with
+    | Some () -> ()
+    | None -> ()
