@@ -443,83 +443,8 @@ module Recursive = struct
     value : 'a;
     next : 'a parametric option;
   }
-  [@@schematic.name "recursive-parametric"] [@@deriving eq, schema, show]
-
-  include struct
-    open Schematic.Schemas
-
-    let parametric_schema a_schema =
-      let rec descriptor a_schema =
-        let f self =
-          Schema.Map
-            {
-              decode =
-                (fun (value, (next, ())) ->
-                  Result.Ok ({ value; next } : 'a parametric));
-              encode =
-                (fun ({ value; next } : 'a parametric) -> (value, (next, ())));
-              descriptor =
-                Object
-                  (Field
-                     {
-                       field =
-                         {
-                           description = None;
-                           examples = [];
-                           maximum = None;
-                           minimum = None;
-                           name = "value";
-                           omit = false;
-                           requirement = Required;
-                           schema = Outline a_schema;
-                           title = None;
-                         };
-                       rest =
-                         Field
-                           {
-                             field =
-                               {
-                                 description = None;
-                                 examples = [];
-                                 name = "next";
-                                 maximum = None;
-                                 minimum = None;
-                                 omit = false;
-                                 requirement = Optional;
-                                 schema = Outline (schema self);
-                                 title = None;
-                               };
-                             rest = FieldEnd;
-                           };
-                     });
-            }
-        in
-        Schema.fixpoint f
-      and id = Schematic.Schema.name_combine a_schema "recursive-parametric"
-      and schema d =
-        Schema.
-          {
-            descriptor = d;
-            id = Some id;
-            parametric =
-              Some
-                (Parametric
-                   {
-                     name = "a";
-                     parameter = a_schema;
-                     next =
-                       (fun a_schema ->
-                         Plain
-                           {
-                             name = "recursive-parametric";
-                             descriptor = descriptor a_schema;
-                           });
-                   });
-          }
-      in
-      let descriptor = descriptor a_schema in
-      schema descriptor
-  end
+  [@@schematic.name "recursive-parametric"]
+  [@@deriving eq, schema ~fixpoint, show]
 
   let parametric t =
     Alcotest.testable

@@ -367,6 +367,7 @@ end
 
 type context = {
   code_path : Ppxlib.Code_path.t;
+  fixpoint : bool;
   gadt_variant : string option;
   inside : bool;
   loc : location;
@@ -1162,7 +1163,7 @@ module Schema = struct
             [%expr
               Some [%e type_context.params |> List.rev |> List.foldi ~f ~init]]
         in
-        let cache = List.is_empty type_context.params in
+        let cache = context.fixpoint || List.is_empty type_context.params in
         ( [%expr
             let descriptor =
               [%e
@@ -1762,7 +1763,7 @@ module Jsoo_type_expander = Expander (Jsoo_type)
 module Schema_expander = Expander (Schema)
 module Sqml_binding_expander = Expander (Sqml_binding)
 
-let expand ~ctxt ~inside ~version (recursive, types) gadt jsoo sqml =
+let expand ~ctxt ~inside ~version (recursive, types) fixpoint gadt jsoo sqml =
   let loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt in
   let jsoo =
     match jsoo with
@@ -1783,6 +1784,7 @@ let expand ~ctxt ~inside ~version (recursive, types) gadt jsoo sqml =
     in
     {
       code_path;
+      fixpoint;
       gadt_variant = None;
       inside;
       loc;
@@ -1922,10 +1924,11 @@ let add ~version inside =
   and str_type_decl =
     let arg =
       let open Deriving.Args in
-      let gadt = arg "gadt" (elist (pexp_ident (lident __)))
+      let fixpoint = flag "fixpoint"
+      and gadt = arg "gadt" (elist (pexp_ident (lident __)))
       and jsoo = arg "jsoo" __
       and sqml = arg "sqml" (estring __) in
-      empty +> gadt +> jsoo +> sqml
+      empty +> fixpoint +> gadt +> jsoo +> sqml
     in
     Deriving.Generator.V2.make arg (expand ~version ~inside)
   in
