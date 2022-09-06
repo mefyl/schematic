@@ -455,7 +455,12 @@ let inline_v_fold (f : ('fold, 'res) inline_v_fold) fields =
 
 let inline_v (f : _ inline_v) fields =
   let inline : (_, _) inline_v_fold =
-    { f = (fun field () v -> ((), f.f field v)) }
+    {
+      f =
+        (fun field ->
+          let f = f.f field in
+          fun () v -> ((), f v));
+    }
   in
   match inline_v_fold inline fields with
   | Result.Ok f ->
