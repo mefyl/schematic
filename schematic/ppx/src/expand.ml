@@ -1168,22 +1168,34 @@ module Schema = struct
             let descriptor =
               [%e
                 if cache then
-                  [%expr
-                    match
-                      Base.Map.find !__schematic_cache
-                        __schematic_schema_version
-                    with
-                    | None ->
-                      [%e
-                        params_wrap
-                          [%expr
-                            Schema.fixpoint (fun __schematic_self ->
+                  params_wrap
+                    [%expr
+                      match
+                        Base.Map.find !__schematic_cache
+                          __schematic_schema_version
+                      with
+                      | Some schema -> schema
+                      | None ->
+                        Schema.fixpoint (fun __schematic_self ->
+                            match
+                              Base.Map.find !__schematic_cache
+                                __schematic_schema_version
+                            with
+                            | Some schema -> schema
+                            | None ->
+                              let () =
                                 __schematic_cache :=
                                   Base.Map.set !__schematic_cache
                                     ~key:__schematic_schema_version
-                                    ~data:__schematic_self;
-                                [%e c.descriptor])]]
-                    | Some schema -> [%e params_wrap [%expr schema]]]
+                                    ~data:__schematic_self
+                              in
+                              let res = [%e c.descriptor] in
+                              let () =
+                                __schematic_cache :=
+                                  Base.Map.set !__schematic_cache
+                                    ~key:__schematic_schema_version ~data:res
+                              in
+                              res)]
                 else params_wrap c.descriptor]
             and id = [%e id] in
             Schema.

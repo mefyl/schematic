@@ -439,9 +439,19 @@ module Recursive = struct
       { value = 0; next = Some { value = 1; next = None } }
       [%ezjsonm { value = 0; next = { value = 1 } }]
 
+  (* Used to check the lazy fixpoint schema is evaluated only once *)
+  type count = unit [@@deriving eq, show]
+
+  let count = ref 0
+
+  let count_schema_versioned _ =
+    count := !count + 1;
+    unit_schema
+
   type 'a parametric = {
-    value : 'a;
+    count : count; [@schematic.omit ()]
     next : 'a parametric option;
+    value : 'a;
   }
   [@@schematic.name "recursive-parametric"]
   [@@deriving eq, schema ~fixpoint, show]
@@ -452,10 +462,21 @@ module Recursive = struct
       (equal_parametric (Alcotest.equal t))
 
   let parametric () =
-    test "recursive" (parametric Alcotest.int)
-      (parametric_schema int_schema)
-      { value = 0; next = Some { value = 1; next = None } }
-      [%ezjsonm { value = 0; next = { value = 1 } }]
+    let () = Alcotest.(check int "first count" 0 !count) in
+    let schema = parametric_schema int_schema in
+    let () = Alcotest.(check int "second count" 1 !count) in
+    let _schema = parametric_schema int_schema in
+    let () = Alcotest.(check int "third count" 1 !count) in
+    let () =
+      test "recursive" (parametric Alcotest.int) schema
+        {
+          count = ();
+          value = 0;
+          next = Some { count = (); value = 1; next = None };
+        }
+        [%ezjsonm { value = 0; next = { value = 1 } }]
+    in
+    Alcotest.(check int "fourth count" 1 !count)
 end
 
 type mutually_a = { next_b : mutually_b option }
