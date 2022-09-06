@@ -325,23 +325,19 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
     let rec encode_field :
         type req t. (t, req) Schema.field -> req -> (string * Coding.t) option =
      fun { name; requirement; schema; _ } ->
+      let compare = Schema.(compare (field_schema schema))
+      and encode = encode (Schema.field_schema schema).descriptor in
       let optional v =
-        match v with
-        | None -> None
-        | Some v -> Some (name, encode (Schema.field_schema schema).descriptor v)
+        match v with None -> None | Some v -> Some (name, encode v)
       in
       match requirement with
       | Computed -> optional
       | Computed_optional -> (
         fun v -> match v with None -> None | Some v -> optional v)
       | Default default ->
-        let compare = Schema.(compare (field_schema schema)) in
-        fun v ->
-          if compare v default = 0 then None
-          else Some (name, encode (Schema.field_schema schema).descriptor v)
+        fun v -> if compare v default = 0 then None else Some (name, encode v)
       | Optional -> optional
-      | Required ->
-        fun v -> Some (name, encode (Schema.field_schema schema).descriptor v)
+      | Required -> fun v -> Some (name, encode v)
     and encode : type t. t Schema.descriptor -> t -> Coding.t =
      fun schema ->
       match schema with
