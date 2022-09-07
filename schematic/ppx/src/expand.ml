@@ -369,10 +369,15 @@ type context = {
   code_path : Ppxlib.Code_path.t;
   fixpoint : bool;
   gadt_variant : string option;
-  inside : bool;
+  global : global_context;
   loc : location;
   recursive : bool;
   types : string list;
+}
+
+and global_context = {
+  enable_jsoo : bool;
+  inside : bool;
   version : Semver.t option;
 }
 
@@ -1106,7 +1111,7 @@ module Schema = struct
           match param with
           | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
             let combine =
-              if context.inside then [%expr Schema.name_combine]
+              if context.global.inside then [%expr Schema.name_combine]
               else [%expr Schematic.Schema.name_combine]
             in
             [%expr
@@ -1207,7 +1212,7 @@ module Schema = struct
           cache )
       | Expression e ->
         let e =
-          if context.inside then
+          if context.global.inside then
             [%expr { ([%e e]) with Schema.id = Some [%e id] }]
           else [%expr { ([%e e]) with Schematic.Schema.id = Some [%e id] }]
         in
@@ -1226,7 +1231,7 @@ module Schema = struct
         (params_apply [%expr [%e Ast.evar name_versioned] (fun _ -> None)])
     and body_versioned =
       let body =
-        if context.inside then
+        if context.global.inside then
           [%expr
             fun (__schematic_version : Schema.version) ->
               let __schematic_schema_version =
@@ -1242,7 +1247,7 @@ module Schema = struct
               [%e params_wrap schema]]
       in
       if cache then
-        if context.inside then
+        if context.global.inside then
           [%expr
             let __schematic_cache =
               ref (Base.Map.empty (module Version.Option))
@@ -1347,7 +1352,7 @@ module Jsoo_type = struct
         | Inline_try -> None
         | Outline ->
           let t =
-            match context.version with
+            match context.global.version with
             | Some { major = 0; minor = 13; patch; _ } when patch < 1 ->
               [%type:
                 [%t expand_type ~loc ~context ~type_context type_]
@@ -1410,7 +1415,7 @@ module Jsoo_type = struct
            ~f:(function _, Pcstr_tuple [], _, _ -> false | _ -> true)
            options
     then
-      match (context.version, type_context.attributes.union_key) with
+      match (context.global.version, type_context.attributes.union_key) with
       | _, None | Some { major = 0; minor = 13; patch = 0; _ }, _ ->
         [%type: Js_of_ocaml.Js.Unsafe.any]
       | _, Some key ->
@@ -1775,17 +1780,19 @@ module Jsoo_type_expander = Expander (Jsoo_type)
 module Schema_expander = Expander (Schema)
 module Sqml_binding_expander = Expander (Sqml_binding)
 
-let expand ~ctxt ~inside ~version (recursive, types) fixpoint gadt jsoo sqml =
+let expand ~ctxt ~global (recursive, types) fixpoint gadt jsoo sqml =
   let loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt in
   let jsoo =
-    match jsoo with
-    | None -> None
-    | Some [%expr jsoo] | Some [%expr true] -> Some true
-    | Some [%expr false] -> Some false
-    | Some exp ->
-      Ppxlib.Location.raise_errorf ~loc:exp.pexp_loc
-        "schematic-ppx: invalid ~jsoo argument value: %a" Pprintast.expression
-        exp
+    if global.enable_jsoo then
+      match jsoo with
+      | None -> None
+      | Some [%expr jsoo] | Some [%expr true] -> Some true
+      | Some [%expr false] -> Some false
+      | Some exp ->
+        Ppxlib.Location.raise_errorf ~loc:exp.pexp_loc
+          "schematic-ppx: invalid ~jsoo argument value: %a" Pprintast.expression
+          exp
+    else None
   in
   let context =
     let recursive = Poly.(recursive = Recursive)
@@ -1794,16 +1801,7 @@ let expand ~ctxt ~inside ~version (recursive, types) fixpoint gadt jsoo sqml =
       let f { ptype_name; _ } = ptype_name.txt in
       if recursive then List.map ~f types else []
     in
-    {
-      code_path;
-      fixpoint;
-      gadt_variant = None;
-      inside;
-      loc;
-      types;
-      recursive;
-      version = !version;
-    }
+    { code_path; fixpoint; gadt_variant = None; global; loc; types; recursive }
   in
   let expand context =
     let types =
@@ -1877,7 +1875,7 @@ let expand ~ctxt ~inside ~version (recursive, types) fixpoint gadt jsoo sqml =
 
         let _ = fun (_ : int_js) -> ()]
       @ contents
-    else if inside then
+    else if global.inside then
       [%str
         open Schemas
 
@@ -1919,9 +1917,9 @@ let expand_sig ~ctxt (_recursive, types) =
   in
   List.map ~f types |> List.concat
 
-let add ~version inside =
+let add ~inside ~jsoo ~version =
   let () =
-    match !version with
+    match version with
     | None | Some Semver.{ major = 0; minor = 14; _ } -> ()
     | Some version ->
       Fmt.failwith "schematic ppx version mismatch: expecting 0.14.x, got %a"
@@ -1942,6 +1940,7 @@ let add ~version inside =
       and sqml = arg "sqml" (estring __) in
       empty +> fixpoint +> gadt +> jsoo +> sqml
     in
-    Deriving.Generator.V2.make arg (expand ~version ~inside)
+    Deriving.Generator.V2.make arg
+      (expand ~global:{ inside; enable_jsoo = jsoo; version })
   in
   Deriving.add ~sig_type_decl ~str_type_decl "schema"

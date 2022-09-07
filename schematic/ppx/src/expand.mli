@@ -1,1 +1,2 @@
-val add : version:Semver.t option ref -> bool -> Ppxlib.Deriving.t
+val add :
+  inside:bool -> jsoo:bool -> version:Semver.t option -> Ppxlib.Deriving.t
