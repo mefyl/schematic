@@ -7,7 +7,7 @@ let handle name pattern ~f =
 let ebool t =
   let open Ppxlib.Ast_pattern in
   let f ctx loc exp f =
-    let ident = to_func @@ pexp_ident (lident __)
+    let ident = to_func @@ pexp_construct (lident __) none
     and t = to_func t in
     ident ctx loc exp (function
       | "false" -> t ctx loc false f
