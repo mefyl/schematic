@@ -1894,7 +1894,8 @@ let expand ~ctxt ~global (recursive, types) fixpoint gadt jsoo sqml =
     List.map ~f variants |> List.concat
   | None -> expand context
 
-let expand_sig ~ctxt (_recursive, types) =
+let expand_sig ~ctxt ~global:_ (_recursive, types) =
+  (* FIXME: Jsoo declarations *)
   let loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt in
   let module Ast = (val Ast_builder.make loc) in
   let f { ptype_name = { txt; loc }; _ } =
@@ -1918,19 +1919,25 @@ let expand_sig ~ctxt (_recursive, types) =
   List.map ~f types |> List.concat
 
 let add ~inside ~jsoo ~version =
-  let () =
-    match version with
-    | None | Some Semver.{ major = 0; minor = 14; _ } -> ()
-    | Some version ->
-      Fmt.failwith "schematic ppx version mismatch: expecting 0.14.x, got %a"
-        Semver.pp version Ast_pattern.parse
+  let global =
+    lazy
+      (let () =
+         match !version with
+         | None | Some Semver.{ major = 0; minor = 14; _ } -> ()
+         | Some version ->
+           Fmt.failwith
+             "schematic ppx version mismatch: expecting 0.14.x, got %a"
+             Semver.pp version Ast_pattern.parse
+       in
+       { inside; enable_jsoo = !jsoo; version = !version })
   in
   let sig_type_decl =
     let arg =
       let open Deriving.Args in
       empty
     in
-    Deriving.Generator.V2.make arg expand_sig
+    Deriving.Generator.V2.make arg (fun ~ctxt ast ->
+        expand_sig ~global:(Lazy.force global) ~ctxt ast)
   and str_type_decl =
     let arg =
       let open Deriving.Args in
@@ -1940,7 +1947,7 @@ let add ~inside ~jsoo ~version =
       and sqml = arg "sqml" (estring __) in
       empty +> fixpoint +> gadt +> jsoo +> sqml
     in
-    Deriving.Generator.V2.make arg
-      (expand ~global:{ inside; enable_jsoo = jsoo; version })
+    Deriving.Generator.V2.make arg (fun ~ctxt ast ->
+        expand ~global:(Lazy.force global) ~ctxt ast)
   in
   Deriving.add ~sig_type_decl ~str_type_decl "schema"

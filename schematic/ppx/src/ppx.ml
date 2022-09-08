@@ -22,5 +22,4 @@ let () =
     Ppxlib.Ast_pattern.(estring __)
     ~f:(fun s -> version := Schematic.Version.of_string s)
 
-let deriver =
-  Schematic_ppx_expand.Expand.add ~inside:false ~jsoo:!jsoo ~version:!version
+let deriver = Schematic_ppx_expand.Expand.add ~inside:false ~jsoo ~version
