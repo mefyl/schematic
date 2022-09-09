@@ -106,9 +106,8 @@ module Jsoo_coding : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
   let to_time v =
     if Js.instanceof v Js.date_now then
       let date = Js.Unsafe.coerce v in
-      Ptime.of_float_s (date##getTime /. 1000.)
-      |> Result.of_option ~error:"invalid date"
-    else Result.fail @@ Schematic.Coding.type_error "Date" (type_name v)
+      Ptime.of_float_s (date##getTime /. 1000.) |> Result.of_option ~error:None
+    else Result.fail None
 
   let to_time_local v =
     Result.map (to_time v) ~f:(fun time -> (time, 0 (* FIXME *)))

@@ -44,8 +44,8 @@ module type IMPL = sig
   val to_json : t -> Ezjsonm.value option
   val to_list : t -> t list option
   val to_string : t -> string option
-  val to_time : t -> (Ptime.t, string) Result.t
-  val to_time_local : t -> (Ptime.t * int, string) Result.t
+  val to_time : t -> (Ptime.t, string option) Result.t
+  val to_time_local : t -> (Ptime.t * int, string option) Result.t
   val type_name : t -> string
 end
 
@@ -266,8 +266,16 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | Some s when String.(s = expected) -> Result.return ()
         | Some s -> Result.fail (error "expected %S, got %S" expected s)
         | None -> type_error "string" None)
-      | Time -> Coding.to_time v |> Result.map_error ~f:(error "%s")
-      | Time_local -> Coding.to_time_local v |> Result.map_error ~f:(error "%s")
+      | Time -> (
+        match Coding.to_time v with
+        | Result.Ok _ as ok -> ok
+        | Result.Error None -> type_error "time" None
+        | Result.Error (Some e) -> Result.fail (error "%s" e))
+      | Time_local -> (
+        match Coding.to_time_local v with
+        | Result.Ok _ as ok -> ok
+        | Result.Error None -> type_error "localtime" None
+        | Result.Error (Some e) -> Result.fail (error "%s" e))
       | Tuple items ->
         let* v = Coding.to_list v |> type_error "list" in
         let rec decode_tuple :

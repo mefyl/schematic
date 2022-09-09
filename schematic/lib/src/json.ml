@@ -43,17 +43,17 @@ module Json_coding : Coding.IMPL with type t = Ezjsonm.value = struct
   let to_time_ = function
     | `String s ->
       let error (`RFC3339 (_, e)) =
-        Caml.Format.asprintf "%a" Ptime.pp_rfc3339_error e
+        Some (Caml.Format.asprintf "%a" Ptime.pp_rfc3339_error e)
       in
       Ptime.of_rfc3339 ~strict:true s |> Result.map_error ~f:error
-    | v -> Result.fail @@ Coding.type_error "string" (type_name v)
+    | _ -> Result.fail None
 
   let to_time v = to_time_ v >>| fun (t, _tz, _) -> t
 
   let to_time_local v =
     to_time_ v >>= function
     | t, Some tz, _ -> Result.return (t, tz)
-    | _, None, _ -> Result.fail "missing timezone"
+    | _, None, _ -> Result.fail (Some "missing timezone")
 end
 
 module Make (Impl : Impl) = struct
