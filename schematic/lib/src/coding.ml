@@ -20,7 +20,6 @@ type 't key_set = ('t -> string -> 't -> ('t, string) Result.t) customizable
 module type IMPL = sig
   type t
 
-  val is_null : t -> bool
   val key_get : t key_get
   val key_set : t key_set
   val null : unit -> t
@@ -32,6 +31,7 @@ module type IMPL = sig
   val of_int64 : int64 -> t
   val of_json : Ezjsonm.value -> t
   val of_list : t list -> t
+  val of_option : t option -> t
   val of_string : string -> t
   val of_time : Ptime.t -> t
   val of_time_local : Ptime.t * int -> t
@@ -43,6 +43,7 @@ module type IMPL = sig
   val to_int64 : t -> int64 option
   val to_json : t -> Ezjsonm.value option
   val to_list : t -> t list option
+  val to_option : t -> t option option
   val to_string : t -> string option
   val to_time : t -> (Ptime.t, string option) Result.t
   val to_time_local : t -> (Ptime.t * int, string option) Result.t
@@ -145,24 +146,29 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | Some v -> (
           if omit then Result.return default
           else
-            match (Coding.is_null v, schema.descriptor) with
-            | true, Nullable nullable -> (
+            match (Coding.to_option v, schema.descriptor) with
+            | Some None, Nullable nullable -> (
               match decode schema.id ids_next nullable.descriptor v with
               | Result.Ok v -> Result.return (Some v)
               | Result.Error _ -> decode schema.id ids_next schema.descriptor v)
-            | _ -> decode schema.id ids_next schema.descriptor v)
+            | Some None, _ -> decode schema.id ids_next schema.descriptor v
+            | Some (Some v), _ -> decode schema.id ids_next schema.descriptor v
+            | None, _ -> type_error id ids "option" v None)
         | None -> Result.return default)
       | Computed -> fun _ -> Result.Ok None
       | Computed_optional -> fun _ -> Result.Ok None
       | Optional -> (
         function
-        | Some v when Coding.is_null v -> (
-          match decode schema.id ids_next schema.descriptor v with
-          | Result.Ok v -> Result.return (Some v)
-          | Result.Error _ -> Result.return None)
-        | Some v ->
-          Result.map ~f:Option.return
-          @@ decode schema.id ids_next schema.descriptor v
+        | Some v -> (
+          match Coding.to_option v with
+          | Some None -> (
+            match decode schema.id ids_next schema.descriptor v with
+            | Result.Ok v -> Result.return (Some v)
+            | Result.Error _ -> Result.return None)
+          | Some (Some v) ->
+            Result.map ~f:Option.return
+            @@ decode schema.id ids_next schema.descriptor v
+          | None -> type_error id ids "option" v None)
         | None -> Result.return None)
       | Required -> (
         function
@@ -206,10 +212,17 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           >>= fun value -> Result.return (name, value)
         in
         map_results ~f fields
-      | Null -> Option.some_if (Coding.is_null v) () |> type_error "null"
-      | Nullable s ->
-        if Coding.is_null v then Result.return None
-        else decode s.id ids s.descriptor v |> Result.map ~f:Option.return
+      | Null ->
+        let res =
+          match Coding.to_option v with Some None -> Some () | _ -> None
+        in
+        type_error "null" res
+      | Nullable s -> (
+        match Coding.to_option v with
+        | Some None -> Result.return None
+        | Some (Some v) ->
+          decode s.id ids s.descriptor v |> Result.map ~f:Option.return
+        | None -> type_error "option" None)
       | Object fields_schema ->
         let* fields = Coding.to_fields v |> type_error "object" in
         let rec decode_object :
@@ -370,9 +383,9 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         let encode = encode descriptor in
         fun v -> encode @@ decons v
       | Null -> Coding.null
-      | Nullable s -> (
+      | Nullable s ->
         let encode = encode s.descriptor in
-        fun v -> match v with None -> Coding.null () | Some v -> encode v)
+        fun v -> Option.map ~f:encode v |> Coding.of_option
       | Mapping fields_schema ->
         let encode = encode fields_schema.descriptor in
         fun v ->

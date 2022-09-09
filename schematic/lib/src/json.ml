@@ -19,7 +19,6 @@ module Json_coding : Coding.IMPL with type t = Ezjsonm.value = struct
 
   let ( >>= ) = Result.( >>= )
   let ( >>| ) = Result.( >>| )
-  let is_null = function `Null -> true | _ -> false
   let null () = `Null
   let of_bool b = `Bool b
   let of_fields f = `O f
@@ -28,6 +27,7 @@ module Json_coding : Coding.IMPL with type t = Ezjsonm.value = struct
   let of_int64 i = `Float (Float.of_int64 i)
   let of_json v = v
   let of_list l = `A l
+  let of_option = function Some v -> v | None -> `Null
   let of_string s = `String s
   let of_time t = `String (Ptime.to_rfc3339 t)
   let of_time_local (t, tz_offset_s) = `String (Ptime.to_rfc3339 ~tz_offset_s t)
@@ -38,6 +38,7 @@ module Json_coding : Coding.IMPL with type t = Ezjsonm.value = struct
   let to_int64 = function `Float v -> Some (Float.to_int64 v) | _ -> None
   let to_json v = Some v
   let to_list = function `A l -> Some l | _ -> None
+  let to_option = function `Null -> Some None | v -> Some (Some v)
   let to_string = function `String v -> Some v | _ -> None
 
   let to_time_ = function

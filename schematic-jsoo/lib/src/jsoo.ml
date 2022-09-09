@@ -45,7 +45,6 @@ module Jsoo_coding : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
     `Custom f
 
   let null () = Js.Unsafe.pure_js_expr "null"
-  let is_null v = v == null ()
   let of_bool v = Js.Unsafe.coerce @@ Js.bool v
   let of_date = `Custom js_of_date
 
@@ -62,6 +61,7 @@ module Jsoo_coding : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
   let of_int64 v = Js.Unsafe.coerce @@ Js.number_of_float @@ Float.of_int64 v
   let of_json v = Js.Unsafe.coerce @@ Impl_js.to_js v
   let of_list v = Js.Unsafe.coerce @@ Js.array @@ Array.of_list v
+  let of_option v = Js.Opt.option v |> Js.Unsafe.inject
   let of_string v = Js.Unsafe.coerce @@ Js.string v
   let of_time v = Js.Unsafe.coerce @@ js_of_ptime v
   let of_time_local v = Js.Unsafe.coerce @@ js_of_ptime (fst v)
@@ -97,6 +97,8 @@ module Jsoo_coding : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
     if Js.instanceof v Js.array_empty then
       Js.Unsafe.coerce v |> Js.to_array |> Array.to_list |> Option.return
     else None
+
+  let to_option v = Some (Js.Opt.to_option @@ Js.Opt.return v)
 
   let to_string v =
     if Js.typeof v == Js.string "string" then
