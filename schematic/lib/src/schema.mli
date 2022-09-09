@@ -35,6 +35,7 @@ val inline_v_fold :
 val field_ignored : ('t, 'req) field -> bool
 val field_schema : 't field_schema -> 't t
 val compare : 'a t -> 'a -> 'a -> int
+val equal : 'a t -> 'a -> 'a -> bool
 
 type pack
 

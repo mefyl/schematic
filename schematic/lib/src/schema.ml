@@ -684,6 +684,8 @@ let compare schema =
   in
   compare schema.descriptor
 
+let equal schema l r = compare schema l r = 0
+
 type pack = Pack : _ t -> pack
 
 let pack (type a) (schema : a t) = Pack schema
