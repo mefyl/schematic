@@ -4,11 +4,13 @@
   schematic-cli.opam
   schematic-http.opam
   schematic-jsoo.opam
+  schematic-sexp.opam
   schematic-sqml.opam
   schematic.opam
   (alias_rec schematic/default)
   (alias_rec schematic-http/default)
   (alias_rec schematic-jsoo/default)
+  (alias_rec schematic-sexp/default)
   (alias_rec schematic-sqml/default)))
 
 (rule

@@ -1,0 +1,8 @@
+(include_subdirs unqualified)
+
+(library
+ (name schematic_sexp)
+ (public_name schematic-sexp)
+ (libraries base fmt json-derivers schematic sexplib)
+ (preprocess
+  (pps js_of_ocaml-ppx ppx_here)))

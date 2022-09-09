@@ -68,6 +68,20 @@
    (= :version))))
 
 (package
+ (name schematic-sexp)
+ (synopsis "Derive sexps from Ocaml objects")
+ (description "Encode to and from s-expressions via a schema.")
+ (depends
+  (alcotest
+   (and
+    (>= 1.1.0)
+    :with-test))
+  json-derivers
+  (schematic
+   (= :version))
+  sexp))
+
+(package
  (name schematic-sqml)
  (synopsis "Derive SQML bindings from Ocaml types")
  (description "Deduce SQML bindings from schematic type metadata.")

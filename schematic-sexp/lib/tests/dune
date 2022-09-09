@@ -1,0 +1,7 @@
+(include_subdirs unqualified)
+
+(test
+ (name test)
+ (libraries alcotest schematic schematic-sexp)
+ (preprocess
+  (pps schematic.ppx)))
