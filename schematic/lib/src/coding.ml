@@ -41,7 +41,7 @@ module type IMPL = sig
   val to_float : t -> float option
   val to_int : t -> int option
   val to_int64 : t -> int64 option
-  val to_json : t -> Ezjsonm.value
+  val to_json : t -> Ezjsonm.value option
   val to_list : t -> t list option
   val to_string : t -> string option
   val to_time : t -> (Ptime.t, string) Result.t
@@ -182,7 +182,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         Fmt.kstr f reason
       and ( >>= ) = Result.( >>= ) in
       match schema with
-      | Any -> Result.return (Coding.to_json v)
+      | Any -> Coding.to_json v |> type_error "JSON"
       | Bool -> Coding.to_bool v |> type_error "boolean"
       | Date -> (
         match Coding.to_date with

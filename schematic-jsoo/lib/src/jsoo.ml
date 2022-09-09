@@ -91,7 +91,7 @@ module Jsoo_coding : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
     let+ v = to_float v in
     Int64.of_float v
 
-  let to_json v = Impl_js.of_js v
+  let to_json v = Some (Impl_js.of_js v)
 
   let to_list v =
     if Js.instanceof v Js.array_empty then

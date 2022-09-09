@@ -36,7 +36,7 @@ module Json_coding : Coding.IMPL with type t = Ezjsonm.value = struct
   let to_float = function `Float v -> Some v | _ -> None
   let to_int = function `Float v -> Some (Float.to_int v) | _ -> None
   let to_int64 = function `Float v -> Some (Float.to_int64 v) | _ -> None
-  let to_json v = v
+  let to_json v = Some v
   let to_list = function `A l -> Some l | _ -> None
   let to_string = function `String v -> Some v | _ -> None
 
