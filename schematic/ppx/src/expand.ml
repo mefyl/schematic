@@ -222,8 +222,8 @@ module Attributes = struct
 
   let requirement { computed; loc; specs = { default; _ }; type_; _ } =
     match type_ with
-    | [%type: [%t? t] option] when Option.is_none computed -> (Optional, t)
-    | [%type: [%t? t] option] -> (Computed_optional, t)
+    | [%type: [%t? t] option] when Option.is_none default ->
+      if Option.is_none computed then (Optional, t) else (Computed_optional, t)
     | t -> (
       match (default, computed) with
       | Some default, _ ->

@@ -52,6 +52,15 @@ let test ?decoded name test schema value j =
   if Caml.Sys.command cmd <> 0 then
     Alcotest.check json (Fmt.str "%s: schema validation" name) schema encoded
 
+module Option = struct
+  include Option
+
+  let schema_versioned = Schematic.Schemas.option_schema_versioned
+
+  let pp pp =
+    Fmt.(option ~none:(const string "None") (const string "Some " ++ pp))
+end
+
 (* Failure *)
 
 let failure () =
@@ -70,65 +79,77 @@ let atom_string () =
   test "string atom" Alcotest.string string_schema "trente trois"
     [%ezjsonm "trente trois"]
 
-(* Option *)
+(* Optionals *)
 
-let options () =
-  let () =
-    test "some int"
-      Alcotest.(option int)
-      (option_schema int_schema) (Some 28) [%ezjsonm 28]
-  and () =
-    test "none int"
-      Alcotest.(option int)
-      (option_schema int_schema) None [%ezjsonm None]
-  in
-  ()
+module Optionals = struct
+  let options () =
+    let () =
+      test "some int"
+        Alcotest.(option int)
+        (option_schema int_schema) (Some 28) [%ezjsonm 28]
+    and () =
+      test "none int"
+        Alcotest.(option int)
+        (option_schema int_schema) None [%ezjsonm None]
+    in
+    ()
 
-type nullable_option = { no : int option option } [@@deriving eq, schema, show]
+  (* Nullable option *)
 
-(* Nullable option *)
+  type nullable_option = { no : int option option }
+  [@@deriving eq, schema, show]
 
-let nullable_option = Alcotest.testable pp_nullable_option equal_nullable_option
+  let nullable_option =
+    Alcotest.testable pp_nullable_option equal_nullable_option
 
-let nullable_option () =
-  let () =
-    test "omitted" nullable_option nullable_option_schema { no = None } (`O [])
-  and () =
-    test "null" nullable_option nullable_option_schema { no = Some None }
-      [%ezjsonm { no = None }]
-  and () =
-    test "specified" nullable_option nullable_option_schema
-      { no = Some (Some 74) } [%ezjsonm { no = 74 }]
-  in
-  ()
+  let nullable_option () =
+    let () =
+      test "omitted" nullable_option nullable_option_schema { no = None }
+        (`O [])
+    and () =
+      test "null" nullable_option nullable_option_schema { no = Some None }
+        [%ezjsonm { no = None }]
+    and () =
+      test "specified" nullable_option nullable_option_schema
+        { no = Some (Some 74) } [%ezjsonm { no = 74 }]
+    in
+    ()
 
-(* Default option*)
+  (* Default option*)
 
-module Option = struct
-  include Option
+  type default_option = { oo : int Option.t Option.t [@default None] }
+  [@@deriving eq, schema, show]
 
-  let schema_versioned = Schematic.Schemas.option_schema_versioned
+  let default_option =
+    Alcotest.(testable pp_default_option equal_default_option)
 
-  let pp pp =
-    Fmt.(option ~none:(const string "None") (const string "Some " ++ pp))
+  let default_option () =
+    let () =
+      test "none" default_option default_option_schema { oo = None } (`O [])
+    and () =
+      test "some none" default_option default_option_schema { oo = Some None }
+        [%ezjsonm { oo = None }]
+    and () =
+      test "some some" default_option default_option_schema
+        { oo = Some (Some 877) } [%ezjsonm { oo = 877 }]
+    in
+    ()
+
+  (* Disabled optionals *)
+
+  type disabled_optionals = {
+    a : int option; [@schematic.default_opt None]
+    b : int list; [@default []] [@schematic.default_opt None]
+  }
+  [@@deriving eq, schema, show]
+
+  let disabled_optionals () =
+    let disabled_optionals =
+      Alcotest.testable pp_disabled_optionals equal_disabled_optionals
+    in
+    test "disabled optionals" disabled_optionals disabled_optionals_schema
+      { a = None; b = [] } [%ezjsonm { a = None; b = [] }]
 end
-
-type default_option = { oo : int Option.t Option.t [@default None] }
-[@@deriving eq, schema, show]
-
-let default_option = Alcotest.(testable pp_default_option equal_default_option)
-
-let default_option () =
-  let () =
-    test "none" default_option default_option_schema { oo = None } (`O [])
-  and () =
-    test "some none" default_option default_option_schema { oo = Some None }
-      [%ezjsonm { oo = None }]
-  and () =
-    test "some some" default_option default_option_schema
-      { oo = Some (Some 877) } [%ezjsonm { oo = 877 }]
-  in
-  ()
 
 (* Record *)
 
@@ -1294,9 +1315,10 @@ let () =
         [
           test_case "int" `Quick atom_int;
           test_case "string" `Quick atom_string;
-          test_case "option" `Quick options;
-          test_case "nullable option" `Quick nullable_option;
-          test_case "default option" `Quick default_option;
+          test_case "option" `Quick Optionals.options;
+          test_case "nullable option" `Quick Optionals.nullable_option;
+          test_case "default option" `Quick Optionals.default_option;
+          test_case "disabled optionals" `Quick Optionals.disabled_optionals;
           test_case "record" `Quick record;
           test_case "tuple" `Quick tuple;
           test_case "variant" `Quick Variant.variant;
