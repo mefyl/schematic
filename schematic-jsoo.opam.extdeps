@@ -22,6 +22,7 @@ depends: [
   "base64" {= "3.5.0"}
   "bigstringaf" {= "0.9.0"}
   "cmdliner" {= "1.1.1"}
+  "conf-npm" {= "1" & with-test}
   "conf-pkg-config" {= "2"}
   "cppo" {= "1.6.9"}
   "csexp" {= "1.5.1"}

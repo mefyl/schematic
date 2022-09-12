@@ -60,6 +60,7 @@
    (and
     (>= 1.1.0)
     :with-test))
+  (conf-npm :with-test)
   (js_of_ocaml
    (>= 4.0.0))
   (js_of_ocaml-ppx
