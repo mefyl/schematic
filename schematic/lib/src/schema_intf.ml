@@ -126,13 +126,20 @@ module type WALK = sig
   (* Object *)
 
   val fields_empty : unit -> fields
+
+  (** [field_inline required fields rest] *)
   val field_inline : bool -> fields list -> fields -> fields
+
+  (** [field_outline name required t rest]*)
   val field_outline : string -> bool -> t -> fields -> fields
+
   val object_ : fields -> t
 
   (* Union *)
 
+  (** [case key name t] *)
   val case : string option -> string -> t -> t
+
   val union : t list -> t
 
   (* Descriptors *)

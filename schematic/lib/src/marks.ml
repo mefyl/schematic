@@ -2,6 +2,8 @@ open Base
 
 module type MARK = sig
   type t
+
+  val normalize_id : string -> string
 end
 
 module Make (S : MARK) = struct
@@ -39,4 +41,18 @@ module Make (S : MARK) = struct
     let merge = Set.union_list (module Mark)
     let of_list = Set.of_list (module Mark)
   end
+
+  let rec of_mark marks mark =
+    if Marks.has marks mark then ([], marks)
+    else
+      let res, deps =
+        let res, deps = Lazy.force @@ snd mark in
+        ([ (S.normalize_id @@ fst mark, res) ], deps)
+      in
+      let marks = Marks.add marks mark in
+      let f (res, marks) mark =
+        let deps, marks = of_mark marks mark in
+        (res @ deps, marks)
+      in
+      Marks.fold ~init:(res, marks) ~f deps
 end

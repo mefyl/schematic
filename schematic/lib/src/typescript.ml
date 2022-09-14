@@ -16,16 +16,18 @@ type t =
 
 type typescript = t
 
-include Marks.Make (struct
-  type t = typescript
-end)
-
 let name s =
   String.split ~on:'_' s
   |> List.map ~f:(String.split ~on:'-')
   |> List.concat
   |> List.map ~f:String.capitalize
   |> String.concat ~sep:""
+
+include Marks.Make (struct
+  type t = typescript
+
+  let normalize_id = name
+end)
 
 module Of = Schema.Walk (struct
   type res = t * Marks.t
@@ -131,20 +133,6 @@ module Of = Schema.Walk (struct
     let t, marks = List.unzip cases in
     (Union t, Marks.merge marks)
 end)
-
-let rec of_mark marks mark =
-  if Marks.has marks mark then ([], marks)
-  else
-    let res, deps =
-      let res, deps = Lazy.force @@ snd mark in
-      ([ (name @@ fst mark, res) ], deps)
-    in
-    let marks = Marks.add marks mark in
-    let f (res, marks) mark =
-      let deps, marks = of_mark marks mark in
-      (res @ deps, marks)
-    in
-    Marks.fold ~init:(res, marks) ~f deps
 
 let mark_of_schema Schema.{ id; descriptor; parametric } =
   match parametric with
