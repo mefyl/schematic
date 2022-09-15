@@ -31,6 +31,17 @@ let type_alias_c = ("type_alias", {|
 int
 |})
 
+type record_voidptr = {
+  foo : Ezjsonm.value; [@schematic.schema fun _ -> Schematic.Schemas.any_schema]
+}
+[@@deriving schema]
+
+let record_voidptr_c = ("record_voidptr", {|
+struct {
+  (void)* foo;
+}
+|})
+
 module Generate_types = struct
   let test t expected =
     Schematic.C.of_schema t
@@ -41,6 +52,7 @@ module Generate_types = struct
 
   let primitive_record () = test primitive_record_schema [ primitive_record_c ]
   let type_alias () = test type_alias_schema [ type_alias_c ]
+  let record_voidptr () = test record_voidptr_schema [ record_voidptr_c ]
 end
 
 let () =
@@ -51,5 +63,6 @@ let () =
         [
           test_case "type alias" `Quick Generate_types.type_alias;
           test_case "record" `Quick Generate_types.primitive_record;
+          test_case "voidptr" `Quick Generate_types.record_voidptr;
         ] );
     ]

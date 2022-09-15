@@ -2,6 +2,7 @@ open Base
 
 type t =
   | Atom of string
+  | Pointer of t
   | Struct of { fields : (string * t) list }
 [@@deriving show]
 
@@ -20,6 +21,9 @@ module Of = Schema.Walk (struct
   type t = res
 
   let make name = (Atom name, Marks.empty)
+
+  (* Shallow primitive types *)
+  let ignore () = make "void"
 
   (* XXX: bit width *)
   let int () = make "int"
@@ -65,15 +69,24 @@ module Of = Schema.Walk (struct
     t
 
   let union _ = failwith "unimplemented: union "
-  let any _ = failwith "unimplemented: any "
-  let bool _ = failwith "unimplemented: bool "
-  let float _ = failwith "unimplemented: float "
+
+  let any () =
+    let void, marks = ignore () in
+    (Pointer void, marks)
+
+  (* #include <stdbool.h>*)
+  (* "bool" *)
+  let bool () = make "bool"
+
+  (* XXX *)
+  let float () = make "double"
   let date _ = failwith "unimplemented: date "
   let mapping _ = failwith "unimplemented: mapping "
-  let ignore _ = failwith "unimplemented: ignore "
-  let int64 _ = failwith "unimplemented: int64 "
+
+  (* header? *)
+  let int64 () = make "int16_t"
   let list _ = failwith "unimplemented: list "
-  let null _ = failwith "unimplemented: null "
+  let null () = failwith "unimplemented: null "
   let nullable _ = failwith "unimplemented: nullable "
   let string _ = failwith "unimplemented: string "
   let string_const _ = failwith "unimplemented: string_const "
@@ -111,6 +124,8 @@ let pp ?(indent = 2) fmt ts =
       in
       match ts with
       | Atom s -> const string s
+      | Pointer t ->
+        const char '(' ++ const pp t ++ const char ')' ++ const char '*'
       | Struct { fields; _ } -> const object_ fields
     in
     printer fmt ()
