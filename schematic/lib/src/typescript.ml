@@ -115,6 +115,7 @@ module Of = Schema.Walk (struct
     (fields, Marks.merge (rest_marks :: marks))
 
   let field_outline name required (schema, marks) (rest, rest_marks) =
+    Fmt.epr "field_outline %S %b@." name required;
     ( List.map ~f:(List.cons (name, schema, required)) rest,
       Marks.merge [ marks; rest_marks ] )
 
@@ -223,6 +224,7 @@ let pp ?(indent = 2) fmt ts =
         ++ sp ++ const char ']'
       and object_ =
         let field f (name, v, required) =
+          Fmt.epr "field %S %b@." name required;
           let pp =
             box ~indent
             @@ Fmt.pair
