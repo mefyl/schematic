@@ -1,3 +1,4 @@
-_opam*
-.merlin
 _build
+_opam
+node_modules
+yarn.lock
