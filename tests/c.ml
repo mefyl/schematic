@@ -36,9 +36,25 @@ type record_voidptr = {
 }
 [@@deriving schema]
 
+(* FIXME: we should probably have a tag. *)
 let record_voidptr_c = ("record_voidptr", {|
 struct {
   (void)* foo;
+}
+|})
+
+type wrapper = {
+  somevar : int;
+  r : primitive_record;
+}
+[@@deriving schema]
+
+(* XXX: pointers? *)
+let wrapper_c =
+  ("wrapper", {|
+struct {
+  int somevar;
+  primitive_record r;
 }
 |})
 
@@ -53,6 +69,9 @@ module Generate_types = struct
   let primitive_record () = test primitive_record_schema [ primitive_record_c ]
   let type_alias () = test type_alias_schema [ type_alias_c ]
   let record_voidptr () = test record_voidptr_schema [ record_voidptr_c ]
+
+  (* XXX: order? *)
+  let nested () = test wrapper_schema [ wrapper_c; primitive_record_c ]
 end
 
 let () =
@@ -64,5 +83,6 @@ let () =
           test_case "type alias" `Quick Generate_types.type_alias;
           test_case "record" `Quick Generate_types.primitive_record;
           test_case "voidptr" `Quick Generate_types.record_voidptr;
+          test_case "nested record" `Quick Generate_types.nested;
         ] );
     ]

@@ -8,11 +8,13 @@ type t =
 
 type c = t
 
+let normalize_id s = s
+
 include Marks.Make (struct
   type t = c
 
   (* potential FIXME (check valid identifiers in C) *)
-  let normalize_id s = s
+  let normalize_id = normalize_id
 end)
 
 module Of = Schema.Walk (struct
@@ -32,7 +34,10 @@ module Of = Schema.Walk (struct
     Fmt.epr "id: %a\n@." Fmt.(option string) id;
     match parametric with
     | Some parametric -> parametric ()
-    | None -> ( match id with None -> s () | Some _id -> failwith "oh no id")
+    | None -> (
+      match id with
+      | None -> s ()
+      | Some id -> (Atom (normalize_id id), Marks.make id s))
 
   let parametric template_name _args _effective _t =
     Fmt.pr "tn: %s@." template_name;
