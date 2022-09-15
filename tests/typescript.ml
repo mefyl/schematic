@@ -6,6 +6,8 @@ module Schemas_library = struct
   let v = V
 end
 
+type 'a hidden_option = 'a option [@@deriving schema]
+
 type record = {
   a : int;
   inline : inline; [@schematic.inline]
@@ -25,6 +27,10 @@ and tuple = string * int64 * unit
 and variant =
   | Record of record
   | Otherwise of { i : int }
+
+and option_option = { oo : int option option }
+
+and option_default = { od : int option hidden_option [@default None] }
 [@@deriving schema]
 
 let tuple_typescript = ("Tuple", "[ string, number, null ]")
@@ -198,6 +204,16 @@ module Generate_types = struct
         ( "Computed",
           {|{ "x": number; "y": number; "ratio"?: number; "sum": number }|} );
       ]
+
+  let option_option () =
+    test option_option_schema [ ("OptionOption", {|{ "oo"?: number | null }|}) ]
+
+  let option_default () =
+    test option_default_schema
+      [
+        ("OptionDefault", {|{ "od"?: HiddenOption }|});
+        ("HiddenOption", {|number | null | null|});
+      ]
 end
 
 let () =
@@ -218,5 +234,7 @@ let () =
           test_case "inline-keyed-variant" `Quick
             Generate_types.inline_keyed_variant;
           test_case "computed" `Quick Generate_types.computed;
+          test_case "option option" `Quick Generate_types.option_option;
+          test_case "option option" `Quick Generate_types.option_default;
         ] );
     ]
