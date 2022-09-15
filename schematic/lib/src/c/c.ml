@@ -1,10 +1,5 @@
 open Base
-
-type t =
-  | Atom of string
-  | Pointer of t
-  | Struct of { fields : (string * t) list }
-[@@deriving show]
+include C_intf
 
 type c = t
 
@@ -74,10 +69,7 @@ module Of = Schema.Walk (struct
     t
 
   let union _ = failwith "unimplemented: union "
-
-  let any () =
-    let void, marks = ignore () in
-    (Pointer void, marks)
+  let any () = failwith "unimpl: nay"
 
   (* #include <stdbool.h>*)
   (* "bool" *)
@@ -129,53 +121,15 @@ let pp ?(indent = 2) fmt ts =
       in
       match ts with
       | Atom s -> const string s
-      | Pointer t ->
-        const char '(' ++ const pp t ++ const char ')' ++ const char '*'
       | Struct { fields; _ } -> const object_ fields
     in
     printer fmt ()
   in
   pp fmt ts
 
-let to_string = Fmt.to_to_string pp
+let to_c_type_expression = Fmt.to_to_string pp
 
-module C_coding : Coding.IMPL with type t = unit = struct
-  type t = unit
+include C_codegen
 
-  let key_get =
-    let f _o _f = Result.fail "unimpl" in
-    `Custom f
-
-  let key_set =
-    let f _o _f _v = Result.fail "unimpl" in
-    `Custom f
-
-  let null _ = failwith "unimpl"
-  let of_bool _ = failwith "unimpl"
-  let of_date = `Custom (failwith "unimpl")
-  let of_fields _ = failwith "unimpl"
-  let of_float _ = failwith "unimpl"
-  let of_int _ = failwith "unimpl"
-  let of_int64 _ = failwith "unimpl"
-  let of_json _ = failwith "unimpl"
-  let of_list _ = failwith "unimpl"
-  let of_option _ = failwith "unimpl"
-  let of_string _ = failwith "unimpl"
-  let of_time _ = failwith "unimpl"
-  let of_time_local _ = failwith "unimpl"
-  let to_bool _ = failwith "unimpl"
-  let to_date = `Custom (failwith "unimpl")
-  let to_fields _ = failwith "unimpl"
-  let to_float _ = failwith "unimpl"
-  let to_int _ = failwith "unimpl"
-  let to_int64 _ = failwith "unimpl"
-  let to_json _ = failwith "unimpl"
-  let to_list _ = failwith "unimpl"
-  let to_option _ = failwith "unimpl"
-  let to_string _ = failwith "unimpl"
-  let to_time _ = failwith "unimpl"
-  let to_time_local _ = failwith "unimpl"
-  let type_name _ = failwith "unimpl"
-end
-
-module Coding = Coding.Make (C_coding)
+let to_of_caml_src name c = Fmt.to_to_string pp_of_caml_converter (name, c)
+let to_to_caml_src name c = Fmt.to_to_string pp_to_caml_converter (name, c)

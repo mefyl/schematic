@@ -1,0 +1,9 @@
+(test
+ (name c)
+ (package schematic)
+ ; This is an example, we don't actually want zlib
+ (link_flags -cclib -lz)
+ (modules c)
+ (preprocess
+  (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
+ (libraries alcotest schematic))
