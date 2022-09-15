@@ -347,7 +347,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         type req t. (t, req) Schema.field -> req -> (string * Coding.t) option =
      fun { name; requirement; schema; _ } ->
       let compare = Schema.(compare (field_schema schema))
-      and encode = encode (Schema.field_schema schema).descriptor in
+      and encode = encode_schema (Schema.field_schema schema) in
       let optional v =
         match v with None -> None | Some v -> Some (name, encode v)
       in
@@ -359,35 +359,36 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         fun v -> if compare v default = 0 then None else Some (name, encode v)
       | Optional -> optional
       | Required -> fun v -> Some (name, encode v)
-    and encode : type t. t Schema.descriptor -> t -> Coding.t =
-     fun schema ->
+    and encode_descriptor :
+        type t. string option -> t Schema.descriptor -> t -> Coding.t =
+     fun id schema ->
       match schema with
       | Any -> Coding.of_json
       | Bool -> Coding.of_bool
       | Date -> (
         match Coding.of_date with
-        | `Generic -> encode date_tuple_schema.descriptor
+        | `Generic -> encode_schema date_tuple_schema
         | `Custom f -> f)
       | Fixpoint s ->
         (* Break infinite recursion. Would be better to have a fixpoint here
            too. *)
-        fun v -> encode (Lazy.force s) v
+        fun v -> encode_descriptor id (Lazy.force s) v
       | Float -> Coding.of_float
       | Ignore -> Coding.null
       | Int -> Coding.of_int
       | Int64 -> Coding.of_int64
       | List items_schema ->
-        let f = encode items_schema.descriptor in
+        let f = encode_schema items_schema in
         fun v -> Coding.of_list (List.map ~f v)
       | Map { encode = decons; descriptor; _ } ->
-        let encode = encode descriptor in
+        let encode = encode_descriptor id descriptor in
         fun v -> encode @@ decons v
       | Null -> Coding.null
       | Nullable s ->
-        let encode = encode s.descriptor in
+        let encode = encode_schema s in
         fun v -> Option.map ~f:encode v |> Coding.of_option
       | Mapping fields_schema ->
-        let encode = encode fields_schema.descriptor in
+        let encode = encode_schema fields_schema in
         fun v ->
           Coding.of_fields (List.map ~f:(fun (name, v) -> (name, encode v)) v)
       | Object o ->
@@ -403,7 +404,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
             function
             | ItemEnd -> fun _ -> []
             | Item { schema; rest } ->
-              let encode = encode schema.descriptor
+              let encode = encode_schema schema
               and encode_rest = encode_tuple rest in
               fun v ->
                 let hd, tl = v in
@@ -420,7 +421,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       | Union { cases; key } -> (
         let cases =
           let f (Schema.Case { encoder; name; schema; _ }) =
-            let encode = encode schema.descriptor in
+            let encode = encode_schema schema in
             fun v ->
               match encoder v with
               | Some v -> (
@@ -441,9 +442,14 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         fun v ->
           match List.find_map ~f:(fun case -> case v) cases with
           | Some res -> res
-          | None -> failwith "unmatched variant schema case")
+          | None ->
+            Fmt.failwith "unmatched variant case in schema %a"
+              Fmt.(option string)
+              id)
+    and encode_schema : type t. t Schema.t -> t -> Coding.t =
+     fun schema v -> encode_descriptor schema.id schema.descriptor v
     in
-    encode schema.Schema.descriptor
+    encode_schema schema
 end
 
 module type STR = sig
