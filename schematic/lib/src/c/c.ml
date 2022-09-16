@@ -62,7 +62,8 @@ module Of = Schema.Walk (struct
       match ast with
       | (Atom "int" | Atom "char") as prim -> prim
       | Atom _ as nonprim -> Pointer nonprim
-      | _ -> failwith "nah"
+      | Pointer (Atom _) as p -> p
+      | _ as x -> failwith (Fmt.str "nah: %a" pp x)
     in
 
     (* FIXME: generate a new struct definition on the fly... *)

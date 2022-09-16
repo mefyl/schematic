@@ -20,3 +20,4 @@ type wrapper = {
 
 type type_alias = int [@@deriving schema, show, eq]
 type string_wrapper = string [@@deriving schema, show, eq]
+type diverse = { s : string } [@@deriving schema, show, eq] [@@boxed]

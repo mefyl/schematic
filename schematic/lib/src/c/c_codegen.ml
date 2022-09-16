@@ -21,6 +21,7 @@ let pp_of_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
                Fmt.epr "field_type: %a\n" C_intf.pp field_type;
                let conv_fn =
                  match field_type with
+                 | Pointer (Atom "char") -> of_caml_name_for "string"
                  | Atom typename | Pointer (Atom typename) ->
                    of_caml_name_for typename
                  | _ -> failwith "unsupported nested type COIN"
@@ -65,6 +66,7 @@ let pp_to_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
         |> List.mapi ~f:(fun i (field_name, field_type) ->
                let conv_fn =
                  match field_type with
+                 | Pointer (Atom "char") -> to_caml_name_for "string"
                  | Atom typename | Pointer (Atom typename) ->
                    to_caml_name_for typename
                  | _ -> failwith "unsupported nested type"

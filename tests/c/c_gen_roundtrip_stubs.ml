@@ -3,6 +3,7 @@ open C_test_types
 
 let headers =
   {|#define CAML_NAME_SPACE
+#include <string.h>
 #include <caml/alloc.h>
 #include <caml/memory.h>
 #include <caml/mlvalues.h>
@@ -18,9 +19,25 @@ value int_to_caml(int x) {
 int int_of_caml(value x) {
   return Int_val(x);
 }
+
+value string_to_caml(char* p) {
+  CAMLparam0();
+  CAMLlocal1(v);
+  v = caml_copy_string(p);
+  CAMLreturn(v);
+}
+
+char* string_of_caml(value v) {
+  CAMLparam1(v);
+  char* p = strdup(String_val(v));
+  CAMLreturnT(char*, p);
+}
 |}
 
-let ctypes = Schematic.C.of_schema wrapper_schema |> List.rev
+(* XXX : dedup & smarter order... *)
+let ctypes =
+  Schematic.C.of_schema wrapper_schema @ Schematic.C.of_schema diverse_schema
+  |> List.rev
 
 let typedefs =
   ctypes
@@ -51,6 +68,15 @@ CAMLprim value sch_wrapper_rt_id(value v) {
   CAMLlocal1(ret);
   wrapper* p = wrapper_of_caml(v);
   ret = wrapper_to_caml(p);
+  CAMLreturn(ret);
+}
+
+
+CAMLprim value sch_diverse_rt_id(value v) {
+  CAMLparam1(v);
+  CAMLlocal1(ret);
+  wrapper* p = diverse_of_caml(v);
+  ret = diverse_to_caml(p);
   CAMLreturn(ret);
 }
 
