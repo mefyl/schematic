@@ -24,7 +24,7 @@ module Of = Schema.Walk (struct
 
   (* XXX: bit width *)
   let int () = make "int"
-  let string () = failwith "string"
+  let string () = (Pointer (Atom "char"), Marks.empty)
 
   let schema (id : string option) parametric s =
     Fmt.epr "id: %a\n@." Fmt.(option string) id;

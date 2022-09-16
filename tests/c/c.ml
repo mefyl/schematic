@@ -70,6 +70,12 @@ struct {
 }
 |})
 
+type string_wrapper = string [@@deriving schema]
+
+let string_wrapper_c = ("string_wrapper", {|
+char*
+|})
+
 let pretty_string =
   let pp_string ppf x = Fmt.pf ppf "{|\n%s\n|}" x in
   Alcotest.testable pp_string String.( = )
@@ -87,6 +93,7 @@ module Generate_types = struct
   let primitive_record () = test primitive_record_schema [ primitive_record_c ]
   let type_alias () = test type_alias_schema [ type_alias_c ]
   let nested () = test wrapper_schema [ wrapper_c; primitive_record_c ]
+  let string () = test string_wrapper_schema [ string_wrapper_c ]
 end
 
 module Of_caml = struct
@@ -120,6 +127,7 @@ let () =
           test_case "type alias" `Quick Generate_types.type_alias;
           test_case "record" `Quick Generate_types.primitive_record;
           test_case "nested record" `Quick Generate_types.nested;
+          test_case "string" `Quick Generate_types.string;
         ] );
       ( "of_caml",
         [ test_case "primitive_record" `Quick Of_caml.primitive_record ] );
