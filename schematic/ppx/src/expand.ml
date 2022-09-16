@@ -469,14 +469,20 @@ let versioned versioned unversioned =
 let version_match ~loc ~f init options =
   let f next = function
     | schema, None -> f schema
-    | schema, Some (Semver.{ major; minor; patch; _ }, op) ->
+    | schema, Some (Semver.{ major; minor; patch; prerelease; build }, op) ->
       let module Ast_builder = Ast_builder.Make (struct
         let loc = loc
       end) in
       let version =
         [%expr
-          Schematic.Version.make [%e Ast_builder.eint major]
-            [%e Ast_builder.eint minor] [%e Ast_builder.eint patch]]
+          Schematic.Version.make
+            ~prerelease:
+              [%e
+                Ast_builder.elist @@ List.map ~f:Ast_builder.estring prerelease]
+            ~build:
+              [%e Ast_builder.elist @@ List.map ~f:Ast_builder.estring build]
+            [%e Ast_builder.eint major] [%e Ast_builder.eint minor]
+            [%e Ast_builder.eint patch]]
       and predicate =
         match op with
         | `Eq -> [%expr Schematic.Version.equal]

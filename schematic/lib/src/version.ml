@@ -10,9 +10,9 @@ let sexp_of_t = function
           Atom (Int.to_string patch);
         ])
 
-let make major minor patch =
+let make ?(prerelease = []) ?(build = []) major minor patch =
   Base.Option.value_exn ~here:[%here]
-    (Semver.from_parts major minor patch [] [])
+    (Semver.from_parts major minor patch prerelease build)
 
 include Base.Comparable.Make (struct
   include Semver
