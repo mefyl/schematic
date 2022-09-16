@@ -12,7 +12,7 @@ include Marks.Make (struct
   let normalize_id = normalize_id
 end)
 
-module Of = Schema.Walk (struct
+module Of = Cwalk.Walk (struct
   type res = t * Marks.t
   type fields = (string * t) list * Marks.t
   type t = res
@@ -29,11 +29,18 @@ module Of = Schema.Walk (struct
   let schema (id : string option) parametric s =
     Fmt.epr "id: %a\n@." Fmt.(option string) id;
     match parametric with
-    | Some parametric -> parametric ()
+    | Some parametric ->
+      Fmt.epr "parametric\n";
+      parametric ()
     | None -> (
+      Fmt.epr "not parametric\n";
       match id with
-      | None -> s ()
-      | Some id -> (Atom (normalize_id id), Marks.make id s))
+      | None ->
+        Fmt.epr "no id\n";
+        s ()
+      | Some id ->
+        Fmt.epr "has id: %s\n" id;
+        (Atom (normalize_id id), Marks.make id s))
 
   let parametric template_name _args _effective _t =
     Fmt.epr "tn: %s@." template_name;
@@ -72,12 +79,28 @@ module Of = Schema.Walk (struct
   let object_ ((fields_cases, marks) : fields) =
     (Struct { fields = fields_cases }, marks)
 
+  (* XXX: handling case/union with this walker is weird *)
+
+  let string_const s =
+    (* failwith ("unimplemented: string_const " ^ s) *)
+    (Constant s, Marks.empty)
+
   let case key name t =
-    Fmt.epr "case key: %a" Fmt.(option string) key;
-    Fmt.epr "case name: %s" name;
+    Fmt.epr "case key: %a\n" Fmt.(option string) key;
+    Fmt.epr "case name: %s\n" name;
+    Fmt.epr "case t: %a\n@." Fmt.(pair pp nop) t;
     t
 
-  let union _ = failwith "unimplemented: union "
+  let union id cases =
+    let marks = cases |> List.map ~f:snd |> Marks.merge in
+    Fmt.epr "cases: %a@." Fmt.(list (pair pp nop)) cases;
+
+    let constructors =
+      cases |> List.map ~f:(function Constant s, _ -> (s, Constant s))
+    in
+    (* let t, marks = List.unzip cases in (Union t, Marks.merge marks) *)
+    (Variant (Option.value_exn id, constructors), marks)
+
   let any () = failwith "unimpl: nay"
 
   (* #include <stdbool.h>*)
@@ -94,7 +117,6 @@ module Of = Schema.Walk (struct
   let list _ = failwith "unimplemented: list "
   let null () = failwith "unimplemented: null "
   let nullable _ = failwith "unimplemented: nullable "
-  let string_const _ = failwith "unimplemented: string_const "
   let time _ = failwith "unimplemented: time "
   let time_local _ = failwith "unimplemented: time_local "
   let tuple _ = failwith "unimplemented: tuple "
@@ -103,9 +125,9 @@ end)
 (* XXX: copied from TypeScript, might be generalizable? *)
 let mark_of_schema Schema.{ id; descriptor; parametric } =
   match parametric with
-  | None -> (Option.value_exn ~here:[%here] id, lazy (Of.descriptor descriptor))
-  | Some parametric ->
-    (Option.value_exn ~here:[%here] id, lazy (Of.parametric parametric))
+  | None ->
+    (Option.value_exn ~here:[%here] id, lazy (Of.descriptor id descriptor))
+  | Some parametric -> failwith "no parametrics yet"
 
 let of_schema marks s = of_mark marks @@ mark_of_schema s
 let of_schema schema = of_schema Marks.empty schema |> fst
@@ -115,23 +137,55 @@ let force fmt _ = Caml.Format.pp_force_newline fmt ()
 let non_ptr = [ "int"; "char"; "bool" ]
 
 (* XXX: Butchering the boxing logic while I learn it. *)
+
 let pp ?(indent = 2) fmt ts =
   let rec pp fmt ts =
     let printer =
       let open Fmt in
-      let object_ =
-        let field f (name, v) =
-          let pp = box (Fmt.pair ~sep:sp (hvbox pp) Fmt.string) in
-          pp f (v, name ^ ";")
+      let struct_or_union_field f (name, v) =
+        let open Fmt in
+        let pp = box (Fmt.pair ~sep:sp (hvbox pp) Fmt.string) in
+        pp f (v, name ^ ";")
+      in
+
+      let variant ?(indent = 2) fmt (name, constructors) =
+        let is_basic =
+          List.for_all
+            ~f:(function _, Constant _ -> true | _ -> false)
+            constructors
         in
+        let variant_names = List.map ~f:fst constructors in
+
+        (* An enum declaring each constructor of the variant. This is totally
+           independent of whether there is a payload associated with those
+           constructors. *)
+        let enum =
+          const string "enum {" ++ force ++ sps indent
+          ++ (vbox
+             @@ const
+                  (list
+                     ~sep:(const char ',' ++ force)
+                     (fun fmt -> Fmt.fmt "%s_%s" fmt name))
+                  variant_names)
+          ++ sp ++ const char '}'
+        in
+
+        let printer =
+          if is_basic then enum else failwith "no support for payloads yet"
+        in
+        printer fmt ()
+      in
+
+      let object_ =
         const string "struct {" ++ force ++ sps indent
-        ++ (vbox @@ list ~sep:force field)
+        ++ (vbox @@ list ~sep:force struct_or_union_field)
         ++ sp ++ const char '}'
       in
       match ts with
       | Atom s -> const string s
       | Pointer t -> const pp t ++ const char '*'
       | Struct { fields; _ } -> const object_ fields
+      | Variant v -> const variant v
     in
     printer fmt ()
   in
