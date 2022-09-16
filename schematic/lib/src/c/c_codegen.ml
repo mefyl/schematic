@@ -34,6 +34,7 @@ let pp_of_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
       let statement = Fmt.fmt "%s" in
       const (vbox @@ list ~sep:semi statement) statements ++ const char ';'
     | Atom _s -> failwith "a"
+    | Pointer _ -> failwith "ptr"
   in
 
   let decl = Fmt.str "%s %s(value v)" ptr_type c_function_name in
@@ -80,6 +81,7 @@ let pp_to_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
       let statement = Fmt.fmt "%s" in
       const (vbox @@ list ~sep:semi statement) statements ++ const char ';'
     | Atom _s -> failwith "a"
+    | Pointer _ -> failwith "ptr"
   in
 
   let decl = Fmt.str "value %s(%s p)" c_function_name ptr_type in

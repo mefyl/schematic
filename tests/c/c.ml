@@ -62,12 +62,11 @@ type wrapper = {
 }
 [@@deriving schema]
 
-(* FIXME: use a pointer *)
 let wrapper_c =
   ("wrapper", {|
 struct {
   int somevar;
-  primitive_record r;
+  primitive_record* r;
 }
 |})
 

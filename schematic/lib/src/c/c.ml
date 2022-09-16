@@ -24,6 +24,7 @@ module Of = Schema.Walk (struct
 
   (* XXX: bit width *)
   let int () = make "int"
+  let string () = failwith "string"
 
   let schema (id : string option) parametric s =
     Fmt.epr "id: %a\n@." Fmt.(option string) id;
@@ -57,6 +58,13 @@ module Of = Schema.Walk (struct
 
     let marks = Marks.merge [ marks; rest_marks ] in
 
+    let ast =
+      match ast with
+      | (Atom "int" | Atom "char") as prim -> prim
+      | Atom _ as nonprim -> Pointer nonprim
+      | _ -> failwith "nah"
+    in
+
     (* FIXME: generate a new struct definition on the fly... *)
     ((name, ast) :: rest_ast, marks)
 
@@ -85,7 +93,6 @@ module Of = Schema.Walk (struct
   let list _ = failwith "unimplemented: list "
   let null () = failwith "unimplemented: null "
   let nullable _ = failwith "unimplemented: nullable "
-  let string _ = failwith "unimplemented: string "
   let string_const _ = failwith "unimplemented: string_const "
   let time _ = failwith "unimplemented: time "
   let time_local _ = failwith "unimplemented: time_local "
@@ -104,6 +111,7 @@ let of_schema schema = of_schema Marks.empty schema |> fst
 (* End of shameless copy *)
 
 let force fmt _ = Caml.Format.pp_force_newline fmt ()
+let non_ptr = [ "int"; "char"; "bool" ]
 
 (* XXX: Butchering the boxing logic while I learn it. *)
 let pp ?(indent = 2) fmt ts =
@@ -121,6 +129,7 @@ let pp ?(indent = 2) fmt ts =
       in
       match ts with
       | Atom s -> const string s
+      | Pointer t -> const pp t ++ const char '*'
       | Struct { fields; _ } -> const object_ fields
     in
     printer fmt ()
