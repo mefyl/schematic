@@ -85,19 +85,26 @@ module Of = Cwalk.Walk (struct
     (* failwith ("unimplemented: string_const " ^ s) *)
     (Constant s, Marks.empty)
 
-  let case key name t =
+  let case key name (c, marks) =
     Fmt.epr "case key: %a\n" Fmt.(option string) key;
     Fmt.epr "case name: %s\n" name;
-    Fmt.epr "case t: %a\n@." Fmt.(pair pp nop) t;
-    t
+    Fmt.epr "case c: %a\n@." pp c;
+    (* match t with | Constant t -> t | *)
+    (Case (name, c), marks)
 
+  (* FIXME: no failwith :( *)
   let union id cases =
     let marks = cases |> List.map ~f:snd |> Marks.merge in
     Fmt.epr "cases: %a@." Fmt.(list (pair pp nop)) cases;
 
-    let constructors =
-      cases |> List.map ~f:(function Constant s, _ -> (s, Constant s))
+    let f = function
+      | Case (s, x), _ -> (s, x)
+      | x, _ ->
+        Fmt.epr "PAAHA %a\n@." pp x;
+        failwith "naa"
     in
+
+    let constructors = cases |> List.map ~f in
     (* let t, marks = List.unzip cases in (Union t, Marks.merge marks) *)
     (Variant (Option.value_exn id, constructors), marks)
 
@@ -133,22 +140,32 @@ let of_schema marks s = of_mark marks @@ mark_of_schema s
 let of_schema schema = of_schema Marks.empty schema |> fst
 (* End of shameless copy *)
 
-let force fmt _ = Caml.Format.pp_force_newline fmt ()
-let non_ptr = [ "int"; "char"; "bool" ]
-
 (* XXX: Butchering the boxing logic while I learn it. *)
 
 let pp ?(indent = 2) fmt ts =
   let rec pp fmt ts =
     let printer =
       let open Fmt in
+      let braced lhs inner : _ Fmt.t =
+        (vbox ~indent @@ (lhs ++ const string " {" ++ cut ++ inner))
+        ++ cut ++ const char '}'
+      in
+
       let struct_or_union_field f (name, v) =
         let open Fmt in
         let pp = box (Fmt.pair ~sep:sp (hvbox pp) Fmt.string) in
         pp f (v, name ^ ";")
       in
 
-      let variant ?(indent = 2) fmt (name, constructors) =
+      let struct_ : (string * _) list Fmt.t =
+        braced (const string "struct") (list ~sep:cut struct_or_union_field)
+      in
+
+      let union_ : (string * _) list Fmt.t =
+        braced (const string "union") (list ~sep:cut struct_or_union_field)
+      in
+
+      let variant fmt (name, constructors) =
         let is_basic =
           List.for_all
             ~f:(function _, Constant _ -> true | _ -> false)
@@ -160,31 +177,39 @@ let pp ?(indent = 2) fmt ts =
            independent of whether there is a payload associated with those
            constructors. *)
         let enum =
-          const string "enum {" ++ force ++ sps indent
-          ++ (vbox
-             @@ const
-                  (list
-                     ~sep:(const char ',' ++ force)
-                     (fun fmt -> Fmt.fmt "%s_%s" fmt name))
-                  variant_names)
-          ++ sp ++ const char '}'
+          let tag_suffix = if is_basic then "" else "_tag" in
+          braced (const string "enum")
+            (const
+               (list
+                  ~sep:(const char ',' ++ cut)
+                  (fun fmt s -> Fmt.fmt "%s_%s%s" fmt name s tag_suffix))
+               variant_names)
         in
 
         let printer =
-          if is_basic then enum else failwith "no support for payloads yet"
+          if is_basic then enum
+          else
+            let tag_field = enum ++ const string " tag;" in
+            let payload_field =
+              const union_
+                (constructors
+                |> List.filter ~f:(function
+                     | _, Constant _ -> false
+                     | _ -> true))
+              ++ const string " payload;"
+            in
+            let inner = tag_field ++ cut ++ payload_field in
+
+            (* Kind of a special case of struct... *)
+            braced (const string "struct") inner
         in
         printer fmt ()
       in
 
-      let object_ =
-        const string "struct {" ++ force ++ sps indent
-        ++ (vbox @@ list ~sep:force struct_or_union_field)
-        ++ sp ++ const char '}'
-      in
       match ts with
       | Atom s -> const string s
       | Pointer t -> const pp t ++ const char '*'
-      | Struct { fields; _ } -> const object_ fields
+      | Struct { fields; _ } -> const struct_ fields
       | Variant v -> const variant v
     in
     printer fmt ()

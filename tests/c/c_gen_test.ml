@@ -89,6 +89,21 @@ enum {
 }
 |})
 
+let payload_variant_c =
+  ( "payload_variant",
+    {|
+struct {
+  enum {
+    payload_variant_nothing_tag,
+    payload_variant_someint_tag
+  } tag;
+  union {
+    int someint;
+  } payload;
+}
+|}
+  )
+
 let pretty_string =
   let pp_string ppf x = Fmt.pf ppf "{|\n%s\n|}" x in
   Alcotest.testable pp_string String.( = )
@@ -107,12 +122,8 @@ module Generate_types = struct
   let type_alias () = test type_alias_schema [ type_alias_c ]
   let nested () = test wrapper_schema [ wrapper_c; primitive_record_c ]
   let string () = test string_wrapper_schema [ string_wrapper_c ]
-
-  let basic_variant () =
-    Fmt.pr "basic_variant_schema id: %a\n"
-      Fmt.(option string)
-      basic_variant_schema.id;
-    test basic_variant_schema [ basic_variant_c ]
+  let basic_variant () = test basic_variant_schema [ basic_variant_c ]
+  let payload_variant () = test payload_variant_schema [ payload_variant_c ]
 end
 
 module Of_caml = struct
@@ -154,6 +165,7 @@ let () =
           test_case "nested record" `Quick Generate_types.nested;
           test_case "string" `Quick Generate_types.string;
           test_case "basic_variant" `Quick Generate_types.basic_variant;
+          test_case "payload_variant" `Quick Generate_types.payload_variant;
         ] );
       ( "of_caml",
         [
