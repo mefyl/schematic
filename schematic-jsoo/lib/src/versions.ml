@@ -1,9 +1,10 @@
-module V0_14_6 = struct
+module V0_14_7 = struct
   module Json = Json
   module Jsoo = Jsoo
   module Schemas = Schemas
 end
 
+module V0_14_6 = V0_14_7
 module V0_14_5 = V0_14_6
 module V0_14_4 = V0_14_5
 module V0_14_3 = V0_14_4
