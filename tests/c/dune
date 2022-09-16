@@ -1,9 +1,47 @@
-(test
- (name c)
- (package schematic)
- ; This is an example, we don't actually want zlib
- (link_flags -cclib -lz)
- (modules c)
+(library
+ (name c_test_types)
+ (modules c_test_types)
  (preprocess
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
- (libraries alcotest schematic))
+ (libraries schematic))
+
+(test
+ (name c_gen_test)
+ (package schematic)
+ (modules c_gen_test)
+ (preprocess
+  (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
+ (libraries alcotest schematic c_test_types))
+
+(executable
+ (name c_gen_roundtrip_stubs)
+ (modules c_gen_roundtrip_stubs)
+ (libraries alcotest schematic c_test_types))
+
+(rule
+ (target c_roundtrip_stubs.c)
+ (deps (universe))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{dep:c_gen_roundtrip_stubs.exe}))))
+
+; (rule
+;  (deps c_roundtrip_stubs.c)
+;  (target c_roundtrip_stubs.o)
+;  (action
+;   (progn
+;    (run gcc -c -I %{ocaml_where} c_roundtrip_stubs.c -o %{target}))))
+
+(test
+ (name c_roundtrip)
+ (package schematic)
+ (modes exe)
+ (deps c_roundtrip_stubs.o (universe))
+ (foreign_stubs
+  (language c)
+  (names c_roundtrip_stubs))
+ (modules c_roundtrip)
+ (preprocess
+  (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
+ (libraries alcotest schematic c_test_types))

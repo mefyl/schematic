@@ -18,7 +18,7 @@ let pp_of_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
       let field_stores =
         fields
         |> List.mapi ~f:(fun i (field_name, field_type) ->
-               Fmt.pr "field_type: %a\n" C_intf.pp field_type;
+               Fmt.epr "field_type: %a\n" C_intf.pp field_type;
                let conv_fn =
                  match field_type with
                  | Atom typename | Pointer (Atom typename) ->
@@ -65,7 +65,8 @@ let pp_to_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
         |> List.mapi ~f:(fun i (field_name, field_type) ->
                let conv_fn =
                  match field_type with
-                 | Atom typename -> to_caml_name_for typename
+                 | Atom typename | Pointer (Atom typename) ->
+                   to_caml_name_for typename
                  | _ -> failwith "unsupported nested type"
                in
                Fmt.str "Store_field(v, %d, %s(p->%s))" i conv_fn field_name)

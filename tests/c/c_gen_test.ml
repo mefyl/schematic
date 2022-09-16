@@ -1,21 +1,10 @@
 open Base
-
-module Schemas_library = struct
-  type Schematic.Schema.library += V
-
-  let v = V
-end
+open C_test_types
 
 (* TODO: prefixing, for lack of namespacing *)
 
 (** typedef * RHS *)
 type test_case = string * string
-
-type primitive_record = {
-  a : int;
-  b : int;
-}
-[@@deriving schema]
 
 let primitive_record_c : test_case =
   ("primitive_record", {|
@@ -50,17 +39,9 @@ value primitive_record_to_caml(primitive_record* p) {
 }
 |}
 
-type type_alias = int [@@deriving schema]
-
 let type_alias_c = ("type_alias", {|
 int
 |})
-
-type wrapper = {
-  somevar : int;
-  r : primitive_record;
-}
-[@@deriving schema]
 
 let wrapper_c =
   ("wrapper", {|
@@ -81,7 +62,19 @@ wrapper* wrapper_of_caml(value v) {
 }
 |}
 
-type string_wrapper = string [@@deriving schema]
+let wrapper_to_caml =
+  {|
+value wrapper_to_caml(wrapper* p) {
+  CAMLparam0();
+  CAMLlocal1(v);
+  int n_fields = 2;
+  int tag = 0;
+  v = caml_alloc(n_fields, tag);
+  Store_field(v, 0, int_to_caml(p->somevar));
+  Store_field(v, 1, primitive_record_to_caml(p->r));
+  CAMLreturn(v);
+}
+|}
 
 let string_wrapper_c = ("string_wrapper", {|
 char*
@@ -130,6 +123,9 @@ module To_caml = struct
 
   let primitive_record () =
     test primitive_record_schema [ primitive_record_to_caml ]
+
+  let nested () =
+    test wrapper_schema [ wrapper_to_caml; primitive_record_to_caml ]
 end
 
 let () =
@@ -149,5 +145,8 @@ let () =
           test_case "nested record" `Quick Of_caml.nested;
         ] );
       ( "to_caml",
-        [ test_case "primitive_record" `Quick To_caml.primitive_record ] );
+        [
+          test_case "primitive_record" `Quick To_caml.primitive_record;
+          test_case "nested record" `Quick To_caml.nested;
+        ] );
     ]

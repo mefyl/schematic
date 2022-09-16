@@ -36,25 +36,25 @@ module Of = Schema.Walk (struct
       | Some id -> (Atom (normalize_id id), Marks.make id s))
 
   let parametric template_name _args _effective _t =
-    Fmt.pr "tn: %s@." template_name;
+    Fmt.epr "tn: %s@." template_name;
     failwith "parametric: unimpl"
 
   let fields_empty () =
-    Fmt.pr "fields_empty\n";
+    Fmt.epr "fields_empty\n";
     ([], Marks.empty)
 
   let field_inline _required fields _rest =
-    Fmt.pr "fields_inline\n";
+    Fmt.epr "fields_inline\n";
     List.hd_exn fields
 
   let field_outline (name : string) (_required : bool) ((ast, marks) : t)
       ((rest_ast, rest_marks) : fields) =
-    Fmt.pr "field_outline (name: %s)\n" name;
-    Fmt.pr "field_outline 'ast': %s\n" (show ast);
-    Fmt.pr "field_outline 'rest_ast': '%a'\n"
+    Fmt.epr "field_outline (name: %s)\n" name;
+    Fmt.epr "field_outline 'ast': %s\n" (show ast);
+    Fmt.epr "field_outline 'rest_ast': '%a'\n"
       Fmt.(list @@ pair string pp)
       rest_ast;
-    Fmt.pr "\n";
+    Fmt.epr "\n";
 
     let marks = Marks.merge [ marks; rest_marks ] in
 
@@ -72,8 +72,8 @@ module Of = Schema.Walk (struct
     (Struct { fields = fields_cases }, marks)
 
   let case key name t =
-    Fmt.pr "case key: %a" Fmt.(option string) key;
-    Fmt.pr "case name: %s" name;
+    Fmt.epr "case key: %a" Fmt.(option string) key;
+    Fmt.epr "case name: %s" name;
     t
 
   let union _ = failwith "unimplemented: union "

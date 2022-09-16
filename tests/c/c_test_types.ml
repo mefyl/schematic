@@ -1,0 +1,22 @@
+open Base
+
+module Schemas_library = struct
+  type Schematic.Schema.library += V
+
+  let v = V
+end
+
+type primitive_record = {
+  a : int;
+  b : int;
+}
+[@@deriving schema, show, eq]
+
+type wrapper = {
+  somevar : int;
+  r : primitive_record;
+}
+[@@deriving schema, show, eq]
+
+type type_alias = int [@@deriving schema, show, eq]
+type string_wrapper = string [@@deriving schema, show, eq]
