@@ -70,6 +70,17 @@ struct {
 }
 |})
 
+let wrapper_of_caml =
+  {|
+wrapper* wrapper_of_caml(value v) {
+  CAMLparam1(v);
+  wrapper* p = malloc(sizeof(*p));
+  p->somevar = int_of_caml(Field(v, 0));
+  p->r = primitive_record_of_caml(Field(v, 1));
+  CAMLreturnT(wrapper*, p);
+}
+|}
+
 type string_wrapper = string [@@deriving schema]
 
 let string_wrapper_c = ("string_wrapper", {|
@@ -105,6 +116,9 @@ module Of_caml = struct
 
   let primitive_record () =
     test primitive_record_schema [ primitive_record_of_caml ]
+
+  let nested () =
+    test wrapper_schema [ wrapper_of_caml; primitive_record_of_caml ]
 end
 
 module To_caml = struct
@@ -130,7 +144,10 @@ let () =
           test_case "string" `Quick Generate_types.string;
         ] );
       ( "of_caml",
-        [ test_case "primitive_record" `Quick Of_caml.primitive_record ] );
+        [
+          test_case "primitive_record" `Quick Of_caml.primitive_record;
+          test_case "nested record" `Quick Of_caml.nested;
+        ] );
       ( "to_caml",
         [ test_case "primitive_record" `Quick To_caml.primitive_record ] );
     ]
