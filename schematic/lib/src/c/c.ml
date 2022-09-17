@@ -170,7 +170,8 @@ let pp ?(indent = 2) fmt ts =
         let is_basic =
           List.for_all ~f:(function _, Void -> true | _ -> false) constructors
         in
-        let variant_names = List.map ~f:fst constructors in
+        let basic, rich = basic_rich_split constructors in
+        let variant_names = List.map ~f:fst basic @ List.map ~f:fst rich in
 
         (* An enum declaring each constructor of the variant. This is totally
            independent of whether there is a payload associated with those

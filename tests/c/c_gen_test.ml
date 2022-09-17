@@ -114,6 +114,7 @@ struct {
   enum {
     payload_variant_nothing_tag,
     payload_variant_nothing2_tag,
+    payload_variant_nothing3_tag,
     payload_variant_someint_tag
   } tag;
   union {
@@ -131,9 +132,9 @@ payload_variant payload_variant_of_caml(value v) {
   payload_variant res;
   if (Is_long(v)) {
     res.tag = Int_val(v);
-    assert(res.tag < 2);
+    assert(res.tag < 3);
   } else {
-    res.tag = 2 + Tag_val(v);
+    res.tag = 3 + Tag_val(v);
     assert(Tag_val(v) < 1);
     switch (Tag_val(v)) {
       case 0:
@@ -156,6 +157,9 @@ value payload_variant_to_caml(payload_variant x) {
       break;
     case payload_variant_nothing2_tag:
       v = Val_int(1);
+      break;
+    case payload_variant_nothing3_tag:
+      v = Val_int(2);
       break;
     case payload_variant_someint_tag:
       v = caml_alloc(1, 0);

@@ -32,4 +32,5 @@ type payload_variant =
   | Nothing
   | Nothing2
   | SomeInt of int
+  | Nothing3
 [@@deriving schema, show, eq]
