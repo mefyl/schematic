@@ -5,7 +5,7 @@ open C_intf
 let of_caml_name_for = Fmt.str "%s_of_caml"
 let to_caml_name_for = Fmt.str "%s_to_caml"
 
-(* TODO: - variants (with or without payloads - separate representations)
+(* TODO:
 
    - polymorphic variants (need to hash - prehash? interaction with main?) *)
 
@@ -50,28 +50,79 @@ let pp_of_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
           constructors
       in
 
-      let plain_case =
-        (* TODO: add assertion *)
-        let stmts =
-          [
-            Fmt.str "%s x = Int_val(v)" name;
-            Fmt.str "assert(x < %d)" (List.length plain_ctrs);
-            "return x";
-          ]
+      if List.is_empty rich_ctrs then
+        let plain_case =
+          let stmts =
+            [
+              Fmt.str "%s x = Int_val(v)" name;
+              Fmt.str "assert(x < %d)" (List.length plain_ctrs);
+              "return x";
+            ]
+          in
+          const pp_statements stmts
         in
-        const pp_statements stmts
-      in
-
-      if List.is_empty rich_ctrs then (false, plain_case)
+        (false, plain_case)
       else
-        let rich_case = const string "RICH" in
+        let plain_case =
+          const pp_statements
+            [
+              "res.tag = Int_val(v)";
+              Fmt.str "assert(res.tag < %d)" (List.length plain_ctrs);
+            ]
+        in
+
+        (* let foo = rich_ctrs |> List.mapi ~f:(fun i (name, typ) -> ) *)
+        let case : (int * (string * c)) Fmt.t =
+         fun fmt (i, (_field_name, c)) ->
+          let typename =
+            match c with Atom s -> s | _ -> failwith "unsupported"
+          in
+
+          vbox ~indent
+            (const string (Fmt.str "case %d:" i)
+            ++ cut
+            ++ const pp_statements
+                 [
+                   (* XXX: tuples will ruin the day. *)
+                   (* FIXME FIXME FIXME *)
+                   Fmt.str "res.payload = %s(Field(v, 0))"
+                     (of_caml_name_for typename);
+                   "break";
+                 ])
+            fmt ()
+        in
+
+        let rich_case =
+          let switch =
+            vbox ~indent
+              (const string "switch (res.tag) {"
+              ++ cut
+              ++ const (list ~sep:semi case)
+                   (rich_ctrs
+                   (* XXX: this must exist already? :( )*)
+                   |> List.mapi ~f:(fun i x -> (i, x))))
+            ++ cut ++ const char '}'
+          in
+          const pp_statements
+            [
+              "res.tag = Tag_val(v)";
+              Fmt.str "assert(res.tag < %d)" (List.length rich_ctrs);
+            ]
+          ++ cut ++ switch
+        in
+
         let open Fmt in
-        ( true,
+        ( false,
           vbox
-            (vbox ~indent (const string "if (Is_long(v)) {" ++ cut ++ plain_case)
+            (const pp_statements [ "CAMLparam1(v)"; Fmt.str "%s res" name ]
+            ++ cut
+            ++ vbox ~indent
+                 (const string "if (Is_long(v)) {" ++ cut ++ plain_case)
             ++ cut
             ++ vbox ~indent (const string "} else {" ++ cut ++ rich_case)
-            ++ cut ++ const char '}') )
+            ++ cut ++ const char '}')
+          ++ cut
+          ++ const pp_statements [ Fmt.str "CAMLreturnT(%s, res)" name ] )
     | x ->
       Fmt.epr "unsupported in of_caml: %a\n" pp x;
       failwith "unsupported"

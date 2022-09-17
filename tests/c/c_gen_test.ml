@@ -104,6 +104,7 @@ let payload_variant_c =
 struct {
   enum {
     payload_variant_nothing_tag,
+    payload_variant_nothing2_tag,
     payload_variant_someint_tag
   } tag;
   union {
@@ -112,6 +113,27 @@ struct {
 }
 |}
   )
+
+let payload_variant_of_caml =
+  {|
+payload_variant payload_variant_of_caml(value v) {
+  CAMLparam1(v);
+  payload_variant res;
+  if (Is_long(v)) {
+    res.tag = Int_val(v);
+    assert(res.tag < 2);
+  } else {
+    res.tag = Tag_val(v);
+    assert(res.tag < 1);
+    switch (res.tag) {
+      case 0:
+        res.payload = int_of_caml(Field(v, 0));
+        break;
+    }
+  }
+  CAMLreturnT(payload_variant, res);
+}
+|}
 
 let pretty_string =
   let pp_string ppf x = Fmt.pf ppf "{|\n%s\n|}" x in
@@ -149,6 +171,9 @@ module Of_caml = struct
     test wrapper_schema [ wrapper_of_caml; primitive_record_of_caml ]
 
   let basic_variant () = test basic_variant_schema [ basic_variant_of_caml ]
+
+  let payload_variant () =
+    test payload_variant_schema [ payload_variant_of_caml ]
 end
 
 module To_caml = struct
@@ -183,6 +208,7 @@ let () =
           test_case "primitive_record" `Quick Of_caml.primitive_record;
           test_case "nested record" `Quick Of_caml.nested;
           test_case "basic_variant" `Quick Of_caml.basic_variant;
+          test_case "payload_variant" `Quick Of_caml.payload_variant;
         ] );
       ( "to_caml",
         [
