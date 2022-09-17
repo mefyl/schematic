@@ -4,6 +4,7 @@ open C_test_types
 let headers =
   {|#define CAML_NAME_SPACE
 #include <string.h>
+#include <assert.h>
 #include <caml/alloc.h>
 #include <caml/memory.h>
 #include <caml/mlvalues.h>
@@ -36,7 +37,9 @@ char* string_of_caml(value v) {
 
 (* XXX : dedup & smarter order... *)
 let ctypes =
-  Schematic.C.of_schema wrapper_schema @ Schematic.C.of_schema diverse_schema
+  Schematic.C.(
+    of_schema wrapper_schema @ of_schema diverse_schema
+    (* @ of_schema basic_variant_schema *))
   |> List.rev
 
 let typedefs =
@@ -50,16 +53,17 @@ let typedefs =
          Fmt.str "typedef %s %s;\n" typeexpr name)
   |> String.concat ~sep:"\n"
 
-let to_caml_srcs =
-  ctypes
-  |> List.map ~f:(fun (id, schema) -> Schematic.C.to_to_caml_src id schema)
-  |> String.concat ~sep:"\n"
-
 let of_caml_srcs =
   ctypes
   |> List.map ~f:(fun (id, schema) -> Schematic.C.to_of_caml_src id schema)
   |> String.concat ~sep:"\n"
 
+let to_caml_srcs =
+  ctypes
+  |> List.map ~f:(fun (id, schema) -> Schematic.C.to_to_caml_src id schema)
+  |> String.concat ~sep:"\n"
+
+(* TODO: gen roundtrips *)
 let rts =
   {|
 
@@ -75,10 +79,19 @@ CAMLprim value sch_wrapper_rt_id(value v) {
 CAMLprim value sch_diverse_rt_id(value v) {
   CAMLparam1(v);
   CAMLlocal1(ret);
-  wrapper* p = diverse_of_caml(v);
+  diverse* p = diverse_of_caml(v);
   ret = diverse_to_caml(p);
   CAMLreturn(ret);
 }
+
+
+// CAMLprim value sch_basic_variant_rt_id(value v) {
+//   CAMLparam1(v);
+//   CAMLlocal1(ret);
+//   wrapper* p = basic_variant_of_caml(v);
+//   ret = basic_variant_to_caml(p);
+//   CAMLreturn(ret);
+// }
 
 |}
 

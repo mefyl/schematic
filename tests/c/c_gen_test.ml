@@ -89,6 +89,15 @@ enum {
 }
 |})
 
+let basic_variant_of_caml =
+  {|
+basic_variant basic_variant_of_caml(value v) {
+  basic_variant x = Int_val(v);
+  assert(x < 2);
+  return x;
+}
+|}
+
 let payload_variant_c =
   ( "payload_variant",
     {|
@@ -138,6 +147,8 @@ module Of_caml = struct
 
   let nested () =
     test wrapper_schema [ wrapper_of_caml; primitive_record_of_caml ]
+
+  let basic_variant () = test basic_variant_schema [ basic_variant_of_caml ]
 end
 
 module To_caml = struct
@@ -171,6 +182,7 @@ let () =
         [
           test_case "primitive_record" `Quick Of_caml.primitive_record;
           test_case "nested record" `Quick Of_caml.nested;
+          test_case "basic_variant" `Quick Of_caml.basic_variant;
         ] );
       ( "to_caml",
         [

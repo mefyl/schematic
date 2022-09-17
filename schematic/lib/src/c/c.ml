@@ -81,9 +81,10 @@ module Of = Cwalk.Walk (struct
 
   (* XXX: handling case/union with this walker is weird *)
 
-  let string_const s =
+  let string_const _s =
     (* failwith ("unimplemented: string_const " ^ s) *)
-    (Constant s, Marks.empty)
+    (* nothing to store *)
+    (Void, Marks.empty)
 
   let case key name (c, marks) =
     Fmt.epr "case key: %a\n" Fmt.(option string) key;
@@ -167,9 +168,7 @@ let pp ?(indent = 2) fmt ts =
 
       let variant fmt (name, constructors) =
         let is_basic =
-          List.for_all
-            ~f:(function _, Constant _ -> true | _ -> false)
-            constructors
+          List.for_all ~f:(function _, Void -> true | _ -> false) constructors
         in
         let variant_names = List.map ~f:fst constructors in
 
@@ -193,9 +192,7 @@ let pp ?(indent = 2) fmt ts =
             let payload_field =
               const union_
                 (constructors
-                |> List.filter ~f:(function
-                     | _, Constant _ -> false
-                     | _ -> true))
+                |> List.filter ~f:(function _, Void -> false | _ -> true))
               ++ const string " payload;"
             in
             let inner = tag_field ++ cut ++ payload_field in

@@ -3,6 +3,11 @@ open C_test_types
 external wrapper_rt_id : wrapper -> wrapper = "sch_wrapper_rt_id"
 external diverse_rt_id : diverse -> diverse = "sch_diverse_rt_id"
 
+(* external basic_variant_rt_id : basic_variant -> basic_variant =
+   "sch_basic_variant_rt_id" *)
+
+(* TODO variants*)
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -28,9 +33,12 @@ module Tests = struct
   let diverse () =
     let x = { s = "Hello world!" } in
     let new_x = diverse_rt_id x in
-
     let t = Alcotest.testable pp_diverse equal_diverse in
     test t new_x x
+
+  (* let basic_variant () = let x = B in let new_x = basic_variant_rt_id x in
+     let t = Alcotest.testable pp_basic_variant equal_basic_variant in test t
+     new_x x *)
 end
 
 let () =
