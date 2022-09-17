@@ -39,7 +39,8 @@ char* string_of_caml(value v) {
 let ctypes =
   Schematic.C.(
     of_schema wrapper_schema @ of_schema diverse_schema
-    (* @ of_schema basic_variant_schema *))
+    @ of_schema basic_variant_schema
+    @ of_schema payload_variant_schema)
   |> List.rev
 
 let typedefs =
@@ -85,13 +86,22 @@ CAMLprim value sch_diverse_rt_id(value v) {
 }
 
 
-// CAMLprim value sch_basic_variant_rt_id(value v) {
-//   CAMLparam1(v);
-//   CAMLlocal1(ret);
-//   wrapper* p = basic_variant_of_caml(v);
-//   ret = basic_variant_to_caml(p);
-//   CAMLreturn(ret);
-// }
+CAMLprim value sch_basic_variant_rt_id(value v) {
+  CAMLparam1(v);
+  CAMLlocal1(ret);
+  basic_variant p = basic_variant_of_caml(v);
+  ret = basic_variant_to_caml(p);
+  CAMLreturn(ret);
+}
+
+
+CAMLprim value sch_payload_variant_rt_id(value v) {
+  CAMLparam1(v);
+  CAMLlocal1(ret);
+  payload_variant p = payload_variant_of_caml(v);
+  ret = payload_variant_to_caml(p);
+  CAMLreturn(ret);
+}
 
 |}
 

@@ -98,6 +98,15 @@ basic_variant basic_variant_of_caml(value v) {
 }
 |}
 
+let basic_variant_to_caml =
+  {|
+value basic_variant_to_caml(basic_variant x) {
+  assert(x < 2);
+  return Val_int(x);
+}
+|}
+
+(* FIXME: possible collisions with "tag" and "payload" *)
 let payload_variant_c =
   ( "payload_variant",
     {|
@@ -114,6 +123,7 @@ struct {
 |}
   )
 
+(* tag / val numbering handling is COMPLETELY broken as-is. *)
 let payload_variant_of_caml =
   {|
 payload_variant payload_variant_of_caml(value v) {
@@ -123,15 +133,36 @@ payload_variant payload_variant_of_caml(value v) {
     res.tag = Int_val(v);
     assert(res.tag < 2);
   } else {
-    res.tag = Tag_val(v);
-    assert(res.tag < 1);
-    switch (res.tag) {
+    res.tag = 2 + Tag_val(v);
+    assert(Tag_val(v) < 1);
+    switch (Tag_val(v)) {
       case 0:
-        res.payload = int_of_caml(Field(v, 0));
+        res.payload.someint = int_of_caml(Field(v, 0));
         break;
     }
   }
   CAMLreturnT(payload_variant, res);
+}
+|}
+
+let payload_variant_to_caml =
+  {|
+value payload_variant_to_caml(payload_variant x) {
+  CAMLparam0();
+  CAMLlocal1(v);
+  switch (x.tag) {
+    case payload_variant_nothing_tag:
+      v = Val_int(0);
+      break;
+    case payload_variant_nothing2_tag:
+      v = Val_int(1);
+      break;
+    case payload_variant_someint_tag:
+      v = caml_alloc(1, 0);
+      Store_field(v, 0, int_to_caml(x.payload.someint));
+      break;
+  }
+  CAMLreturn(v);
 }
 |}
 
@@ -188,6 +219,11 @@ module To_caml = struct
 
   let nested () =
     test wrapper_schema [ wrapper_to_caml; primitive_record_to_caml ]
+
+  let basic_variant () = test basic_variant_schema [ basic_variant_to_caml ]
+
+  let payload_variant () =
+    test payload_variant_schema [ payload_variant_to_caml ]
 end
 
 let () =
@@ -204,15 +240,19 @@ let () =
           test_case "payload_variant" `Quick Generate_types.payload_variant;
         ] );
       ( "of_caml",
-        [
-          test_case "primitive_record" `Quick Of_caml.primitive_record;
-          test_case "nested record" `Quick Of_caml.nested;
-          test_case "basic_variant" `Quick Of_caml.basic_variant;
-          test_case "payload_variant" `Quick Of_caml.payload_variant;
-        ] );
+        Of_caml.
+          [
+            test_case "primitive_record" `Quick primitive_record;
+            test_case "nested record" `Quick nested;
+            test_case "basic_variant" `Quick basic_variant;
+            test_case "payload_variant" `Quick payload_variant;
+          ] );
       ( "to_caml",
-        [
-          test_case "primitive_record" `Quick To_caml.primitive_record;
-          test_case "nested record" `Quick To_caml.nested;
-        ] );
+        To_caml.
+          [
+            test_case "primitive_record" `Quick primitive_record;
+            test_case "nested record" `Quick nested;
+            test_case "basic_variant" `Quick basic_variant;
+            test_case "payload_variant" `Quick payload_variant;
+          ] );
     ]
