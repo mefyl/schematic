@@ -96,6 +96,11 @@ module Of = C_walk.Walk (struct
     let tuple_name = tuple_name items in
     (Atom (tuple_name, false), Marks.make tuple_name s)
 
+  let list (c, marks) =
+    let s () = (Array c, marks) in
+    let name = array_name c in
+    (Atom (name, false), Marks.make name s)
+
   (* Unimplemented *)
 
   let parametric template_name _args _effective _t =
@@ -105,7 +110,6 @@ module Of = C_walk.Walk (struct
   let any () = failwith "unimpl: nay"
   let date _ = failwith "unimplemented: date "
   let mapping _ = failwith "unimplemented: mapping "
-  let list _ = failwith "unimplemented: list "
   let nullable _ = failwith "unimplemented: nullable "
   let time _ = failwith "unimplemented: time "
   let time_local _ = failwith "unimplemented: time_local "

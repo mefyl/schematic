@@ -36,6 +36,7 @@ type payload_variant =
 [@@deriving schema, show, eq]
 
 type pair_alias = string * int [@@deriving schema, show, eq]
+type collection = int list [@@deriving schema, show, eq]
 
 type behemoth = {
   d : diverse;

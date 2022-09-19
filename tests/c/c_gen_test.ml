@@ -285,6 +285,74 @@ typedef struct {
 } diverse;
 |}
 
+let int_array_c = {|
+typedef struct {
+  size_t len;
+  int* data;
+} int_array;
+|}
+
+let collection_c = {|
+typedef int_array collection;
+|}
+
+let collection_of_caml =
+  {|
+collection collection_of_caml(value v) {
+  CAMLparam1(v);
+  int_array res = int_array_of_caml(v);
+  CAMLreturnT(collection, res);
+}
+|}
+
+let collection_to_caml =
+  {|
+value collection_to_caml(collection x) {
+  CAMLparam0();
+  CAMLlocal1(v);
+  v = int_array_to_caml(x);
+  CAMLreturn(v);
+}
+|}
+
+let int_array_of_caml =
+  {|
+int_array int_array_of_caml(value v) {
+  CAMLparam1(v);
+  CAMLlocal1(l);
+  int_array arr = {.len = 0, .data = NULL};
+  l = v;
+  while (l != Val_emptylist) {
+    l = Field(l, 1);
+    arr.len++;
+  }
+  l = v;
+  arr.data = malloc(sizeof(*arr.data) * arr.len);
+  for (int64_t i = 0; i < arr.len; i++) {
+    arr.data[i] = int_of_caml(Field(l, 0));
+    l = Field(l, 1);
+  }
+  CAMLreturnT(int_array, arr);
+}
+|}
+
+let int_array_to_caml =
+  {|
+value int_array_to_caml(int_array arr) {
+  CAMLparam0();
+  CAMLlocal2(cli, cons);
+  cli = Val_emptylist;
+  for (int64_t i = arr.len - 1; i >= 0; i--) {
+    cons = caml_alloc(2, 0);
+    typeof(*arr.data) x = arr.data[i];
+    Store_field(cons, 0, int_to_caml(x));
+    Store_field(cons, 1, cli);
+    cli = cons;
+  }
+  CAMLreturn(cli);
+}
+|}
+
 let pretty_string =
   let pp_string ppf x = Fmt.pf ppf "{|\n%s\n|}" x in
   Alcotest.testable pp_string String.( = )
@@ -294,7 +362,7 @@ module Generate_types = struct
     Schematic.C.of_schema t
     |> List.map ~f:Schematic.C.export
     |> List.map ~f:(fun gen -> "\n" ^ Schematic.C.typedef_src gen)
-    |> Alcotest.(check (list pretty_string) "typescript declarations" expected)
+    |> Alcotest.(check (list pretty_string) "typedefs" expected)
 
   let primitive_record () = test primitive_record_schema [ primitive_record_c ]
   let type_alias () = test type_alias_schema [ type_alias_c ]
@@ -326,6 +394,8 @@ module Generate_types = struct
         wrapper_c;
         primitive_record_c;
       ]
+
+  let collection () = test collection_schema [ collection_c; int_array_c ]
 end
 
 module Of_caml = struct
@@ -334,7 +404,7 @@ module Of_caml = struct
     |> List.map ~f:Schematic.C.export
     |> List.map ~f:(fun Schematic.C.{ of_caml; _ } ->
            Schematic.C.impl_src of_caml |> fun s -> "\n" ^ s ^ "\n")
-    |> Alcotest.(check (list pretty_string) "*_of_caml declarations" expected)
+    |> Alcotest.(check (list pretty_string) "*_of_caml" expected)
 
   let primitive_record () =
     test primitive_record_schema [ primitive_record_of_caml ]
@@ -357,6 +427,9 @@ module Of_caml = struct
         pair_alias_of_caml;
         tuple_string_int_of_caml;
       ]
+
+  let collection () =
+    test collection_schema [ collection_of_caml; int_array_of_caml ]
 end
 
 module To_caml = struct
@@ -365,7 +438,7 @@ module To_caml = struct
     |> List.map ~f:Schematic.C.export
     |> List.map ~f:(fun Schematic.C.{ to_caml; _ } ->
            Schematic.C.impl_src to_caml |> fun s -> "\n" ^ s ^ "\n")
-    |> Alcotest.(check (list pretty_string) "*_to_caml declarations" expected)
+    |> Alcotest.(check (list pretty_string) "*_to_caml" expected)
 
   let primitive_record () =
     test primitive_record_schema [ primitive_record_to_caml ]
@@ -388,6 +461,9 @@ module To_caml = struct
         pair_alias_to_caml;
         tuple_string_int_to_caml;
       ]
+
+  let collection () =
+    test collection_schema [ collection_to_caml; int_array_to_caml ]
 end
 
 let () =
@@ -407,6 +483,7 @@ let () =
             test_case "pair_alias" `Quick pair_alias;
             test_case "record_with_pair_alias" `Quick record_with_pair_alias;
             test_case "behemoth" `Quick behemoth;
+            test_case "collection" `Quick collection;
           ] );
       ( "of_caml",
         Of_caml.
@@ -417,6 +494,7 @@ let () =
             test_case "payload_variant" `Quick payload_variant;
             test_case "pair_alias" `Quick pair_alias;
             test_case "record_with_pair_alias" `Quick record_with_pair_alias;
+            test_case "collection" `Quick collection;
           ] );
       ( "to_caml",
         To_caml.
@@ -427,5 +505,6 @@ let () =
             test_case "payload_variant" `Quick payload_variant;
             test_case "pair_alias" `Quick pair_alias;
             test_case "record_with_pair_alias" `Quick record_with_pair_alias;
+            test_case "collection" `Quick collection;
           ] );
     ]

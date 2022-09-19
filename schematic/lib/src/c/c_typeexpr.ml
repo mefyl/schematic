@@ -55,6 +55,13 @@ let pp ?(indent = 2) fmt ts =
       match ts with
       | Atom (s, false) -> const string s
       | Atom (s, true) -> const string s ++ const char '*'
+      | Array t ->
+        let inner_typename = Fmt.to_to_string pp t in
+        const struct_
+          [
+            ("len", Atom ("size_t", false));
+            ("data", Atom (inner_typename, true));
+          ]
       | String -> const string "char*" (* XXX dedup *)
       | Struct { fields; _ } -> const struct_ fields
       (* Tuples are structs with types named according to their indices *)
@@ -64,6 +71,7 @@ let pp ?(indent = 2) fmt ts =
       | Variant { name; basic; rich } -> const variant (name, basic, rich)
       | Void -> nop
     in
+
     printer fmt ()
   in
   pp fmt ts

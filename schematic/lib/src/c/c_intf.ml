@@ -1,6 +1,7 @@
 type t =
   | Void  (** Zero-Sized Type *)
   | String  (** Native string *)
+  | Array of t
   | Atom of string * bool  (** Reference to another type. RHS : is_ptr *)
   | Struct of { fields : (string * t) list }
   | Variant of {
@@ -31,26 +32,27 @@ open Base
 
 (* XXX: tuples of tuples - name conflicts *)
 
-let tuple_name items =
+let rec c_typename = function
+  | String -> "string"
+  | Atom (s, _) -> s
+  | Tuple members -> tuple_name members
+  | Array t -> array_name t
+  | x -> failwith "unsupported: %a" pp x
+
+and tuple_name items =
   "tuple_"
   ^ (items
-    (* FIXME: use typename *)
-    |> List.map ~f:(function
-         | String -> "string"
-         | Atom (s, _) -> s
-         | _ -> failwith "non-atom tuple member?")
+   (* FIXME: use typename *)
+   |> List.map ~f:c_typename
     |> String.concat ~sep:"_")
+
+and array_name t = c_typename t ^ "_array"
 
 let tuple_fields = List.mapi ~f:(fun i c -> (Fmt.str "t%d" i, c))
 let of_caml_name_for = Fmt.str "%s_of_caml"
 let to_caml_name_for = Fmt.str "%s_to_caml"
 
-let c_typename = function
-  | String -> "string"
-  | Atom (s, _) -> s
-  | Tuple members -> tuple_name members
-  | x -> failwith "unsupported: %a" pp x
-
+(* FIXME: this approach does not protect against collisions *)
 let of_caml_name_for_c = Fn.compose of_caml_name_for c_typename
 let to_caml_name_for_c = Fn.compose to_caml_name_for c_typename
 

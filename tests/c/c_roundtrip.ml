@@ -10,6 +10,7 @@ external payload_variant_rt_id : payload_variant -> payload_variant
   = "sch_payload_variant_rt_id"
 
 external behemoth_rt_id : behemoth -> behemoth = "sch_behemoth_rt_id"
+external collection_rt_id : collection -> collection = "sch_collection_rt_id"
 
 (* TODO variants*)
 
@@ -72,6 +73,12 @@ module Tests = struct
     let new_x = behemoth_rt_id x in
     let t = Alcotest.testable pp_behemoth equal_behemoth in
     test t new_x x
+
+  let collection () =
+    let x = [ 12; 953878; 1; 0; 0; 3; -43 ] in
+    let new_x = collection_rt_id x in
+    let t = Alcotest.testable pp_collection equal_collection in
+    test t new_x x
 end
 
 let () =
@@ -88,5 +95,6 @@ let () =
             test_case "payload_variant: with payload" `Quick
               payload_variant_with_pl;
             test_case "behemoth" `Quick behemoth;
+            test_case "collection" `Quick collection;
           ] );
     ]

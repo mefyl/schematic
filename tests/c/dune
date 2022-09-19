@@ -40,7 +40,10 @@
  (deps c_roundtrip_stubs.o (universe))
  (foreign_stubs
   (language c)
-  (names c_roundtrip_stubs))
+  (names c_roundtrip_stubs)
+  ; When debugging:
+  ; (flags -O0)
+  )
  (modules c_roundtrip)
  (preprocess
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))

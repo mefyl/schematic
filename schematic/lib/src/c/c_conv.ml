@@ -121,6 +121,37 @@ let pp_of_caml_converter ?(indent = 2) (name, ast) =
         @ [ Fmt.str "CAMLreturnT(%s, res)" tuptype ]
       in
       (false, pp)
+    | Array elem_type ->
+      let length_while =
+        braced ~indent "while (l != Val_emptylist)"
+          (const pp_statements [ "l = Field(l, 1)"; "arr.len++" ])
+      in
+      let set_for =
+        braced ~indent "for (int64_t i = 0; i < arr.len; i++)"
+          (const pp_statements
+             [
+               Fmt.str "arr.data[i] = %s(Field(l, 0))"
+                 (of_caml_name_for_c elem_type);
+               "l = Field(l, 1)";
+             ])
+      in
+      let pp =
+        const pp_statements
+          [
+            "CAMLparam1(v)";
+            "CAMLlocal1(l)";
+            Fmt.str "%s arr = {.len = 0, .data = NULL}" (array_name elem_type);
+            "l = v";
+          ]
+        ++ cut ++ length_while ++ cut
+        ++ const pp_statements
+             [ "l = v"; "arr.data = malloc(sizeof(*arr.data) * arr.len)" ]
+        ++ cut ++ set_for ++ cut
+        ++ const pp_statements
+             [ Fmt.str "CAMLreturnT(%s, arr)" (array_name elem_type) ]
+      in
+
+      (false, pp)
     (* The considered type is merely an alias for another *)
     | (Atom _ | String) as c ->
       let pp =
@@ -129,7 +160,7 @@ let pp_of_caml_converter ?(indent = 2) (name, ast) =
             "CAMLparam1(v)";
             Fmt.str "%a res = %s(v)" (C_typeexpr.pp ~indent) c
               (of_caml_name_for_c c);
-            "CAMLreturnT(pair_alias, res)";
+            Fmt.str "CAMLreturnT(%s, res)" name;
           ]
       in
       (false, pp)
@@ -235,6 +266,27 @@ let pp_to_caml_converter ?(indent = 2) (name, ast) =
         @ [ "CAMLreturn(v)" ]
       in
       ("x", false, pp)
+    | Array elem_type ->
+      let loop =
+        braced ~indent "for (int64_t i = arr.len - 1; i >= 0; i--)"
+          (const pp_statements
+             [
+               "cons = caml_alloc(2, 0)";
+               "typeof(*arr.data) x = arr.data[i]";
+               Fmt.str "Store_field(cons, 0, %s(x))"
+                 (to_caml_name_for_c elem_type);
+               "Store_field(cons, 1, cli)";
+               "cli = cons";
+             ])
+      in
+      let pp =
+        const pp_statements
+          [ "CAMLparam0()"; "CAMLlocal2(cli, cons)"; "cli = Val_emptylist" ]
+        ++ cut ++ loop ++ cut
+        ++ const pp_statements [ "CAMLreturn(cli)" ]
+      in
+
+      ("arr", false, pp)
     | (Atom _ | String) as c ->
       let pp =
         const pp_statements

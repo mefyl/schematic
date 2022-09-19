@@ -3,6 +3,7 @@ open C_test_types
 
 let headers =
   {|#define CAML_NAME_SPACE
+#include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -16,11 +17,13 @@ let builtins =
   {|
 // No GC involved here.
 value int_to_caml(int x) {
-  return Val_int(x);
+  CAMLparam0();
+  CAMLreturn(Val_int(x));
 }
 
 int int_of_caml(value x) {
-  return Int_val(x);
+  CAMLparam1(x);
+  CAMLreturnT(int, Int_val(x));
 }
 
 value string_to_caml(char* p) {
@@ -50,6 +53,7 @@ let cgens =
            pair_alias_schema; Schema.pack record_with_pair_alias_schema;
            Schema.pack record_with_variant_schema; *)
         Schema.pack behemoth_schema;
+        Schema.pack collection_schema;
       ]
     |> fst |> List.rev
   in
@@ -121,6 +125,16 @@ CAMLprim value sch_behemoth_rt_id(value v) {
   ret = behemoth_to_caml(p);
   CAMLreturn(ret);
 }
+
+
+CAMLprim value sch_collection_rt_id(value v) {
+  CAMLparam1(v);
+  CAMLlocal1(ret);
+  collection x = collection_of_caml(v);
+  ret = collection_to_caml(x);
+  CAMLreturn(ret);
+}
+
 |}
 
 (* Fmt.pr "// " Fmt.pr "//\n"; Fmt.pr "%s" typedefs; Fmt.pr "\n"; Fmt.pr "//\n";
