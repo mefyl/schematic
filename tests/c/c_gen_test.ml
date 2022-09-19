@@ -229,10 +229,29 @@ struct {
 }
 |}
 
-let record_with_pair_alias_to_caml = {|
+let record_with_pair_alias_of_caml =
+  {|
+record_with_pair_alias* record_with_pair_alias_of_caml(value v) {
+  CAMLparam1(v);
+  record_with_pair_alias* p = malloc(sizeof(*p));
+  p->a = int_of_caml(Field(v, 0));
+  p->pair_alias = pair_alias_of_caml(Field(v, 1));
+  CAMLreturnT(record_with_pair_alias*, p);
+}
 |}
 
-let record_with_pair_alias_of_caml = {|
+let record_with_pair_alias_to_caml =
+  {|
+value record_with_pair_alias_to_caml(record_with_pair_alias* p) {
+  CAMLparam0();
+  CAMLlocal1(v);
+  int n_fields = 2;
+  int tag = 0;
+  v = caml_alloc(n_fields, tag);
+  Store_field(v, 0, int_to_caml(p->a));
+  Store_field(v, 1, pair_alias_to_caml(p->pair_alias));
+  CAMLreturn(v);
+}
 |}
 
 let pretty_string =
@@ -258,6 +277,10 @@ module Generate_types = struct
 
   let pair_alias () =
     test pair_alias_schema [ pair_alias_c; string_int_tuple_c ]
+
+  let record_with_pair_alias () =
+    test record_with_pair_alias_schema
+      [ record_with_pair_alias_c; pair_alias_c; string_int_tuple_c ]
 end
 
 module Of_caml = struct
@@ -280,6 +303,14 @@ module Of_caml = struct
 
   let pair_alias () =
     test pair_alias_schema [ pair_alias_of_caml; tuple_string_int_of_caml ]
+
+  let record_with_pair_alias () =
+    test record_with_pair_alias_schema
+      [
+        record_with_pair_alias_of_caml;
+        pair_alias_of_caml;
+        tuple_string_int_of_caml;
+      ]
 end
 
 module To_caml = struct
@@ -304,7 +335,12 @@ module To_caml = struct
     test pair_alias_schema [ pair_alias_to_caml; tuple_string_int_to_caml ]
 
   let record_with_pair_alias () =
-    test record_with_pair_alias_schema [ record_with_pair_alias_to_caml ]
+    test record_with_pair_alias_schema
+      [
+        record_with_pair_alias_to_caml;
+        pair_alias_to_caml;
+        tuple_string_int_to_caml;
+      ]
 end
 
 let () =
@@ -320,8 +356,9 @@ let () =
             test_case "string" `Quick string;
             test_case "basic_variant" `Quick basic_variant;
             test_case "payload_variant" `Quick payload_variant;
-            test_case "record_with_variant" `Quick record_with_variant
-            (* test_case "pair_alias" `Quick pair_alias; *);
+            test_case "record_with_variant" `Quick record_with_variant;
+            test_case "pair_alias" `Quick pair_alias;
+            test_case "record_with_pair_alias" `Quick record_with_pair_alias;
           ] );
       ( "of_caml",
         Of_caml.
@@ -329,8 +366,9 @@ let () =
             test_case "primitive_record" `Quick primitive_record;
             test_case "nested record" `Quick nested;
             test_case "basic_variant" `Quick basic_variant;
-            test_case "payload_variant" `Quick payload_variant
-            (* test_case "pair_alias" `Quick pair_alias; *);
+            test_case "payload_variant" `Quick payload_variant;
+            test_case "pair_alias" `Quick pair_alias;
+            test_case "record_with_pair_alias" `Quick record_with_pair_alias;
           ] );
       ( "to_caml",
         To_caml.
@@ -338,8 +376,8 @@ let () =
             test_case "primitive_record" `Quick primitive_record;
             test_case "nested record" `Quick nested;
             test_case "basic_variant" `Quick basic_variant;
-            test_case "payload_variant" `Quick payload_variant
-            (* test_case "pair_alias" `Quick pair_alias; test_case
-               "record_with_pair_alias" `Quick record_with_pair_alias; *);
+            test_case "payload_variant" `Quick payload_variant;
+            test_case "pair_alias" `Quick pair_alias;
+            test_case "record_with_pair_alias" `Quick record_with_pair_alias;
           ] );
     ]
