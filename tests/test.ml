@@ -214,7 +214,7 @@ type expectation =
   | Exact of version
   | Range of range
   | Nothing
-  | Aliased [@schematic.as "aktually"]
+  | Aliased [@schematic.as "aktually"] [@schematic.aliases [ "mrmask" ]]
 [@@deriving schema, show]
 
 let test_expectation = Alcotest.testable pp_expectation ( = )
@@ -238,7 +238,10 @@ module Variant = struct
     test ~here:[%here] "variant" test_expectation expectation_schema Nothing
       [%ezjsonm "nothing"];
     test ~here:[%here] "variant" test_expectation expectation_schema Aliased
-      [%ezjsonm "aktually"]
+      [%ezjsonm "aktually"];
+    Alcotest.(check ~here:[%here] (result test_expectation decoding_error))
+      "aliased variant field" (Result.Ok Aliased)
+    @@ Schematic.Json.decode expectation_schema [%ezjsonm "mrmask"]
 
   type singleton = Single [@@deriving eq, schema, show]
 

@@ -279,6 +279,7 @@ module Attributes = struct
 
   type t = {
     alias : string versioned; [@default []]
+    aliases : string list versioned; [@default []]
     computed :
       (string, expression * core_type, String.comparator_witness) Map.t;
     gadt_variant : string option;
@@ -322,6 +323,13 @@ module Attributes = struct
             ~loc attr_payload
         in
         { attrs with alias = attrs.alias @ [ alias ] }
+      | "schematic.aliases" when alias ->
+        let aliases =
+          expect
+            Ast_pattern.(versioned (elist (estring __)) (elist (estring __)))
+            ~loc attr_payload
+        in
+        { attrs with aliases = attrs.aliases @ [ aliases ] }
       | "schematic.computed" when computed ->
         let computed =
           let computed =
@@ -391,6 +399,7 @@ module Attributes = struct
     | [] ->
       {
         alias = [];
+        aliases = [];
         computed = Map.empty (module String);
         gadt_variant = None;
         schema = None;
@@ -958,19 +967,53 @@ module Schema = struct
       in
       List.filter_map ~f options
     in
-    let f (txt, pcd_args, loc, Attributes.{ alias; computed; _ }) =
+    let f (txt, pcd_args, loc, Attributes.{ alias; aliases; computed; _ }) =
       let module Ast = (val Ast_builder.make loc) in
       let name =
         version_match ~loc ~f:Ast.estring
           (Ast.estring (String.lowercase txt))
           alias
+      and aliases =
+        match aliases with
+        | [] -> None
+        | _ ->
+          Some
+            (version_match ~loc
+               ~f:(Fn.compose Ast.elist (List.map ~f:Ast.estring))
+               (Ast.elist []) aliases)
       in
       let schema, ctor_pattern, ctor_value, pattern, value =
         match constructor_arguments_normalize ~loc pcd_args with
         | None ->
           let schema =
             if Option.is_none type_context.attributes.union_key then
-              expanded_of_descriptor ~loc [%expr String_const [%e name]]
+              match aliases with
+              | None ->
+                expanded_of_descriptor ~loc [%expr String_const [%e name]]
+              | Some aliases ->
+                expanded_of_descriptor ~loc
+                  [%expr
+                    let __schematic_case name =
+                      Case
+                        {
+                          name;
+                          schema =
+                            {
+                              descriptor = String_const name;
+                              id = None;
+                              parametric = None;
+                            };
+                          encoder = (fun () -> Some ());
+                          decoder = (fun () -> ());
+                        }
+                    in
+                    Union
+                      {
+                        key = None;
+                        cases =
+                          __schematic_case [%e name]
+                          :: Stdlib.List.map __schematic_case [%e aliases];
+                      }]
             else expanded_of_descriptor ~loc [%expr Object FieldEnd]
           in
           (schema, None, None, None, None)
@@ -978,15 +1021,22 @@ module Schema = struct
           let p i = Ast.pvar (Fmt.str "f%i" i)
           and v i _ = Ast.evar (Fmt.str "f%i" i) in
           let schema =
-            match pcd_args with
-            | Pcstr_record fields ->
+            match (aliases, pcd_args) with
+            | Some _, _ ->
+              expanded_of_descriptor ~loc
+                [%expr
+                  [%ocaml.error
+                    "schematic.aliases attribute not supported on record \
+                     payloads yet"]]
+            | None, Pcstr_record fields ->
               let computed_fields =
                 Attributes.fields_of_computed ~loc computed
               in
               _expand_record true ~context ~type_context
                 (List.map ~f:(expand_field context) fields @ computed_fields)
-            | _ -> encode_type ~context ~type_context type_
+            | None, _ -> encode_type ~context ~type_context type_
           in
+
           ( schema,
             Some (ctor_pattern p),
             Some (ctor_value v),
