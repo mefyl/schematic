@@ -47,8 +47,8 @@ let ctypes =
        Schema.pack basic_variant_schema;
        Schema.pack payload_variant_schema;
        Schema.pack pair_alias_schema;
-       Schema.pack record_with_pair_alias_schema
-       (* Schema.pack behemoth_schema; *);
+       Schema.pack record_with_pair_alias_schema;
+       Schema.pack record_with_variant_schema (* Schema.pack behemoth_schema; *);
      ]
     |> List.rev)
   |> fst |> List.rev
