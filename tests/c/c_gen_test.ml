@@ -163,7 +163,7 @@ value payload_variant_to_caml(payload_variant x) {
 |}
 
 let pair_alias_c = {|
-tuple_char_ptr_int
+tuple_string_int
 |}
 
 let string_int_tuple_c = {|
@@ -178,7 +178,7 @@ let pair_alias_of_caml =
   {|
 pair_alias pair_alias_of_caml(value v) {
   CAMLparam1(v);
-  tuple_char_ptr_int res = tuple_char_ptr_int_of_caml(v);
+  tuple_string_int res = tuple_string_int_of_caml(v);
   CAMLreturnT(pair_alias, res);
 }
 |}
@@ -188,25 +188,25 @@ let pair_alias_to_caml =
 value pair_alias_to_caml(pair_alias x) {
   CAMLparam0();
   CAMLlocal1(v);
-  v = tuple_char_ptr_int_to_caml(x);
+  v = tuple_string_int_to_caml(x);
   CAMLreturn(v);
 }
 |}
 
 let tuple_string_int_of_caml =
   {|
-tuple_char_ptr_int tuple_char_ptr_int_of_caml(value v) {
+tuple_string_int tuple_string_int_of_caml(value v) {
   CAMLparam1(v);
-  tuple_char_ptr_int res;
+  tuple_string_int res;
   res.t0 = string_of_caml(Field(v, 0));
   res.t1 = int_of_caml(Field(v, 1));
-  CAMLreturnT(tuple_char_ptr_int, res);
+  CAMLreturnT(tuple_string_int, res);
 }
 |}
 
 let tuple_string_int_to_caml =
   {|
-value tuple_char_ptr_int_to_caml(tuple_char_ptr_int x) {
+value tuple_string_int_to_caml(tuple_string_int x) {
   CAMLparam0();
   CAMLlocal1(v);
   v = caml_alloc_tuple(2);
@@ -255,6 +255,30 @@ value record_with_pair_alias_to_caml(record_with_pair_alias* p) {
 }
 |}
 
+let behemoth_c =
+  {|
+struct {
+  diverse* d;
+  basic_variant b;
+  payload_variant p;
+  tuple_string_wrapper pair;
+  pair_alias pair_alias;
+}
+|}
+
+let string_wrapper_tuple_c = {|
+struct {
+  char* t0;
+  wrapper* t1;
+}
+|}
+
+let diverse_c = {|
+struct {
+  char* s;
+}
+|}
+
 let pretty_string =
   let pp_string ppf x = Fmt.pf ppf "{|\n%s\n|}" x in
   Alcotest.testable pp_string String.( = )
@@ -282,6 +306,20 @@ module Generate_types = struct
   let record_with_pair_alias () =
     test record_with_pair_alias_schema
       [ record_with_pair_alias_c; pair_alias_c; string_int_tuple_c ]
+
+  let behemoth () =
+    test behemoth_schema
+      [
+        behemoth_c;
+        basic_variant_c;
+        diverse_c;
+        pair_alias_c;
+        string_int_tuple_c;
+        payload_variant_c;
+        string_wrapper_tuple_c;
+        wrapper_c;
+        primitive_record_c;
+      ]
 end
 
 module Of_caml = struct
@@ -360,6 +398,7 @@ let () =
             test_case "record_with_variant" `Quick record_with_variant;
             test_case "pair_alias" `Quick pair_alias;
             test_case "record_with_pair_alias" `Quick record_with_pair_alias;
+            test_case "behemoth" `Quick behemoth;
           ] );
       ( "of_caml",
         Of_caml.

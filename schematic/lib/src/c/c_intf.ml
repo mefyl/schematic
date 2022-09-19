@@ -19,8 +19,8 @@ let tuple_name items =
   "tuple_"
   ^ (items
     |> List.map ~f:(function
-         | Atom s -> s
-         | Pointer (Atom s) -> s ^ "_ptr"
+         | Pointer (Atom "char") -> "string"
+         | Atom s | Pointer (Atom s) -> s
          | _ -> failwith "non-atom tuple member?")
     |> String.concat ~sep:"_")
 

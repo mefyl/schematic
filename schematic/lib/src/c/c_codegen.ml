@@ -122,7 +122,7 @@ let pp_of_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
           |> List.mapi ~f:(fun i c ->
                  Fmt.str "res.t%d = %s(Field(v, %d))" i (of_caml_name_for_c c) i)
           )
-        @ [ "CAMLreturnT(tuple_char_ptr_int, res)" ]
+        @ [ Fmt.str "CAMLreturnT(%s, res)" tuptype ]
       in
       (false, pp)
     (* The considered type is merely an alias for another *)

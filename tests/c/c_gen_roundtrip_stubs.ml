@@ -122,7 +122,7 @@ CAMLprim value sch_payload_variant_rt_id(value v) {
 // CAMLprim value sch_behemoth_rt_id(value v) {
 //   CAMLparam1(v);
 //   CAMLlocal1(ret);
-//   behemoth p = behemoth_of_caml(v);
+//   behemoth* p = behemoth_of_caml(v);
 //   ret = behemoth_to_caml(p);
 //   CAMLreturn(ret);
 // }
