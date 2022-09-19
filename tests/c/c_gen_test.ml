@@ -112,7 +112,7 @@ struct {
   } tag;
   union {
     int someint;
-  } payload;
+  }* payload;
 }
 |}
 
@@ -126,10 +126,11 @@ payload_variant payload_variant_of_caml(value v) {
     assert(res.tag < 3);
   } else {
     res.tag = 3 + Tag_val(v);
+    res.payload = malloc(sizeof(*res.payload));
     assert(Tag_val(v) < 1);
     switch (Tag_val(v)) {
       case 0:
-        res.payload.someint = int_of_caml(Field(v, 0));
+        res.payload->someint = int_of_caml(Field(v, 0));
         break;
     }
   }
@@ -154,7 +155,7 @@ value payload_variant_to_caml(payload_variant x) {
       break;
     case payload_variant_someint_tag:
       v = caml_alloc(1, 0);
-      Store_field(v, 0, int_to_caml(x.payload.someint));
+      Store_field(v, 0, int_to_caml(x.payload->someint));
       break;
   }
   CAMLreturn(v);
@@ -217,7 +218,7 @@ value tuple_char_ptr_int_to_caml(tuple_char_ptr_int x) {
 
 let record_with_variant_c = {|
 struct {
-  payload_variant* v;
+  payload_variant v;
 }
 |}
 

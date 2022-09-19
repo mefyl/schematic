@@ -56,7 +56,7 @@ let pp_of_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
           ]
       in
       (false, pp)
-    | Variant { basic; rich } ->
+    | Variant { basic; rich; _ } ->
       let plain_case =
         const pp_statements
           [
@@ -75,7 +75,7 @@ let pp_of_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
                 [
                   (* XXX: tuples will ruin the day. *)
                   (* FIXME FIXME FIXME *)
-                  Fmt.str "res.payload.%s = %s(Field(v, 0))" field_name
+                  Fmt.str "res.payload->%s = %s(Field(v, 0))" field_name
                     (of_caml_name_for typename);
                   "break";
                 ]))
@@ -96,6 +96,7 @@ let pp_of_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
         const pp_statements
           [
             Fmt.str "res.tag = %d + Tag_val(v)" (List.length basic);
+            "res.payload = malloc(sizeof(*res.payload))";
             Fmt.str "assert(Tag_val(v) < %d)" (List.length rich);
           ]
         ++ cut ++ switch
@@ -138,6 +139,7 @@ let pp_of_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
           ]
       in
       (false, pp)
+    | _ -> failwith "no"
   in
 
   let return_type = if is_ptr then ptr_type else name in
@@ -209,7 +211,7 @@ let pp_to_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
                      [
                        (* XXX FIXME alloc size - tuples*)
                        Fmt.str "v = caml_alloc(1, %d)" i;
-                       Fmt.str "Store_field(v, 0, %s(x.payload.%s))"
+                       Fmt.str "Store_field(v, 0, %s(x.payload->%s))"
                          (to_caml_name_for_c constr_type)
                          constr_name;
                        "break";

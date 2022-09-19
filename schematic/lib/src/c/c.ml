@@ -62,9 +62,12 @@ module Of = Cwalk.Walk (struct
         let atom = Atom id in
         (* XXX: this most likely breaks recursive types, but for now, it's way
            cleaner than the alternative *)
+        (* XXX: what about type aliases? Seems like they would break this. It
+           might be that this is not decidable at this stage... *)
         let ast =
           match fst @@ s () with
-          | Struct _ | Variant _ -> Pointer atom
+          | Void | Variant _ -> atom
+          | Struct _ -> Pointer atom
           | _ -> atom
         in
         (ast, Marks.make id s))
@@ -88,7 +91,7 @@ module Of = Cwalk.Walk (struct
     let basic, rich =
       constructors
       |> List.partition_map ~f:(function
-           | (s, Void) as x -> First s
+           | s, Void -> First s
            | (_, _) as x -> Second x)
     in
 
@@ -183,7 +186,9 @@ let pp ?(indent = 2) fmt ts =
           if is_basic then enum
           else
             let tag_field = enum ++ const string " tag;" in
-            let payload_field = const union_ rich ++ const string " payload;" in
+            let payload_field =
+              const union_ rich ++ const string "* payload;"
+            in
             let inner = tag_field ++ cut ++ payload_field in
 
             (* Kind of a special case of struct... *)
