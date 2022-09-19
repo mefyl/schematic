@@ -20,6 +20,7 @@ type 't key_set = ('t -> string -> 't -> ('t, string) Result.t) customizable
 module type IMPL = sig
   type t
 
+  val pp : t Fmt.t
   val key_get : t key_get
   val key_set : t key_set
   val null : unit -> t
@@ -315,7 +316,9 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           in
           match List.find_map ~f:conv cases with
           | Some res -> Result.return res
-          | None -> Result.fail (error "no union case was matched"))
+          | None ->
+            Result.fail
+              (error "no union case was matched for @[%a@]" Coding.pp v))
         | Some key -> (
           let* key_value =
             let* v =

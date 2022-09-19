@@ -4,8 +4,38 @@ include Json_intf
 let schema = Schema.make Any
 let schema_versioned (_ : Schema.version) = schema
 
+let rec pp f json =
+  let pp =
+    let open Fmt in
+    let indent = 2 in
+    match json with
+    | `Bool b -> const bool b
+    | `Float f -> const float f
+    | `String s -> const Dump.string s
+    | `Null -> const string "null"
+    | `A elements ->
+      box
+      @@ const string "["
+         ++ (hvbox ~indent @@ (cut ++ const (list ~sep:comma pp) elements))
+         ++ cut ++ const string "]"
+    | `O elements ->
+      box
+      @@ const string "{"
+         ++ (hvbox ~indent
+            @@ cut
+               ++ const
+                    (list ~sep:comma
+                       (box ~indent
+                       @@ pair ~sep:(const string ":" ++ sp) Dump.string pp))
+                    elements)
+         ++ cut ++ const string "}"
+  in
+  pp f ()
+
 module Json_coding : Coding.IMPL with type t = Ezjsonm.value = struct
   type t = Ezjsonm.value
+
+  let pp = pp
 
   include Coding.Defaults
 
@@ -69,35 +99,7 @@ module Make (Impl : Impl) = struct
   let of_string s = Impl.of_string s
   let to_channel chan t = Ezjsonm.value_to_channel ~minify:true chan t
   let to_string t = Impl.to_string t
-
-  let rec pp f json =
-    let pp =
-      let open Fmt in
-      let indent = 2 in
-      match json with
-      | `Bool b -> const bool b
-      | `Float f -> const float f
-      | `String s -> const Dump.string s
-      | `Null -> const string "null"
-      | `A elements ->
-        box
-        @@ const string "["
-           ++ (hvbox ~indent @@ (cut ++ const (list ~sep:comma pp) elements))
-           ++ cut ++ const string "]"
-      | `O elements ->
-        box
-        @@ const string "{"
-           ++ (hvbox ~indent
-              @@ cut
-                 ++ const
-                      (list ~sep:comma
-                         (box ~indent
-                         @@ pair ~sep:(const string ":" ++ sp) Dump.string pp))
-                      elements)
-           ++ cut ++ const string "}"
-    in
-    pp f ()
-
+  let pp = pp
   let to_ezjsonm v = v
 
   let rec equal l r =

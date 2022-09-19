@@ -19,6 +19,7 @@ let ( let+ ) = Option.( >>| )
 module Jsoo_coding : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
   type t = Js.Unsafe.any
 
+  let pp fmt t = Fmt.string fmt @@ Js.to_string @@ Js._JSON##stringify t
   let type_name o = Js_of_ocaml.Js.typeof o |> Js.to_string
 
   let key_get =

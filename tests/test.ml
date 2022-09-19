@@ -263,6 +263,21 @@ module Variant = struct
       computed_payload_schema
       (Computed { x = 239; y = 114 })
       [%ezjsonm { x = 239; y = 114; z = 353 }]
+
+  let no_match () =
+    let error =
+      Schematic.Json.decode expectation_schema
+        [%ezjsonm { invalid = "payload" }]
+    in
+    Alcotest.(check ~here:[%here] (result test_expectation decoding_error))
+      "invalid variant decoding"
+      (Error
+         {
+           path = [];
+           schema = Some "expectation";
+           reason = {|no union case was matched for {"invalid": "payload"}|};
+         })
+      error
 end
 
 (* Polymorphic variant *)
@@ -1329,6 +1344,7 @@ let () =
           test_case "variant" `Quick Variant.variant;
           test_case "singleton variant" `Quick Variant.singleton;
           test_case "computed variant field" `Quick Variant.computed;
+          test_case "unmatched variant" `Quick Variant.no_match;
           test_case "polymorphic variant" `Quick Polymorphic_variant.payload;
           test_case "keyed polymorphic variant" `Quick Polymorphic_variant.keyed;
           test_case "alias" `Quick alias;

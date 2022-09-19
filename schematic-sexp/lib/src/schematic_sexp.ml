@@ -9,6 +9,8 @@ let schema_versioned (_ : Schema.version) = schema
 module Sexp_coding : Coding.IMPL with type t = t = struct
   type nonrec t = t
 
+  let pp = Sexplib.Sexp.pp
+
   include Coding.Defaults
 
   let type_name = function
