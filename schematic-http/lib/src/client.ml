@@ -250,38 +250,49 @@ module Check_status (Status : STATUS) (Handler : HANDLER) = struct
   let raw ?headers ?body method_ uri =
     let f ((resp, body) as r) =
       let status = Cohttp_.Response.status resp in
-      match Status.check status with
-      | `Body_error schema -> (
-        let* () =
-          Logs.warn (fun m ->
-              m "unexpected status %s querying %a"
-                (Cohttp_.Code.string_of_status status)
-                Uri.pp uri)
-        and* body = Body.to_string body in
-        match Handler.Coding.decode schema body with
-        | Result.Ok error ->
+      let rec extract_error = function
+        | `Body_error schema ->
+          extract_error
+            (`Body_decoder (Body_decoder { schema; decode = (fun e -> e) }))
+        | `Body_decoder (Body_decoder { schema; decode }) -> (
+          let* () =
+            Logs.warn (fun m ->
+                m "unexpected status %s querying %a"
+                  (Cohttp_.Code.string_of_status status)
+                  Uri.pp uri)
+          and* body = Body.to_string body in
+          match Handler.Coding.decode schema body with
+          | Result.Ok error ->
+            Lwt_result.fail
+              Error.(
+                make ~method_ ~status
+                  ~reason:(`Http (Unexpected_status (decode error)))
+                  uri)
+          | Result.Error e ->
+            let e =
+              {
+                e with
+                reason = Fmt.str "while decoding error body: %s" e.reason;
+              }
+            in
+            Lwt_result.fail
+              Error.(make ~method_ ~status ~reason:(`Decoding e) uri))
+        | `Error error ->
+          let* () =
+            Logs.warn (fun m ->
+                m "unexpected status %s querying %a"
+                  (Cohttp_.Code.string_of_status status)
+                  Uri.pp uri)
+          and* () = Body.drain body in
           Lwt_result.fail
             Error.(
               make ~method_ ~status ~reason:(`Http (Unexpected_status error))
                 uri)
-        | Result.Error e ->
-          let e =
-            { e with reason = Fmt.str "while decoding error body: %s" e.reason }
-          in
-          Lwt_result.fail
-            Error.(make ~method_ ~status ~reason:(`Decoding e) uri))
-      | `Error error ->
-        let* () =
-          Logs.warn (fun m ->
-              m "unexpected status %s querying %a"
-                (Cohttp_.Code.string_of_status status)
-                Uri.pp uri)
-        and* () = Body.drain body in
-        Lwt_result.fail
-          Error.(
-            make ~method_ ~status ~reason:(`Http (Unexpected_status error)) uri)
-      | `Ok -> Monad.return r
+        | `Ok -> Monad.return r
+      in
+      extract_error (Status.check status)
     in
+
     Handler.raw ?headers ?body method_ uri
     |> Lwt_result.map_error (function
          | Error.{ reason = `Http e; _ } as error ->

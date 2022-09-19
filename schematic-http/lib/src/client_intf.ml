@@ -78,12 +78,23 @@ module type RATE_LIMIT = sig
   val sleep : float -> unit Lwt.t
 end
 
+type 'error body_decoder =
+  | Body_decoder : {
+      schema : 'e Schematic.Schema.t;
+      decode : 'e -> 'error;
+    }
+      -> 'error body_decoder
+
 module type STATUS = sig
   type error
 
   val check :
     Cohttp.Code.status_code ->
-    [ `Body_error of error Schematic.Schema.t | `Error of error | `Ok ]
+    [ `Body_error of error Schematic.Schema.t
+    | `Body_decoder of error body_decoder
+    | `Error of error
+    | `Ok
+    ]
 end
 
 module type HANDLER = sig
