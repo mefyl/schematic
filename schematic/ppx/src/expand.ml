@@ -194,6 +194,47 @@ let specs_empty =
     omit = false;
   }
 
+let versioned versioned unversioned =
+  let open Ast_pattern in
+  let versioned =
+    let+ op, (schema, version) =
+      let version v =
+        let f context loc pl cont =
+          parse (estring __) loc pl (fun s ->
+              match Semver.of_string s with
+              | None -> Location.raise_errorf ~loc "invalid semantic version"
+              | Some version ->
+                (to_func v) context loc version (fun v -> cont v))
+        in
+        of_func f
+      and op v =
+        let f context loc pl cont =
+          let v = to_func v in
+          parse
+            (pexp_ident @@ lident __)
+            loc pl
+            (function
+              | "=" -> v context loc `Eq (fun v -> cont v)
+              | "<" -> v context loc `Lt (fun v -> cont v)
+              | "<=" -> v context loc `Lte (fun v -> cont v)
+              | ">" -> v context loc `Gt (fun v -> cont v)
+              | ">=" -> v context loc `Gte (fun v -> cont v)
+              | op ->
+                Location.raise_errorf ~loc "invalid version operator: %s" op)
+        in
+        of_func f
+      in
+      pexp_apply (op __)
+        (pair nolabel versioned ^:: pair nolabel (version __) ^:: nil |> pack2)
+      |> pack2
+    in
+    (schema, Some (version, op))
+  and unversioned =
+    let+ expr = unversioned in
+    (expr, None)
+  in
+  single_expr_payload (versioned ||| unversioned)
+
 module Attributes = struct
   type 'a versioned =
     ('a * (Semver.t * [ `Eq | `Gt | `Gte | `Lt | `Lte ]) option) list
@@ -237,7 +278,7 @@ module Attributes = struct
       | None, None -> (Required, t))
 
   type t = {
-    alias : string option;
+    alias : string versioned; [@default []]
     computed :
       (string, expression * core_type, String.comparator_witness) Map.t;
     gadt_variant : string option;
@@ -274,20 +315,13 @@ module Attributes = struct
     | { attr_name = { txt; _ }; attr_loc = loc; attr_payload } :: attrs -> (
       let attrs = extract ~alias ~computed ~name ~union_key attrs in
       match txt with
-      | "schematic.as" when alias -> (
-        match attrs with
-        | { alias = None; _ } ->
-          {
-            attrs with
-            alias =
-              Some
-                (expect
-                   Ast_pattern.(single_expr_payload (estring __))
-                   ~loc attr_payload);
-          }
-        | _ ->
-          Ppxlib.Location.raise_errorf ~loc
-            "schematic-ppx: duplicate schematic.as annotation on schema")
+      | "schematic.as" when alias ->
+        let alias =
+          expect
+            Ast_pattern.(versioned (estring __) (estring __))
+            ~loc attr_payload
+        in
+        { attrs with alias = attrs.alias @ [ alias ] }
       | "schematic.computed" when computed ->
         let computed =
           let computed =
@@ -356,7 +390,7 @@ module Attributes = struct
         attrs)
     | [] ->
       {
-        alias = None;
+        alias = [];
         computed = Map.empty (module String);
         gadt_variant = None;
         schema = None;
@@ -424,47 +458,6 @@ module type EXPANSION = sig
     constructor_declaration list ->
     expanded
 end
-
-let versioned versioned unversioned =
-  let open Ast_pattern in
-  let versioned =
-    let+ op, (schema, version) =
-      let version v =
-        let f context loc pl cont =
-          parse (estring __) loc pl (fun s ->
-              match Semver.of_string s with
-              | None -> Location.raise_errorf ~loc "invalid semantic version"
-              | Some version ->
-                (to_func v) context loc version (fun v -> cont v))
-        in
-        of_func f
-      and op v =
-        let f context loc pl cont =
-          let v = to_func v in
-          parse
-            (pexp_ident @@ lident __)
-            loc pl
-            (function
-              | "=" -> v context loc `Eq (fun v -> cont v)
-              | "<" -> v context loc `Lt (fun v -> cont v)
-              | "<=" -> v context loc `Lte (fun v -> cont v)
-              | ">" -> v context loc `Gt (fun v -> cont v)
-              | ">=" -> v context loc `Gte (fun v -> cont v)
-              | op ->
-                Location.raise_errorf ~loc "invalid version operator: %s" op)
-        in
-        of_func f
-      in
-      pexp_apply (op __)
-        (pair nolabel versioned ^:: pair nolabel (version __) ^:: nil |> pack2)
-      |> pack2
-    in
-    (schema, Some (version, op))
-  and unversioned =
-    let+ expr = unversioned in
-    (expr, None)
-  in
-  single_expr_payload (versioned ||| unversioned)
 
 let version_match ~loc ~f init options =
   let f next = function
@@ -967,14 +960,17 @@ module Schema = struct
     in
     let f (txt, pcd_args, loc, Attributes.{ alias; computed; _ }) =
       let module Ast = (val Ast_builder.make loc) in
-      let name = Option.value ~default:(String.lowercase txt) alias in
+      let name =
+        version_match ~loc ~f:Ast.estring
+          (Ast.estring (String.lowercase txt))
+          alias
+      in
       let schema, ctor_pattern, ctor_value, pattern, value =
         match constructor_arguments_normalize ~loc pcd_args with
         | None ->
           let schema =
             if Option.is_none type_context.attributes.union_key then
-              expanded_of_descriptor ~loc
-                [%expr String_const [%e Ast.estring name]]
+              expanded_of_descriptor ~loc [%expr String_const [%e name]]
             else expanded_of_descriptor ~loc [%expr Object FieldEnd]
           in
           (schema, None, None, None, None)
@@ -1016,7 +1012,7 @@ module Schema = struct
         [%expr
           Schema.Case
             {
-              name = [%e Ast.estring name];
+              name = [%e name];
               schema = [%e schema_of_expanded ~loc schema];
               encoder = [%e construct];
               decoder = [%e destruct];
