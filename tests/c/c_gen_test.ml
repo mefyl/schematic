@@ -3,11 +3,12 @@ open C_test_types
 
 (* TODO: prefixing, for lack of namespacing *)
 
-let primitive_record_c = {|
-struct {
+let primitive_record_c =
+  {|
+typedef struct {
   int a;
   int b;
-}
+} primitive_record;
 |}
 
 let primitive_record_of_caml =
@@ -36,14 +37,15 @@ value primitive_record_to_caml(primitive_record* p) {
 |}
 
 let type_alias_c = {|
-int
+typedef int type_alias;
 |}
 
-let wrapper_c = {|
-struct {
+let wrapper_c =
+  {|
+typedef struct {
   int somevar;
   primitive_record* r;
-}
+} wrapper;
 |}
 
 let wrapper_of_caml =
@@ -72,15 +74,16 @@ value wrapper_to_caml(wrapper* p) {
 |}
 
 let string_wrapper_c = {|
-char*
+typedef char* string_wrapper;
 |}
 
 (* XXX: get rid of union if there is no payload *)
-let basic_variant_c = {|
-enum {
+let basic_variant_c =
+  {|
+typedef enum {
   basic_variant_a,
   basic_variant_b
-}
+} basic_variant;
 |}
 
 let basic_variant_of_caml =
@@ -103,7 +106,7 @@ value basic_variant_to_caml(basic_variant x) {
 (* FIXME: possible collisions with "tag" and "payload" *)
 let payload_variant_c =
   {|
-struct {
+typedef struct {
   enum {
     payload_variant_nothing_tag,
     payload_variant_nothing2_tag,
@@ -113,7 +116,7 @@ struct {
   union {
     int someint;
   }* payload;
-}
+} payload_variant;
 |}
 
 let payload_variant_of_caml =
@@ -163,14 +166,15 @@ value payload_variant_to_caml(payload_variant x) {
 |}
 
 let pair_alias_c = {|
-tuple_string_int
+typedef tuple_string_int pair_alias;
 |}
 
-let string_int_tuple_c = {|
-struct {
+let string_int_tuple_c =
+  {|
+typedef struct {
   char* t0;
   int t1;
-}
+} tuple_string_int;
 |}
 
 (* XXX tuple naming *)
@@ -216,18 +220,19 @@ value tuple_string_int_to_caml(tuple_string_int x) {
 }
 |}
 
-let record_with_variant_c = {|
-struct {
+let record_with_variant_c =
+  {|
+typedef struct {
   payload_variant v;
-}
+} record_with_variant;
 |}
 
 let record_with_pair_alias_c =
   {|
-struct {
+typedef struct {
   int a;
   pair_alias pair_alias;
-}
+} record_with_pair_alias;
 |}
 
 let record_with_pair_alias_of_caml =
@@ -257,26 +262,27 @@ value record_with_pair_alias_to_caml(record_with_pair_alias* p) {
 
 let behemoth_c =
   {|
-struct {
+typedef struct {
   diverse* d;
   basic_variant b;
   payload_variant p;
   tuple_string_wrapper pair;
   pair_alias pair_alias;
-}
+} behemoth;
 |}
 
-let string_wrapper_tuple_c = {|
-struct {
+let string_wrapper_tuple_c =
+  {|
+typedef struct {
   char* t0;
   wrapper* t1;
-}
+} tuple_string_wrapper;
 |}
 
 let diverse_c = {|
-struct {
+typedef struct {
   char* s;
-}
+} diverse;
 |}
 
 let pretty_string =
@@ -286,8 +292,8 @@ let pretty_string =
 module Generate_types = struct
   let test t expected =
     Schematic.C.of_schema t
-    |> List.map ~f:(fun (_id, schema) ->
-           "\n" ^ Schematic.C.to_c_type_expression schema ^ "\n")
+    |> List.map ~f:Schematic.C.export
+    |> List.map ~f:(fun gen -> "\n" ^ Schematic.C.typedef_src gen)
     |> Alcotest.(check (list pretty_string) "typescript declarations" expected)
 
   let primitive_record () = test primitive_record_schema [ primitive_record_c ]
@@ -325,8 +331,9 @@ end
 module Of_caml = struct
   let test t expected =
     Schematic.C.of_schema t
-    |> List.map ~f:(fun (id, schema) ->
-           Schematic.C.to_of_caml_src id schema |> fun s -> "\n" ^ s ^ "\n")
+    |> List.map ~f:Schematic.C.export
+    |> List.map ~f:(fun Schematic.C.{ of_caml; _ } ->
+           Schematic.C.impl_src of_caml |> fun s -> "\n" ^ s ^ "\n")
     |> Alcotest.(check (list pretty_string) "*_of_caml declarations" expected)
 
   let primitive_record () =
@@ -355,8 +362,9 @@ end
 module To_caml = struct
   let test t expected =
     Schematic.C.of_schema t
-    |> List.map ~f:(fun (id, schema) ->
-           Schematic.C.to_to_caml_src id schema |> fun s -> "\n" ^ s ^ "\n")
+    |> List.map ~f:Schematic.C.export
+    |> List.map ~f:(fun Schematic.C.{ to_caml; _ } ->
+           Schematic.C.impl_src to_caml |> fun s -> "\n" ^ s ^ "\n")
     |> Alcotest.(check (list pretty_string) "*_to_caml declarations" expected)
 
   let primitive_record () =

@@ -1,20 +1,20 @@
 open Base
 open C_intf
+open C_pp
 
 (* TODO: prefixes *)
-let force_newline fmt _ = Caml.Format.pp_force_newline fmt ()
-
 (* TODO:
 
    - polymorphic variants (need to hash - prehash? interaction with main?) *)
 
+let force_newline fmt _ = Caml.Format.pp_force_newline fmt ()
 let pp_statements = Fmt.((vbox @@ list ~sep:semi string) ++ const char ';')
 let ptr_type = Fmt.str "%s*"
 
 let signature ~return_type ~fname ~argtype ~argname =
   Fmt.str "%s %s(%s %s)" return_type fname argtype argname
 
-(* TODO: use the generic braced we wanted *)
+(* TODO: use the generic braced *)
 let case ~indent case contents =
   let open Fmt in
   let post_case, post_box =
@@ -24,8 +24,7 @@ let case ~indent case contents =
   in
   vbox ~indent (const string (Fmt.str "case %s:" case) ++ post_case) ++ post_box
 
-let pp_of_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
-    =
+let pp_of_caml_converter ?(indent = 2) (name, ast) =
   let open Fmt in
   let ptr_type = ptr_type name in
   let c_function_name = of_caml_name_for name in
@@ -128,13 +127,12 @@ let pp_of_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
     (* The considered type is merely an alias for another *)
     (* XXX: how shall we know whether this ought to be a pointer? *)
     (* If it ought to, it should be a Pointer (Atom s)! *)
-    | Atom aliased_name ->
+    | (Atom aliased_name | Pointer (Atom aliased_name)) as x ->
       let pp =
         const pp_statements
           [
             "CAMLparam1(v)";
-            Fmt.str "%s res = %s(v)" aliased_name
-              (of_caml_name_for aliased_name);
+            Fmt.str "%s res = %s(v)" aliased_name (of_caml_name_for_c x);
             "CAMLreturnT(pair_alias, res)";
           ]
       in
@@ -146,16 +144,9 @@ let pp_of_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
   let decl =
     signature ~return_type ~fname:c_function_name ~argtype:"value" ~argname:"v"
   in
-  let opening =
-    hbox @@ (const string decl ++ const char ' ' ++ const char '{')
-  in
-  let printer =
-    vbox ~indent (opening ++ cut ++ vbox body) ++ cut ++ const char '}'
-  in
-  printer f ()
+  { signature = decl; impl = body }
 
-let pp_to_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
-    =
+let pp_to_caml_converter ?(indent = 2) (name, ast) =
   let open Fmt in
   let ptr_type = ptr_type name in
   let c_function_name = to_caml_name_for name in
@@ -250,31 +241,27 @@ let pp_to_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
       in
       ("x", false, pp)
     (* A type that is plainly aliased to another. *)
-    | Atom aliased_name ->
+    | (Atom aliased_name | Pointer (Atom aliased_name)) as x ->
       let pp =
         const pp_statements
           [
             "CAMLparam0()";
             "CAMLlocal1(v)";
-            Fmt.str "v = %s(x)" (to_caml_name_for aliased_name);
+            Fmt.str "v = %s(x)" (to_caml_name_for_c x);
             "CAMLreturn(v)";
           ]
       in
       ("x", false, pp)
-    | x ->
-      Fmt.epr "unsupported in to_caml: %a\n" pp x;
-      failwith "unsupported"
+    | x -> failwith "unsupported in to_caml: %a\n" pp x
   in
   let argtype = if is_ptr then ptr_type else name in
   let decl =
     signature ~return_type:"value" ~fname:c_function_name ~argtype ~argname
   in
-  let opening =
-    hbox @@ (const string decl ++ const char ' ' ++ const char '{')
-  in
-  let printer =
-    vbox ~indent (opening ++ cut ++ vbox body) ++ cut ++ const char '}'
-  in
-  printer f ()
+  { signature = decl; impl = body }
 
 (* TODO: generate *_free() functions *)
+
+let converters name ast =
+  let open Fmt in
+  (pp_of_caml_converter (name, ast), pp_to_caml_converter (name, ast))

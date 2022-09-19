@@ -9,6 +9,8 @@ external basic_variant_rt_id : basic_variant -> basic_variant
 external payload_variant_rt_id : payload_variant -> payload_variant
   = "sch_payload_variant_rt_id"
 
+external behemoth_rt_id : behemoth -> behemoth = "sch_behemoth_rt_id"
+
 (* TODO variants*)
 
 (* Most robust way of testing conversion, for sure:
@@ -56,6 +58,20 @@ module Tests = struct
     let new_x = payload_variant_rt_id x in
     let t = Alcotest.testable pp_payload_variant equal_payload_variant in
     test t new_x x
+
+  let behemoth () =
+    let x : behemoth =
+      {
+        d = { s = "Coucou" };
+        b = B;
+        p = SomeInt 101;
+        pair = ("hello", { somevar = 1; r = { a = 0; b = 56000 } });
+        pair_alias = ("coin", 8);
+      }
+    in
+    let new_x = behemoth_rt_id x in
+    let t = Alcotest.testable pp_behemoth equal_behemoth in
+    test t new_x x
 end
 
 let () =
@@ -71,5 +87,6 @@ let () =
             test_case "payload_variant: plain" `Quick payload_variant_plain;
             test_case "payload_variant: with payload" `Quick
               payload_variant_with_pl;
+            test_case "behemoth" `Quick behemoth;
           ] );
     ]

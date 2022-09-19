@@ -13,6 +13,20 @@ type t =
 
 type c = t
 
+(* XXX: order of signatures! *)
+
+type c_function = {
+  signature : string;
+  impl : unit Fmt.t;
+}
+
+type c_gen = {
+  name : string;
+  type_expr : unit Fmt.t;
+  to_caml : c_function;
+  of_caml : c_function; (* TODO free *)
+}
+
 open Base
 
 let tuple_name items =
