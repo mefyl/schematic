@@ -84,7 +84,15 @@ module Of = Cwalk.Walk (struct
       cases |> List.map ~f:(fun (s, (c, m)) -> ((s, c), m)) |> List.unzip
     in
     let marks = marks |> Marks.merge in
-    (Variant (Option.value_exn name, constructors), marks)
+
+    let basic, rich =
+      constructors
+      |> List.partition_map ~f:(function
+           | (s, Void) as x -> First s
+           | (_, _) as x -> Second x)
+    in
+
+    (Variant { name = Option.value_exn name; basic; rich }, marks)
 
   let tuple ts =
     let items, marks = List.unzip ts in
@@ -158,17 +166,11 @@ let pp ?(indent = 2) fmt ts =
         braced (const string "union") (list ~sep:cut struct_or_union_field)
       in
 
-      let variant fmt (name, constructors) =
-        let is_basic =
-          List.for_all ~f:(function _, Void -> true | _ -> false) constructors
-        in
-        let basic, rich = basic_rich_split constructors in
-        let variant_names = List.map ~f:fst basic @ List.map ~f:fst rich in
-
-        (* An enum declaring each constructor of the variant. This is totally
-           independent of whether there is a payload associated with those
-           constructors. *)
+      let variant fmt (name, basic, rich) =
+        let is_basic = List.is_empty rich in
+        (* An enum declaring each constructor of the variant. *)
         let enum =
+          let variant_names = basic @ List.map ~f:fst rich in
           let tag_suffix = if is_basic then "" else "_tag" in
           braced (const string "enum")
             (const
@@ -177,17 +179,11 @@ let pp ?(indent = 2) fmt ts =
                   (fun fmt s -> Fmt.fmt "%s_%s%s" fmt name s tag_suffix))
                variant_names)
         in
-
         let printer =
           if is_basic then enum
           else
             let tag_field = enum ++ const string " tag;" in
-            let payload_field =
-              const union_
-                (constructors
-                |> List.filter ~f:(function _, Void -> false | _ -> true))
-              ++ const string " payload;"
-            in
+            let payload_field = const union_ rich ++ const string " payload;" in
             let inner = tag_field ++ cut ++ payload_field in
 
             (* Kind of a special case of struct... *)
@@ -204,7 +200,7 @@ let pp ?(indent = 2) fmt ts =
       | Tuple types ->
         let fields = tuple_fields types in
         const struct_ fields
-      | Variant v -> const variant v
+      | Variant { name; basic; rich } -> const variant (name, basic, rich)
       | Void -> nop
     in
     printer fmt ()

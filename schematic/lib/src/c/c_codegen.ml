@@ -45,78 +45,73 @@ let pp_of_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
         @ [ Fmt.str "CAMLreturnT(%s, p)" ptr_type ]
       in
       (true, const pp_statements statements)
-    | Variant (_name, constructors) ->
-      let plain_ctrs, rich_ctrs = basic_rich_split constructors in
+      (* Plain-only variant *)
+    | Variant { basic; rich = []; _ } ->
+      let pp =
+        const pp_statements
+          [
+            Fmt.str "%s x = Int_val(v)" name;
+            Fmt.str "assert(x < %d)" (List.length basic);
+            "return x";
+          ]
+      in
+      (false, pp)
+    | Variant { basic; rich } ->
+      let plain_case =
+        const pp_statements
+          [
+            "res.tag = Int_val(v)";
+            Fmt.str "assert(res.tag < %d)" (List.length basic);
+          ]
+      in
+      let case : (int * (string * c)) Fmt.t =
+       fun fmt (i, (field_name, c)) ->
+        let typename =
+          match c with Atom s -> s | _ -> failwith "unsupported"
+        in
+        case ~indent (Int.to_string i)
+          (Some
+             (const pp_statements
+                [
+                  (* XXX: tuples will ruin the day. *)
+                  (* FIXME FIXME FIXME *)
+                  Fmt.str "res.payload.%s = %s(Field(v, 0))" field_name
+                    (of_caml_name_for typename);
+                  "break";
+                ]))
+          fmt ()
+      in
 
-      if List.is_empty rich_ctrs then
-        let plain_case =
-          let stmts =
-            [
-              Fmt.str "%s x = Int_val(v)" name;
-              Fmt.str "assert(x < %d)" (List.length plain_ctrs);
-              "return x";
-            ]
-          in
-          const pp_statements stmts
-        in
-        (false, plain_case)
-      else
-        let plain_case =
-          const pp_statements
-            [
-              "res.tag = Int_val(v)";
-              Fmt.str "assert(res.tag < %d)" (List.length plain_ctrs);
-            ]
-        in
-        let case : (int * (string * c)) Fmt.t =
-         fun fmt (i, (field_name, c)) ->
-          let typename =
-            match c with Atom s -> s | _ -> failwith "unsupported"
-          in
-          case ~indent (Int.to_string i)
-            (Some
-               (const pp_statements
-                  [
-                    (* XXX: tuples will ruin the day. *)
-                    (* FIXME FIXME FIXME *)
-                    Fmt.str "res.payload.%s = %s(Field(v, 0))" field_name
-                      (of_caml_name_for typename);
-                    "break";
-                  ]))
-            fmt ()
-        in
-
-        let rich_case =
-          let switch =
-            vbox ~indent
-              (const string "switch (Tag_val(v)) {"
-              ++ cut
-              ++ const (list ~sep:semi case)
-                   (rich_ctrs
-                   (* XXX: this must exist already? :( )*)
-                   |> List.mapi ~f:(fun i x -> (i, x))))
-            ++ cut ++ const char '}'
-          in
-          const pp_statements
-            [
-              Fmt.str "res.tag = %d + Tag_val(v)" (List.length plain_ctrs);
-              Fmt.str "assert(Tag_val(v) < %d)" (List.length rich_ctrs);
-            ]
-          ++ cut ++ switch
-        in
-
-        let open Fmt in
-        ( false,
-          vbox
-            (const pp_statements [ "CAMLparam1(v)"; Fmt.str "%s res" name ]
+      let rich_case =
+        let switch =
+          vbox ~indent
+            (const string "switch (Tag_val(v)) {"
             ++ cut
-            ++ vbox ~indent
-                 (const string "if (Is_long(v)) {" ++ cut ++ plain_case)
-            ++ cut
-            ++ vbox ~indent (const string "} else {" ++ cut ++ rich_case)
-            ++ cut ++ const char '}')
+            ++ const (list ~sep:semi case)
+                 (rich
+                 (* XXX: this must exist already? :( )*)
+                 |> List.mapi ~f:(fun i x -> (i, x))))
+          ++ cut ++ const char '}'
+        in
+        const pp_statements
+          [
+            Fmt.str "res.tag = %d + Tag_val(v)" (List.length basic);
+            Fmt.str "assert(Tag_val(v) < %d)" (List.length rich);
+          ]
+        ++ cut ++ switch
+      in
+
+      let open Fmt in
+      ( false,
+        vbox
+          (const pp_statements [ "CAMLparam1(v)"; Fmt.str "%s res" name ]
           ++ cut
-          ++ const pp_statements [ Fmt.str "CAMLreturnT(%s, res)" name ] )
+          ++ vbox ~indent (const string "if (Is_long(v)) {" ++ cut ++ plain_case)
+          ++ cut
+          ++ vbox ~indent (const string "} else {" ++ cut ++ rich_case)
+          ++ cut ++ const char '}')
+        ++ cut
+        ++ const pp_statements [ Fmt.str "CAMLreturnT(%s, res)" name ] )
     | Tuple members ->
       let tuptype = tuple_name members in
       let pp =
@@ -186,66 +181,55 @@ let pp_to_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
         @ field_stores @ [ "CAMLreturn(v)" ]
       in
       ("p", true, const pp_statements statements)
-    | Variant (variant_name, constructors) ->
-      let basic_ctrs, rich_ctrs = basic_rich_split constructors in
+    (* Plain-only variant *)
+    | Variant { basic; rich = []; _ } ->
       let pp =
-        if List.is_empty rich_ctrs then
-          const pp_statements
-            [
-              Fmt.str "assert(x < %d)" (List.length basic_ctrs);
-              "return Val_int(x)";
-            ]
-        else
-          let basic_cases =
-            basic_ctrs
-            |> List.mapi ~f:(fun i (constr_name, _) ->
-                   let case_name =
-                     Fmt.str "%s_%s_tag" variant_name constr_name
-                   in
-                   let case_contents =
-                     const pp_statements
-                       [
-                         (* XXX FIXME alloc size - tuples...*)
-                         Fmt.str "v = Val_int(%d)" i;
-                         "break";
-                       ]
-                   in
-                   case ~indent case_name (Some case_contents))
-          in
-
-          let rich_cases =
-            rich_ctrs
-            |> List.mapi ~f:(fun i (constr_name, constr_type) ->
-                   let case_name =
-                     Fmt.str "%s_%s_tag" variant_name constr_name
-                   in
-                   let case_contents =
-                     const pp_statements
-                       [
-                         (* XXX FIXME alloc size - tuples*)
-                         Fmt.str "v = caml_alloc(1, %d)" i;
-                         Fmt.str "Store_field(v, 0, %s(x.payload.%s))"
-                           (to_caml_name_for_c constr_type)
-                           constr_name;
-                         "break";
-                       ]
-                   in
-                   case ~indent case_name (Some case_contents))
-          in
-
-          let cases =
-            basic_cases @ rich_cases
-            |> List.fold ~init:nop ~f:(fun acc x -> acc ++ cut ++ x)
-          in
-
-          let switch =
-            vbox ~indent (const string "switch (x.tag) {" ++ cases)
-            ++ cut ++ const char '}'
-          in
-
-          const pp_statements [ "CAMLparam0()"; "CAMLlocal1(v)" ]
-          ++ cut ++ switch ++ cut
-          ++ const pp_statements [ "CAMLreturn(v)" ]
+        const pp_statements
+          [ Fmt.str "assert(x < %d)" (List.length basic); "return Val_int(x)" ]
+      in
+      ("x", false, pp)
+    | Variant { name = variant_name; basic; rich } ->
+      let pp =
+        let basic_cases : (string * unit Fmt.t) list =
+          basic
+          |> List.mapi ~f:(fun i constr_name ->
+                 ( constr_name,
+                   const pp_statements
+                     [
+                       (* XXX FIXME alloc size - tuples...*)
+                       Fmt.str "v = Val_int(%d)" i;
+                       "break";
+                     ] ))
+        in
+        let rich_cases : (string * unit Fmt.t) list =
+          rich
+          |> List.mapi ~f:(fun i (constr_name, constr_type) ->
+                 ( constr_name,
+                   const pp_statements
+                     [
+                       (* XXX FIXME alloc size - tuples*)
+                       Fmt.str "v = caml_alloc(1, %d)" i;
+                       Fmt.str "Store_field(v, 0, %s(x.payload.%s))"
+                         (to_caml_name_for_c constr_type)
+                         constr_name;
+                       "break";
+                     ] ))
+        in
+        let cases =
+          basic_cases @ rich_cases
+          |> List.map ~f:(fun (constr_name, contents) ->
+                 case ~indent
+                   (case_name variant_name constr_name)
+                   (Some contents))
+          |> List.fold ~init:nop ~f:(fun acc x -> acc ++ cut ++ x)
+        in
+        let switch =
+          vbox ~indent (const string "switch (x.tag) {" ++ cases)
+          ++ cut ++ const char '}'
+        in
+        const pp_statements [ "CAMLparam0()"; "CAMLlocal1(v)" ]
+        ++ cut ++ switch ++ cut
+        ++ const pp_statements [ "CAMLreturn(v)" ]
       in
       ("x", false, pp)
     | Tuple members ->

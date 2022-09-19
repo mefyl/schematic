@@ -3,21 +3,17 @@ type t =
   | Atom of string
   | Pointer of t
   | Struct of { fields : (string * t) list }
-  | Variant of (string * (string * t) list)
-      (**(variant name (for prefixes)) X (constructor name X constructor
-         contents) *)
+  | Variant of {
+      name : string;
+      basic : string list;
+      rich : (string * t) list;
+    }
   | Tuple of t list
 [@@deriving show]
 
 type c = t
 
 open Base
-
-(** Separate a variant's basic (LHS) and rich (RHS) constructors *)
-let basic_rich_split =
-  List.partition_map ~f:(function
-    | (_, Void) as x -> First x
-    | (_, _) as x -> Second x)
 
 let tuple_name items =
   "tuple_"
@@ -42,3 +38,6 @@ let c_typename = function
 
 let of_caml_name_for_c = Fn.compose of_caml_name_for c_typename
 let to_caml_name_for_c = Fn.compose to_caml_name_for c_typename
+
+let case_name variant_name constr_name =
+  Fmt.str "%s_%s_tag" variant_name constr_name
