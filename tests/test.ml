@@ -26,13 +26,13 @@ let decoding_error =
 
 let dollar = String.Search_pattern.create "$"
 
-let test ?decoded name test schema value j =
+let test ~here ?decoded name test schema value j =
   let encoded = Schematic.Json.encode schema value in
-  Alcotest.check json (Fmt.str "%s: encoded JSON" name) j encoded;
+  Alcotest.check ~here json (Fmt.str "%s: encoded JSON" name) j encoded;
   let () =
     match Schematic.Json.decode schema j with
     | Result.Ok d ->
-      Alcotest.check test
+      Alcotest.check ~here test
         (Fmt.str "%s: decoded value" name)
         (Option.value ~default:value decoded)
         d
@@ -50,7 +50,9 @@ let test ?decoded name test schema value j =
       (String.escaped @@ Schematic.Json.to_string @@ encoded)
   in
   if Caml.Sys.command cmd <> 0 then
-    Alcotest.check json (Fmt.str "%s: schema validation" name) schema encoded
+    Alcotest.check ~here json
+      (Fmt.str "%s: schema validation" name)
+      schema encoded
 
 module Option = struct
   include Option
@@ -66,17 +68,18 @@ end
 let failure () =
   if
     try
-      test "int atom" Alcotest.int int_schema 28 [%ezjsonm 29];
+      test ~here:[%here] "int atom" Alcotest.int int_schema 28 [%ezjsonm 29];
       true
     with _ -> false
   then Alcotest.fail "failure test failed"
 
 (* Atoms *)
 
-let atom_int () = test "int atom" Alcotest.int int_schema 28 [%ezjsonm 28]
+let atom_int () =
+  test ~here:[%here] "int atom" Alcotest.int int_schema 28 [%ezjsonm 28]
 
 let atom_string () =
-  test "string atom" Alcotest.string string_schema "trente trois"
+  test ~here:[%here] "string atom" Alcotest.string string_schema "trente trois"
     [%ezjsonm "trente trois"]
 
 (* Optionals *)
@@ -84,11 +87,11 @@ let atom_string () =
 module Optionals = struct
   let options () =
     let () =
-      test "some int"
+      test ~here:[%here] "some int"
         Alcotest.(option int)
         (option_schema int_schema) (Some 28) [%ezjsonm 28]
     and () =
-      test "none int"
+      test ~here:[%here] "none int"
         Alcotest.(option int)
         (option_schema int_schema) None [%ezjsonm None]
     in
@@ -104,13 +107,13 @@ module Optionals = struct
 
   let nullable_option () =
     let () =
-      test "omitted" nullable_option nullable_option_schema { no = None }
-        (`O [])
+      test ~here:[%here] "omitted" nullable_option nullable_option_schema
+        { no = None } (`O [])
     and () =
-      test "null" nullable_option nullable_option_schema { no = Some None }
-        [%ezjsonm { no = None }]
+      test ~here:[%here] "null" nullable_option nullable_option_schema
+        { no = Some None } [%ezjsonm { no = None }]
     and () =
-      test "specified" nullable_option nullable_option_schema
+      test ~here:[%here] "specified" nullable_option nullable_option_schema
         { no = Some (Some 74) } [%ezjsonm { no = 74 }]
     in
     ()
@@ -125,12 +128,13 @@ module Optionals = struct
 
   let default_option () =
     let () =
-      test "none" default_option default_option_schema { oo = None } (`O [])
+      test ~here:[%here] "none" default_option default_option_schema
+        { oo = None } (`O [])
     and () =
-      test "some none" default_option default_option_schema { oo = Some None }
-        [%ezjsonm { oo = None }]
+      test ~here:[%here] "some none" default_option default_option_schema
+        { oo = Some None } [%ezjsonm { oo = None }]
     and () =
-      test "some some" default_option default_option_schema
+      test ~here:[%here] "some some" default_option default_option_schema
         { oo = Some (Some 877) } [%ezjsonm { oo = 877 }]
     in
     ()
@@ -147,8 +151,9 @@ module Optionals = struct
     let disabled_optionals =
       Alcotest.testable pp_disabled_optionals equal_disabled_optionals
     in
-    test "disabled optionals" disabled_optionals disabled_optionals_schema
-      { a = None; b = [] } [%ezjsonm { a = None; b = [] }]
+    test ~here:[%here] "disabled optionals" disabled_optionals
+      disabled_optionals_schema { a = None; b = [] }
+      [%ezjsonm { a = None; b = [] }]
 end
 
 (* Record *)
@@ -170,7 +175,7 @@ and v2 = { major = 3; minor = 4; subminor = 5 }
 and v3 = { major = 6; minor = 7; subminor = 8 }
 
 let record () =
-  test "record" test_version version_schema v1
+  test ~here:[%here] "record" test_version version_schema v1
     [%ezjsonm { major = 0; minor = 1; subminor = 2 }]
 
 (* Alias *)
@@ -178,7 +183,7 @@ let record () =
 type version_alias = version [@@deriving schema]
 
 let alias () =
-  test "record" test_version version_alias_schema v2
+  test ~here:[%here] "record" test_version version_alias_schema v2
     [%ezjsonm { major = 3; minor = 4; subminor = 5 }]
 
 (* Tuple *)
@@ -195,7 +200,7 @@ let pp_range fmt (l, r, i) =
 let test_range = Alcotest.testable pp_range ( = )
 
 let tuple () =
-  test "tuple" test_range range_schema (v1, v2, 83)
+  test ~here:[%here] "tuple" test_range range_schema (v1, v2, 83)
     [%ezjsonm
       [
         { major = 0; minor = 1; subminor = 2 };
@@ -210,22 +215,16 @@ type expectation =
   | Range of range
   | Nothing
   | Aliased [@schematic.as "aktually"]
-[@@deriving schema]
-
-let pp_expectation fmt = function
-  | Exact v -> pp_version fmt v
-  | Range (l, r, i) -> Fmt.pf fmt "(%a, %a, %i)" pp_version l pp_version r i
-  | Nothing -> Fmt.pf fmt "nothing"
-  | Aliased -> Fmt.pf fmt "aliased"
+[@@deriving schema, show]
 
 let test_expectation = Alcotest.testable pp_expectation ( = )
 
 module Variant = struct
   let variant () =
-    test "variant" test_expectation expectation_schema
+    test ~here:[%here] "variant" test_expectation expectation_schema
       (Exact { major = 1; minor = 2; subminor = 3 })
       [%ezjsonm { major = 1; minor = 2; subminor = 3 }];
-    test "variant" test_expectation expectation_schema
+    test ~here:[%here] "variant" test_expectation expectation_schema
       (Range
          ( { major = 1; minor = 2; subminor = 3 },
            { major = 4; minor = 5; subminor = 6 },
@@ -236,9 +235,9 @@ module Variant = struct
           { major = 4; minor = 5; subminor = 6 };
           108;
         ]];
-    test "variant" test_expectation expectation_schema Nothing
+    test ~here:[%here] "variant" test_expectation expectation_schema Nothing
       [%ezjsonm "nothing"];
-    test "variant" test_expectation expectation_schema Aliased
+    test ~here:[%here] "variant" test_expectation expectation_schema Aliased
       [%ezjsonm "aktually"]
 
   type singleton = Single [@@deriving eq, schema, show]
@@ -246,7 +245,7 @@ module Variant = struct
   let singleton = Alcotest.testable pp_singleton equal_singleton
 
   let singleton () =
-    test "singleton variant" singleton singleton_schema Single
+    test ~here:[%here] "singleton variant" singleton singleton_schema Single
       [%ezjsonm "single"]
 
   type computed_payload =
@@ -260,7 +259,7 @@ module Variant = struct
     Alcotest.testable pp_computed_payload equal_computed_payload
 
   let computed () =
-    test "variant payload with computed field" computed_payload
+    test ~here:[%here] "variant payload with computed field" computed_payload
       computed_payload_schema
       (Computed { x = 239; y = 114 })
       [%ezjsonm { x = 239; y = 114; z = 353 }]
@@ -283,12 +282,14 @@ module Polymorphic_variant = struct
   let test_day = Alcotest.testable pp_day equal_day
 
   let payload () =
-    test "polymorphic variant" test_day day_schema `Mon [%ezjsonm "mon"];
-    test "polymorphic variant alias" test_day day_schema `Tue
+    test ~here:[%here] "polymorphic variant" test_day day_schema `Mon
+      [%ezjsonm "mon"];
+    test ~here:[%here] "polymorphic variant alias" test_day day_schema `Tue
       [%ezjsonm "tuesday"];
-    test "polymorphic variant payload" test_day day_schema (`Wed 160)
-      [%ezjsonm 160];
-    test "polymorphic variant composite payload" test_day day_schema
+    test ~here:[%here] "polymorphic variant payload" test_day day_schema
+      (`Wed 160) [%ezjsonm 160];
+    test ~here:[%here] "polymorphic variant composite payload" test_day
+      day_schema
       (`Thu (true, false))
       [%ezjsonm [ true; false ]]
 
@@ -304,9 +305,9 @@ module Polymorphic_variant = struct
   let test_keyed = Alcotest.testable pp_keyed equal_keyed
 
   let keyed () =
-    test "keyed polymorphic variant" test_keyed keyed_schema `Left
+    test ~here:[%here] "keyed polymorphic variant" test_keyed keyed_schema `Left
       [%ezjsonm { position = "left" }];
-    test "keyed polymorphic variant" test_keyed keyed_schema
+    test ~here:[%here] "keyed polymorphic variant" test_keyed keyed_schema
       (`Center { stable = false })
       [%ezjsonm { position = "center"; stable = false }]
 end
@@ -315,16 +316,16 @@ end
 
 module List = struct
   let objects () =
-    test "list"
+    test ~here:[%here] "list"
       (Alcotest.list test_version)
       (list_schema version_schema)
       [] [%ezjsonm []];
-    test "list"
+    test ~here:[%here] "list"
       (Alcotest.list test_version)
       (list_schema version_schema)
       [ { major = 0; minor = 1; subminor = 2 } ]
       [%ezjsonm [ { major = 0; minor = 1; subminor = 2 } ]];
-    test "list"
+    test ~here:[%here] "list"
       (Alcotest.list test_version)
       (list_schema version_schema)
       [
@@ -340,19 +341,19 @@ module List = struct
         ]]
 
   let option () =
-    test "list"
+    test ~here:[%here] "list"
       Alcotest.(list (option int))
       (list_schema (option_schema int_schema))
       [] [%ezjsonm []];
-    test "list"
+    test ~here:[%here] "list"
       Alcotest.(list (option int))
       (list_schema (option_schema int_schema))
       [ Some 1; Some 2; Some 3 ] [%ezjsonm [ 1; 2; 3 ]];
-    test "list"
+    test ~here:[%here] "list"
       Alcotest.(list (option int))
       (list_schema (option_schema int_schema))
       [ None; None; None ] [%ezjsonm [ None; None; None ]];
-    test "list"
+    test ~here:[%here] "list"
       Alcotest.(list (option int))
       (list_schema (option_schema int_schema))
       [ Some 1; None; Some 3 ] [%ezjsonm [ 1; None; 3 ]]
@@ -364,7 +365,7 @@ module Parametric = struct
   type 'a pair = 'a * 'a [@@deriving schema]
 
   let simple () =
-    test "parametric_type"
+    test ~here:[%here] "parametric_type"
       (Alcotest.pair test_version test_version)
       (pair_schema version_schema)
       (v1, v3)
@@ -377,7 +378,7 @@ module Parametric = struct
   type _ anonymous = int [@@deriving schema]
 
   let anonymous () =
-    test "anonymous parameter" Alcotest.int
+    test ~here:[%here] "anonymous parameter" Alcotest.int
       (anonymous_schema version_schema)
       345 [%ezjsonm 345]
 end
@@ -390,7 +391,7 @@ module Gadt = struct
   let simple = Alcotest.testable pp_simple equal_simple
 
   let simple () =
-    test "simple GADT" simple
+    test ~here:[%here] "simple GADT" simple
       (simple_schema version_schema)
       Int [%ezjsonm "int"]
 
@@ -414,11 +415,11 @@ module Gadt = struct
 
   let complex () =
     let () =
-      test "complex GADT" (complex ())
+      test ~here:[%here] "complex GADT" (complex ())
         (int_complex_schema int_schema)
         Int [%ezjsonm "int"]
     in
-    test "complex GADT" (complex ())
+    test ~here:[%here] "complex GADT" (complex ())
       (string_complex_schema string_schema)
       (String "386") [%ezjsonm "386"]
 end
@@ -437,7 +438,7 @@ let pp_escape fmt { special_char; keyword } =
 let test_escape = Alcotest.testable pp_escape ( = )
 
 let escape () =
-  test "escape" test_escape escape_schema
+  test ~here:[%here] "escape" test_escape escape_schema
     { special_char = 128; keyword = "coin" }
     (`O [ ("'char$", `Float 128.); ("type", `String "coin") ])
 
@@ -456,7 +457,7 @@ module Recursive = struct
   let test_recursive = Alcotest.testable pp_recursive ( = )
 
   let plain () =
-    test "recursive" test_recursive schema
+    test ~here:[%here] "recursive" test_recursive schema
       { value = 0; next = Some { value = 1; next = None } }
       [%ezjsonm { value = 0; next = { value = 1 } }]
 
@@ -489,7 +490,7 @@ module Recursive = struct
     let _schema = parametric_schema int_schema in
     let () = Alcotest.(check int "third count" 1 !count) in
     let () =
-      test "recursive" (parametric Alcotest.int) schema
+      test ~here:[%here] "recursive" (parametric Alcotest.int) schema
         {
           count = ();
           value = 0;
@@ -509,7 +510,7 @@ and pp_mutally_b fmt { next_a } = Fmt.option pp_mutually_a fmt next_a
 let test_mutually_a = Alcotest.testable pp_mutually_a ( = )
 
 let mutually () =
-  test "mutually recursive" test_mutually_a mutually_a_schema
+  test ~here:[%here] "mutually recursive" test_mutually_a mutually_a_schema
     { next_b = Some { next_a = Some { next_b = None } } }
     [%ezjsonm { next_b = { next_a = [%aq `O []] } }]
 
@@ -523,7 +524,8 @@ type ignored = {
 
 let ignored () =
   let ignored = Alcotest.(testable pp_ignored equal_ignored) in
-  test "missing ignored fields are accepted" ignored ignored_schema
+  test ~here:[%here] "missing ignored fields are accepted" ignored
+    ignored_schema
     { ignored = (); not_ignored = () }
     [%ezjsonm { not_ignored = None }]
 
@@ -595,7 +597,7 @@ module Inline = struct
           [ [ "a"; "b"; "c"; "d" ] ]
         @@ descriptor_fields inline_schema.descriptor)
     in
-    test "coding" inline inline_schema
+    test ~here:[%here] "coding" inline inline_schema
       { a = 0; coin = { b = 1; c = 2 }; d = 3; ignored = () }
       [%ezjsonm { a = 0; b = 1; c = 2; d = 3 }]
 
@@ -608,7 +610,7 @@ module Inline = struct
           [ [ "a"; "b"; "c"; "d" ]; [ "dummy" ] ]
         @@ descriptor_fields variant_inline_schema.descriptor)
     in
-    test "coding" variant_inline variant_inline_schema
+    test ~here:[%here] "coding" variant_inline variant_inline_schema
       (Ctor { a = 0; coin = { b = 1; c = 2 }; d = 3; ignored = () })
       [%ezjsonm { a = 0; b = 1; c = 2; d = 3 }]
 
@@ -622,11 +624,11 @@ module Inline = struct
         @@ descriptor_fields inline_variant_schema.descriptor)
     in
     let () =
-      test "coding of Foo" inline_variant inline_variant_schema
+      test ~here:[%here] "coding of Foo" inline_variant inline_variant_schema
         { x = 362; pan = Foo { b = 363; c = 364 } }
         [%ezjsonm { x = 362; b = 363; c = 364 }]
     in
-    test "coding of Bar" inline_variant inline_variant_schema
+    test ~here:[%here] "coding of Bar" inline_variant inline_variant_schema
       { x = 369; pan = Bar { d = 370; e = 371 } }
       [%ezjsonm { x = 369; d = 370; e = 371 }]
 
@@ -639,7 +641,7 @@ module Inline = struct
           [ [ "maybe"; "b"; "c" ] ]
         @@ descriptor_fields (inline_maybe_schema inlined_schema).descriptor)
     and () =
-      test "inlinable" (inline_maybe inlined)
+      test ~here:[%here] "inlinable" (inline_maybe inlined)
         (inline_maybe_schema inlined_schema)
         { maybe = true; inline = { b = 411; c = 412 } }
         [%ezjsonm { maybe = true; b = 411; c = 412 }]
@@ -653,7 +655,7 @@ module Inline = struct
             [ [ "maybe"; "inline" ] ]
           @@ descriptor_fields schema.descriptor)
       and () =
-        test "not inlinable"
+        test ~here:[%here] "not inlinable"
           (inline_maybe Alcotest.int)
           schema
           { maybe = true; inline = 416 }
@@ -683,7 +685,7 @@ module Inline = struct
   let parametric = Alcotest.testable pp_parametric equal_parametric
 
   let inline_parametric () =
-    test "parametric inlinable" parametric parametric_schema
+    test ~here:[%here] "parametric inlinable" parametric parametric_schema
       { inlined = A { value = 457; param = () } }
       [%ezjsonm { value = 457 }]
 
@@ -709,11 +711,11 @@ module Inline = struct
     let inline_nested_optional =
       Alcotest.testable pp_inline_nested_optional equal_inline_nested_optional
     in
-    test "optional inline filled" inline_nested_optional
+    test ~here:[%here] "optional inline filled" inline_nested_optional
       inline_nested_optional_schema
       { inline_nested = { inlined = Some { b = 665; c = 666 } } }
       [%ezjsonm { b = 665; c = 666 }];
-    test "optional inline empty" inline_nested_optional
+    test ~here:[%here] "optional inline empty" inline_nested_optional
       inline_nested_optional_schema
       { inline_nested = { inlined = None } }
       (`O [])
@@ -722,11 +724,11 @@ module Inline = struct
     let inline_nested_default =
       Alcotest.testable pp_inline_nested_default equal_inline_nested_default
     in
-    test "default inline filled" inline_nested_default
+    test ~here:[%here] "default inline filled" inline_nested_default
       inline_nested_default_schema
       { inline_nested = { inlined = Some { b = 665; c = 666 } } }
       [%ezjsonm { b = 665; c = 666 }];
-    test "default inline empty" inline_nested_default
+    test ~here:[%here] "default inline empty" inline_nested_default
       inline_nested_default_schema
       { inline_nested = { inlined = None } }
       (`O [])
@@ -767,7 +769,7 @@ let make_time_local s =
   |> fun (t, tz, _) -> (t, Option.value_exn tz)
 
 let time () =
-  test "time" test_time event_schema
+  test ~here:[%here] "time" test_time event_schema
     {
       start = make_time "2020-05-08T23:48:34+02:00";
       endd_ = make_time "2020-05-08T23:48:47+02:00";
@@ -777,7 +779,7 @@ let time () =
         start = "2020-05-08T21:48:34-00:00";
         endd = "2020-05-08T21:48:47-00:00";
       }];
-  test "time-local" test_time_local event_local_schema
+  test ~here:[%here] "time-local" test_time_local event_local_schema
     {
       start_local = make_time_local "2020-05-08T23:48:34+02:00";
       end_local = make_time_local "2020-05-08T23:48:47+02:00";
@@ -807,9 +809,9 @@ and optional_inline_wrapper = {
 
 let optional_inline () =
   let t = Alcotest.testable pp_optional_inline_wrapper ( = ) in
-  test "missing optional inline" t optional_inline_wrapper_schema
+  test ~here:[%here] "missing optional inline" t optional_inline_wrapper_schema
     { inline = None; c = 377 } [%ezjsonm { c = 377 }];
-  test "filled optional inline" t optional_inline_wrapper_schema
+  test ~here:[%here] "filled optional inline" t optional_inline_wrapper_schema
     {
       inline = Some { a = 375; b = 376; inline2 = { d = 378 }; missing = None };
       c = 377;
@@ -829,11 +831,11 @@ type keyed =
 let keyed () =
   let tester = Alcotest.(testable pp_keyed equal_keyed) in
   let () =
-    test "paragraph" tester keyed_schema
+    test ~here:[%here] "paragraph" tester keyed_schema
       (Paragraph_ { content = "text" })
       [%ezjsonm { content = "text"; typ = "paragraph" }]
   and () =
-    test "header" tester keyed_schema
+    test ~here:[%here] "header" tester keyed_schema
       (Header { content = "text"; level = 411 })
       [%ezjsonm { content = "text"; level = 411; typ = "header" }]
   and () =
@@ -957,13 +959,14 @@ module Metadata = struct
           "type" : "object"
        }|};
     let tester = Alcotest.(testable pp_default ( = )) in
-    test "default-int" tester default_schema { a = 358; b = "---" }
-      [%ezjsonm { b = "---" }];
-    test "default-string" tester default_schema { a = 359; b = "359" }
-      [%ezjsonm { a = 359 }];
-    test "default-both" tester default_schema { a = 358; b = "359" } (`O []);
-    test "default-none" tester default_schema { a = 359; b = "---" }
-      [%ezjsonm { a = 359; b = "---" }]
+    test ~here:[%here] "default-int" tester default_schema
+      { a = 358; b = "---" } [%ezjsonm { b = "---" }];
+    test ~here:[%here] "default-string" tester default_schema
+      { a = 359; b = "359" } [%ezjsonm { a = 359 }];
+    test ~here:[%here] "default-both" tester default_schema
+      { a = 358; b = "359" } (`O []);
+    test ~here:[%here] "default-none" tester default_schema
+      { a = 359; b = "---" } [%ezjsonm { a = 359; b = "---" }]
 end
 
 module Comparison = struct
@@ -1029,7 +1032,7 @@ module Comparison = struct
 end
 
 module Error_messages = struct
-  let test name schema str e =
+  let test ~here name schema str e =
     let res =
       let* json =
         Schematic.Json.of_string str
@@ -1042,22 +1045,22 @@ module Error_messages = struct
       ()
     in
     Alcotest.(
-      check (result unit string) name (Result.Error e)
+      check ~here (result unit string) name (Result.Error e)
         (Result.map_error ~f:Schematic.Error.to_string res))
 
   let missing () =
     let () =
-      test "missing fields are reported" Recursive.schema
+      test ~here:[%here] "missing fields are reported" Recursive.schema
         {|{"value":0,"next":{"value":1,"next":{}}}|}
         {|path next.next: schema recursive: missing required field "value"|}
     and () =
-      test "root error display no path" Recursive.schema {|{}|}
+      test ~here:[%here] "root error display no path" Recursive.schema {|{}|}
         {|schema recursive: missing required field "value"|}
     in
     ()
 
   let type_error () =
-    test "missing" Recursive.schema
+    test ~here:[%here] "missing" Recursive.schema
       {|{"value":0,"next":{"value":1,"next":{"value":"nope"}}}|}
       {|path next.next.value: expected integer, got string|}
 end
@@ -1130,11 +1133,11 @@ let collision_2 =
 
 let collision () =
   let () =
-    test "collision_1" collision_1 collision_1_schema
+    test ~here:[%here] "collision_1" collision_1 collision_1_schema
       ({ collision_a = 725; collision_b = "725" } : collision_1)
       [%ezjsonm { collision_a = 725; collision_b = "725" }]
   and () =
-    test "collision_2" collision_2
+    test ~here:[%here] "collision_2" collision_2
       (collision_2_schema Schematic.Schemas.string_schema)
       ({ collision_a = 725; collision_b = "725" } : string collision_2)
       [%ezjsonm { collision_a = 725; collision_b = "725" }]
@@ -1155,9 +1158,9 @@ module Computed = struct
   let t = Alcotest.testable pp equal
 
   let computed () =
-    test "computed" t schema { x = 1; y = 2 }
+    test ~here:[%here] "computed" t schema { x = 1; y = 2 }
       [%ezjsonm { x = 1; y = 2; sum = 3; opposite = -1 }];
-    test "computed optional" t schema { x = 0; y = 0 }
+    test ~here:[%here] "computed optional" t schema { x = 0; y = 0 }
       [%ezjsonm { x = 0; sum = 0 }];
     (* This used to fail because the computed field was expected *)
     Alcotest.(check (result t decoding_error))
@@ -1196,17 +1199,19 @@ module Version = struct
     | _ -> None
 
   let test () =
-    test "latest none" t schema { v = None } [%ezjsonm { v = None }];
-    test "latest int" t schema { v = Some (Int 3) } [%ezjsonm { v = 3 }];
-    test "latest string" t schema { v = Some (String "3") }
+    test ~here:[%here] "latest none" t schema { v = None }
+      [%ezjsonm { v = None }];
+    test ~here:[%here] "latest int" t schema { v = Some (Int 3) }
+      [%ezjsonm { v = 3 }];
+    test ~here:[%here] "latest string" t schema { v = Some (String "3") }
       [%ezjsonm { v = "3" }];
-    test "old none" t
+    test ~here:[%here] "old none" t
       (schema_versioned schema_versions)
       { v = None } [%ezjsonm { w = None }];
-    test "old int" t
+    test ~here:[%here] "old int" t
       (schema_versioned schema_versions)
       { v = Some (Int 3) } [%ezjsonm { w = 3 }];
-    test "old string" t
+    test ~here:[%here] "old string" t
       (schema_versioned schema_versions)
       { v = Some (String "3") } ~decoded:{ v = None } [%ezjsonm { w = None }]
 end
@@ -1252,7 +1257,7 @@ module VersionCascade = struct
       let json =
         [%ezjsonm { id = "glouglou"; content = { content_new = "foo" } }]
       in
-      test "latest" testable schema value json
+      test ~here:[%here] "latest" testable schema value json
     in
     let () =
       let schema_versions = function
@@ -1263,7 +1268,7 @@ module VersionCascade = struct
       let value = { t_ = value } in
       let json = [%ezjsonm { content_old = "foo" }] in
       let schema = schema_versioned schema_versions in
-      test "legacy" testable schema value json
+      test ~here:[%here] "legacy" testable schema value json
     in
     ()
 end
