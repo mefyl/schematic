@@ -258,18 +258,12 @@ let pp_to_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
            ]
         @ (members
           |> List.mapi ~f:(fun i c ->
-                 (* TODO dedup *)
-                 let typename =
-                   match c with
-                   | Atom s -> s
-                   | Pointer (Atom "char") -> "string"
-                   | x -> failwith "unsupported: %a" pp x
-                 in
-                 let conv = to_caml_name_for typename in
+                 let conv = to_caml_name_for_c c in
                  Fmt.str "Store_field(v, %d, %s(x.t%d))" i conv i))
         @ [ "CAMLreturn(v)" ]
       in
       ("x", false, pp)
+    (* A type that is plainly aliased to another. *)
     | Atom aliased_name ->
       let pp =
         const pp_statements

@@ -3,6 +3,7 @@ include C_intf
 
 type c = t
 
+(* XXX: legacy, need to review & test identifier conversion *)
 let normalize_id s = s
 
 include Marks.Make (struct
@@ -40,9 +41,10 @@ module Of = Cwalk.Walk (struct
 
   (* Some careful considerations to make here:
 
-     - Recursive data will most definitely need to use pointers. - If we try to
-     force the schema here and there is a cycle, we'll enter an infinite
-     loop. *)
+     - Recursive data will most definitely need to use pointers.
+
+     - If we try to force the schema here and there is a cycle, we'll enter an
+     infinite loop. *)
   let schema (id : string option) parametric s =
     Fmt.epr "id: %a\n@." Fmt.(option string) id;
     match parametric with
@@ -56,24 +58,22 @@ module Of = Cwalk.Walk (struct
         (c, marks)
       | Some id ->
         Fmt.epr "has id: %s\n" id;
-        (Atom (normalize_id id), Marks.make id s))
+
+        let atom = Atom id in
+        (* XXX: this most likely breaks recursive types, but for now, it's way
+           cleaner than the alternative *)
+        let ast =
+          match fst @@ s () with
+          | Struct _ | Variant _ -> Pointer atom
+          | _ -> atom
+        in
+        (ast, Marks.make id s))
 
   let fields_empty () = ([], Marks.empty)
 
   let field (name : string) (_required : bool) ((ast, marks) : t)
       ((rest_ast, rest_marks) : fields) =
     let marks = Marks.merge [ marks; rest_marks ] in
-
-    let ast =
-      match ast with
-      | (Atom "int" | Atom "char") as prim -> prim
-      (* XXX *)
-      | Atom s when String.is_prefix ~prefix:"tuple_" s -> Atom s
-      | Atom _ as nonprim -> Pointer nonprim
-      | Pointer (Atom _) as p -> p
-      | Tuple _ as tup -> tup
-      | _ as x -> failwith (Fmt.str "nah: %a" pp x)
-    in
     ((name, ast) :: rest_ast, marks)
 
   let object_ ((fields_cases, marks) : fields) =
@@ -88,7 +88,7 @@ module Of = Cwalk.Walk (struct
 
   let tuple ts =
     let items, marks = List.unzip ts in
-    (* FIXME *)
+    (* XXX *)
     let s () = (Tuple items, Marks.merge marks) in
     let tuple_name = tuple_name items in
     (Atom tuple_name, Marks.make tuple_name s)
