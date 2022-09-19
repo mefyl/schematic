@@ -37,11 +37,16 @@ char* string_of_caml(value v) {
 
 (* XXX : dedup & smarter order... *)
 let ctypes =
-  Schematic.C.(
-    of_schema wrapper_schema @ of_schema diverse_schema
-    @ of_schema basic_variant_schema
-    @ of_schema payload_variant_schema)
-  |> List.rev
+  let open Schematic in
+  C.of_schemas_state C.state_empty
+    ([
+       Schema.pack wrapper_schema;
+       Schema.pack diverse_schema;
+       Schema.pack basic_variant_schema;
+       Schema.pack payload_variant_schema (* Schema.pack behemoth_schema; *);
+     ]
+    |> List.rev)
+  |> fst |> List.rev
 
 let typedefs =
   ctypes
@@ -64,7 +69,12 @@ let to_caml_srcs =
   |> List.map ~f:(fun (id, schema) -> Schematic.C.to_to_caml_src id schema)
   |> String.concat ~sep:"\n"
 
-(* TODO: gen roundtrips *)
+(* TODO:
+
+   check that the compiler gives warning when passing a type that contains an
+   unboxable type *)
+
+(* TODO: generate roundtrips (must take pointers into account) *)
 let rts =
   {|
 
@@ -103,6 +113,14 @@ CAMLprim value sch_payload_variant_rt_id(value v) {
   CAMLreturn(ret);
 }
 
+
+// CAMLprim value sch_behemoth_rt_id(value v) {
+//   CAMLparam1(v);
+//   CAMLlocal1(ret);
+//   behemoth p = behemoth_of_caml(v);
+//   ret = behemoth_to_caml(p);
+//   CAMLreturn(ret);
+// }
 |}
 
 let () =
