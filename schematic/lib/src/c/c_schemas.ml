@@ -11,7 +11,7 @@ include Marks.Make (struct
   let normalize_id = normalize_id
 end)
 
-module Of = Cwalk.Walk (struct
+module Of = C_walk.Walk (struct
   type res = t * Marks.t
   type fields = (string * t) list * Marks.t
   type case = string * t
