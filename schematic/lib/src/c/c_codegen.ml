@@ -2,8 +2,6 @@ open Base
 open C_intf
 
 (* TODO: prefixes *)
-let of_caml_name_for = Fmt.str "%s_of_caml"
-let to_caml_name_for = Fmt.str "%s_to_caml"
 let force_newline fmt _ = Caml.Format.pp_force_newline fmt ()
 
 (* TODO:
@@ -38,15 +36,7 @@ let pp_of_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
         fields
         |> List.mapi ~f:(fun i (field_name, field_type) ->
                Fmt.epr "field_type: %a\n" C_intf.pp field_type;
-               let conv_fn =
-                 match field_type with
-                 | Pointer (Atom "char") -> of_caml_name_for "string"
-                 | Atom typename | Pointer (Atom typename) ->
-                   (* FIXME: tup/arr - figure out correct of_caml_name_for *)
-                   of_caml_name_for typename
-                 | Tuple members -> of_caml_name_for (tuple_name members)
-                 | _ -> failwith "unsupported nested type COIN"
-               in
+               let conv_fn = of_caml_name_for_c field_type in
                Fmt.str "p->%s = %s(Field(v, %d))" field_name conv_fn i)
       in
       let statements =
@@ -134,15 +124,8 @@ let pp_of_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
         @@ [ "CAMLparam1(v)"; Fmt.str "%s res" tuptype ]
         @ (members
           |> List.mapi ~f:(fun i c ->
-                 let typename =
-                   match c with
-                   | Atom s -> s
-                   | Pointer (Atom "char") -> "string"
-                   | x -> failwith "unsupported: %a" pp x
-                 in
-                 let conv = of_caml_name_for typename in
-
-                 Fmt.str "res.t%d = %s(Field(v, %d))" i conv i))
+                 Fmt.str "res.t%d = %s(Field(v, %d))" i (of_caml_name_for_c c) i)
+          )
         @ [ "CAMLreturnT(tuple_char_ptr_int, res)" ]
       in
       (false, pp)
@@ -189,14 +172,7 @@ let pp_to_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
       let field_stores =
         fields
         |> List.mapi ~f:(fun i (field_name, field_type) ->
-               let conv_fn =
-                 match field_type with
-                 | Pointer (Atom "char") -> to_caml_name_for "string"
-                 | Atom typename | Pointer (Atom typename) ->
-                   to_caml_name_for typename
-                 | Tuple members -> to_caml_name_for (tuple_name members)
-                 | _ -> failwith "unsupported nested type"
-               in
+               let conv_fn = to_caml_name_for_c field_type in
                Fmt.str "Store_field(v, %d, %s(p->%s))" i conv_fn field_name)
       in
       let statements =
@@ -243,19 +219,14 @@ let pp_to_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
                    let case_name =
                      Fmt.str "%s_%s_tag" variant_name constr_name
                    in
-                   let constr_type =
-                     match constr_type with
-                     | Atom s -> s
-                     | _ -> failwith "unsupported"
-                   in
-                   let conv_fn_name = to_caml_name_for constr_type in
                    let case_contents =
                      const pp_statements
                        [
                          (* XXX FIXME alloc size - tuples*)
                          Fmt.str "v = caml_alloc(1, %d)" i;
                          Fmt.str "Store_field(v, 0, %s(x.payload.%s))"
-                           conv_fn_name constr_name;
+                           (to_caml_name_for_c constr_type)
+                           constr_name;
                          "break";
                        ]
                    in

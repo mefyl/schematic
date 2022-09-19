@@ -21,12 +21,28 @@ module Of = Cwalk.Walk (struct
   let make name = (Atom name, Marks.empty)
 
   (* Shallow primitive types *)
-  let ignore () = make "void"
 
-  (* XXX: bit width *)
+  (* Zero-Sized Types *)
+  let ignore _ = (Void, Marks.empty)
+  let null = ignore
+  let string_const = ignore
+
+  (* Primitive types without indirection *)
   let int () = make "int"
+  let bool () = make "bool"
+  let float () = make "float"
+
+  (* XXX - Might need special handling on the caml side *)
+  let int64 () = make "int64_t"
+
+  (* XXX *)
   let string () = (Pointer (Atom "char"), Marks.empty)
 
+  (* Some careful considerations to make here:
+
+     - Recursive data will most definitely need to use pointers. - If we try to
+     force the schema here and there is a cycle, we'll enter an infinite
+     loop. *)
   let schema (id : string option) parametric s =
     Fmt.epr "id: %a\n@." Fmt.(option string) id;
     match parametric with
@@ -42,13 +58,9 @@ module Of = Cwalk.Walk (struct
         Fmt.epr "has id: %s\n" id;
         (Atom (normalize_id id), Marks.make id s))
 
-  let parametric template_name _args _effective _t =
-    Fmt.epr "tn: %s@." template_name;
-    failwith "parametric: unimpl"
-
   let fields_empty () = ([], Marks.empty)
 
-  let field_outline (name : string) (_required : bool) ((ast, marks) : t)
+  let field (name : string) (_required : bool) ((ast, marks) : t)
       ((rest_ast, rest_marks) : fields) =
     let marks = Marks.merge [ marks; rest_marks ] in
 
@@ -62,42 +74,17 @@ module Of = Cwalk.Walk (struct
       | Tuple _ as tup -> tup
       | _ as x -> failwith (Fmt.str "nah: %a" pp x)
     in
-
-    (* FIXME: generate a new struct definition on the fly... *)
     ((name, ast) :: rest_ast, marks)
 
   let object_ ((fields_cases, marks) : fields) =
     (Struct { fields = fields_cases }, marks)
 
-  let string_const _s =
-    (* nothing to store *)
-    (Void, Marks.empty)
-
-  let union ~name ~key cases =
+  let union ~name ~key:_ cases =
     let constructors, marks =
       cases |> List.map ~f:(fun (s, (c, m)) -> ((s, c), m)) |> List.unzip
     in
     let marks = marks |> Marks.merge in
     (Variant (Option.value_exn name, constructors), marks)
-
-  let any () = failwith "unimpl: nay"
-
-  (* #include <stdbool.h>*)
-  (* "bool" *)
-  let bool () = make "bool"
-
-  (* XXX *)
-  let float () = make "double"
-  let date _ = failwith "unimplemented: date "
-  let mapping _ = failwith "unimplemented: mapping "
-
-  (* header? *)
-  let int64 () = make "int64_t"
-  let list _ = failwith "unimplemented: list "
-  let null () = failwith "unimplemented: null "
-  let nullable _ = failwith "unimplemented: nullable "
-  let time _ = failwith "unimplemented: time "
-  let time_local _ = failwith "unimplemented: time_local "
 
   let tuple ts =
     let items, marks = List.unzip ts in
@@ -105,6 +92,20 @@ module Of = Cwalk.Walk (struct
     let s () = (Tuple items, Marks.merge marks) in
     let tuple_name = tuple_name items in
     (Atom tuple_name, Marks.make tuple_name s)
+
+  (* Unimplemented *)
+
+  let parametric template_name _args _effective _t =
+    Fmt.epr "tn: %s@." template_name;
+    failwith "parametric: unimpl"
+
+  let any () = failwith "unimpl: nay"
+  let date _ = failwith "unimplemented: date "
+  let mapping _ = failwith "unimplemented: mapping "
+  let list _ = failwith "unimplemented: list "
+  let nullable _ = failwith "unimplemented: nullable "
+  let time _ = failwith "unimplemented: time "
+  let time_local _ = failwith "unimplemented: time_local "
 end)
 
 (* XXX: copied from TypeScript, might be generalizable? *)
@@ -112,7 +113,7 @@ let mark_of_schema Schema.{ id; descriptor; parametric } =
   match parametric with
   | None ->
     (Option.value_exn ~here:[%here] id, lazy (Of.descriptor id descriptor))
-  | Some parametric -> failwith "no parametrics yet"
+  | Some _parametric -> failwith "no parametrics yet"
 
 let of_schema marks s = of_mark marks @@ mark_of_schema s
 
@@ -204,6 +205,7 @@ let pp ?(indent = 2) fmt ts =
         let fields = tuple_fields types in
         const struct_ fields
       | Variant v -> const variant v
+      | Void -> nop
     in
     printer fmt ()
   in
