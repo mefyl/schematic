@@ -5,6 +5,7 @@ include C_intf
 module type WALK_TYPES = sig
   type t
   type fields
+  type case
 end
 
 module type WALK_DEFAULT = sig
@@ -29,9 +30,6 @@ module type WALK = sig
 
   val fields_empty : unit -> fields
 
-  (** [field_inline required fields rest] *)
-  val field_inline : bool -> fields list -> fields -> fields
-
   (** [field_outline name required t rest]*)
   val field_outline : string -> bool -> t -> fields -> fields
 
@@ -39,10 +37,7 @@ module type WALK = sig
 
   (* Union *)
 
-  (** [case key name t] *)
-  val case : string option -> string -> t -> t
-
-  val union : string option -> t list -> t
+  val union : name:string option -> key:string option -> (string * t) list -> t
 
   (* Descriptors *)
 
@@ -87,10 +82,13 @@ module Walk (W : WALK) = struct
     | String_const s -> W.string_const s
     | Object f -> W.object_ (fields f)
     | Tuple l -> W.tuple @@ tuple l
-    | Union { cases; key } -> W.union id @@ List.map ~f:(case key) cases
-
-  and case : type t. string option -> t case -> W.t =
-   fun key (Case { name; schema = s; _ }) -> W.case key name (schema s)
+    | Union { cases; key } ->
+      let cases =
+        cases
+        |> List.map ~f:(fun (Schema.Case { name; schema = s; _ }) ->
+               (name, schema s))
+      in
+      W.union ~name:id ~key cases
 
   and schema : type t. t Schema_intf.t -> W.t =
    fun { id; descriptor = d; parametric = p } ->
@@ -116,35 +114,20 @@ module Walk (W : WALK) = struct
         } ->
       fields rest
     | Field { field = { omit = true; _ }; rest } -> fields rest
-    | Field { field = { name; requirement; schema = Outline s; _ }; rest } ->
-      let rest = fields rest
-      and schema = schema s in
-      W.field_outline name (required requirement) schema rest
-    | Field
-        { field = { requirement; schema = Inline { descriptor; _ }; _ }; rest }
-      ->
-      let fields =
-        match walk_fields descriptor { f = (fun f -> fields f) } with
-        | Result.Ok v -> v
-        | Result.Error e -> failwith e
-      and rest = fields rest in
-      W.field_inline (required requirement) fields rest
     | Field
         {
           field =
             {
               name;
               requirement;
-              schema = Inline_try ({ descriptor; _ } as s);
+              schema = Outline s | Inline s | Inline_try s;
               _;
             };
           rest;
-        } -> (
-      let rest = fields rest in
-      match walk_fields descriptor { f = (fun f -> fields f) } with
-      | Result.Ok fields -> W.field_inline (required requirement) fields rest
-      | Result.Error _ ->
-        W.field_outline name (required requirement) (schema s) rest)
+        } ->
+      let rest = fields rest
+      and schema = schema s in
+      W.field_outline name (required requirement) schema rest
 
   and tuple : type t. t tuple -> W.t list = function
     | ItemEnd -> []

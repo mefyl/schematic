@@ -16,12 +16,6 @@ let ptr_type = Fmt.str "%s*"
 let signature ~return_type ~fname ~argtype ~argname =
   Fmt.str "%s %s(%s %s)" return_type fname argtype argname
 
-(** Separate a variant's basic (LHS) and rich (RHS) constructors *)
-let basic_rich_split =
-  List.partition_map ~f:(function
-    | (_, Void) as x -> First x
-    | (_, _) as x -> Second x)
-
 (* TODO: use the generic braced we wanted *)
 let case ~indent case contents =
   let open Fmt in
@@ -48,7 +42,9 @@ let pp_of_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
                  match field_type with
                  | Pointer (Atom "char") -> of_caml_name_for "string"
                  | Atom typename | Pointer (Atom typename) ->
+                   (* FIXME: tup/arr - figure out correct of_caml_name_for *)
                    of_caml_name_for typename
+                 | Tuple members -> of_caml_name_for (tuple_name members)
                  | _ -> failwith "unsupported nested type COIN"
                in
                Fmt.str "p->%s = %s(Field(v, %d))" field_name conv_fn i)
@@ -131,10 +127,41 @@ let pp_of_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
             ++ cut ++ const char '}')
           ++ cut
           ++ const pp_statements [ Fmt.str "CAMLreturnT(%s, res)" name ] )
-    | x ->
-      Fmt.epr "unsupported in of_caml: %a\n" pp x;
-      failwith "unsupported"
+    | Tuple members ->
+      let tuptype = tuple_name members in
+      let pp =
+        const pp_statements
+        @@ [ "CAMLparam1(v)"; Fmt.str "%s res" tuptype ]
+        @ (members
+          |> List.mapi ~f:(fun i c ->
+                 let typename =
+                   match c with
+                   | Atom s -> s
+                   | Pointer (Atom "char") -> "string"
+                   | x -> failwith "unsupported: %a" pp x
+                 in
+                 let conv = of_caml_name_for typename in
+
+                 Fmt.str "res.t%d = %s(Field(v, %d))" i conv i))
+        @ [ "CAMLreturnT(tuple_char_ptr_int, res)" ]
+      in
+      (false, pp)
+    (* The considered type is merely an alias for another *)
+    (* XXX: how shall we know whether this ought to be a pointer? *)
+    (* If it ought to, it should be a Pointer (Atom s)! *)
+    | Atom aliased_name ->
+      let pp =
+        const pp_statements
+          [
+            "CAMLparam1(v)";
+            Fmt.str "%s res = %s(v)" aliased_name
+              (of_caml_name_for aliased_name);
+            "CAMLreturnT(pair_alias, res)";
+          ]
+      in
+      (false, pp)
   in
+
   let return_type = if is_ptr then ptr_type else name in
   let decl =
     signature ~return_type ~fname:c_function_name ~argtype:"value" ~argname:"v"
@@ -167,6 +194,7 @@ let pp_to_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
                  | Pointer (Atom "char") -> to_caml_name_for "string"
                  | Atom typename | Pointer (Atom typename) ->
                    to_caml_name_for typename
+                 | Tuple members -> to_caml_name_for (tuple_name members)
                  | _ -> failwith "unsupported nested type"
                in
                Fmt.str "Store_field(v, %d, %s(p->%s))" i conv_fn field_name)
@@ -249,6 +277,39 @@ let pp_to_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
           ++ const pp_statements [ "CAMLreturn(v)" ]
       in
       ("x", false, pp)
+    | Tuple members ->
+      let pp =
+        const pp_statements
+        @@ [
+             "CAMLparam0()";
+             "CAMLlocal1(v)";
+             Fmt.str "v = caml_alloc_tuple(%d)" (List.length members);
+           ]
+        @ (members
+          |> List.mapi ~f:(fun i c ->
+                 (* TODO dedup *)
+                 let typename =
+                   match c with
+                   | Atom s -> s
+                   | Pointer (Atom "char") -> "string"
+                   | x -> failwith "unsupported: %a" pp x
+                 in
+                 let conv = to_caml_name_for typename in
+                 Fmt.str "Store_field(v, %d, %s(x.t%d))" i conv i))
+        @ [ "CAMLreturn(v)" ]
+      in
+      ("x", false, pp)
+    | Atom aliased_name ->
+      let pp =
+        const pp_statements
+          [
+            "CAMLparam0()";
+            "CAMLlocal1(v)";
+            Fmt.str "v = %s(x)" (to_caml_name_for aliased_name);
+            "CAMLreturn(v)";
+          ]
+      in
+      ("x", false, pp)
     | x ->
       Fmt.epr "unsupported in to_caml: %a\n" pp x;
       failwith "unsupported"
@@ -257,7 +318,6 @@ let pp_to_caml_converter ?(indent = 2) (f : Stdlib.Format.formatter) (name, ast)
   let decl =
     signature ~return_type:"value" ~fname:c_function_name ~argtype ~argname
   in
-
   let opening =
     hbox @@ (const string decl ++ const char ' ' ++ const char '{')
   in

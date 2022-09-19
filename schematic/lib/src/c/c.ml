@@ -15,6 +15,7 @@ end)
 module Of = Cwalk.Walk (struct
   type res = t * Marks.t
   type fields = (string * t) list * Marks.t
+  type case = string * t
   type t = res
 
   let make name = (Atom name, Marks.empty)
@@ -29,15 +30,14 @@ module Of = Cwalk.Walk (struct
   let schema (id : string option) parametric s =
     Fmt.epr "id: %a\n@." Fmt.(option string) id;
     match parametric with
-    | Some parametric ->
-      Fmt.epr "parametric\n";
-      parametric ()
+    | Some parametric -> parametric ()
     | None -> (
-      Fmt.epr "not parametric\n";
       match id with
       | None ->
         Fmt.epr "no id\n";
-        s ()
+        let c, marks = s () in
+        Fmt.epr "c: %a\n" pp c;
+        (c, marks)
       | Some id ->
         Fmt.epr "has id: %s\n" id;
         (Atom (normalize_id id), Marks.make id s))
@@ -46,30 +46,20 @@ module Of = Cwalk.Walk (struct
     Fmt.epr "tn: %s@." template_name;
     failwith "parametric: unimpl"
 
-  let fields_empty () =
-    Fmt.epr "fields_empty\n";
-    ([], Marks.empty)
-
-  let field_inline _required fields _rest =
-    Fmt.epr "fields_inline\n";
-    List.hd_exn fields
+  let fields_empty () = ([], Marks.empty)
 
   let field_outline (name : string) (_required : bool) ((ast, marks) : t)
       ((rest_ast, rest_marks) : fields) =
-    Fmt.epr "field_outline (name: %s)\n" name;
-    Fmt.epr "field_outline 'ast': %s\n" (show ast);
-    Fmt.epr "field_outline 'rest_ast': '%a'\n"
-      Fmt.(list @@ pair string pp)
-      rest_ast;
-    Fmt.epr "\n";
-
     let marks = Marks.merge [ marks; rest_marks ] in
 
     let ast =
       match ast with
       | (Atom "int" | Atom "char") as prim -> prim
+      (* XXX *)
+      | Atom s when String.is_prefix ~prefix:"tuple_" s -> Atom s
       | Atom _ as nonprim -> Pointer nonprim
       | Pointer (Atom _) as p -> p
+      | Tuple _ as tup -> tup
       | _ as x -> failwith (Fmt.str "nah: %a" pp x)
     in
 
@@ -79,35 +69,16 @@ module Of = Cwalk.Walk (struct
   let object_ ((fields_cases, marks) : fields) =
     (Struct { fields = fields_cases }, marks)
 
-  (* XXX: handling case/union with this walker is weird *)
-
   let string_const _s =
-    (* failwith ("unimplemented: string_const " ^ s) *)
     (* nothing to store *)
     (Void, Marks.empty)
 
-  let case key name (c, marks) =
-    Fmt.epr "case key: %a\n" Fmt.(option string) key;
-    Fmt.epr "case name: %s\n" name;
-    Fmt.epr "case c: %a\n@." pp c;
-    (* match t with | Constant t -> t | *)
-    (Case (name, c), marks)
-
-  (* FIXME: no failwith :( *)
-  let union id cases =
-    let marks = cases |> List.map ~f:snd |> Marks.merge in
-    Fmt.epr "cases: %a@." Fmt.(list (pair pp nop)) cases;
-
-    let f = function
-      | Case (s, x), _ -> (s, x)
-      | x, _ ->
-        Fmt.epr "PAAHA %a\n@." pp x;
-        failwith "naa"
+  let union ~name ~key cases =
+    let constructors, marks =
+      cases |> List.map ~f:(fun (s, (c, m)) -> ((s, c), m)) |> List.unzip
     in
-
-    let constructors = cases |> List.map ~f in
-    (* let t, marks = List.unzip cases in (Union t, Marks.merge marks) *)
-    (Variant (Option.value_exn id, constructors), marks)
+    let marks = marks |> Marks.merge in
+    (Variant (Option.value_exn name, constructors), marks)
 
   let any () = failwith "unimpl: nay"
 
@@ -121,13 +92,19 @@ module Of = Cwalk.Walk (struct
   let mapping _ = failwith "unimplemented: mapping "
 
   (* header? *)
-  let int64 () = make "int16_t"
+  let int64 () = make "int64_t"
   let list _ = failwith "unimplemented: list "
   let null () = failwith "unimplemented: null "
   let nullable _ = failwith "unimplemented: nullable "
   let time _ = failwith "unimplemented: time "
   let time_local _ = failwith "unimplemented: time_local "
-  let tuple _ = failwith "unimplemented: tuple "
+
+  let tuple ts =
+    let items, marks = List.unzip ts in
+    (* FIXME *)
+    let s () = (Tuple items, Marks.merge marks) in
+    let tuple_name = tuple_name items in
+    (Atom tuple_name, Marks.make tuple_name s)
 end)
 
 (* XXX: copied from TypeScript, might be generalizable? *)
@@ -138,6 +115,20 @@ let mark_of_schema Schema.{ id; descriptor; parametric } =
   | Some parametric -> failwith "no parametrics yet"
 
 let of_schema marks s = of_mark marks @@ mark_of_schema s
+
+let unpacker marks =
+  let unpack : type a. a Schema.t -> (string * t) list * Marks.t =
+   fun s -> of_schema marks s
+  in
+  { Schema.unpack }
+
+let of_schemas_state marks schemas =
+  let f (res, marks) s =
+    let ts, marks = Schema.unpack (unpacker marks) s in
+    (res @ ts, marks)
+  in
+  List.fold_left ~init:([], marks) ~f schemas
+
 let of_schema schema = of_schema Marks.empty schema |> fst
 (* End of shameless copy *)
 
@@ -208,6 +199,10 @@ let pp ?(indent = 2) fmt ts =
       | Atom s -> const string s
       | Pointer t -> const pp t ++ const char '*'
       | Struct { fields; _ } -> const struct_ fields
+      (* Tuples are structs with types named according to their indices *)
+      | Tuple types ->
+        let fields = tuple_fields types in
+        const struct_ fields
       | Variant v -> const variant v
     in
     printer fmt ()
@@ -220,3 +215,7 @@ include C_codegen
 
 let to_of_caml_src name c = Fmt.to_to_string pp_of_caml_converter (name, c)
 let to_to_caml_src name c = Fmt.to_to_string pp_to_caml_converter (name, c)
+
+type state = Marks.t
+
+let state_empty = Marks.empty
