@@ -237,7 +237,7 @@ let versioned versioned unversioned =
 
 module Attributes = struct
   type 'a versioned =
-    ('a * (Semver.t * [ `Eq | `Gt | `Gte | `Lt | `Lte ]) option) list
+    ('a * (Semver.t * [ `Eq | `Gt | `Gte | `Lt | `Lte ]) option) Ast.loc list
 
   type field = {
     alias : string versioned; [@default []]
@@ -322,14 +322,14 @@ module Attributes = struct
             Ast_pattern.(versioned (estring __) (estring __))
             ~loc attr_payload
         in
-        { attrs with alias = attrs.alias @ [ alias ] }
+        { attrs with alias = attrs.alias @ [ { txt = alias; loc } ] }
       | "schematic.aliases" when alias ->
         let aliases =
           expect
             Ast_pattern.(versioned (elist (estring __)) (elist (estring __)))
             ~loc attr_payload
         in
-        { attrs with aliases = attrs.aliases @ [ aliases ] }
+        { attrs with aliases = attrs.aliases @ [ { txt = aliases; loc } ] }
       | "schematic.computed" when computed ->
         let computed =
           let computed =
@@ -468,10 +468,14 @@ module type EXPANSION = sig
     expanded
 end
 
-let version_match ~loc ~f init options =
+let version_match ~f init options =
   let f next = function
-    | schema, None -> f schema
-    | schema, Some (Semver.{ major; minor; patch; prerelease; build }, op) ->
+    | { txt = schema, None; _ } -> f schema
+    | {
+        txt =
+          schema, Some (Semver.{ major; minor; patch; prerelease; build }, op);
+        loc;
+      } ->
       let module Ast_builder = Ast_builder.Make (struct
         let loc = loc
       end) in
@@ -534,7 +538,10 @@ let expand_field _
     | "default" -> default Source.generic true false
     | "schematic.as" ->
       let pattern = Ast_pattern.(versioned (estring __) (estring __)) in
-      { attrs with alias = expect ~loc pattern attr_payload :: attrs.alias }
+      {
+        attrs with
+        alias = { txt = expect ~loc pattern attr_payload; loc } :: attrs.alias;
+      }
     | "schematic.default" -> default Source.schematic true false
     | "schematic.default_opt" -> default Source.schematic false false
     | ("schematic.inline" as attr) | ("schematic.inline_try" as attr) -> (
@@ -592,7 +599,10 @@ let expand_field _
           "schematic-ppx: record payload expected")
     | "schematic.schema" ->
       let pattern = Ast_pattern.(versioned __ __) in
-      { attrs with schema = expect ~loc pattern attr_payload :: attrs.schema }
+      {
+        attrs with
+        schema = { txt = expect ~loc pattern attr_payload; loc } :: attrs.schema;
+      }
     | "schematic.sqml.foreign_key" ->
       Ast_pattern.parse
         Ast_pattern.(single_expr_payload __)
@@ -829,10 +839,10 @@ module Schema = struct
           | Required -> [%expr Required]
         in
         let alias =
-          version_match ~loc ~f:Ast.estring (Ast.estring (rename name)) alias
+          version_match ~f:Ast.estring (Ast.estring (rename name)) alias
         and schema =
           let schema =
-            version_match ~loc
+            version_match
               ~f:(fun schema -> [%expr [%e schema] __schematic_version])
               (schema_of_expanded ~loc
               @@ encode_type ~context ~type_context type_)
@@ -970,15 +980,13 @@ module Schema = struct
     let f (txt, pcd_args, loc, Attributes.{ alias; aliases; computed; _ }) =
       let module Ast = (val Ast_builder.make loc) in
       let name =
-        version_match ~loc ~f:Ast.estring
-          (Ast.estring (String.lowercase txt))
-          alias
-      and aliases =
+        version_match ~f:Ast.estring (Ast.estring (String.lowercase txt)) alias
+      and name_aliases =
         match aliases with
         | [] -> None
         | _ ->
           Some
-            (version_match ~loc
+            (version_match
                ~f:(Fn.compose Ast.elist (List.map ~f:Ast.estring))
                (Ast.elist []) aliases)
       in
@@ -987,7 +995,7 @@ module Schema = struct
         | None ->
           let schema =
             if Option.is_none type_context.attributes.union_key then
-              match aliases with
+              match name_aliases with
               | None ->
                 expanded_of_descriptor ~loc [%expr String_const [%e name]]
               | Some aliases ->
@@ -1022,19 +1030,19 @@ module Schema = struct
           and v i _ = Ast.evar (Fmt.str "f%i" i) in
           let schema =
             match (aliases, pcd_args) with
-            | Some _, _ ->
-              expanded_of_descriptor ~loc
+            | { loc; _ } :: _, _ ->
+              expanded_of_descriptor ~loc:type_context.loc
                 [%expr
                   [%ocaml.error
                     "schematic.aliases attribute not supported on record \
                      payloads yet"]]
-            | None, Pcstr_record fields ->
+            | [], Pcstr_record fields ->
               let computed_fields =
                 Attributes.fields_of_computed ~loc computed
               in
               _expand_record true ~context ~type_context
                 (List.map ~f:(expand_field context) fields @ computed_fields)
-            | None, _ -> encode_type ~context ~type_context type_
+            | [], _ -> encode_type ~context ~type_context type_
           in
 
           ( schema,
@@ -1422,7 +1430,7 @@ module Jsoo_type = struct
                   Js_of_ocaml.Js.readonly_prop])
           and alias =
             List.find_map
-              ~f:(function alias, None -> Some alias | _ -> None)
+              ~f:(function { txt = alias, None; _ } -> Some alias | _ -> None)
               alias
           in
           Some (Otag ({ loc; txt = Option.value ~default:name alias }, t))
