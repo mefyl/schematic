@@ -3,16 +3,12 @@ open C_test_types
 
 (* TODO: prefixing, for lack of namespacing *)
 
-(** typedef * RHS *)
-type test_case = string * string
-
-let primitive_record_c : test_case =
-  ("primitive_record", {|
+let primitive_record_c = {|
 struct {
   int a;
   int b;
 }
-|})
+|}
 
 let primitive_record_of_caml =
   {|
@@ -39,17 +35,16 @@ value primitive_record_to_caml(primitive_record* p) {
 }
 |}
 
-let type_alias_c = ("type_alias", {|
+let type_alias_c = {|
 int
-|})
+|}
 
-let wrapper_c =
-  ("wrapper", {|
+let wrapper_c = {|
 struct {
   int somevar;
   primitive_record* r;
 }
-|})
+|}
 
 let wrapper_of_caml =
   {|
@@ -76,18 +71,17 @@ value wrapper_to_caml(wrapper* p) {
 }
 |}
 
-let string_wrapper_c = ("string_wrapper", {|
+let string_wrapper_c = {|
 char*
-|})
+|}
 
 (* XXX: get rid of union if there is no payload *)
-let basic_variant_c =
-  ("basic_variant", {|
+let basic_variant_c = {|
 enum {
   basic_variant_a,
   basic_variant_b
 }
-|})
+|}
 
 let basic_variant_of_caml =
   {|
@@ -108,8 +102,7 @@ value basic_variant_to_caml(basic_variant x) {
 
 (* FIXME: possible collisions with "tag" and "payload" *)
 let payload_variant_c =
-  ( "payload_variant",
-    {|
+  {|
 struct {
   enum {
     payload_variant_nothing_tag,
@@ -122,9 +115,7 @@ struct {
   } payload;
 }
 |}
-  )
 
-(* tag / val numbering handling is COMPLETELY broken as-is. *)
 let payload_variant_of_caml =
   {|
 payload_variant payload_variant_of_caml(value v) {
@@ -170,6 +161,80 @@ value payload_variant_to_caml(payload_variant x) {
 }
 |}
 
+let pair_alias_c = {|
+tuple_char_ptr_int
+|}
+
+let string_int_tuple_c = {|
+struct {
+  char* t0;
+  int t1;
+}
+|}
+
+(* XXX tuple naming *)
+let pair_alias_of_caml =
+  {|
+pair_alias pair_alias_of_caml(value v) {
+  CAMLparam1(v);
+  tuple_char_ptr_int res = tuple_char_ptr_int_of_caml(v);
+  CAMLreturnT(pair_alias, res);
+}
+|}
+
+let pair_alias_to_caml =
+  {|
+value pair_alias_to_caml(pair_alias x) {
+  CAMLparam0();
+  CAMLlocal1(v);
+  v = tuple_char_ptr_int_to_caml(x);
+  CAMLreturn(v);
+}
+|}
+
+let tuple_string_int_of_caml =
+  {|
+tuple_char_ptr_int tuple_char_ptr_int_of_caml(value v) {
+  CAMLparam1(v);
+  tuple_char_ptr_int res;
+  res.t0 = string_of_caml(Field(v, 0));
+  res.t1 = int_of_caml(Field(v, 1));
+  CAMLreturnT(tuple_char_ptr_int, res);
+}
+|}
+
+let tuple_string_int_to_caml =
+  {|
+value tuple_char_ptr_int_to_caml(tuple_char_ptr_int x) {
+  CAMLparam0();
+  CAMLlocal1(v);
+  v = caml_alloc_tuple(2);
+  Store_field(v, 0, string_to_caml(x.t0));
+  Store_field(v, 1, int_to_caml(x.t1));
+  CAMLreturn(v);
+}
+|}
+
+let record_with_variant_c = {|
+struct {
+  payload_variant* v;
+}
+|}
+
+let record_with_pair_alias_c =
+  {|
+struct {
+  int a;
+  pair_alias* pair_alias;
+}
+|}
+
+let record_with_pair_alias_to_caml = {|
+|}
+
+let record_with_pair_alias_of_caml = {|
+|}
+
 let pretty_string =
   let pp_string ppf x = Fmt.pf ppf "{|\n%s\n|}" x in
   Alcotest.testable pp_string String.( = )
@@ -177,12 +242,9 @@ let pretty_string =
 module Generate_types = struct
   let test t expected =
     Schematic.C.of_schema t
-    |> List.map ~f:(fun (id, schema) ->
-           (id, "\n" ^ Schematic.C.to_c_type_expression schema ^ "\n"))
-    |> Alcotest.(
-         check
-           (list (pair pretty_string pretty_string))
-           "typescript declarations" expected)
+    |> List.map ~f:(fun (_id, schema) ->
+           "\n" ^ Schematic.C.to_c_type_expression schema ^ "\n")
+    |> Alcotest.(check (list pretty_string) "typescript declarations" expected)
 
   let primitive_record () = test primitive_record_schema [ primitive_record_c ]
   let type_alias () = test type_alias_schema [ type_alias_c ]
@@ -190,13 +252,19 @@ module Generate_types = struct
   let string () = test string_wrapper_schema [ string_wrapper_c ]
   let basic_variant () = test basic_variant_schema [ basic_variant_c ]
   let payload_variant () = test payload_variant_schema [ payload_variant_c ]
+
+  let pair_alias () =
+    test pair_alias_schema [ pair_alias_c; string_int_tuple_c ]
+
+  let record_with_variant () =
+    test record_with_variant_schema [ record_with_variant_c; payload_variant_c ]
 end
 
 module Of_caml = struct
   let test t expected =
     Schematic.C.of_schema t
     |> List.map ~f:(fun (id, schema) ->
-           "\n" ^ Schematic.C.to_of_caml_src id schema ^ "\n")
+           Schematic.C.to_of_caml_src id schema |> fun s -> "\n" ^ s ^ "\n")
     |> Alcotest.(check (list pretty_string) "*_of_caml declarations" expected)
 
   let primitive_record () =
@@ -209,13 +277,16 @@ module Of_caml = struct
 
   let payload_variant () =
     test payload_variant_schema [ payload_variant_of_caml ]
+
+  let pair_alias () =
+    test pair_alias_schema [ pair_alias_of_caml; tuple_string_int_of_caml ]
 end
 
 module To_caml = struct
   let test t expected =
     Schematic.C.of_schema t
     |> List.map ~f:(fun (id, schema) ->
-           "\n" ^ Schematic.C.to_to_caml_src id schema ^ "\n")
+           Schematic.C.to_to_caml_src id schema |> fun s -> "\n" ^ s ^ "\n")
     |> Alcotest.(check (list pretty_string) "*_to_caml declarations" expected)
 
   let primitive_record () =
@@ -228,6 +299,12 @@ module To_caml = struct
 
   let payload_variant () =
     test payload_variant_schema [ payload_variant_to_caml ]
+
+  let pair_alias () =
+    test pair_alias_schema [ pair_alias_to_caml; tuple_string_int_to_caml ]
+
+  let record_with_pair_alias () =
+    test record_with_pair_alias_schema [ record_with_pair_alias_to_caml ]
 end
 
 let () =
@@ -235,14 +312,17 @@ let () =
   run "Schematic.C"
     [
       ( "typegen",
-        [
-          test_case "type alias" `Quick Generate_types.type_alias;
-          test_case "record" `Quick Generate_types.primitive_record;
-          test_case "nested record" `Quick Generate_types.nested;
-          test_case "string" `Quick Generate_types.string;
-          test_case "basic_variant" `Quick Generate_types.basic_variant;
-          test_case "payload_variant" `Quick Generate_types.payload_variant;
-        ] );
+        Generate_types.
+          [
+            test_case "type alias" `Quick type_alias;
+            test_case "record" `Quick primitive_record;
+            test_case "nested record" `Quick nested;
+            test_case "string" `Quick string;
+            test_case "basic_variant" `Quick basic_variant;
+            test_case "payload_variant" `Quick payload_variant;
+            test_case "pair_alias" `Quick pair_alias;
+            test_case "record_with_variant" `Quick record_with_variant;
+          ] );
       ( "of_caml",
         Of_caml.
           [
@@ -250,6 +330,7 @@ let () =
             test_case "nested record" `Quick nested;
             test_case "basic_variant" `Quick basic_variant;
             test_case "payload_variant" `Quick payload_variant;
+            test_case "pair_alias" `Quick pair_alias;
           ] );
       ( "to_caml",
         To_caml.
@@ -258,5 +339,8 @@ let () =
             test_case "nested record" `Quick nested;
             test_case "basic_variant" `Quick basic_variant;
             test_case "payload_variant" `Quick payload_variant;
+            test_case "pair_alias" `Quick pair_alias
+            (* test_case "record_with_pair_alias" `Quick
+               record_with_pair_alias; *);
           ] );
     ]

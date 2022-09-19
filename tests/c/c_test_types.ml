@@ -34,3 +34,22 @@ type payload_variant =
   | SomeInt of int
   | Nothing3
 [@@deriving schema, show, eq]
+
+type pair_alias = string * int [@@deriving schema, show, eq]
+
+type behemoth = {
+  d : diverse;
+  b : basic_variant;
+  p : payload_variant;
+  pair : string * wrapper;
+  pair_alias : pair_alias;
+}
+[@@deriving schema, show, eq]
+
+type record_with_pair_alias = {
+  a : int;
+  pair_alias : pair_alias;
+}
+[@@deriving schema, show, eq]
+
+type record_with_variant = { v : payload_variant } [@@deriving schema, show, eq]
