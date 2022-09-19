@@ -17,7 +17,7 @@ module Of = C_walk.Walk (struct
   type case = string * t
   type t = res
 
-  let make name = (Atom name, Marks.empty)
+  let make name = (Atom (name, false), Marks.empty)
 
   (* Shallow primitive types *)
 
@@ -33,9 +33,7 @@ module Of = C_walk.Walk (struct
 
   (* XXX - Might need special handling on the caml side *)
   let int64 () = make "int64_t"
-
-  (* XXX *)
-  let string () = (Pointer (Atom "char"), Marks.empty)
+  let string () = (String, Marks.empty)
 
   (* Some careful considerations to make here:
 
@@ -57,18 +55,14 @@ module Of = C_walk.Walk (struct
       | Some id ->
         Fmt.epr "has id: %s\n" id;
 
-        let atom = Atom id in
-        (* XXX: this most likely breaks recursive types, but for now, it's way
-           cleaner than the alternative *)
-        (* XXX: what about type aliases? Seems like they would break this. It
-           might be that this is not decidable at this stage... *)
-        let ast =
+        (* XXX: this probably breaks recursive data types *)
+        let ptr =
           match fst @@ s () with
-          | Void | Variant _ -> atom
-          | Struct _ -> Pointer atom
-          | _ -> atom
+          | Struct _ -> true
+          | Atom _ (* FIXME: should follow indirection *) | _ -> false
         in
-        (ast, Marks.make id s))
+
+        (Atom (id, ptr), Marks.make id s))
 
   let fields_empty () = ([], Marks.empty)
 
@@ -100,7 +94,7 @@ module Of = C_walk.Walk (struct
     (* XXX *)
     let s () = (Tuple items, Marks.merge marks) in
     let tuple_name = tuple_name items in
-    (Atom tuple_name, Marks.make tuple_name s)
+    (Atom (tuple_name, false), Marks.make tuple_name s)
 
   (* Unimplemented *)
 

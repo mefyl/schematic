@@ -1,7 +1,7 @@
 type t =
-  | Void
-  | Atom of string
-  | Pointer of t
+  | Void  (** Zero-Sized Type *)
+  | String  (** Native string *)
+  | Atom of string * bool  (** Reference to another type. RHS : is_ptr *)
   | Struct of { fields : (string * t) list }
   | Variant of {
       name : string;
@@ -29,12 +29,15 @@ type c_gen = {
 
 open Base
 
+(* XXX: tuples of tuples - name conflicts *)
+
 let tuple_name items =
   "tuple_"
   ^ (items
+    (* FIXME: use typename *)
     |> List.map ~f:(function
-         | Pointer (Atom "char") -> "string"
-         | Atom s | Pointer (Atom s) -> s
+         | String -> "string"
+         | Atom (s, _) -> s
          | _ -> failwith "non-atom tuple member?")
     |> String.concat ~sep:"_")
 
@@ -43,10 +46,8 @@ let of_caml_name_for = Fmt.str "%s_of_caml"
 let to_caml_name_for = Fmt.str "%s_to_caml"
 
 let c_typename = function
-  | Pointer (Atom "char") -> "string"
-  | Atom s -> s
-  | Pointer (Atom s) ->
-    s (* XXX! no distinction between a type and a pointer to it *)
+  | String -> "string"
+  | Atom (s, _) -> s
   | Tuple members -> tuple_name members
   | x -> failwith "unsupported: %a" pp x
 

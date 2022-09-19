@@ -53,8 +53,9 @@ let pp ?(indent = 2) fmt ts =
       in
 
       match ts with
-      | Atom s -> const string s
-      | Pointer t -> const pp t ++ const char '*'
+      | Atom (s, false) -> const string s
+      | Atom (s, true) -> const string s ++ const char '*'
+      | String -> const string "char*" (* XXX dedup *)
       | Struct { fields; _ } -> const struct_ fields
       (* Tuples are structs with types named according to their indices *)
       | Tuple types ->

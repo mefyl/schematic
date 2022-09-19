@@ -65,9 +65,6 @@ let pp_of_caml_converter ?(indent = 2) (name, ast) =
       in
       let case : (int * (string * c)) Fmt.t =
        fun fmt (i, (field_name, c)) ->
-        let typename =
-          match c with Atom s -> s | _ -> failwith "unsupported"
-        in
         case ~indent (Int.to_string i)
           (Some
              (const pp_statements
@@ -75,7 +72,7 @@ let pp_of_caml_converter ?(indent = 2) (name, ast) =
                   (* XXX: tuples will ruin the day. *)
                   (* FIXME FIXME FIXME *)
                   Fmt.str "res.payload->%s = %s(Field(v, 0))" field_name
-                    (of_caml_name_for typename);
+                    (of_caml_name_for_c c);
                   "break";
                 ]))
           fmt ()
@@ -125,21 +122,19 @@ let pp_of_caml_converter ?(indent = 2) (name, ast) =
       in
       (false, pp)
     (* The considered type is merely an alias for another *)
-    (* XXX: how shall we know whether this ought to be a pointer? *)
-    (* If it ought to, it should be a Pointer (Atom s)! *)
-    | (Atom aliased_name | Pointer (Atom aliased_name)) as x ->
+    | (Atom _ | String) as c ->
       let pp =
         const pp_statements
           [
             "CAMLparam1(v)";
-            Fmt.str "%s res = %s(v)" aliased_name (of_caml_name_for_c x);
+            Fmt.str "%a res = %s(v)" (C_typeexpr.pp ~indent) c
+              (of_caml_name_for_c c);
             "CAMLreturnT(pair_alias, res)";
           ]
       in
       (false, pp)
     | _ -> failwith "no"
   in
-
   let return_type = if is_ptr then ptr_type else name in
   let decl =
     signature ~return_type ~fname:c_function_name ~argtype:"value" ~argname:"v"
@@ -240,14 +235,13 @@ let pp_to_caml_converter ?(indent = 2) (name, ast) =
         @ [ "CAMLreturn(v)" ]
       in
       ("x", false, pp)
-    (* A type that is plainly aliased to another. *)
-    | (Atom aliased_name | Pointer (Atom aliased_name)) as x ->
+    | (Atom _ | String) as c ->
       let pp =
         const pp_statements
           [
             "CAMLparam0()";
             "CAMLlocal1(v)";
-            Fmt.str "v = %s(x)" (to_caml_name_for_c x);
+            Fmt.str "v = %s(x)" (to_caml_name_for_c c);
             "CAMLreturn(v)";
           ]
       in
