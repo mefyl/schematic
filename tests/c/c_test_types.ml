@@ -94,3 +94,4 @@ let pp_any_manual_annotation : any_manual_annotation Fmt.t =
 (* type node = | Nil | Cons of node [@@deriving schema, eq, show] *)
 
 type time_alias = Ptime.t [@@deriving schema, show, eq]
+type time_local_alias = Ptime.local [@@deriving schema, show, eq]

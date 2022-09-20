@@ -97,17 +97,24 @@ module Of = C_walk.Walk (struct
     let name = array_name c in
     (Atom (name, Some arrtyp), Marks.make name s)
 
-  (* This could be optimized, but this approach allows us to simplify things *)
+  (* This could be optimized (null ptr optim), but this approach allows us to
+     simplify things *)
   let nullable (c, marks) =
     let name = c_typename c ^ "_option" in
     (Variant { name; basic = [ "none" ]; rich = [ ("some", c) ] }, marks)
 
   (* Simplest possible encoding *)
+  (* We could use a struct for "key" / "value" fields instead of a tuple. *)
   let mapping t = tuple [ string (); t ] |> list
 
   let time () =
     Lazy.force C_sanity_checks.ptime;
     make "timespec"
+
+  (* TODO: for clarity, use a struct *)
+  let time_local () =
+    Lazy.force C_sanity_checks.ptime_local;
+    tuple [ time (); int () ]
 
   (* Unimplemented *)
 
@@ -117,7 +124,6 @@ module Of = C_walk.Walk (struct
 
   let any () = (Atom ("json", Some String), Marks.empty)
   let date _ = failwith "unimplemented: date "
-  let time_local _ = failwith "unimplemented: time_local "
 end)
 
 (* XXX: copied from TypeScript, might be generalizable? *)

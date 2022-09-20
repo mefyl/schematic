@@ -20,6 +20,7 @@ let ctypes =
       Schema.pack record_containing_ambiguous_record_schema;
       Schema.pack any_alias_schema;
       Schema.pack time_alias_schema;
+      Schema.pack time_local_alias_schema;
     ]
   |> fst |> List.rev
 

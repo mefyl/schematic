@@ -63,6 +63,7 @@ module Ptime : sig
   type local = Ptime.t * Ptime.tz_offset_s
 
   val equal_local : local -> local -> bool
+  val pp_local : local Fmt.t
   val local_schema : local Schema.t
   val local_schema_versioned : Schema.version -> local Schema.t
   val date_schema : date Schema.t

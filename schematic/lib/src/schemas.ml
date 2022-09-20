@@ -158,6 +158,7 @@ module Ptime = struct
   type local = Ptime.t * Ptime.tz_offset_s
 
   let equal_local (t1, o1) (t2, o2) = Ptime.equal t1 t2 && o1 = o2
+  let pp_local = Fmt.(pair Ptime.pp Int.pp)
   let local_schema = Schema.make Time_local
   let local_schema_versioned (_ : Schema.version) = local_schema
   let date_schema = Schema.make Date

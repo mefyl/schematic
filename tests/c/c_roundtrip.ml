@@ -41,6 +41,9 @@ external record_containing_ambiguous_record_rt_id :
 external any_alias_rt_id : any_alias -> any_alias = "sch_any_alias_rt_id"
 external time_alias_rt_id : time_alias -> time_alias = "sch_time_alias_rt_id"
 
+external time_local_alias_rt_id : time_local_alias -> time_local_alias
+  = "sch_time_local_alias_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -173,6 +176,13 @@ module Tests = struct
     |> List.iter (fun x ->
            let new_x = time_alias_rt_id x in
            test t new_x x)
+
+  let time_local () =
+    let t = Alcotest.testable pp_time_local_alias equal_time_local_alias in
+    [ (Ptime.min, 0); (Ptime.max, 5443) ]
+    |> List.iter (fun x ->
+           let new_x = time_local_alias_rt_id x in
+           test t new_x x)
 end
 
 let () =
@@ -200,5 +210,6 @@ let () =
             test_case "type alias indirection" `Quick indirection;
             test_case "any (JSON)" `Quick any;
             test_case "time" `Quick time;
+            test_case "time_local" `Quick time_local;
           ] );
     ]

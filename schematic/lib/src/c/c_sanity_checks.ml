@@ -10,3 +10,12 @@ let ptime =
        Stdlib.Obj.repr (Schemas.Ptime.unsafe_of_d_ps ref_val)
      in
      assert (Poly.(ptime_repr = assumed_repr)))
+
+let ptime_local =
+  lazy
+    (* This one doesn't require doing at runtime. We're asserting type equality
+       at compilation time. *)
+    (let open Schemas in
+    let x : Ptime.t * int = (Ptime.min, 1) in
+    let (_ : Ptime.local) = x in
+    ())
