@@ -43,3 +43,5 @@ let roundtrip_src (name, c) =
   in
   let pp = braced ~indent:2 decl body in
   Fmt.to_to_string pp ()
+
+let runtime = C_runtime.runtime
