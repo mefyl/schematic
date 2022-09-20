@@ -48,12 +48,10 @@ let ctypes =
   let open Schematic in
   C.of_schemas_state C.state_empty
     [
-      (* Schema.pack wrapper_schema; Schema.pack diverse_schema; Schema.pack
-         basic_variant_schema; Schema.pack payload_variant_schema; Schema.pack
-         pair_alias_schema; Schema.pack record_with_pair_alias_schema;
-         Schema.pack record_with_variant_schema; *)
       Schema.pack behemoth_schema;
       Schema.pack collection_schema;
+      Schema.pack wrapper_schema;
+      Schema.pack primitive_record_schema;
     ]
   |> fst |> List.rev
 
