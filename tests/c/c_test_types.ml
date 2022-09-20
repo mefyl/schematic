@@ -97,3 +97,12 @@ let pp_any_manual_annotation : any_manual_annotation Fmt.t =
 type time_alias = Ptime.t [@@deriving schema, show, eq]
 type time_local_alias = Ptime.local [@@deriving schema, show, eq]
 type date_alias = Ptime.date [@@deriving schema, eq]
+
+type 'a parametric_record = { parameterized_field : 'a }
+[@@deriving schema, eq, show]
+
+type polymorphic_variant =
+  [ `A
+  | `B
+  ]
+[@@deriving schema, eq, show]

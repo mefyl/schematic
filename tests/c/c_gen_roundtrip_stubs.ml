@@ -21,7 +21,9 @@ let ctypes =
       Schema.pack any_alias_schema;
       Schema.pack time_alias_schema;
       Schema.pack time_local_alias_schema;
-      Schema.pack date_alias_schema;
+      Schema.pack date_alias_schema
+      (* Schema.pack (parametric_record_schema Schematic.Schemas.int_schema); *)
+      (* Schema.pack polymorphic_variant_schema; *);
     ]
   |> fst |> List.rev
 
