@@ -44,6 +44,8 @@ external time_alias_rt_id : time_alias -> time_alias = "sch_time_alias_rt_id"
 external time_local_alias_rt_id : time_local_alias -> time_local_alias
   = "sch_time_local_alias_rt_id"
 
+external date_alias_rt_id : date_alias -> date_alias = "sch_date_alias_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -183,6 +185,13 @@ module Tests = struct
     |> List.iter (fun x ->
            let new_x = time_local_alias_rt_id x in
            test t new_x x)
+
+  let date () =
+    let t = Alcotest.testable (Fmt.any "") equal_date_alias in
+    [ (2022, 01, 01); (1970, 01, 01) ]
+    |> List.iter (fun x ->
+           let new_x = date_alias_rt_id x in
+           test t new_x x)
 end
 
 let () =
@@ -211,5 +220,6 @@ let () =
             test_case "any (JSON)" `Quick any;
             test_case "time" `Quick time;
             test_case "time_local" `Quick time_local;
+            test_case "date" `Quick date;
           ] );
     ]

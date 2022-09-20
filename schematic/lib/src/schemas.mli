@@ -66,6 +66,7 @@ module Ptime : sig
   val pp_local : local Fmt.t
   val local_schema : local Schema.t
   val local_schema_versioned : Schema.version -> local Schema.t
+  val equal_date : date -> date -> bool
   val date_schema : date Schema.t
   val date_schema_versioned : Schema.version -> date Schema.t
   val span_schema : span Schema.t

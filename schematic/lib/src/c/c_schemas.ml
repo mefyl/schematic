@@ -116,14 +116,21 @@ module Of = C_walk.Walk (struct
     Lazy.force C_sanity_checks.ptime_local;
     tuple [ time (); int () ]
 
+  let any () = (Atom ("json", Some String), Marks.empty)
+
+  let date () =
+    Lazy.force C_sanity_checks.date;
+    (* This will work because a Ptime.date is a (int * int * int), which has the
+       same memory representation as a struct with three int fields. *)
+    let int = fst (int ()) in
+    let fields = [ ("year", int); ("month", int); ("day", int) ] in
+    (Struct { fields }, Marks.empty)
+
   (* Unimplemented *)
 
   let parametric template_name _args _effective _t =
     Fmt.epr "tn: %s@." template_name;
     failwith "parametric: unimpl"
-
-  let any () = (Atom ("json", Some String), Marks.empty)
-  let date _ = failwith "unimplemented: date "
 end)
 
 (* XXX: copied from TypeScript, might be generalizable? *)

@@ -6,6 +6,7 @@ module Schemas_library = struct
   let v = V
 end
 
+open Schematic.Schemas
 module Ptime = Schematic.Schemas.Ptime
 
 type primitive_record = {
@@ -95,3 +96,4 @@ let pp_any_manual_annotation : any_manual_annotation Fmt.t =
 
 type time_alias = Ptime.t [@@deriving schema, show, eq]
 type time_local_alias = Ptime.local [@@deriving schema, show, eq]
+type date_alias = Ptime.date [@@deriving schema, eq]

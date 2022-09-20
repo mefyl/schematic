@@ -21,6 +21,7 @@ let ctypes =
       Schema.pack any_alias_schema;
       Schema.pack time_alias_schema;
       Schema.pack time_local_alias_schema;
+      Schema.pack date_alias_schema;
     ]
   |> fst |> List.rev
 

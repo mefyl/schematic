@@ -161,6 +161,7 @@ module Ptime = struct
   let pp_local = Fmt.(pair Ptime.pp Int.pp)
   let local_schema = Schema.make Time_local
   let local_schema_versioned (_ : Schema.version) = local_schema
+  let equal_date (y1, m1, d1) (y2, m2, d2) = y1 = y2 && m1 = m2 && d1 = d2
   let date_schema = Schema.make Date
   let date_schema_versioned (_ : Schema.version) = date_schema
 
