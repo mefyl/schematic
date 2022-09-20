@@ -1,3 +1,6 @@
+(* XXX: we should probably merge this back into a generalized walker in
+   schemas *)
+
 open Schema
 open Base
 include C_intf

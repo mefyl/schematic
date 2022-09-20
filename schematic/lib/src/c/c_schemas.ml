@@ -29,9 +29,11 @@ module Of = C_walk.Walk (struct
   (* Primitive types without indirection *)
   let int () = make "int"
   let bool () = make "bool"
-  let float () = make "float"
 
-  (* XXX - Might need special handling on the caml side *)
+  (** "OCaml's floating-point numbers follow the IEEE 754 standard, using double
+      precision (64 bits) numbers." *)
+  let float () = make "double"
+
   let int64 () = make "int64_t"
   let string () = (String, Marks.empty)
 

@@ -12,6 +12,9 @@ external payload_variant_rt_id : payload_variant -> payload_variant
 external behemoth_rt_id : behemoth -> behemoth = "sch_behemoth_rt_id"
 external collection_rt_id : collection -> collection = "sch_collection_rt_id"
 
+external int64_alias_rt_id : int64_alias -> int64_alias
+  = "sch_int64_alias_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -83,6 +86,12 @@ module Tests = struct
     let new_x = collection_rt_id x in
     let t = Alcotest.testable pp_collection equal_collection in
     test t new_x x
+
+  let int64 () =
+    let x : int64 = 8000000000L in
+    let new_x = int64_alias_rt_id x in
+    let t = Alcotest.testable pp_int64_alias equal_int64_alias in
+    test t new_x x
 end
 
 let () =
@@ -101,5 +110,6 @@ let () =
               payload_variant_with_inline_tuple_payload;
             test_case "behemoth" `Quick behemoth;
             test_case "collection" `Quick collection;
+            test_case "int64" `Quick int64;
           ] );
     ]

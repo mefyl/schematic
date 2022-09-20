@@ -15,7 +15,6 @@ let headers =
 
 let builtins =
   {|
-// No GC involved here.
 value int_to_caml(int x) {
   CAMLparam0();
   CAMLreturn(Val_int(x));
@@ -38,6 +37,20 @@ char* string_of_caml(value v) {
   char* p = strdup(String_val(v));
   CAMLreturnT(char*, p);
 }
+
+
+value int64_t_to_caml(int64_t x) {
+  CAMLparam0();
+  CAMLlocal1(v);
+  v = caml_copy_int64(x);
+  CAMLreturn(v);
+}
+
+int64_t int64_t_of_caml(value v) {
+  CAMLparam1(v);
+  int64_t x = Int64_val(v);
+  CAMLreturnT(int64_t, x);
+}
 |}
 
 let nl_concat = String.concat ~sep:"\n"
@@ -52,6 +65,7 @@ let ctypes =
       Schema.pack collection_schema;
       Schema.pack wrapper_schema;
       Schema.pack primitive_record_schema;
+      Schema.pack int64_alias_schema;
     ]
   |> fst |> List.rev
 
