@@ -17,7 +17,7 @@ module Of = C_walk.Walk (struct
   type case = string * t
   type t = res
 
-  let make name = (Atom (name, false), Marks.empty)
+  let make name = (Atom (name, None), Marks.empty)
 
   (* Shallow primitive types *)
 
@@ -54,15 +54,8 @@ module Of = C_walk.Walk (struct
         (c, marks)
       | Some id ->
         Fmt.epr "has id: %s\n" id;
-
-        (* XXX: this probably breaks recursive data types *)
-        let ptr =
-          match fst @@ s () with
-          | Struct _ -> true
-          | Atom _ (* FIXME: should follow indirection *) | _ -> false
-        in
-
-        (Atom (id, ptr), Marks.make id s))
+        let base_type : c option = concrete_type (fst @@ s ()) in
+        (Atom (id, base_type), Marks.make id s))
 
   let fields_empty () = ([], Marks.empty)
 
@@ -91,15 +84,17 @@ module Of = C_walk.Walk (struct
 
   let tuple ts =
     let items, marks = List.unzip ts in
+    let tuptyp = Tuple items in
     (* XXX *)
-    let s () = (Tuple items, Marks.merge marks) in
+    let s () = (tuptyp, Marks.merge marks) in
     let tuple_name = tuple_name items in
-    (Atom (tuple_name, false), Marks.make tuple_name s)
+    (Atom (tuple_name, Some tuptyp), Marks.make tuple_name s)
 
   let list (c, marks) =
-    let s () = (Array c, marks) in
+    let arrtyp = Array c in
+    let s () = (arrtyp, marks) in
     let name = array_name c in
-    (Atom (name, false), Marks.make name s)
+    (Atom (name, Some arrtyp), Marks.make name s)
 
   (* Unimplemented *)
 

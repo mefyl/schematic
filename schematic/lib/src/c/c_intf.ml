@@ -2,7 +2,7 @@ type t =
   | Void  (** Zero-Sized Type *)
   | String  (** Native string *)
   | Array of t
-  | Atom of string * bool  (** Reference to another type. RHS : is_ptr *)
+  | Atom of string * t option  (** The RHS is the referenced type, if known. *)
   | Struct of { fields : (string * t) list }
   | Variant of {
       name : string;
@@ -58,3 +58,8 @@ let to_caml_name_for_c = Fn.compose to_caml_name_for c_typename
 
 let case_name variant_name constr_name =
   Fmt.str "%s_%s_tag" variant_name constr_name
+
+let rec concrete_type = function
+  | Atom (_, Some t) -> concrete_type t
+  | Atom (_, None) -> None
+  | t -> Some t

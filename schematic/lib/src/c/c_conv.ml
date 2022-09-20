@@ -83,7 +83,7 @@ let pp_of_caml_converter ?(indent = 2) (name, ast) =
           vbox ~indent
             (const string "switch (Tag_val(v)) {"
             ++ cut
-            ++ const (list ~sep:semi case)
+            ++ const (list ~sep:cut case)
                  (rich
                  (* XXX: this must exist already? :( )*)
                  |> List.mapi ~f:(fun i x -> (i, x))))

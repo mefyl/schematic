@@ -5,6 +5,7 @@ let pp ?(indent = 2) fmt ts =
   let rec pp fmt ts =
     let printer =
       let open Fmt in
+      (* TODO: get rid of this "braced" (redundant with C_pp) *)
       let braced lhs inner : _ Fmt.t =
         (vbox ~indent @@ (lhs ++ const string " {" ++ cut ++ inner))
         ++ cut ++ const char '}'
@@ -53,15 +54,13 @@ let pp ?(indent = 2) fmt ts =
       in
 
       match ts with
-      | Atom (s, false) -> const string s
-      | Atom (s, true) -> const string s ++ const char '*'
+      | Atom (s, Some (Struct _)) -> const string s ++ const char '*'
+      | Atom (s, _) -> const string s
       | Array t ->
-        let inner_typename = Fmt.to_to_string pp t in
-        const struct_
-          [
-            ("len", Atom ("size_t", false));
-            ("data", Atom (inner_typename, true));
-          ]
+        (* We're not using the `struct_` formatter, on purpose. *)
+        C_pp.braced ~indent "struct"
+          (const string "size_t len" ++ semi ++ const pp t ++ const string "* "
+         ++ const string "data;")
       | String -> const string "char*" (* XXX dedup *)
       | Struct { fields; _ } -> const struct_ fields
       (* Tuples are structs with types named according to their indices *)
