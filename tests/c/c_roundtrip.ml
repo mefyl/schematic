@@ -15,6 +15,8 @@ external collection_rt_id : collection -> collection = "sch_collection_rt_id"
 external int64_alias_rt_id : int64_alias -> int64_alias
   = "sch_int64_alias_rt_id"
 
+external bool_alias_rt_id : bool_alias -> bool_alias = "sch_bool_alias_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -92,6 +94,13 @@ module Tests = struct
     let new_x = int64_alias_rt_id x in
     let t = Alcotest.testable pp_int64_alias equal_int64_alias in
     test t new_x x
+
+  let bool () =
+    let t = Alcotest.testable pp_bool_alias equal_bool_alias in
+    [ true; false ]
+    |> List.iter (fun x ->
+           let new_x = bool_alias_rt_id x in
+           test t new_x x)
 end
 
 let () =
@@ -111,5 +120,6 @@ let () =
             test_case "behemoth" `Quick behemoth;
             test_case "collection" `Quick collection;
             test_case "int64" `Quick int64;
+            test_case "bool" `Quick bool;
           ] );
     ]

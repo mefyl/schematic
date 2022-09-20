@@ -51,6 +51,19 @@ int64_t int64_t_of_caml(value v) {
   int64_t x = Int64_val(v);
   CAMLreturnT(int64_t, x);
 }
+
+value bool_to_caml(bool x) {
+  CAMLparam0();
+  CAMLlocal1(v);
+  v = Val_bool(x);
+  CAMLreturn(v);
+}
+
+bool bool_of_caml(value v) {
+  CAMLparam1(v);
+  bool x = Bool_val(v);
+  CAMLreturnT(bool, x);
+}
 |}
 
 let nl_concat = String.concat ~sep:"\n"
@@ -66,6 +79,7 @@ let ctypes =
       Schema.pack wrapper_schema;
       Schema.pack primitive_record_schema;
       Schema.pack int64_alias_schema;
+      Schema.pack bool_alias_schema;
     ]
   |> fst |> List.rev
 
