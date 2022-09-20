@@ -135,7 +135,7 @@ let unpacker marks =
 let of_schemas_state marks schemas =
   let f (res, marks) s =
     let ts, marks = Schema.unpack (unpacker marks) s in
-    (res @ ts, marks)
+    (ts @ res, marks)
   in
   List.fold_left ~init:([], marks) ~f schemas
 

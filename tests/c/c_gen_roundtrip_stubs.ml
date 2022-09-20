@@ -84,21 +84,19 @@ value double_to_caml(double x) {
 
 let nl_concat = String.concat ~sep:"\n"
 
-(* XXX : dedup & smarter order... *)
-
 let ctypes =
   let open Schematic in
   C.of_schemas_state C.state_empty
     [
-      Schema.pack behemoth_schema;
+      Schema.pack primitive_record_schema;
       Schema.pack collection_schema;
       Schema.pack wrapper_schema;
-      Schema.pack primitive_record_schema;
-      Schema.pack int64_alias_schema;
-      Schema.pack bool_alias_schema;
+      Schema.pack float_map_alias_schema;
+      Schema.pack behemoth_schema;
       Schema.pack float_alias_schema;
       Schema.pack int_option_alias_schema;
-      Schema.pack float_map_alias_schema;
+      Schema.pack bool_alias_schema;
+      Schema.pack int64_alias_schema;
     ]
   |> fst |> List.rev
 
