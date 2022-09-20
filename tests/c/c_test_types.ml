@@ -60,3 +60,8 @@ type bool_alias = bool [@@deriving schema, show, eq]
 type float_alias = float [@@deriving schema, show, eq]
 type int_option_alias = int option [@@deriving schema, show, eq]
 type float_map_alias = (string * float) list [@@deriving schema, show, eq]
+type indirected_record_1 = primitive_record [@@deriving schema, show, eq]
+type indirected_record_2 = indirected_record_1 [@@deriving schema, show, eq]
+
+type record_with_indir_field = { indir : indirected_record_2 }
+[@@deriving schema, show, eq]

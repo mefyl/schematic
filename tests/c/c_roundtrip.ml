@@ -26,6 +26,10 @@ external int_option_alias_rt_id : int_option_alias -> int_option_alias
 external float_map_alias_rt_id : float_map_alias -> float_map_alias
   = "sch_float_map_alias_rt_id"
 
+external record_with_indir_field_rt_id :
+  record_with_indir_field -> record_with_indir_field
+  = "sch_record_with_indir_field_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -132,6 +136,14 @@ module Tests = struct
     let new_x = float_map_alias_rt_id x in
     let t = Alcotest.testable pp_float_map_alias equal_float_map_alias in
     test t new_x x
+
+  let indirection () =
+    let x = { indir = { a = -2; b = 43 } } in
+    let new_x = record_with_indir_field_rt_id x in
+    let t =
+      Alcotest.testable pp_record_with_indir_field equal_record_with_indir_field
+    in
+    test t new_x x
 end
 
 let () =
@@ -155,5 +167,6 @@ let () =
             test_case "float" `Quick float;
             test_case "int option" `Quick int_option;
             test_case "mapping" `Quick mapping;
+            test_case "type alias indirection" `Quick indirection;
           ] );
     ]

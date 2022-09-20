@@ -97,6 +97,7 @@ let ctypes =
       Schema.pack int_option_alias_schema;
       Schema.pack bool_alias_schema;
       Schema.pack int64_alias_schema;
+      Schema.pack record_with_indir_field_schema;
     ]
   |> fst |> List.rev
 
