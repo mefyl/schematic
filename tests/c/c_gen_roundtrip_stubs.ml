@@ -98,6 +98,7 @@ let ctypes =
       Schema.pack bool_alias_schema;
       Schema.pack float_alias_schema;
       Schema.pack int_option_alias_schema;
+      Schema.pack float_map_alias_schema;
     ]
   |> fst |> List.rev
 

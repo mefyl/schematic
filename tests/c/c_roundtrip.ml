@@ -23,6 +23,9 @@ external float_alias_rt_id : float_alias -> float_alias
 external int_option_alias_rt_id : int_option_alias -> int_option_alias
   = "sch_int_option_alias_rt_id"
 
+external float_map_alias_rt_id : float_map_alias -> float_map_alias
+  = "sch_float_map_alias_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -123,6 +126,12 @@ module Tests = struct
     |> List.iter (fun x ->
            let new_x = int_option_alias_rt_id x in
            test t new_x x)
+
+  let mapping () =
+    let x = [ ("somekey", 54.); ("testy testo", 0.) ] in
+    let new_x = float_map_alias_rt_id x in
+    let t = Alcotest.testable pp_float_map_alias equal_float_map_alias in
+    test t new_x x
 end
 
 let () =
@@ -145,5 +154,6 @@ let () =
             test_case "bool" `Quick bool;
             test_case "float" `Quick float;
             test_case "int option" `Quick int_option;
+            test_case "mapping" `Quick mapping;
           ] );
     ]

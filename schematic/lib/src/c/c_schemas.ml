@@ -102,6 +102,9 @@ module Of = C_walk.Walk (struct
     let name = c_typename c ^ "_option" in
     (Variant { name; basic = [ "none" ]; rich = [ ("some", c) ] }, marks)
 
+  (* Simplest possible encoding *)
+  let mapping t = tuple [ string (); t ] |> list
+
   (* Unimplemented *)
 
   let parametric template_name _args _effective _t =
@@ -110,7 +113,6 @@ module Of = C_walk.Walk (struct
 
   let any () = failwith "unimpl: nay"
   let date _ = failwith "unimplemented: date "
-  let mapping _ = failwith "unimplemented: mapping "
   let time _ = failwith "unimplemented: time "
   let time_local _ = failwith "unimplemented: time_local "
 end)
