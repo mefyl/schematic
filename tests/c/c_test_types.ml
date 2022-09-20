@@ -6,6 +6,8 @@ module Schemas_library = struct
   let v = V
 end
 
+module Ptime = Schematic.Schemas.Ptime
+
 type primitive_record = {
   a : int;
   b : int;
@@ -90,3 +92,5 @@ let pp_any_manual_annotation : any_manual_annotation Fmt.t =
 
 (* Recursive type *)
 (* type node = | Nil | Cons of node [@@deriving schema, eq, show] *)
+
+type time_alias = Ptime.t [@@deriving schema, show, eq]

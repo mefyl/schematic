@@ -318,18 +318,3 @@ let pp_to_caml_converter ?(indent = 2) (name, ast) =
 let converters name ast =
   let open Fmt in
   (pp_of_caml_converter (name, ast), pp_to_caml_converter (name, ast))
-
-let () =
-  (* Globally register JSON conversion callbacks, to be invoked by our bundled C
-     runtime. *)
-  let json_string_of_value (v : Ezjsonm.value) : string =
-    Ezjsonm.value_to_string v
-  in
-  let json_string_to_value (s : string) : Ezjsonm.value =
-    Ezjsonm.value_from_string s
-  in
-  Stdlib.Callback.register "schematic_c_json_string_of_value"
-    json_string_of_value;
-  Stdlib.Callback.register "schematic_c_json_string_to_value"
-    json_string_to_value;
-  ()

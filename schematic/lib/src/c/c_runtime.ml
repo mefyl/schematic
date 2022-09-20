@@ -31,11 +31,17 @@ let headers =
   bannerify "Schematic C backend support headers."
     {|
 #define CAML_NAME_SPACE
+
+// C stdlib headers
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
+#include <time.h>
+
+// OCaml headers.
+// Ensure search path is consistent with actual object files!
 #include <caml/alloc.h>
 #include <caml/memory.h>
 #include <caml/mlvalues.h>
@@ -82,6 +88,11 @@ value json_to_caml(char* x) {
 
   CAMLreturn(v);
 }
+|}
+
+let typedefs = {|
+typedef char* json;
+typedef struct timespec timespec;
 |}
 
 let builtins =
@@ -151,9 +162,28 @@ value double_to_caml(double x) {
   CAMLreturn(v);
 }
 
-typedef char* json;
+
+
+timespec timespec_of_caml(value v) {
+  CAMLparam1(v);
+  timespec x;
+  x.tv_sec = Long_val(Field(v, 0));
+  x.tv_nsec = Int64_val(Field(v, 1));
+  CAMLreturnT(timespec, x);
+}
+
+
+value timespec_to_caml(timespec x) {
+  CAMLparam0();
+  CAMLlocal1(v);
+  v = caml_alloc_tuple(2);
+  Store_field(v, 0, Val_long(x.tv_sec));
+  Store_field(v, 1, caml_copy_int64(x.tv_nsec));
+  CAMLreturn(v);
+}
+
 |}
   ^ json_of_caml_builtin ^ json_to_caml_builtin
 
-let builtins = bannerify "Schematic C builtins." builtins
-let runtime = headers ^ builtins
+let builtins = bannerify "Schematic C builtins" builtins
+let runtime = headers ^ typedefs ^ builtins

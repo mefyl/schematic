@@ -105,6 +105,10 @@ module Of = C_walk.Walk (struct
   (* Simplest possible encoding *)
   let mapping t = tuple [ string (); t ] |> list
 
+  let time () =
+    Lazy.force C_sanity_checks.ptime;
+    make "timespec"
+
   (* Unimplemented *)
 
   let parametric template_name _args _effective _t =
@@ -113,7 +117,6 @@ module Of = C_walk.Walk (struct
 
   let any () = (Atom ("json", Some String), Marks.empty)
   let date _ = failwith "unimplemented: date "
-  let time _ = failwith "unimplemented: time "
   let time_local _ = failwith "unimplemented: time_local "
 end)
 

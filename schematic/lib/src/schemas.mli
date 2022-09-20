@@ -53,6 +53,8 @@ end
 module Ptime : sig
   include module type of Ptime with type t = Ptime.t and type span = Ptime.span
 
+  type t = Ptime.t
+
   val schema : Ptime.t Schema.t
   val schema_versioned : Schema.version -> Ptime.t Schema.t
 

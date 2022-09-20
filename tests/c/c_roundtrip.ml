@@ -39,6 +39,7 @@ external record_containing_ambiguous_record_rt_id :
   = "sch_record_containing_ambiguous_record_rt_id"
 
 external any_alias_rt_id : any_alias -> any_alias = "sch_any_alias_rt_id"
+external time_alias_rt_id : time_alias -> time_alias = "sch_time_alias_rt_id"
 
 (* Most robust way of testing conversion, for sure:
 
@@ -165,6 +166,13 @@ module Tests = struct
     let new_x = any_alias_rt_id x in
     let t = Alcotest.testable pp_any_alias equal_any_alias in
     test t new_x x
+
+  let time () =
+    let t = Alcotest.testable pp_time_alias equal_time_alias in
+    [ Ptime.min; Ptime.max ]
+    |> List.iter (fun x ->
+           let new_x = time_alias_rt_id x in
+           test t new_x x)
 end
 
 let () =
@@ -191,5 +199,6 @@ let () =
             test_case "mapping" `Quick mapping;
             test_case "type alias indirection" `Quick indirection;
             test_case "any (JSON)" `Quick any;
+            test_case "time" `Quick time;
           ] );
     ]

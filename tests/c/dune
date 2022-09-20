@@ -1,9 +1,10 @@
 (library
  (name c_test_types)
+ (package schematic)
  (modules c_test_types)
  (preprocess
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
- (libraries schematic))
+ (libraries schematic ptime))
 
 (test
  (name c_gen_test)
@@ -47,4 +48,4 @@
  (modules c_roundtrip)
  (preprocess
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
- (libraries alcotest schematic c_test_types))
+ (libraries alcotest schematic c_test_types ptime))
