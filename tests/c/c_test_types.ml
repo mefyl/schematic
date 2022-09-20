@@ -87,3 +87,6 @@ type any_manual_annotation =
 
 let pp_any_manual_annotation : any_manual_annotation Fmt.t =
   Fmt.of_to_string Ezjsonm.get_string
+
+(* Recursive type *)
+(* type node = | Nil | Cons of node [@@deriving schema, eq, show] *)
