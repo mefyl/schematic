@@ -8,8 +8,6 @@ open C_pp
    - polymorphic variants (need to hash - prehash? interaction with main?) *)
 
 let force_newline fmt _ = Caml.Format.pp_force_newline fmt ()
-let pp_statements = Fmt.((vbox @@ list ~sep:semi string) ++ const char ';')
-let ptr_type = Fmt.str "%s*"
 
 let signature ~return_type ~fname ~argtype ~argname =
   Fmt.str "%s %s(%s %s)" return_type fname argtype argname
