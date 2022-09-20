@@ -30,6 +30,14 @@ external record_with_indir_field_rt_id :
   record_with_indir_field -> record_with_indir_field
   = "sch_record_with_indir_field_rt_id"
 
+(* XXX: Sadly enough, OCaml will not warn us if we exposed a primitive involving
+   a type that itself contains a type whose boxed/unboxed status is ambiguous.
+   This is dangerous. For now (4.12.1) it will work by default, but this may
+   break in the future. @@boxed will help. *)
+external record_containing_ambiguous_record_rt_id :
+  record_containing_ambiguous_record -> record_containing_ambiguous_record
+  = "sch_record_containing_ambiguous_record_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.

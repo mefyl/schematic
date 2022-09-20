@@ -98,6 +98,7 @@ let ctypes =
       Schema.pack bool_alias_schema;
       Schema.pack int64_alias_schema;
       Schema.pack record_with_indir_field_schema;
+      Schema.pack record_containing_ambiguous_record_schema;
     ]
   |> fst |> List.rev
 

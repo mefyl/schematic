@@ -55,6 +55,9 @@ type record_with_pair_alias = {
 [@@deriving schema, show, eq]
 
 type record_with_variant = { v : payload_variant } [@@deriving schema, show, eq]
+
+(* Roundtrip only *)
+
 type int64_alias = int64 [@@deriving schema, show, eq]
 type bool_alias = bool [@@deriving schema, show, eq]
 type float_alias = float [@@deriving schema, show, eq]
@@ -64,4 +67,12 @@ type indirected_record_1 = primitive_record [@@deriving schema, show, eq]
 type indirected_record_2 = indirected_record_1 [@@deriving schema, show, eq]
 
 type record_with_indir_field = { indir : indirected_record_2 }
+[@@boxed] [@@deriving schema, show, eq]
+
+type problem_child = { only_field : string } [@@deriving schema, show, eq]
+
+type record_containing_ambiguous_record = {
+  problem_child : problem_child;
+  padding_field : int;
+}
 [@@deriving schema, show, eq]
