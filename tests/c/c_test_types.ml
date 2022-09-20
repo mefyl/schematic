@@ -57,3 +57,4 @@ type record_with_pair_alias = {
 type record_with_variant = { v : payload_variant } [@@deriving schema, show, eq]
 type int64_alias = int64 [@@deriving schema, show, eq]
 type bool_alias = bool [@@deriving schema, show, eq]
+type float_alias = float [@@deriving schema, show, eq]

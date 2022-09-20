@@ -64,6 +64,22 @@ bool bool_of_caml(value v) {
   bool x = Bool_val(v);
   CAMLreturnT(bool, x);
 }
+
+
+double double_of_caml(value v) {
+  CAMLparam1(v);
+  double x = Double_val(v);
+  CAMLreturnT(double, x);
+}
+
+
+value double_to_caml(double x) {
+  CAMLparam0();
+  CAMLlocal1(v);
+  v = caml_copy_double(x);
+  CAMLreturn(v);
+}
+
 |}
 
 let nl_concat = String.concat ~sep:"\n"
@@ -80,6 +96,7 @@ let ctypes =
       Schema.pack primitive_record_schema;
       Schema.pack int64_alias_schema;
       Schema.pack bool_alias_schema;
+      Schema.pack float_alias_schema;
     ]
   |> fst |> List.rev
 
