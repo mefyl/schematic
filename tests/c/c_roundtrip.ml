@@ -20,6 +20,9 @@ external bool_alias_rt_id : bool_alias -> bool_alias = "sch_bool_alias_rt_id"
 external float_alias_rt_id : float_alias -> float_alias
   = "sch_float_alias_rt_id"
 
+external int_option_alias_rt_id : int_option_alias -> int_option_alias
+  = "sch_int_option_alias_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -112,6 +115,14 @@ module Tests = struct
     |> List.iter (fun x ->
            let new_x = float_alias_rt_id x in
            test t new_x x)
+
+  let int_option () =
+    let t = Alcotest.testable pp_int_option_alias equal_int_option_alias in
+    (* Reminder: nan != nan *)
+    [ None; Some 0; Some (-1); Some 1 ]
+    |> List.iter (fun x ->
+           let new_x = int_option_alias_rt_id x in
+           test t new_x x)
 end
 
 let () =
@@ -133,5 +144,6 @@ let () =
             test_case "int64" `Quick int64;
             test_case "bool" `Quick bool;
             test_case "float" `Quick float;
+            test_case "int option" `Quick int_option;
           ] );
     ]
