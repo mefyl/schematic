@@ -54,8 +54,8 @@ module Of = C_walk.Walk (struct
         (c, marks)
       | Some id ->
         Fmt.epr "has id: %s\n" id;
-        let base_type : c option = concrete_type (fst @@ s ()) in
-        (Atom (id, base_type), Marks.make id s))
+        let referenced_type : c = fst @@ s () in
+        (Atom (id, Some referenced_type), Marks.make id s))
 
   let fields_empty () = ([], Marks.empty)
 
@@ -85,7 +85,6 @@ module Of = C_walk.Walk (struct
   let tuple ts =
     let items, marks = List.unzip ts in
     let tuptyp = Tuple items in
-    (* XXX *)
     let s () = (tuptyp, Marks.merge marks) in
     let tuple_name = tuple_name items in
     (Atom (tuple_name, Some tuptyp), Marks.make tuple_name s)

@@ -77,7 +77,6 @@ let string_wrapper_c = {|
 typedef char* string_wrapper;
 |}
 
-(* XXX: get rid of union if there is no payload *)
 let basic_variant_c =
   {|
 typedef enum {
@@ -103,6 +102,14 @@ value basic_variant_to_caml(basic_variant x) {
 }
 |}
 
+let tuple_int_string_c =
+  {|
+typedef struct {
+  int t0;
+  char* t1;
+} tuple_int_string;
+|}
+
 (* FIXME: possible collisions with "tag" and "payload" *)
 let payload_variant_c =
   {|
@@ -111,10 +118,12 @@ typedef struct {
     payload_variant_nothing_tag,
     payload_variant_nothing2_tag,
     payload_variant_nothing3_tag,
-    payload_variant_someint_tag
+    payload_variant_someint_tag,
+    payload_variant_a_pair_tag
   } tag;
   union {
     int someint;
+    tuple_int_string a_pair;
   }* payload;
 } payload_variant;
 |}
@@ -130,10 +139,13 @@ payload_variant payload_variant_of_caml(value v) {
   } else {
     res.tag = 3 + Tag_val(v);
     res.payload = malloc(sizeof(*res.payload));
-    assert(Tag_val(v) < 1);
+    assert(Tag_val(v) < 2);
     switch (Tag_val(v)) {
       case 0:
         res.payload->someint = int_of_caml(Field(v, 0));
+        break;
+      case 1:
+        res.payload->a_pair = tuple_int_string_of_caml(v);
         break;
     }
   }
@@ -159,6 +171,11 @@ value payload_variant_to_caml(payload_variant x) {
     case payload_variant_someint_tag:
       v = caml_alloc(1, 0);
       Store_field(v, 0, int_to_caml(x.payload->someint));
+      break;
+    case payload_variant_a_pair_tag:
+      v = caml_alloc(2, 1);
+      Store_field(v, 0, int_to_caml(x.payload->a_pair.t0));
+      Store_field(v, 1, string_to_caml(x.payload->a_pair.t1));
       break;
   }
   CAMLreturn(v);
@@ -353,6 +370,29 @@ value int_array_to_caml(int_array arr) {
 }
 |}
 
+let tuple_int_string_of_caml =
+  {|
+tuple_int_string tuple_int_string_of_caml(value v) {
+  CAMLparam1(v);
+  tuple_int_string res;
+  res.t0 = int_of_caml(Field(v, 0));
+  res.t1 = string_of_caml(Field(v, 1));
+  CAMLreturnT(tuple_int_string, res);
+}
+|}
+
+let tuple_int_string_to_caml =
+  {|
+value tuple_int_string_to_caml(tuple_int_string x) {
+  CAMLparam0();
+  CAMLlocal1(v);
+  v = caml_alloc_tuple(2);
+  Store_field(v, 0, int_to_caml(x.t0));
+  Store_field(v, 1, string_to_caml(x.t1));
+  CAMLreturn(v);
+}
+|}
+
 let pretty_string =
   let pp_string ppf x = Fmt.pf ppf "{|\n%s\n|}" x in
   Alcotest.testable pp_string String.( = )
@@ -369,10 +409,13 @@ module Generate_types = struct
   let nested () = test wrapper_schema [ wrapper_c; primitive_record_c ]
   let string () = test string_wrapper_schema [ string_wrapper_c ]
   let basic_variant () = test basic_variant_schema [ basic_variant_c ]
-  let payload_variant () = test payload_variant_schema [ payload_variant_c ]
+
+  let payload_variant () =
+    test payload_variant_schema [ payload_variant_c; tuple_int_string_c ]
 
   let record_with_variant () =
-    test record_with_variant_schema [ record_with_variant_c; payload_variant_c ]
+    test record_with_variant_schema
+      [ record_with_variant_c; payload_variant_c; tuple_int_string_c ]
 
   let pair_alias () =
     test pair_alias_schema [ pair_alias_c; string_int_tuple_c ]
@@ -390,6 +433,7 @@ module Generate_types = struct
         pair_alias_c;
         string_int_tuple_c;
         payload_variant_c;
+        tuple_int_string_c;
         string_wrapper_tuple_c;
         wrapper_c;
         primitive_record_c;
@@ -415,7 +459,8 @@ module Of_caml = struct
   let basic_variant () = test basic_variant_schema [ basic_variant_of_caml ]
 
   let payload_variant () =
-    test payload_variant_schema [ payload_variant_of_caml ]
+    test payload_variant_schema
+      [ payload_variant_of_caml; tuple_int_string_of_caml ]
 
   let pair_alias () =
     test pair_alias_schema [ pair_alias_of_caml; tuple_string_int_of_caml ]
@@ -449,7 +494,8 @@ module To_caml = struct
   let basic_variant () = test basic_variant_schema [ basic_variant_to_caml ]
 
   let payload_variant () =
-    test payload_variant_schema [ payload_variant_to_caml ]
+    test payload_variant_schema
+      [ payload_variant_to_caml; tuple_int_string_to_caml ]
 
   let pair_alias () =
     test pair_alias_schema [ pair_alias_to_caml; tuple_string_int_to_caml ]

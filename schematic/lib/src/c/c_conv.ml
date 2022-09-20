@@ -65,14 +65,16 @@ let pp_of_caml_converter ?(indent = 2) (name, ast) =
       in
       let case : (int * (string * c)) Fmt.t =
        fun fmt (i, (field_name, c)) ->
+        Fmt.epr "Case type %a\n" pp c;
+        let v =
+          match c with Atom (_, Some (Tuple _)) -> "v" | _ -> "Field(v, 0)"
+        in
         case ~indent (Int.to_string i)
           (Some
              (const pp_statements
                 [
-                  (* XXX: tuples will ruin the day. *)
-                  (* FIXME FIXME FIXME *)
-                  Fmt.str "res.payload->%s = %s(Field(v, 0))" field_name
-                    (of_caml_name_for_c c);
+                  Fmt.str "res.payload->%s = %s(%s)" field_name
+                    (of_caml_name_for_c c) v;
                   "break";
                 ]))
           fmt ()
@@ -179,9 +181,7 @@ let pp_to_caml_converter ?(indent = 2) (name, ast) =
   let argname, is_ptr, (body : unit Fmt.t) =
     match ast with
     | Struct { fields } ->
-      (* XXX: is this always the right tag? *)
       let tag = 0 in
-
       let n_fields = List.length fields in
       let field_stores =
         fields
@@ -213,26 +213,35 @@ let pp_to_caml_converter ?(indent = 2) (name, ast) =
           basic
           |> List.mapi ~f:(fun i constr_name ->
                  ( constr_name,
-                   const pp_statements
-                     [
-                       (* XXX FIXME alloc size - tuples...*)
-                       Fmt.str "v = Val_int(%d)" i;
-                       "break";
-                     ] ))
+                   const pp_statements [ Fmt.str "v = Val_int(%d)" i; "break" ]
+                 ))
         in
         let rich_cases : (string * unit Fmt.t) list =
           rich
           |> List.mapi ~f:(fun i (constr_name, constr_type) ->
+                 let payload = Fmt.str "x.payload->%s" constr_name in
+
+                 let n_fields, stmts =
+                   match constr_type with
+                   | Atom (_, Some (Tuple members)) ->
+                     ( members |> List.length,
+                       members
+                       |> List.mapi ~f:(fun i c ->
+                              Fmt.str "Store_field(v, %d, %s(%s.t%d))" i
+                                (to_caml_name_for_c c) payload i) )
+                   | _ ->
+                     ( 1,
+                       [
+                         Fmt.str "Store_field(v, 0, %s(%s))"
+                           (to_caml_name_for_c constr_type)
+                           payload;
+                       ] )
+                 in
+                 let tag = i in
                  ( constr_name,
                    const pp_statements
-                     [
-                       (* XXX FIXME alloc size - tuples*)
-                       Fmt.str "v = caml_alloc(1, %d)" i;
-                       Fmt.str "Store_field(v, 0, %s(x.payload->%s))"
-                         (to_caml_name_for_c constr_type)
-                         constr_name;
-                       "break";
-                     ] ))
+                     ([ Fmt.str "v = caml_alloc(%d, %i)" n_fields tag ]
+                     @ stmts @ [ "break" ]) ))
         in
         let cases =
           basic_cases @ rich_cases

@@ -1,3 +1,5 @@
+(* type repr_info = { indirected: bool; } *)
+
 type t =
   | Void  (** Zero-Sized Type *)
   | String  (** Native string *)
@@ -40,11 +42,7 @@ let rec c_typename = function
   | x -> failwith "unsupported: %a" pp x
 
 and tuple_name items =
-  "tuple_"
-  ^ (items
-   (* FIXME: use typename *)
-   |> List.map ~f:c_typename
-    |> String.concat ~sep:"_")
+  "tuple_" ^ (items |> List.map ~f:c_typename |> String.concat ~sep:"_")
 
 and array_name t = c_typename t ^ "_array"
 
@@ -58,6 +56,9 @@ let to_caml_name_for_c = Fn.compose to_caml_name_for c_typename
 
 let case_name variant_name constr_name =
   Fmt.str "%s_%s_tag" variant_name constr_name
+
+(* let rec referenced_type = function | Atom (_, Some t) -> Some t | Atom (_,
+   None) -> None | _ -> *)
 
 let rec concrete_type = function
   | Atom (_, Some t) -> concrete_type t

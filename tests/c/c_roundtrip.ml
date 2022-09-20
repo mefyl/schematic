@@ -12,8 +12,6 @@ external payload_variant_rt_id : payload_variant -> payload_variant
 external behemoth_rt_id : behemoth -> behemoth = "sch_behemoth_rt_id"
 external collection_rt_id : collection -> collection = "sch_collection_rt_id"
 
-(* TODO variants*)
-
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -28,7 +26,7 @@ external collection_rt_id : collection -> collection = "sch_collection_rt_id"
    Then it checks for equality. *)
 
 module Tests = struct
-  let test t got expected = Alcotest.(check t "TODO" expected) got
+  let test t got expected = Alcotest.(check t "" expected) got
 
   let wrapper () =
     let x = { somevar = 42; r = { a = 1; b = 77 } } in
@@ -56,6 +54,12 @@ module Tests = struct
 
   let payload_variant_with_pl () =
     let x = SomeInt 53 in
+    let new_x = payload_variant_rt_id x in
+    let t = Alcotest.testable pp_payload_variant equal_payload_variant in
+    test t new_x x
+
+  let payload_variant_with_inline_tuple_payload () =
+    let x = A_pair (990, "cocorico") in
     let new_x = payload_variant_rt_id x in
     let t = Alcotest.testable pp_payload_variant equal_payload_variant in
     test t new_x x
@@ -92,8 +96,9 @@ let () =
             test_case "diverse" `Quick diverse;
             test_case "basic_variant" `Quick basic_variant;
             test_case "payload_variant: plain" `Quick payload_variant_plain;
-            test_case "payload_variant: with payload" `Quick
-              payload_variant_with_pl;
+            test_case "payload_variant: payload" `Quick payload_variant_with_pl;
+            test_case "payload_variant: inline tuple payload" `Quick
+              payload_variant_with_inline_tuple_payload;
             test_case "behemoth" `Quick behemoth;
             test_case "collection" `Quick collection;
           ] );

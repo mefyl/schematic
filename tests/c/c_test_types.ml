@@ -33,6 +33,7 @@ type payload_variant =
   | Nothing2
   | SomeInt of int
   | Nothing3
+  | A_pair of int * string
 [@@deriving schema, show, eq]
 
 type pair_alias = string * int [@@deriving schema, show, eq]

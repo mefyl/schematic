@@ -61,7 +61,7 @@ let pp ?(indent = 2) fmt ts =
         C_pp.braced ~indent "struct"
           (const string "size_t len" ++ semi ++ const pp t ++ const string "* "
          ++ const string "data;")
-      | String -> const string "char*" (* XXX dedup *)
+      | String -> const string "char*"
       | Struct { fields; _ } -> const struct_ fields
       (* Tuples are structs with types named according to their indices *)
       | Tuple types ->
