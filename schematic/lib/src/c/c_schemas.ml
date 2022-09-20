@@ -111,7 +111,7 @@ module Of = C_walk.Walk (struct
     Fmt.epr "tn: %s@." template_name;
     failwith "parametric: unimpl"
 
-  let any () = failwith "unimpl: nay"
+  let any () = (Atom ("json", Some String), Marks.empty)
   let date _ = failwith "unimplemented: date "
   let time _ = failwith "unimplemented: time "
   let time_local _ = failwith "unimplemented: time_local "

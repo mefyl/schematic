@@ -76,3 +76,14 @@ type record_containing_ambiguous_record = {
   padding_field : int;
 }
 [@@deriving schema, show, eq]
+
+type any_alias = Schematic.Schemas.any [@@deriving schema, eq]
+
+let pp_any_alias : any_alias Fmt.t = Fmt.of_to_string Ezjsonm.get_string
+
+type any_manual_annotation =
+  (Ezjsonm.value[@schematic.schema fun _ -> Schematic.Schemas.any_schema])
+[@@deriving schema]
+
+let pp_any_manual_annotation : any_manual_annotation Fmt.t =
+  Fmt.of_to_string Ezjsonm.get_string

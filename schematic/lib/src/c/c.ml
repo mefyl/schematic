@@ -45,3 +45,6 @@ let roundtrip_src (name, c) =
   Fmt.to_to_string pp ()
 
 let runtime = C_runtime.runtime
+
+(** You MUST call this if you want support for arbitrary JSON values. *)
+let register_callbacks = C_runtime.register_callbacks

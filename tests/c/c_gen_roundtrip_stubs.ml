@@ -18,6 +18,7 @@ let ctypes =
       Schema.pack int64_alias_schema;
       Schema.pack record_with_indir_field_schema;
       Schema.pack record_containing_ambiguous_record_schema;
+      Schema.pack any_alias_schema;
     ]
   |> fst |> List.rev
 
@@ -36,11 +37,6 @@ let declarations, impls =
   let signatures = List.concat signatures |> nl_concat in
   let impls = List.concat impls |> nl_concat in
   ([ typedefs; signatures ] |> nl_concat, impls)
-
-(* TODO:
-
-   check that the compiler gives warning when passing a type that contains an
-   unboxable type *)
 
 let rts = ctypes |> List.map ~f:Schematic.C.roundtrip_src |> nl_concat
 

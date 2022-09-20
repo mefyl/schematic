@@ -38,6 +38,8 @@ external record_containing_ambiguous_record_rt_id :
   record_containing_ambiguous_record -> record_containing_ambiguous_record
   = "sch_record_containing_ambiguous_record_rt_id"
 
+external any_alias_rt_id : any_alias -> any_alias = "sch_any_alias_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -152,10 +154,22 @@ module Tests = struct
       Alcotest.testable pp_record_with_indir_field equal_record_with_indir_field
     in
     test t new_x x
+
+  let any () =
+    (* [ `Null | `Bool of bool | `Float of float | `String of string | `A of
+       value list | `O of (string * value) list ] *)
+    let x : any_alias =
+      `A
+        [ `A []; `Float 65.; `O [ ("mykey", `Bool true); ("otherKey", `Null) ] ]
+    in
+    let new_x = any_alias_rt_id x in
+    let t = Alcotest.testable pp_any_alias equal_any_alias in
+    test t new_x x
 end
 
 let () =
   let open Alcotest in
+  Schematic.C.register_callbacks ();
   run "Schematic.C roundtrip"
     [
       ( "typegen",
@@ -176,5 +190,6 @@ let () =
             test_case "int option" `Quick int_option;
             test_case "mapping" `Quick mapping;
             test_case "type alias indirection" `Quick indirection;
+            test_case "any (JSON)" `Quick any;
           ] );
     ]
