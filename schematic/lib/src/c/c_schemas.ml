@@ -97,6 +97,11 @@ module Of = C_walk.Walk (struct
     let name = array_name c in
     (Atom (name, Some arrtyp), Marks.make name s)
 
+  (* This could be optimized, but this approach allows us to simplify things *)
+  let nullable (c, marks) =
+    let name = c_typename c ^ "_option" in
+    (Variant { name; basic = [ "none" ]; rich = [ ("some", c) ] }, marks)
+
   (* Unimplemented *)
 
   let parametric template_name _args _effective _t =
@@ -106,7 +111,6 @@ module Of = C_walk.Walk (struct
   let any () = failwith "unimpl: nay"
   let date _ = failwith "unimplemented: date "
   let mapping _ = failwith "unimplemented: mapping "
-  let nullable _ = failwith "unimplemented: nullable "
   let time _ = failwith "unimplemented: time "
   let time_local _ = failwith "unimplemented: time_local "
 end)
