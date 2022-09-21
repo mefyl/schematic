@@ -63,18 +63,30 @@ let pp_of_caml_converter ?(indent = 2) (name, ast) =
       in
       let case : (int * (string * c)) Fmt.t =
        fun fmt (i, (field_name, c)) ->
-        Fmt.epr "Case type %a\n" pp c;
-        let v =
-          match c with Atom (_, Some (Tuple _)) -> "v" | _ -> "Field(v, 0)"
+        let stmts =
+          match c with
+          | Atom (_, Some (Tuple _)) ->
+            [
+              Fmt.str "res.payload->%s = %s(v)" field_name
+                (of_caml_name_for_c c);
+            ]
+          | Struct { fields } ->
+            fields
+            |> List.mapi ~f:(fun i (inline_field_name, field_c) ->
+                   Fmt.str "res.payload->%s.%s = %s(Field(v, %d))" field_name
+                     inline_field_name
+                     (of_caml_name_for_c field_c)
+                     i)
+          | _ ->
+            [
+              Fmt.str "res.payload->%s = %s(Field(v, 0))" field_name
+                (of_caml_name_for_c c);
+            ]
         in
+
+        Fmt.epr "Case type %a\n" pp c;
         case ~indent (Int.to_string i)
-          (Some
-             (const pp_statements
-                [
-                  Fmt.str "res.payload->%s = %s(%s)" field_name
-                    (of_caml_name_for_c c) v;
-                  "break";
-                ]))
+          (Some (const pp_statements (stmts @ [ "break" ])))
           fmt ()
       in
 
@@ -221,12 +233,20 @@ let pp_to_caml_converter ?(indent = 2) (name, ast) =
 
                  let n_fields, stmts =
                    match constr_type with
+                   (* Inline tuple *)
                    | Atom (_, Some (Tuple members)) ->
                      ( members |> List.length,
                        members
                        |> List.mapi ~f:(fun i c ->
                               Fmt.str "Store_field(v, %d, %s(%s.t%d))" i
                                 (to_caml_name_for_c c) payload i) )
+                   (* Inline record *)
+                   | Struct { fields } ->
+                     ( fields |> List.length,
+                       fields
+                       |> List.mapi ~f:(fun i (field_name, c) ->
+                              Fmt.str "Store_field(v, %d, %s(%s.%s))" i
+                                (to_caml_name_for_c c) payload field_name) )
                    | _ ->
                      ( 1,
                        [

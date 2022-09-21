@@ -1,5 +1,3 @@
-(* type repr_info = { indirected: bool; } *)
-
 type t =
   | Void  (** Zero-Sized Type *)
   | String  (** Native string *)
@@ -16,8 +14,6 @@ type t =
 
 type c = t
 
-(* XXX: order of signatures! *)
-
 type c_function = {
   signature : string;
   impl : unit Fmt.t;
@@ -32,13 +28,14 @@ type c_gen = {
 
 open Base
 
-(* XXX: tuples of tuples - name conflicts *)
+(* XXX: tuples of tuples - name conflicts? *)
 
 let rec c_typename = function
   | String -> "string"
   | Atom (s, _) -> s
   | Tuple members -> tuple_name members
   | Array t -> array_name t
+  | Variant { name; _ } -> name
   | x -> failwith (Fmt.str "unsupported: %a" pp x)
 
 and tuple_name items =
