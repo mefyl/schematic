@@ -196,7 +196,7 @@ end
 
 let () =
   let open Alcotest in
-  Schematic.C.register_callbacks ();
+  Schematic.C.Runtime.register_callbacks ();
   run "Schematic.C roundtrip"
     [
       ( "typegen",

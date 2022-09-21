@@ -6,6 +6,8 @@ include C_intf
 (* XXX: Butchering the boxing logic while I learn it. *)
 
 include C_schemas
+module Runtime = C_runtime
+module Builtins = C_builtins
 
 let export (name, c) : c_gen =
   let open Fmt in
@@ -44,7 +46,49 @@ let roundtrip_src (name, c) =
   let pp = braced ~indent:2 decl body in
   Fmt.to_to_string pp ()
 
-let runtime = C_runtime.runtime
+(* let runtime = C_runtime.runtime
 
-(** You MUST call this if you want support for arbitrary JSON values. *)
-let register_callbacks = C_runtime.register_callbacks
+   (** You MUST call this if you want support for arbitrary JSON values. *) let
+   register_callbacks = C_runtime.register_callbacks *)
+
+(** Returns (header file content) * (implementation file content)
+
+    XXX: need to include header in impl! *)
+
+(* TODO: static for unexported symbols? *)
+let export_schemas (schemas : Schema.pack list) =
+  let nl_concat = String.concat ~sep:"\n" in
+
+  let ctypes = of_schemas_state state_empty schemas |> fst |> List.rev in
+
+  let cgens = ctypes |> List.map ~f:export in
+
+  let user_declarations, user_impls =
+    let typedefs = cgens |> List.map ~f:typedef_src |> nl_concat in
+    let signatures, impls =
+      cgens
+      |> List.map ~f:(fun { to_caml; of_caml; _ } ->
+             ( List.map [ to_caml; of_caml ] ~f:signature_src,
+               List.map [ to_caml; of_caml ] ~f:impl_src ))
+      |> List.unzip
+    in
+    let signatures = List.concat signatures |> nl_concat in
+    let impls = List.concat impls |> nl_concat in
+    ([ typedefs; signatures ] |> nl_concat, impls)
+  in
+
+  let header_file_contents = Builtins.declarations ^ user_declarations in
+
+  (* XXX *)
+  let rts = ctypes |> List.map ~f:roundtrip_src |> nl_concat in
+
+  (* TODO include declaration file *)
+  let c_file_contents = Builtins.implementations ^ user_impls ^ rts in
+
+  (header_file_contents, c_file_contents)
+
+(* let () = Fmt.pr "%s\n" Schematic.C.runtime; Fmt.pr "\n"; Fmt.pr "//\n";
+   Fmt.pr "// Generated declarations\n"; Fmt.pr "//\n"; Fmt.pr "%s"
+   declarations; Fmt.pr "\n"; Fmt.pr "//\n"; Fmt.pr "// Generated
+   implementations\n"; Fmt.pr "//\n"; Fmt.pr "%s" impls; Fmt.pr "\n"; Fmt.pr
+   "\n"; Fmt.pr "%s" rts; () *)

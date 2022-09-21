@@ -17,15 +17,13 @@
 (executable
  (name c_gen_roundtrip_stubs)
  (modules c_gen_roundtrip_stubs)
- (libraries alcotest schematic c_test_types))
+ (libraries alcotest schematic c_test_types stdio))
 
 (rule
- (target c_roundtrip_stubs.c)
+ (targets c_roundtrip_stubs.h c_roundtrip_stubs.c)
  (deps (universe))
  (action
-  (with-stdout-to
-   %{target}
-   (run %{dep:c_gen_roundtrip_stubs.exe}))))
+  (run %{dep:c_gen_roundtrip_stubs.exe} %{targets})))
 
 ; (rule
 ;  (deps c_roundtrip_stubs.c)
