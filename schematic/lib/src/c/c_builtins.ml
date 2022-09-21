@@ -94,12 +94,12 @@ let implementations =
   
 value unit_to_caml(unit x){
   CAMLparam0();
-  assert(x == 0);
+  // assert(x == 0);
   CAMLreturn(Val_unit);
 }
 unit unit_of_caml(value v) {
   CAMLparam1(v);
-  assert(v == Val_unit);
+  // assert(v == Val_unit);
   CAMLreturnT(unit, 0);
 }
 
