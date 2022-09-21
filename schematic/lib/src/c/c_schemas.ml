@@ -2,7 +2,7 @@ open Base
 include C_intf
 
 (* XXX: legacy, need to review & test identifier conversion *)
-let normalize_id s = s
+let normalize_id s = String.split ~on:'-' s |> String.concat ~sep:"_"
 
 include Marks.Make (struct
   type t = c
@@ -128,9 +128,10 @@ module Of = C_walk.Walk (struct
 
   (* Unimplemented *)
 
+  (* FIXME: any parametric type gets mapped into `unit` for now. *)
   let parametric template_name _args _effective _t =
     Fmt.epr "tn: %s@." template_name;
-    failwith "parametric: unimpl"
+    ignore ()
 end)
 
 (* XXX: copied from TypeScript, might be generalizable? *)
@@ -138,7 +139,8 @@ let mark_of_schema Schema.{ id; descriptor; parametric } =
   match parametric with
   | None ->
     (Option.value_exn ~here:[%here] id, lazy (Of.descriptor id descriptor))
-  | Some _parametric -> failwith "no parametrics yet"
+  | Some parametric ->
+    (Option.value_exn ~here:[%here] id, lazy (Of.parametric parametric))
 
 let of_schema marks s = of_mark marks @@ mark_of_schema s
 

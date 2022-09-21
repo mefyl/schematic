@@ -20,6 +20,7 @@ let schemas =
     Schema.pack time_local_alias_schema;
     Schema.pack date_alias_schema;
     Schema.pack record_with_unit_schema;
+    Schema.pack (parametric_record_schema string_wrapper_schema);
   ]
 
 let () =

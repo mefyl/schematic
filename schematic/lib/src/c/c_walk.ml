@@ -97,9 +97,25 @@ module Walk (W : WALK) = struct
    fun { id; descriptor = d; parametric = p } ->
     let schema () = descriptor id d
     and parametric =
-      match p with None -> None | Some p -> failwith "no generics"
+      match p with
+      | None -> None
+      | Some p ->
+        Some
+          (fun () ->
+            let name, args, eff_args, t = parametric p in
+            W.parametric name args eff_args t)
     in
     W.schema id parametric schema
+
+  and parametric : type t. t parametric -> string * string list * W.t list * W.t
+      = function
+    | Plain { name; descriptor = d } -> (name, [], [], descriptor (Some name) d)
+    | Parametric { name; parameter; next } ->
+      let template_name, args, eff_args, t =
+        parametric
+          (next { parameter with id = Some ("#" ^ name); parametric = None })
+      in
+      (template_name, name :: args, schema parameter :: eff_args, t)
 
   and fields : type t. t fields -> W.fields = function
     | FieldEnd -> W.fields_empty ()
@@ -135,4 +151,8 @@ module Walk (W : WALK) = struct
   and tuple : type t. t tuple -> W.t list = function
     | ItemEnd -> []
     | Item { schema = s; rest } -> schema s :: tuple rest
+
+  let parametric p =
+    let name, args, eff_args, t = parametric p in
+    W.parametric name args eff_args t
 end
