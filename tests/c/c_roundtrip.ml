@@ -49,6 +49,10 @@ external date_alias_rt_id : date_alias -> date_alias = "sch_date_alias_rt_id"
 external record_with_unit_rt_id : record_with_unit -> record_with_unit
   = "sch_record_with_unit_rt_id"
 
+external variant_with_inline_record_payload_rt_id :
+  variant_with_inline_record_payload -> variant_with_inline_record_payload
+  = "sch_variant_with_inline_record_payload_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -99,6 +103,15 @@ module Tests = struct
     let x = A_pair (990, "cocorico") in
     let new_x = payload_variant_rt_id x in
     let t = Alcotest.testable pp_payload_variant equal_payload_variant in
+    test t new_x x
+
+  let payload_variant_with_inline_record_payload () =
+    let x = Inline_payload { field = 6298 } in
+    let new_x = variant_with_inline_record_payload_rt_id x in
+    let t =
+      Alcotest.testable pp_variant_with_inline_record_payload
+        equal_variant_with_inline_record_payload
+    in
     test t new_x x
 
   let behemoth () =
@@ -232,5 +245,7 @@ let () =
             test_case "time_local" `Quick time_local;
             test_case "date" `Quick date;
             test_case "record containing a `unit`" `Quick record_with_unit;
+            test_case "payload_variant: inline record payload" `Quick
+              payload_variant_with_inline_record_payload;
           ] );
     ]

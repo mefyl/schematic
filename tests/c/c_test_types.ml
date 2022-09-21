@@ -113,3 +113,8 @@ type record_with_unit = {
   after_unit : int;
 }
 [@@deriving schema, show, eq]
+
+type variant_with_inline_record_payload =
+  | Payloads_are_overrated_anyway
+  | Inline_payload of { field : int }
+[@@deriving schema, show, eq]
