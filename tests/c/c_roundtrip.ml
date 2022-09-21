@@ -46,6 +46,9 @@ external time_local_alias_rt_id : time_local_alias -> time_local_alias
 
 external date_alias_rt_id : date_alias -> date_alias = "sch_date_alias_rt_id"
 
+external record_with_unit_rt_id : record_with_unit -> record_with_unit
+  = "sch_record_with_unit_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -192,6 +195,13 @@ module Tests = struct
     |> List.iter (fun x ->
            let new_x = date_alias_rt_id x in
            test t new_x x)
+
+  let record_with_unit () =
+    let t = Alcotest.testable pp_record_with_unit equal_record_with_unit in
+    [ { concrete = 24322443; nothing = (); after_unit = 4 } ]
+    |> List.iter (fun x ->
+           let new_x = record_with_unit_rt_id x in
+           test t new_x x)
 end
 
 let () =
@@ -221,5 +231,6 @@ let () =
             test_case "time" `Quick time;
             test_case "time_local" `Quick time_local;
             test_case "date" `Quick date;
+            test_case "record containing a `unit`" `Quick record_with_unit;
           ] );
     ]

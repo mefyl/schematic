@@ -21,10 +21,10 @@ module Of = C_walk.Walk (struct
 
   (* Shallow primitive types *)
 
-  (* Zero-Sized Types *)
-  let ignore _ = (Void, Marks.empty)
+  (* unit descriptors *)
+  let ignore () = make "unit"
   let null = ignore
-  let string_const = ignore
+  let string_const _s = (Void, Marks.empty)
 
   (* Primitive types without indirection *)
   let int () = make "int"

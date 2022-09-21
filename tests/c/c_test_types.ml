@@ -106,3 +106,10 @@ type polymorphic_variant =
   | `B
   ]
 [@@deriving schema, eq, show]
+
+type record_with_unit = {
+  concrete : int;
+  nothing : unit;
+  after_unit : int;
+}
+[@@deriving schema, show, eq]

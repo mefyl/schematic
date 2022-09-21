@@ -63,9 +63,11 @@ value json_to_caml(char* x) {
 }
 |}
 
-let typedefs = {|
+let typedefs =
+  {|
 typedef char* json;
 typedef struct timespec timespec;
+typedef int unit;
 |}
 
 (* TODO: DRY builtin sigs / impls. *)
@@ -89,6 +91,19 @@ value timespec_to_caml(timespec x);
 let implementations =
   bannerify "Schematic C builtin implementations"
   @@ {|
+  
+value unit_to_caml(unit x){
+  CAMLparam0();
+  assert(x == 0);
+  CAMLreturn(Val_unit);
+}
+unit unit_of_caml(value v) {
+  CAMLparam1(v);
+  assert(v == Val_unit);
+  CAMLreturnT(unit, 0);
+}
+
+  
 value int_to_caml(int x) {
   CAMLparam0();
   CAMLreturn(Val_int(x));
