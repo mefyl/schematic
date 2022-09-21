@@ -120,11 +120,15 @@ module Of = C_walk.Walk (struct
 
   let date () =
     Lazy.force C_sanity_checks.date;
-    (* This will work because a Ptime.date is a (int * int * int), which has the
-       same memory representation as a struct with three int fields. *)
-    let int = fst (int ()) in
-    let fields = [ ("year", int); ("month", int); ("day", int) ] in
-    (Struct { fields }, Marks.empty)
+
+    let s () =
+      let int = fst (int ()) in
+      (* This will work because a Ptime.date is a (int * int * int), which has
+         the same memory representation as a struct with three int fields. *)
+      let fields = [ ("year", int); ("month", int); ("day", int) ] in
+      (Struct { fields }, Marks.empty)
+    in
+    schema (Some "date") None s
 
   (* Unimplemented *)
 
