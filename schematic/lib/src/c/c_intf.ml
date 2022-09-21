@@ -39,7 +39,7 @@ let rec c_typename = function
   | Atom (s, _) -> s
   | Tuple members -> tuple_name members
   | Array t -> array_name t
-  | x -> failwith "unsupported: %a" pp x
+  | x -> failwith (Fmt.str "unsupported: %a" pp x)
 
 and tuple_name items =
   "tuple_" ^ (items |> List.map ~f:c_typename |> String.concat ~sep:"_")

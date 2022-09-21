@@ -316,5 +316,4 @@ let pp_to_caml_converter ?(indent = 2) (name, ast) =
 (* TODO: generate *_free() functions *)
 
 let converters name ast =
-  let open Fmt in
   (pp_of_caml_converter (name, ast), pp_to_caml_converter (name, ast))

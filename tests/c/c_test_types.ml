@@ -1,13 +1,11 @@
 open Base
+open Schematic.Schemas
 
 module Schemas_library = struct
   type Schematic.Schema.library += V
 
   let v = V
 end
-
-open Schematic.Schemas
-module Ptime = Schematic.Schemas.Ptime
 
 type primitive_record = {
   a : int;
