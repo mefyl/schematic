@@ -120,3 +120,6 @@ type variant_with_inline_record_payload =
   | Payloads_are_overrated_anyway
   | Inline_payload of { field : int }
 [@@deriving schema, show, eq]
+
+(* Purposeful name conflict *)
+type time = Ptime.t [@@deriving schema, show, eq]

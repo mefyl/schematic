@@ -2,11 +2,13 @@ open Base
 
 type t = Id of string [@@deriving eq, ord]
 
-let make s =
-  let s = String.split ~on:'-' s |> String.concat ~sep:"_" in
+let reserved_typenames = [ "time" ]
 
-  (* TODO: normalize here *)
-  Id s
+let make s =
+  if List.mem reserved_typenames s ~equal:String.equal then Id (s ^ "_")
+  else
+    let s = String.split ~on:'-' s |> String.concat ~sep:"_" in
+    Id s
 
 let map ~f = function Id s -> Id (f s)
 let to_string = function Id s -> s

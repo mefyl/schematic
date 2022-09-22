@@ -14,6 +14,7 @@ let headers =
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
+#include <time.h>
 
 // OCaml headers.
 // Ensure search path is consistent with actual object files!
@@ -21,11 +22,6 @@ let headers =
 #include <caml/memory.h>
 #include <caml/mlvalues.h>
 #include <caml/callback.h>
-
-
-// Individual declarations.
-// Including time.h is likely to lead to conflicts. Let us not.
-struct timespec;
 |}
 
 (* Can't say this looks beautiful, but it allows for flexibility in callback
@@ -72,8 +68,12 @@ value json_to_caml(char* x) {
 let typedefs =
   {|
 typedef char* json;
-typedef struct timespec timespec;
 typedef int unit;
+
+
+// Individual declarations.
+// Including time.h is likely to lead to conflicts. Let us not.
+typedef struct timespec timespec;
 |}
 
 (* TODO: DRY builtin sigs / impls. *)

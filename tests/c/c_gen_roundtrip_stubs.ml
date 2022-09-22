@@ -22,6 +22,7 @@ let schemas =
     Schema.pack record_with_unit_schema;
     Schema.pack (parametric_record_schema string_wrapper_schema);
     Schema.pack variant_with_inline_record_payload_schema;
+    Schema.pack time_schema;
   ]
 
 let () =
