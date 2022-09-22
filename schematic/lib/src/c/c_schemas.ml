@@ -54,9 +54,8 @@ module Of = C_walk.Walk (struct
         (c, marks)
       | Some id ->
         Fmt.epr "has id: %s\n" id;
-        let id = Identifier.make id in
         let referenced_type : c = fst @@ s () in
-        (Atom (id, Some referenced_type), Marks.make id s))
+        (Atom (Identifier.make id, Some referenced_type), Marks.make id s))
 
   let fields_empty () = ([], Marks.empty)
 
@@ -92,13 +91,14 @@ module Of = C_walk.Walk (struct
     let tuptyp = Tuple items in
     let s () = (tuptyp, Marks.merge marks) in
     let tuple_name = tuple_name items in
-    (Atom (tuple_name, Some tuptyp), Marks.make tuple_name s)
+    ( Atom (tuple_name, Some tuptyp),
+      Marks.make (Identifier.to_string tuple_name) s )
 
   let list (c, marks) =
     let arrtyp = Array c in
     let s () = (arrtyp, marks) in
     let name = array_name c in
-    (Atom (name, Some arrtyp), Marks.make name s)
+    (Atom (name, Some arrtyp), Marks.make (Identifier.to_string name) s)
 
   (* This could be optimized (null ptr optim), but this approach allows us to
      simplify things *)
@@ -157,11 +157,9 @@ end)
 let mark_of_schema Schema.{ id; descriptor; parametric } =
   match parametric with
   | None ->
-    ( Identifier.make @@ Option.value_exn ~here:[%here] id,
-      lazy (Of.descriptor id descriptor) )
+    (Option.value_exn ~here:[%here] id, lazy (Of.descriptor id descriptor))
   | Some parametric ->
-    ( Identifier.make @@ Option.value_exn ~here:[%here] id,
-      lazy (Of.parametric parametric) )
+    (Option.value_exn ~here:[%here] id, lazy (Of.parametric parametric))
 
 let of_schema marks s = of_mark marks @@ mark_of_schema s
 
