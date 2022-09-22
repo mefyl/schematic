@@ -1,6 +1,8 @@
 open C_runtime
 open C_pp
 
+(* TODO: include guards *)
+
 let headers =
   bannerify "Schematic C backend support headers."
     {|
