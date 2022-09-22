@@ -53,6 +53,10 @@ external variant_with_inline_record_payload_rt_id :
   variant_with_inline_record_payload -> variant_with_inline_record_payload
   = "sch_variant_with_inline_record_payload_rt_id"
 
+external string_wrapper_parametric_record_rt_id :
+  string_wrapper parametric_record -> string_wrapper parametric_record
+  = "sch_string_wrapper_parametric_record_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -215,6 +219,16 @@ module Tests = struct
     |> List.iter (fun x ->
            let new_x = record_with_unit_rt_id x in
            test t new_x x)
+
+  let reified_parametric () =
+    let x = { parameterized_field = "Helloooooo!" } in
+    let new_x = string_wrapper_parametric_record_rt_id x in
+    let t =
+      Alcotest.testable
+        (pp_parametric_record pp_string_wrapper)
+        (equal_parametric_record equal_string_wrapper)
+    in
+    test t new_x x
 end
 
 let () =
@@ -247,5 +261,6 @@ let () =
             test_case "record containing a `unit`" `Quick record_with_unit;
             test_case "payload_variant: inline record payload" `Quick
               payload_variant_with_inline_record_payload;
+            test_case "reified parametric record" `Quick reified_parametric;
           ] );
     ]
