@@ -393,6 +393,13 @@ value tuple_int_string_to_caml(tuple_int_string x) {
 }
 |}
 
+let primitive_record_in_parametric_c =
+  {|
+typedef struct {
+  primitive_record parameterized_field;
+} primitive_record_parametric_record;
+|}
+
 let pretty_string =
   let pp_string ppf x = Fmt.pf ppf "{|\n%s\n|}" x in
   Alcotest.testable pp_string String.( = )
@@ -440,6 +447,11 @@ module Generate_types = struct
       ]
 
   let collection () = test collection_schema [ collection_c; int_array_c ]
+
+  let reified_param () =
+    test
+      (parametric_record_schema primitive_record_schema)
+      [ primitive_record_in_parametric_c; primitive_record_c ]
 end
 
 module Of_caml = struct
@@ -530,6 +542,7 @@ let () =
             test_case "record_with_pair_alias" `Quick record_with_pair_alias;
             test_case "behemoth" `Quick behemoth;
             test_case "collection" `Quick collection;
+            test_case "reified parametric type" `Quick reified_param;
           ] );
       ( "of_caml",
         Of_caml.
