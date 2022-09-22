@@ -396,7 +396,7 @@ value tuple_int_string_to_caml(tuple_int_string x) {
 let primitive_record_in_parametric_c =
   {|
 typedef struct {
-  primitive_record parameterized_field;
+  primitive_record* parameterized_field;
 } primitive_record_parametric_record;
 |}
 

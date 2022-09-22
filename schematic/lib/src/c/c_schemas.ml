@@ -148,9 +148,65 @@ module Of = C_walk.Walk (struct
   (* Unimplemented *)
 
   (* FIXME: any parametric type gets mapped into `unit` for now. *)
-  let parametric template_name _args _effective _t =
-    Fmt.epr "tn: %s@." template_name;
-    ignore ()
+  (* TODO: multiple levels of nesting *)
+  let parametric template_name args effective (c, marks) =
+    Fmt.epr "template name: %s@." template_name;
+    Fmt.epr "args: %a@." Fmt.(list string) args;
+    Fmt.epr "effective args: %a@." Fmt.(list pp) (effective |> List.map ~f:fst);
+    Fmt.epr "c : %a@." pp c;
+    Fmt.epr "marks : %a@." Marks.pp marks;
+
+    let args = List.zip_exn args effective in
+
+    let parameterized s =
+      if String.is_prefix ~prefix:"#" s then Some (String.subo ~pos:1 s)
+      else None
+    in
+
+    let concrete type_param =
+      match Base.List.Assoc.find args ~equal:String.equal type_param with
+      | Some concrete -> fst @@ concrete
+      | None -> failwith "expected matching concrete type"
+    in
+
+    (* Map marks to remove type parameters *)
+    (* FIXME: should recursively traverse marks... *)
+    let marks =
+      Marks.map marks ~f:(fun (name, x) ->
+          match parameterized name with
+          | Some typeparam -> (
+            match concrete typeparam with
+            | Atom (concrete_name, _) -> (Identifier.to_string concrete_name, x)
+            | _ -> failwith "a")
+          | None -> (name, x))
+    in
+
+    let c =
+      match c with
+      | Struct { fields } ->
+        let f ((field_name : Identifier.t), (field_c : c)) =
+          let field_c =
+            match field_c with
+            | Atom (name, _) as atom -> (
+              (* XXX id handling... *)
+              let name = Identifier.to_string name in
+
+              (* Replace parameterized types with concrete types *)
+              match parameterized name with
+              | Some field_type_param -> concrete field_type_param
+              | None -> atom)
+            | _ -> failwith ""
+          in
+          (field_name, field_c)
+        in
+
+        let fields = fields |> List.map ~f in
+
+        Struct { fields }
+      | x -> x
+    in
+
+    (c, marks)
 end)
 
 (* XXX: copied from TypeScript, might be generalizable? *)

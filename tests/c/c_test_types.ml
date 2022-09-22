@@ -99,6 +99,10 @@ type date_alias = Ptime.date [@@deriving schema, eq]
 type 'a parametric_record = { parameterized_field : 'a }
 [@@deriving schema, eq, show]
 
+(* TODO: unboxed parameter *)
+(* TODO: nested generics *)
+(* TODO: functors? *)
+
 type polymorphic_variant =
   [ `A
   | `B
