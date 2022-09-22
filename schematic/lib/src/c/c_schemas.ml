@@ -106,13 +106,17 @@ module Of = C_walk.Walk (struct
      simplify things *)
   let nullable (c, marks) =
     let name = c_typename c |> Identifier.map ~f:(fun s -> s ^ "_option") in
-    ( Variant
-        {
-          name;
-          basic = [ Identifier.make "none" ];
-          rich = [ (Identifier.make "some", c) ];
-        },
-      marks )
+
+    let s () =
+      ( Variant
+          {
+            name;
+            basic = [ Identifier.make "none" ];
+            rich = [ (Identifier.make "some", c) ];
+          },
+        marks )
+    in
+    schema (Some (Identifier.to_string name)) None s
 
   (* Simplest possible encoding *)
   (* We could use a struct for "key" / "value" fields instead of a tuple. *)
