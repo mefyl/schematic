@@ -41,7 +41,7 @@ let test ~here ?decoded name test schema value j =
         (Fmt.str "JSON decode error: %a" Schematic.Error.pp_decoding e)
   in
   let schema = json_schema schema in
-  Fmt.epr "%s@." Ezjsonm.(value_to_string schema);
+  Logs.debug (fun m -> m "%s@." Ezjsonm.(value_to_string schema));
   let cmd =
     Printf.sprintf {|%s/validate-schema "%s" "%s"|} root
       (String.Search_pattern.replace_all dollar

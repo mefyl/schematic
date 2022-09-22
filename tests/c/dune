@@ -17,7 +17,7 @@
 (executable
  (name c_gen_roundtrip_stubs)
  (modules c_gen_roundtrip_stubs)
- (libraries alcotest schematic c_test_types stdio))
+ (libraries alcotest schematic c_test_types stdio logs logs.fmt))
 
 (rule
  (targets c_roundtrip_stubs.h c_roundtrip_stubs.c)

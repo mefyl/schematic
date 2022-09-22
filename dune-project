@@ -38,6 +38,7 @@
   (ocaml
    (>= 4.12.0))
   fmt
+  logs
   ppxlib
   ppx_deriving
   ppx_here

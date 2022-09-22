@@ -42,18 +42,18 @@ module Of = C_walk.Walk (struct
      - If we try to force the schema here and there is a cycle, we'll enter an
      infinite loop. *)
   let schema (id : string option) parametric s =
-    Fmt.epr "id: %a\n@." Fmt.(option string) id;
+    Logs.debug (fun m -> m "id: %a\n@." Fmt.(option string) id);
     match parametric with
     | Some parametric -> parametric ()
     | None -> (
       match id with
       | None ->
-        Fmt.epr "no id\n";
+        Logs.debug (fun m -> m "no id\n");
         let c, marks = s () in
-        Fmt.epr "c: %a\n" pp c;
+        Logs.debug (fun m -> m "c: %a\n" pp c);
         (c, marks)
       | Some id ->
-        Fmt.epr "has id: %s\n" id;
+        Logs.debug (fun m -> m "has id: %s\n" id);
         let referenced_type : c = fst @@ s () in
         (Atom (Identifier.make id, Some referenced_type), Marks.make id s))
 
@@ -150,11 +150,12 @@ module Of = C_walk.Walk (struct
   (* FIXME: any parametric type gets mapped into `unit` for now. *)
   (* TODO: multiple levels of nesting *)
   let parametric template_name args effective (c, marks) =
-    Fmt.epr "template name: %s@." template_name;
-    Fmt.epr "args: %a@." Fmt.(list string) args;
-    Fmt.epr "effective args: %a@." Fmt.(list pp) (effective |> List.map ~f:fst);
-    Fmt.epr "c : %a@." pp c;
-    Fmt.epr "marks : %a@." Marks.pp marks;
+    Logs.debug (fun m -> m "template name: %s@." template_name);
+    Logs.debug (fun m -> m "args: %a@." Fmt.(list string) args);
+    Logs.debug (fun m ->
+        m "effective args: %a@." Fmt.(list pp) (effective |> List.map ~f:fst));
+    Logs.debug (fun m -> m "c : %a@." pp c);
+    Logs.debug (fun m -> m "marks : %a@." Marks.pp marks);
 
     let args = List.zip_exn args effective in
 

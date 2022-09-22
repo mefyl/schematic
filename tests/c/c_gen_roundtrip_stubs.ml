@@ -25,6 +25,9 @@ let schemas =
   ]
 
 let () =
+  Logs.set_level (Some Logs.Debug);
+  Logs.set_reporter (Logs_fmt.reporter ());
+
   let argv = Sys.get_argv () in
   let h_filename, c_filename = (argv.(1), argv.(2)) in
   let h_contents, c_contents = C.export_schemas schemas in

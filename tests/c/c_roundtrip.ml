@@ -233,6 +233,8 @@ end
 
 let () =
   let open Alcotest in
+  Logs.set_level (Some Logs.Debug);
+  Logs.set_reporter (Logs_fmt.reporter ());
   Schematic.C.Runtime.register_callbacks ();
   run "Schematic.C roundtrip"
     [
