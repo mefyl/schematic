@@ -151,10 +151,15 @@ module Of = C_walk.Walk (struct
     in
     schema (Some "date") None s
 
-  (* Unimplemented *)
+  (** A parametric type.
 
-  (* FIXME: any parametric type gets mapped into `unit` for now. *)
-  (* TODO: multiple levels of nesting *)
+      - [template_name]: name of the generic type
+      - [args]: type parameters (abstract)
+      - [effective]: effect types plugging into each of [args]
+      - [marks]: marks carried along, which includes # marks that need to be
+        updated before returning
+      - [c]: almost-fully-instantiated instance of type [c]. Needs to be
+        recursively traversed in order to replace # references. *)
   let parametric template_name args effective (c, marks) =
     let sep = Fmt.(const string ", ") in
     Logs.debug (fun m -> m "template name: %s@." template_name);
