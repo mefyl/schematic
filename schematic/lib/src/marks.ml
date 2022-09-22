@@ -40,6 +40,7 @@ module Make (S : MARK) = struct
     val empty : t
     val make : string -> (unit -> S.t * Marks.t) -> t
     val add : t -> Mark.t -> t
+    val map : t -> f:(Mark.t -> Mark.t) -> t
     val fold : t -> init:'a -> f:('a -> Mark.t -> 'a) -> 'a
     val has : t -> Mark.t -> bool
     val merge : t list -> t
@@ -51,6 +52,7 @@ module Make (S : MARK) = struct
     let empty = Set.empty (module Mark)
     let make id f = Set.of_list (module Mark) [ (id, lazy (f ())) ]
     let add = Set.add
+    let map t = Set.map (module Mark) t
     let fold = Set.fold
     let has = Set.mem
     let merge = Set.union_list (module Mark)
