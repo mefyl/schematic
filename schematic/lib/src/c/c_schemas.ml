@@ -6,6 +6,8 @@ include C_intf
 include Marks.Make (struct
   type t = c
 
+  let pp = pp
+
   module Id = Identifier
 end)
 
@@ -150,10 +152,13 @@ module Of = C_walk.Walk (struct
   (* FIXME: any parametric type gets mapped into `unit` for now. *)
   (* TODO: multiple levels of nesting *)
   let parametric template_name args effective (c, marks) =
+    let sep = Fmt.(const string ", ") in
     Logs.debug (fun m -> m "template name: %s@." template_name);
-    Logs.debug (fun m -> m "args: %a@." Fmt.(list string) args);
+    Logs.debug (fun m -> m "args: %a@." Fmt.(list string ~sep) args);
     Logs.debug (fun m ->
-        m "effective args: %a@." Fmt.(list pp) (effective |> List.map ~f:fst));
+        m "effective args: %a@."
+          Fmt.(list pp ~sep)
+          (effective |> List.map ~f:fst));
     Logs.debug (fun m -> m "c : %a@." pp c);
     Logs.debug (fun m -> m "marks : %a@." Marks.pp marks);
 

@@ -13,6 +13,7 @@ type t =
     }  (** [Template<T1, T2, ..., TN>] *)
   | Tuple of t list  (** [\[T1, T2, ..., TN \]]*)
   | Union of t list  (** [T1 | T2 | ... | TN] *)
+[@@deriving show]
 
 type typescript = t
 
@@ -25,6 +26,8 @@ let name s =
 
 include Marks.Make (struct
   type t = typescript
+
+  let pp = pp
 
   (* TODO: use type-safe ID for Typescript as well as C *)
   module Id = struct

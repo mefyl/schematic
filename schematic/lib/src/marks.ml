@@ -3,6 +3,8 @@ open Base
 module type MARK = sig
   type t
 
+  val pp : t Fmt.t
+
   module Id : sig
     type t
 
@@ -15,7 +17,7 @@ module type FOO = sig
 
   include Comparable.S with type t = u
 
-  val pp : t Fmt.t
+  val pp : ?with_value:bool -> t Fmt.t
 end
 
 module Make (S : MARK) = struct
@@ -31,7 +33,21 @@ module Make (S : MARK) = struct
     include T
     include Base.Comparable.Make (T)
 
-    let pp : t Fmt.t = fun fmt (s, _) -> Fmt.string fmt s
+    let pp : ?with_value:bool -> t Fmt.t =
+     fun ?(with_value = true) f (s, v) ->
+      if with_value then
+        let open Fmt in
+        let inner : (_ * (_ * _)) Fmt.t =
+         fun f (s, (v, _r)) ->
+          (const string s ++ const char ',' ++ sp ++ const char '{'
+         ++ const S.pp v ++ const char ','
+         (* XXX: cannot use Marks.pp here (unsafe module recursiveness) *)
+         ++ const string " ..."
+          ++ const char '}')
+            f ()
+        in
+        (const char '(' ++ inner ++ const char ')') f (s, Lazy.force v)
+      else Fmt.string f s
   end
 
   and Marks : sig
@@ -59,9 +75,15 @@ module Make (S : MARK) = struct
     let of_list = Set.of_list (module Mark)
 
     let pp : t Fmt.t =
-     fun fmt t ->
+     fun f t ->
       let l = Set.to_list t in
-      (Fmt.list Mark.pp) fmt l
+      let open Fmt in
+      let sep = const char ',' ++ sp in
+      let pp =
+        const string "Marks:" ++ sp ++ const char '(' ++ list Mark.pp ~sep
+        ++ const char ')'
+      in
+      pp f l
   end
 
   let rec of_mark marks mark =
