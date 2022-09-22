@@ -1,13 +1,17 @@
+open Base
+module Identifier = C_identifier
+
 type t =
   | Void  (** Zero-Sized Type *)
   | String  (** Native string *)
   | Array of t
-  | Atom of string * t option  (** The RHS is the referenced type, if known. *)
-  | Struct of { fields : (string * t) list }
+  | Atom of Identifier.t * t option
+      (** The RHS is the referenced type, if known. *)
+  | Struct of { fields : (Identifier.t * t) list }
   | Variant of {
-      name : string;
-      basic : string list;
-      rich : (string * t) list;
+      name : Identifier.t;
+      basic : Identifier.t list;
+      rich : (Identifier.t * t) list;
     }
   | Tuple of t list
 [@@deriving show]
@@ -20,7 +24,7 @@ type c_function = {
 }
 
 type c_gen = {
-  name : string;
+  name : Identifier.t;
   type_expr : unit Fmt.t;
   to_caml : c_function;
   of_caml : c_function; (* TODO free *)
@@ -30,8 +34,8 @@ open Base
 
 (* XXX: tuples of tuples - name conflicts? *)
 
-let rec c_typename = function
-  | String -> "string"
+let rec c_typename : c -> Identifier.t = function
+  | String -> Identifier.make "string"
   | Atom (s, _) -> s
   | Tuple members -> tuple_name members
   | Array t -> array_name t
@@ -39,13 +43,18 @@ let rec c_typename = function
   | x -> failwith (Fmt.str "unsupported: %a" pp x)
 
 and tuple_name items =
-  "tuple_" ^ (items |> List.map ~f:c_typename |> String.concat ~sep:"_")
+  Identifier.make @@ "tuple_"
+  ^ (items
+    |> List.map ~f:(Fn.compose Identifier.to_string c_typename)
+    |> String.concat ~sep:"_")
 
-and array_name t = c_typename t ^ "_array"
+and array_name t = c_typename t |> Identifier.map ~f:(fun s -> s ^ "_array")
 
-let tuple_fields = List.mapi ~f:(fun i c -> (Fmt.str "t%d" i, c))
-let of_caml_name_for = Fmt.str "%s_of_caml"
-let to_caml_name_for = Fmt.str "%s_to_caml"
+let tuple_fields =
+  List.mapi ~f:(fun i c -> (Identifier.make @@ Fmt.str "t%d" i, c))
+
+let of_caml_name_for = Identifier.map ~f:(Fmt.str "%s_of_caml")
+let to_caml_name_for = Identifier.map ~f:(Fmt.str "%s_to_caml")
 
 (* FIXME: this approach does not protect against collisions *)
 let of_caml_name_for_c = Fn.compose of_caml_name_for c_typename

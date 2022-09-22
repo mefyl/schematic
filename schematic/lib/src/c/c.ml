@@ -16,7 +16,7 @@ let export (name, c) : c_gen =
 
 let typedef_src { name; type_expr; _ } =
   let s = Fmt.to_to_string type_expr () in
-  Fmt.str "typedef %s %s;\n" s name
+  Fmt.str "typedef %s %a;\n" s C_identifier.pp name
 
 let signature_src { signature; _ } = Fmt.str "%s;" signature
 
@@ -32,14 +32,16 @@ let roundtrip_src (name, c) =
   let c = Atom (name, Some c) in
   let typ = Fmt.to_to_string C_typeexpr.pp c in
 
-  let decl = Fmt.str "CAMLprim value sch_%s_rt_id(value v)" name in
+  let decl =
+    Fmt.str "CAMLprim value sch_%a_rt_id(value v)" Identifier.pp name
+  in
   let body =
     const pp_statements
       [
         "CAMLparam1(v)";
         "CAMLlocal1(ret)";
-        Fmt.str "%s x = %s(v)" typ (of_caml_name_for name);
-        Fmt.str "ret = %s(x)" (to_caml_name_for name);
+        Fmt.str "%s x = %a(v)" typ Identifier.pp (of_caml_name_for name);
+        Fmt.str "ret = %a(x)" Identifier.pp (to_caml_name_for name);
         "CAMLreturn(ret)";
       ]
   in

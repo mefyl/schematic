@@ -3,17 +3,22 @@ open Base
 module type MARK = sig
   type t
 
-  val normalize_id : string -> string
+  module Id : sig
+    type t
+
+    val compare : t -> t -> int
+    val to_string : t -> string
+  end
 end
 
 module Make (S : MARK) = struct
   module rec Mark :
-    (Comparable.S with type t = string * (S.t * Marks.t) Lazy.t) = struct
+    (Comparable.S with type t = S.Id.t * (S.t * Marks.t) Lazy.t) = struct
     module T = struct
-      type t = string * (S.t * Marks.t) Lazy.t
+      type t = S.Id.t * (S.t * Marks.t) Lazy.t
 
-      let sexp_of_t (id, _) = Sexp.Atom id
-      let compare (l, _) (r, _) = String.compare l r
+      let sexp_of_t (id, _) = Sexp.Atom (S.Id.to_string id)
+      let compare (l, _) (r, _) = S.Id.compare l r
     end
 
     include T
@@ -24,7 +29,7 @@ module Make (S : MARK) = struct
     type t
 
     val empty : t
-    val make : string -> (unit -> S.t * Marks.t) -> t
+    val make : S.Id.t -> (unit -> S.t * Marks.t) -> t
     val add : t -> Mark.t -> t
     val fold : t -> init:'a -> f:('a -> Mark.t -> 'a) -> 'a
     val has : t -> Mark.t -> bool
@@ -47,7 +52,7 @@ module Make (S : MARK) = struct
     else
       let res, deps =
         let res, deps = Lazy.force @@ snd mark in
-        ([ (S.normalize_id @@ fst mark, res) ], deps)
+        ([ (fst mark, res) ], deps)
       in
       let marks = Marks.add marks mark in
       let f (res, marks) mark =

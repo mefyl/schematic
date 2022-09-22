@@ -2,13 +2,11 @@ open Base
 include C_intf
 
 (* XXX: legacy, need to review & test identifier conversion *)
-let normalize_id s = String.split ~on:'-' s |> String.concat ~sep:"_"
 
 include Marks.Make (struct
   type t = c
 
-  (* potential FIXME (check valid identifiers in C) *)
-  let normalize_id = normalize_id
+  module Id = Identifier
 end)
 
 module Of = C_walk.Walk (struct
@@ -17,7 +15,7 @@ module Of = C_walk.Walk (struct
   type case = string * t
   type t = res
 
-  let make name = (Atom (name, None), Marks.empty)
+  let make name = (Atom (Identifier.make name, None), Marks.empty)
 
   (* Shallow primitive types *)
 
@@ -56,6 +54,7 @@ module Of = C_walk.Walk (struct
         (c, marks)
       | Some id ->
         Fmt.epr "has id: %s\n" id;
+        let id = Identifier.make id in
         let referenced_type : c = fst @@ s () in
         (Atom (id, Some referenced_type), Marks.make id s))
 
@@ -66,12 +65,15 @@ module Of = C_walk.Walk (struct
     let marks = Marks.merge [ marks; rest_marks ] in
     ((name, ast) :: rest_ast, marks)
 
-  let object_ ((fields_cases, marks) : fields) =
-    (Struct { fields = fields_cases }, marks)
+  let object_ ((fields, marks) : fields) =
+    let fields = fields |> List.map ~f:(fun (s, c) -> (Identifier.make s, c)) in
+    (Struct { fields }, marks)
 
   let union ~name ~key:_ cases =
     let constructors, marks =
-      cases |> List.map ~f:(fun (s, (c, m)) -> ((s, c), m)) |> List.unzip
+      cases
+      |> List.map ~f:(fun (s, (c, m)) -> ((Identifier.make s, c), m))
+      |> List.unzip
     in
     let marks = marks |> Marks.merge in
 
@@ -82,7 +84,8 @@ module Of = C_walk.Walk (struct
            | (_, _) as x -> Second x)
     in
 
-    (Variant { name = Option.value_exn name; basic; rich }, marks)
+    ( Variant { name = Identifier.make @@ Option.value_exn name; basic; rich },
+      marks )
 
   let tuple ts =
     let items, marks = List.unzip ts in
@@ -100,8 +103,14 @@ module Of = C_walk.Walk (struct
   (* This could be optimized (null ptr optim), but this approach allows us to
      simplify things *)
   let nullable (c, marks) =
-    let name = c_typename c ^ "_option" in
-    (Variant { name; basic = [ "none" ]; rich = [ ("some", c) ] }, marks)
+    let name = c_typename c |> Identifier.map ~f:(fun s -> s ^ "_option") in
+    ( Variant
+        {
+          name;
+          basic = [ Identifier.make "none" ];
+          rich = [ (Identifier.make "some", c) ];
+        },
+      marks )
 
   (* Simplest possible encoding *)
   (* We could use a struct for "key" / "value" fields instead of a tuple. *)
@@ -116,7 +125,7 @@ module Of = C_walk.Walk (struct
     Lazy.force C_sanity_checks.ptime_local;
     tuple [ time (); int () ]
 
-  let any () = (Atom ("json", Some String), Marks.empty)
+  let any () = (Atom (Identifier.make "json", Some String), Marks.empty)
 
   let date () =
     Lazy.force C_sanity_checks.date;
@@ -125,7 +134,13 @@ module Of = C_walk.Walk (struct
       let int = fst (int ()) in
       (* This will work because a Ptime.date is a (int * int * int), which has
          the same memory representation as a struct with three int fields. *)
-      let fields = [ ("year", int); ("month", int); ("day", int) ] in
+      let fields =
+        [
+          (Identifier.make "year", int);
+          (Identifier.make "month", int);
+          (Identifier.make "day", int);
+        ]
+      in
       (Struct { fields }, Marks.empty)
     in
     schema (Some "date") None s
@@ -142,14 +157,16 @@ end)
 let mark_of_schema Schema.{ id; descriptor; parametric } =
   match parametric with
   | None ->
-    (Option.value_exn ~here:[%here] id, lazy (Of.descriptor id descriptor))
+    ( Identifier.make @@ Option.value_exn ~here:[%here] id,
+      lazy (Of.descriptor id descriptor) )
   | Some parametric ->
-    (Option.value_exn ~here:[%here] id, lazy (Of.parametric parametric))
+    ( Identifier.make @@ Option.value_exn ~here:[%here] id,
+      lazy (Of.parametric parametric) )
 
 let of_schema marks s = of_mark marks @@ mark_of_schema s
 
 let unpacker marks =
-  let unpack : type a. a Schema.t -> (string * t) list * Marks.t =
+  let unpack : type a. a Schema.t -> (Identifier.t * t) list * Marks.t =
    fun s -> of_schema marks s
   in
   { Schema.unpack }

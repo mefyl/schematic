@@ -26,7 +26,10 @@ let name s =
 include Marks.Make (struct
   type t = typescript
 
-  let normalize_id = name
+  (* TODO: use type-safe ID for Typescript as well as C *)
+  module Id = struct
+    include String
+  end
 end)
 
 module Of = Schema.Walk (struct
@@ -46,7 +49,7 @@ module Of = Schema.Walk (struct
         if String.is_prefix ~prefix:"#" id then
           (Atom (name @@ String.subo ~pos:1 id), Marks.empty)
         else
-          let mark = Marks.make id s in
+          let mark = Marks.make (name id) s in
           (Atom (name id), mark))
 
   let parametric template_name args effective t =

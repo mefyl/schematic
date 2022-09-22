@@ -22,9 +22,9 @@ let case ~indent case contents =
   in
   vbox ~indent (const string (Fmt.str "case %s:" case) ++ post_case) ++ post_box
 
-let pp_of_caml_converter ?(indent = 2) (name, ast) =
+let pp_of_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
   let open Fmt in
-  let ptr_type = ptr_type name in
+  let ptr_type = ptr_type (Identifier.to_string name) in
   let c_function_name = of_caml_name_for name in
   let is_ptr, (body : unit Fmt.t) =
     match ast with
@@ -34,7 +34,8 @@ let pp_of_caml_converter ?(indent = 2) (name, ast) =
         |> List.mapi ~f:(fun i (field_name, field_type) ->
                Fmt.epr "field_type: %a\n" C_intf.pp field_type;
                let conv_fn = of_caml_name_for_c field_type in
-               Fmt.str "p->%s = %s(Field(v, %d))" field_name conv_fn i)
+               Fmt.str "p->%a = %a(Field(v, %d))" Identifier.pp field_name
+                 Identifier.pp conv_fn i)
       in
       let statements =
         [ "CAMLparam1(v)"; Fmt.str "%s p = malloc(sizeof(*p))" ptr_type ]
@@ -47,7 +48,7 @@ let pp_of_caml_converter ?(indent = 2) (name, ast) =
       let pp =
         const pp_statements
           [
-            Fmt.str "%s x = Int_val(v)" name;
+            Fmt.str "%a x = Int_val(v)" Identifier.pp name;
             Fmt.str "assert(x < %d)" (List.length basic);
             "return x";
           ]
@@ -61,26 +62,26 @@ let pp_of_caml_converter ?(indent = 2) (name, ast) =
             Fmt.str "assert(res.tag < %d)" (List.length basic);
           ]
       in
-      let case : (int * (string * c)) Fmt.t =
+      let case : (int * (Identifier.t * c)) Fmt.t =
        fun fmt (i, (field_name, c)) ->
         let stmts =
           match c with
           | Atom (_, Some (Tuple _)) ->
             [
-              Fmt.str "res.payload->%s = %s(v)" field_name
-                (of_caml_name_for_c c);
+              Fmt.str "res.payload->%a = %a(v)" Identifier.pp field_name
+                Identifier.pp (of_caml_name_for_c c);
             ]
           | Struct { fields } ->
             fields
             |> List.mapi ~f:(fun i (inline_field_name, field_c) ->
-                   Fmt.str "res.payload->%s.%s = %s(Field(v, %d))" field_name
-                     inline_field_name
+                   Fmt.str "res.payload->%a.%a = %a(Field(v, %d))" Identifier.pp
+                     field_name Identifier.pp inline_field_name Identifier.pp
                      (of_caml_name_for_c field_c)
                      i)
           | _ ->
             [
-              Fmt.str "res.payload->%s = %s(Field(v, 0))" field_name
-                (of_caml_name_for_c c);
+              Fmt.str "res.payload->%a = %a(Field(v, 0))" Identifier.pp
+                field_name Identifier.pp (of_caml_name_for_c c);
             ]
         in
 
@@ -113,24 +114,26 @@ let pp_of_caml_converter ?(indent = 2) (name, ast) =
       let open Fmt in
       ( false,
         vbox
-          (const pp_statements [ "CAMLparam1(v)"; Fmt.str "%s res" name ]
+          (const pp_statements
+             [ "CAMLparam1(v)"; Fmt.str "%a res" Identifier.pp name ]
           ++ cut
           ++ vbox ~indent (const string "if (Is_long(v)) {" ++ cut ++ plain_case)
           ++ cut
           ++ vbox ~indent (const string "} else {" ++ cut ++ rich_case)
           ++ cut ++ const char '}')
         ++ cut
-        ++ const pp_statements [ Fmt.str "CAMLreturnT(%s, res)" name ] )
+        ++ const pp_statements
+             [ Fmt.str "CAMLreturnT(%a, res)" Identifier.pp name ] )
     | Tuple members ->
       let tuptype = tuple_name members in
       let pp =
         const pp_statements
-        @@ [ "CAMLparam1(v)"; Fmt.str "%s res" tuptype ]
+        @@ [ "CAMLparam1(v)"; Fmt.str "%a res" Identifier.pp tuptype ]
         @ (members
           |> List.mapi ~f:(fun i c ->
-                 Fmt.str "res.t%d = %s(Field(v, %d))" i (of_caml_name_for_c c) i)
-          )
-        @ [ Fmt.str "CAMLreturnT(%s, res)" tuptype ]
+                 Fmt.str "res.t%d = %a(Field(v, %d))" i Identifier.pp
+                   (of_caml_name_for_c c) i))
+        @ [ Fmt.str "CAMLreturnT(%a, res)" Identifier.pp tuptype ]
       in
       (false, pp)
     | Array elem_type ->
@@ -142,7 +145,7 @@ let pp_of_caml_converter ?(indent = 2) (name, ast) =
         braced ~indent "for (int64_t i = 0; i < arr.len; i++)"
           (const pp_statements
              [
-               Fmt.str "arr.data[i] = %s(Field(l, 0))"
+               Fmt.str "arr.data[i] = %a(Field(l, 0))" Identifier.pp
                  (of_caml_name_for_c elem_type);
                "l = Field(l, 1)";
              ])
@@ -152,7 +155,8 @@ let pp_of_caml_converter ?(indent = 2) (name, ast) =
           [
             "CAMLparam1(v)";
             "CAMLlocal1(l)";
-            Fmt.str "%s arr = {.len = 0, .data = NULL}" (array_name elem_type);
+            Fmt.str "%a arr = {.len = 0, .data = NULL}" Identifier.pp
+              (array_name elem_type);
             "l = v";
           ]
         ++ cut ++ length_while ++ cut
@@ -160,7 +164,10 @@ let pp_of_caml_converter ?(indent = 2) (name, ast) =
              [ "l = v"; "arr.data = malloc(sizeof(*arr.data) * arr.len)" ]
         ++ cut ++ set_for ++ cut
         ++ const pp_statements
-             [ Fmt.str "CAMLreturnT(%s, arr)" (array_name elem_type) ]
+             [
+               Fmt.str "CAMLreturnT(%a, arr)" Identifier.pp
+                 (array_name elem_type);
+             ]
       in
 
       (false, pp)
@@ -170,23 +177,25 @@ let pp_of_caml_converter ?(indent = 2) (name, ast) =
         const pp_statements
           [
             "CAMLparam1(v)";
-            Fmt.str "%a res = %s(v)" (C_typeexpr.pp ~indent) c
+            Fmt.str "%a res = %a(v)" (C_typeexpr.pp ~indent) c Identifier.pp
               (of_caml_name_for_c c);
-            Fmt.str "CAMLreturnT(%s, res)" name;
+            Fmt.str "CAMLreturnT(%a, res)" Identifier.pp name;
           ]
       in
       (false, pp)
     | _ -> failwith "no"
   in
-  let return_type = if is_ptr then ptr_type else name in
+  let return_type = if is_ptr then ptr_type else Identifier.to_string name in
   let decl =
-    signature ~return_type ~fname:c_function_name ~argtype:"value" ~argname:"v"
+    signature ~return_type
+      ~fname:(Identifier.to_string c_function_name)
+      ~argtype:"value" ~argname:"v"
   in
   { signature = decl; impl = body }
 
-let pp_to_caml_converter ?(indent = 2) (name, ast) =
+let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
   let open Fmt in
-  let ptr_type = ptr_type name in
+  let ptr_type = ptr_type (Identifier.to_string name) in
   let c_function_name = to_caml_name_for name in
   let argname, is_ptr, (body : unit Fmt.t) =
     match ast with
@@ -197,7 +206,8 @@ let pp_to_caml_converter ?(indent = 2) (name, ast) =
         fields
         |> List.mapi ~f:(fun i (field_name, field_type) ->
                let conv_fn = to_caml_name_for_c field_type in
-               Fmt.str "Store_field(v, %d, %s(p->%s))" i conv_fn field_name)
+               Fmt.str "Store_field(v, %d, %a(p->%a))" i Identifier.pp conv_fn
+                 Identifier.pp field_name)
       in
       let statements =
         [
@@ -222,14 +232,16 @@ let pp_to_caml_converter ?(indent = 2) (name, ast) =
         let basic_cases : (string * unit Fmt.t) list =
           basic
           |> List.mapi ~f:(fun i constr_name ->
-                 ( constr_name,
+                 ( Identifier.to_string constr_name,
                    const pp_statements [ Fmt.str "v = Val_int(%d)" i; "break" ]
                  ))
         in
         let rich_cases : (string * unit Fmt.t) list =
           rich
           |> List.mapi ~f:(fun i (constr_name, constr_type) ->
-                 let payload = Fmt.str "x.payload->%s" constr_name in
+                 let payload =
+                   Fmt.str "x.payload->%a" Identifier.pp constr_name
+                 in
 
                  let n_fields, stmts =
                    match constr_type with
@@ -238,25 +250,27 @@ let pp_to_caml_converter ?(indent = 2) (name, ast) =
                      ( members |> List.length,
                        members
                        |> List.mapi ~f:(fun i c ->
-                              Fmt.str "Store_field(v, %d, %s(%s.t%d))" i
-                                (to_caml_name_for_c c) payload i) )
+                              Fmt.str "Store_field(v, %d, %a(%s.t%d))" i
+                                Identifier.pp (to_caml_name_for_c c) payload i)
+                     )
                    (* Inline record *)
                    | Struct { fields } ->
                      ( fields |> List.length,
                        fields
                        |> List.mapi ~f:(fun i (field_name, c) ->
-                              Fmt.str "Store_field(v, %d, %s(%s.%s))" i
-                                (to_caml_name_for_c c) payload field_name) )
+                              Fmt.str "Store_field(v, %d, %a(%s.%a))" i
+                                Identifier.pp (to_caml_name_for_c c) payload
+                                Identifier.pp field_name) )
                    | _ ->
                      ( 1,
                        [
-                         Fmt.str "Store_field(v, 0, %s(%s))"
+                         Fmt.str "Store_field(v, 0, %a(%s))" Identifier.pp
                            (to_caml_name_for_c constr_type)
                            payload;
                        ] )
                  in
                  let tag = i in
-                 ( constr_name,
+                 ( Identifier.to_string constr_name,
                    const pp_statements
                      ([ Fmt.str "v = caml_alloc(%d, %i)" n_fields tag ]
                      @ stmts @ [ "break" ]) ))
@@ -265,7 +279,7 @@ let pp_to_caml_converter ?(indent = 2) (name, ast) =
           basic_cases @ rich_cases
           |> List.map ~f:(fun (constr_name, contents) ->
                  case ~indent
-                   (case_name variant_name constr_name)
+                   (case_name (Identifier.to_string variant_name) constr_name)
                    (Some contents))
           |> List.fold ~init:nop ~f:(fun acc x -> acc ++ cut ++ x)
         in
@@ -289,7 +303,8 @@ let pp_to_caml_converter ?(indent = 2) (name, ast) =
         @ (members
           |> List.mapi ~f:(fun i c ->
                  let conv = to_caml_name_for_c c in
-                 Fmt.str "Store_field(v, %d, %s(x.t%d))" i conv i))
+                 Fmt.str "Store_field(v, %d, %a(x.t%d))" i Identifier.pp conv i)
+          )
         @ [ "CAMLreturn(v)" ]
       in
       ("x", false, pp)
@@ -300,7 +315,7 @@ let pp_to_caml_converter ?(indent = 2) (name, ast) =
              [
                "cons = caml_alloc(2, 0)";
                "typeof(*arr.data) x = arr.data[i]";
-               Fmt.str "Store_field(cons, 0, %s(x))"
+               Fmt.str "Store_field(cons, 0, %a(x))" Identifier.pp
                  (to_caml_name_for_c elem_type);
                "Store_field(cons, 1, cli)";
                "cli = cons";
@@ -320,16 +335,18 @@ let pp_to_caml_converter ?(indent = 2) (name, ast) =
           [
             "CAMLparam0()";
             "CAMLlocal1(v)";
-            Fmt.str "v = %s(x)" (to_caml_name_for_c c);
+            Fmt.str "v = %a(x)" Identifier.pp (to_caml_name_for_c c);
             "CAMLreturn(v)";
           ]
       in
       ("x", false, pp)
     | x -> failwith "unsupported in to_caml: %a\n" pp x
   in
-  let argtype = if is_ptr then ptr_type else name in
+  let argtype = if is_ptr then ptr_type else Identifier.to_string name in
   let decl =
-    signature ~return_type:"value" ~fname:c_function_name ~argtype ~argname
+    signature ~return_type:"value"
+      ~fname:(Identifier.to_string c_function_name)
+      ~argtype ~argname
   in
   { signature = decl; impl = body }
 

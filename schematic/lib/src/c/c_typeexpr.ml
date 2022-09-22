@@ -14,14 +14,14 @@ let pp ?(indent = 2) fmt ts =
       let struct_or_union_field f (name, v) =
         let open Fmt in
         let pp = box (Fmt.pair ~sep:sp (hvbox pp) Fmt.string) in
-        pp f (v, name ^ ";")
+        pp f (v, Identifier.to_string name ^ ";")
       in
 
-      let struct_ : (string * _) list Fmt.t =
+      let struct_ : (Identifier.t * _) list Fmt.t =
         braced (const string "struct") (list ~sep:cut struct_or_union_field)
       in
 
-      let union_ : (string * _) list Fmt.t =
+      let union_ : (Identifier.t * _) list Fmt.t =
         braced (const string "union") (list ~sep:cut struct_or_union_field)
       in
 
@@ -29,13 +29,17 @@ let pp ?(indent = 2) fmt ts =
         let is_basic = List.is_empty rich in
         (* An enum declaring each constructor of the variant. *)
         let enum =
-          let variant_names = basic @ List.map ~f:fst rich in
+          let variant_names =
+            (basic |> List.map ~f:Identifier.to_string)
+            @ List.map ~f:(Fn.compose Identifier.to_string fst) rich
+          in
           let tag_suffix = if is_basic then "" else "_tag" in
           braced (const string "enum")
             (const
                (list
                   ~sep:(const char ',' ++ cut)
-                  (fun fmt s -> Fmt.fmt "%s_%s%s" fmt name s tag_suffix))
+                  (fun fmt s ->
+                    Fmt.fmt "%a_%s%s" fmt Identifier.pp name s tag_suffix))
                variant_names)
         in
         let printer =
@@ -54,8 +58,9 @@ let pp ?(indent = 2) fmt ts =
       in
 
       match ts with
-      | Atom (s, Some (Struct _)) -> const string s ++ const char '*'
-      | Atom (s, _) -> const string s
+      | Atom (s, Some (Struct _)) ->
+        const string (Identifier.to_string s) ++ const char '*'
+      | Atom (s, _) -> const string (Identifier.to_string s)
       | Array t ->
         (* We're not using the `struct_` formatter, on purpose. *)
         C_pp.braced ~indent "struct"
