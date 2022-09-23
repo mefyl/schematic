@@ -85,7 +85,9 @@ let export_schemas (schemas : Schema.pack list) =
   let rts = ctypes |> List.map ~f:roundtrip_src |> nl_concat in
 
   (* TODO include declaration file *)
-  let c_file_contents = Builtins.implementations ^ user_impls ^ rts in
+  let c_file_contents =
+    [ Builtins.implementations; rts; user_impls ] |> String.concat ~sep:"\n\n"
+  in
 
   (header_file_contents, c_file_contents)
 
