@@ -1,3 +1,17 @@
+(library
+ (name test_utils)
+ (package schematic)
+ (modules test_utils)
+ (preprocess
+  (pps
+   schematic_ppx
+   ppx_deriving.eq
+   ppx_deriving.make
+   ppx_deriving.show
+   ppx_deriving.ord
+   ppx_here))
+ (libraries alcotest schematic base fmt sexplib))
+
 (test
  (name test)
  (package schematic)
@@ -18,8 +32,8 @@
  (package schematic)
  (modules base64 json typescript)
  (preprocess
-  (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
- (libraries alcotest schematic))
+  (pps schematic_ppx ppx_deriving.eq ppx_deriving.show ppx_deriving.ord))
+ (libraries alcotest schematic test_utils))
 
 (test
  (name jsoo)
