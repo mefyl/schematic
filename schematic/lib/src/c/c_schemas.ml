@@ -67,8 +67,12 @@ module Of = C_walk.Walk (struct
     ((name, ast) :: rest_ast, marks)
 
   let object_ ((fields, marks) : fields) =
-    let fields = fields |> List.map ~f:(fun (s, c) -> (Identifier.make s, c)) in
-    (Struct { fields }, marks)
+    if List.is_empty fields then (Void, marks)
+    else
+      let fields =
+        fields |> List.map ~f:(fun (s, c) -> (Identifier.make s, c))
+      in
+      (Struct { fields }, marks)
 
   let union ~name ~key:_ cases =
     let constructors, marks =
