@@ -255,10 +255,11 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
         let rich_cases : (string * unit Fmt.t) list =
           rich
           |> List.mapi ~f:(fun i (constr_name, constr_type) ->
+                 Logs.debug (fun m ->
+                     m "Rich case constructor type: %a" pp constr_type);
                  let payload =
                    Fmt.str "x.payload->%a" Identifier.pp constr_name
                  in
-
                  let n_fields, stmts =
                    match constr_type with
                    (* Inline tuple *)
