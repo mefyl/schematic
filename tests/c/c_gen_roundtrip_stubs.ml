@@ -31,7 +31,7 @@ let schemas =
   ]
 
 let () =
-  Logs.set_level (Some Logs.Debug);
+  Logs.set_level (Some Logs.Info);
   Logs.set_reporter (Logs_fmt.reporter ());
 
   let argv = Sys.get_argv () in
