@@ -424,49 +424,57 @@ let pretty_string =
   let pp_string ppf x = Fmt.pf ppf "{|\n%s\n|}" x in
   Alcotest.testable pp_string String.( = )
 
+let check_unordered_strings name expected actual =
+  let actual = actual |> List.sort ~compare:String.compare in
+  let expected = expected |> List.sort ~compare:String.compare in
+  Alcotest.(check (list pretty_string) name expected actual)
+
 module Generate_types = struct
-  let test t expected =
-    Schematic.C.of_schema t
-    |> List.map ~f:Schematic.C.export
-    |> List.map ~f:(fun gen -> "\n" ^ Schematic.C.typedef_src gen)
-    |> Alcotest.(check (list pretty_string) "typedefs" expected)
+  let test schema expected =
+    let actual =
+      Schematic.C.of_schema schema
+      |> List.map ~f:Schematic.C.export
+      |> List.map ~f:(fun gen -> "\n" ^ Schematic.C.typedef_src gen)
+      |> List.sort ~compare:String.compare
+    in
+    check_unordered_strings "typedefs" expected actual
 
   let primitive_record () = test primitive_record_schema [ primitive_record_c ]
   let type_alias () = test type_alias_schema [ type_alias_c ]
-  let nested () = test wrapper_schema [ wrapper_c; primitive_record_c ]
+  let nested () = test wrapper_schema [ primitive_record_c; wrapper_c ]
   let string () = test string_wrapper_schema [ string_wrapper_c ]
   let basic_variant () = test basic_variant_schema [ basic_variant_c ]
 
   let payload_variant () =
-    test payload_variant_schema [ payload_variant_c; tuple_int_string_c ]
+    test payload_variant_schema [ tuple_int_string_c; payload_variant_c ]
 
   let record_with_variant () =
     test record_with_variant_schema
-      [ record_with_variant_c; payload_variant_c; tuple_int_string_c ]
+      [ tuple_int_string_c; payload_variant_c; record_with_variant_c ]
 
   let pair_alias () =
-    test pair_alias_schema [ pair_alias_c; string_int_tuple_c ]
+    test pair_alias_schema [ string_int_tuple_c; pair_alias_c ]
 
   let record_with_pair_alias () =
     test record_with_pair_alias_schema
-      [ record_with_pair_alias_c; pair_alias_c; string_int_tuple_c ]
+      [ string_int_tuple_c; pair_alias_c; record_with_pair_alias_c ]
 
   let behemoth () =
     test behemoth_schema
       [
-        behemoth_c;
-        basic_variant_c;
-        diverse_c;
-        pair_alias_c;
-        string_int_tuple_c;
-        payload_variant_c;
-        tuple_int_string_c;
-        string_wrapper_tuple_c;
-        wrapper_c;
         primitive_record_c;
+        wrapper_c;
+        string_wrapper_tuple_c;
+        tuple_int_string_c;
+        payload_variant_c;
+        string_int_tuple_c;
+        pair_alias_c;
+        diverse_c;
+        basic_variant_c;
+        behemoth_c;
       ]
 
-  let collection () = test collection_schema [ collection_c; int_array_c ]
+  let collection () = test collection_schema [ int_array_c; collection_c ]
 
   let reified_param () =
     test
@@ -479,12 +487,14 @@ module Generate_types = struct
 end
 
 module Of_caml = struct
-  let test t expected =
-    Schematic.C.of_schema t
-    |> List.map ~f:Schematic.C.export
-    |> List.map ~f:(fun Schematic.C.{ of_caml; _ } ->
-           Schematic.C.impl_src of_caml |> fun s -> "\n" ^ s ^ "\n")
-    |> Alcotest.(check (list pretty_string) "*_of_caml" expected)
+  let test schema expected =
+    let actual =
+      Schematic.C.of_schema schema
+      |> List.map ~f:Schematic.C.export
+      |> List.map ~f:(fun Schematic.C.{ of_caml; _ } ->
+             Schematic.C.impl_src of_caml |> fun s -> "\n" ^ s ^ "\n")
+    in
+    check_unordered_strings "*_of_caml" expected actual
 
   let primitive_record () =
     test primitive_record_schema [ primitive_record_of_caml ]
@@ -514,12 +524,14 @@ module Of_caml = struct
 end
 
 module To_caml = struct
-  let test t expected =
-    Schematic.C.of_schema t
-    |> List.map ~f:Schematic.C.export
-    |> List.map ~f:(fun Schematic.C.{ to_caml; _ } ->
-           Schematic.C.impl_src to_caml |> fun s -> "\n" ^ s ^ "\n")
-    |> Alcotest.(check (list pretty_string) "*_to_caml" expected)
+  let test schema expected =
+    let actual =
+      Schematic.C.of_schema schema
+      |> List.map ~f:Schematic.C.export
+      |> List.map ~f:(fun Schematic.C.{ to_caml; _ } ->
+             Schematic.C.impl_src to_caml |> fun s -> "\n" ^ s ^ "\n")
+    in
+    check_unordered_strings "*_to_caml" expected actual
 
   let primitive_record () =
     test primitive_record_schema [ primitive_record_to_caml ]
