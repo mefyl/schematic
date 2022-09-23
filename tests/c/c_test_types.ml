@@ -151,3 +151,23 @@ type payload_variant_with_union_key =
   | A_pair_uk of int * int
   | Nothing2_uk
 [@@deriving schema, show, eq] [@@schematic.union_key "type"]
+
+module Weekdays = struct
+  type t = {
+    monday : bool; [@default false]
+    tuesday : bool; [@default false]
+    wednesday : bool; [@default false]
+    thursday : bool; [@default false]
+    friday : bool; [@default false]
+    saturday : bool; [@default false]
+    sunday : bool; [@default false]
+  }
+  [@@deriving eq, show, schema]
+end
+
+type proto_rule =
+  | Week of {
+      period : int; [@schematic.default 1]
+      weekdays : Weekdays.t option;
+    }
+[@@deriving eq, show, schema]

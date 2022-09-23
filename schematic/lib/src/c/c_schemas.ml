@@ -59,11 +59,40 @@ module Of = C_walk.Walk (struct
         let referenced_type : c = fst @@ s () in
         (Atom (Identifier.make id, Some referenced_type), Marks.make id s))
 
+  (* This could be optimized (null ptr optim), but this approach allows us to
+     simplify things *)
+  let nullable (c, marks) =
+    let name = c_typename c |> Identifier.map ~f:(fun s -> s ^ "_option") in
+    let s () =
+      ( Variant
+          {
+            name;
+            basic = [ Identifier.make "none" ];
+            rich = [ (Identifier.make "some", c) ];
+          },
+        marks )
+    in
+    schema (Some (Identifier.to_string name)) None s
+
   let fields_empty () = ([], Marks.empty)
 
-  let field (name : string) (_required : bool) ((ast, marks) : t)
+  let field (name : string) (required : bool) ((ast, marks) : t)
       ((rest_ast, rest_marks) : fields) =
+    Logs.debug (fun m ->
+        m "field: name='%s', required='%a'" name Fmt.bool required);
+
+    let ast, marks =
+      if not required then (
+        Logs.debug (fun m -> m "not required");
+        Logs.debug (fun m ->
+            m "previous marks (from %s): %a" name Marks.pp marks);
+        let ast, marks = nullable (ast, marks) in
+        Logs.debug (fun m -> m "new marks (from %s): %a" name Marks.pp marks);
+        (ast, marks))
+      else (ast, marks)
+    in
     let marks = Marks.merge [ marks; rest_marks ] in
+
     ((name, ast) :: rest_ast, marks)
 
   let object_ ((fields, marks) : fields) =
@@ -105,22 +134,6 @@ module Of = C_walk.Walk (struct
     let s () = (arrtyp, marks) in
     let name = array_name c in
     (Atom (name, Some arrtyp), Marks.make (Identifier.to_string name) s)
-
-  (* This could be optimized (null ptr optim), but this approach allows us to
-     simplify things *)
-  let nullable (c, marks) =
-    let name = c_typename c |> Identifier.map ~f:(fun s -> s ^ "_option") in
-
-    let s () =
-      ( Variant
-          {
-            name;
-            basic = [ Identifier.make "none" ];
-            rich = [ (Identifier.make "some", c) ];
-          },
-        marks )
-    in
-    schema (Some (Identifier.to_string name)) None s
 
   (* Simplest possible encoding *)
   (* We could use a struct for "key" / "value" fields instead of a tuple. *)

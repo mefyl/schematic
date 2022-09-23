@@ -25,6 +25,8 @@ let schemas =
     Schema.pack time_schema;
     Schema.pack payload_variant_with_union_key_schema;
     Schema.pack string_option_record_schema;
+    (* Schema.pack Weekdays.schema; *)
+    Schema.pack proto_rule_schema;
   ]
 
 let () =
