@@ -11,4 +11,5 @@
    ppx_deriving.make
    ppx_deriving.ord
    ppx_deriving.show
-   ppx_here)))
+   ppx_here
+   ppx_hash)))

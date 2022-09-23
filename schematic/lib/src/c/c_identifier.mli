@@ -1,3 +1,5 @@
+open Base
+
 (* Hide concrete type to prevent misuse *)
 type t
 
@@ -7,3 +9,5 @@ val to_string : t -> string
 val pp : t Fmt.t
 val equal : t -> t -> bool
 val compare : t -> t -> int
+val hash_fold_t : Hash.state -> t -> Hash.state
+val hash : t -> Hash.hash_value

@@ -14,7 +14,7 @@ type t =
       rich : (Identifier.t * t) list;
     }
   | Tuple of t list
-[@@deriving show]
+[@@deriving show, hash]
 
 type c = t
 
@@ -40,7 +40,8 @@ let rec c_typename : c -> Identifier.t = function
   | Tuple members -> tuple_name members
   | Array t -> array_name t
   | Variant { name; _ } -> name
-  | x -> failwith (Fmt.str "unsupported: %a" pp x)
+  (* Fallback: hash the structure of the type. *)
+  | c -> Identifier.make (Fmt.str "_sch_%d" (hash c))
 
 and tuple_name items =
   Identifier.make @@ "tuple_"

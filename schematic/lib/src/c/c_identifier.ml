@@ -1,6 +1,6 @@
 open Base
 
-type t = Id of string [@@deriving eq, ord]
+type t = Id of string [@@deriving eq, ord, hash]
 
 let reserved_typenames = [ "time" ]
 
