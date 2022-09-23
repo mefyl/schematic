@@ -149,4 +149,5 @@ type payload_variant_with_union_key =
   | Nothing2_uk
 [@@deriving schema, show, eq] [@@schematic.union_key "type"]
 
-type string_option_alias = string option [@@deriving schema, show, eq]
+type string_option_record = { maybe : string_wrapper option }
+[@@deriving schema, show, eq]

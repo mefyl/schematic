@@ -61,8 +61,9 @@ external payload_variant_with_union_key_rt_id :
   payload_variant_with_union_key -> payload_variant_with_union_key
   = "sch_payload_variant_with_union_key_rt_id"
 
-external string_option_alias_rt_id : string_option_alias -> string_option_alias
-  = "sch_string_option_alias_rt_id"
+external string_option_record_rt_id :
+  string_option_record -> string_option_record
+  = "sch_string_option_record_rt_id"
 
 (* Most robust way of testing conversion, for sure:
 
@@ -184,13 +185,13 @@ module Tests = struct
            let new_x = int_option_alias_rt_id x in
            test t new_x x)
 
-  let string_option () =
+  let string_option_record () =
     let t =
-      Alcotest.testable pp_string_option_alias equal_string_option_alias
+      Alcotest.testable pp_string_option_record equal_string_option_record
     in
-    [ None; Some "hello"; Some "coin" ]
+    [ { maybe = None }; { maybe = Some "hello" }; { maybe = Some "coin" } ]
     |> List.iter (fun x ->
-           let new_x = string_option_alias_rt_id x in
+           let new_x = string_option_record_rt_id x in
            test t new_x x)
 
   let mapping () =
@@ -282,7 +283,6 @@ let () =
             test_case "bool" `Quick bool;
             test_case "float" `Quick float;
             test_case "int option" `Quick int_option;
-            test_case "string option" `Quick string_option;
             test_case "mapping" `Quick mapping;
             test_case "type alias indirection" `Quick indirection;
             test_case "any (JSON)" `Quick any;
@@ -293,5 +293,7 @@ let () =
             test_case "payload_variant: inline record payload" `Quick
               payload_variant_with_inline_record_payload;
             test_case "reified parametric record" `Quick reified_parametric;
+            test_case "string option record (Todo bug)" `Quick
+              string_option_record;
           ] );
     ]

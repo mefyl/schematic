@@ -24,7 +24,7 @@ let schemas =
     Schema.pack variant_with_inline_record_payload_schema;
     Schema.pack time_schema;
     Schema.pack payload_variant_with_union_key_schema;
-    Schema.pack string_option_alias_schema;
+    Schema.pack string_option_record_schema;
   ]
 
 let () =
