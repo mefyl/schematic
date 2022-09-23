@@ -123,17 +123,14 @@ module Of = C_walk.Walk (struct
 
   let tuple ts =
     let items, marks = List.unzip ts in
-    let tuptyp = Tuple items in
-    let s () = (tuptyp, Marks.merge marks) in
+    let s () = (Tuple items, Marks.merge marks) in
     let tuple_name = tuple_name items in
-    ( Atom (tuple_name, Some tuptyp),
-      Marks.make (Identifier.to_string tuple_name) s )
+    schema (Some (Identifier.to_string tuple_name)) None s
 
   let list (c, marks) =
-    let arrtyp = Array c in
-    let s () = (arrtyp, marks) in
+    let s () = (Array c, marks) in
     let name = array_name c in
-    (Atom (name, Some arrtyp), Marks.make (Identifier.to_string name) s)
+    schema (Some (Identifier.to_string name)) None s
 
   (* Simplest possible encoding *)
   (* We could use a struct for "key" / "value" fields instead of a tuple. *)
@@ -249,7 +246,7 @@ let mark_of_schema Schema.{ id; descriptor; parametric } =
   | Some parametric ->
     (Option.value_exn ~here:[%here] id, lazy (Of.parametric parametric))
 
-let of_schema marks s = of_mark marks @@ mark_of_schema s
+let of_schema marks s = of_mark marks (mark_of_schema s)
 
 let unpacker marks =
   let unpack : type a. a Schema.t -> (Identifier.t * t) list * Marks.t =
@@ -259,11 +256,12 @@ let unpacker marks =
 
 let of_schemas_state marks schemas =
   let f (res, marks) s =
-    let ts, marks = Schema.unpack (unpacker marks) s in
-    (ts @ res, marks)
+    let new_ts, marks = Schema.unpack (unpacker marks) s in
+    (res @ new_ts, marks)
   in
   List.fold_left ~init:([], marks) ~f schemas
 
+let of_schemas = of_schemas_state Marks.empty
 let of_schema schema = of_schema Marks.empty schema |> fst
 
 type state = Marks.t

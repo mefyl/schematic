@@ -86,10 +86,11 @@ module Make (S : MARK) = struct
       pp f l
   end
 
-  let rec of_mark marks mark =
+  (** [of_marks marks mark]*)
+  let rec of_mark marks mark : (S.Id.t * S.t) list * Marks.t =
     if Marks.has marks mark then ([], marks)
     else
-      let res, deps =
+      let leaf, deps =
         let res, deps = Lazy.force @@ snd mark in
         ([ (S.Id.make @@ fst mark, res) ], deps)
       in
@@ -98,5 +99,6 @@ module Make (S : MARK) = struct
         let deps, marks = of_mark marks mark in
         (res @ deps, marks)
       in
-      Marks.fold ~init:(res, marks) ~f deps
+      let l, marks = Marks.fold ~init:([], marks) ~f deps in
+      (l @ leaf, marks)
 end

@@ -63,7 +63,7 @@ let roundtrip_src (name, c) =
 let export_schemas ?(safety_checks = false) (schemas : Schema.pack list) =
   let nl_concat = String.concat ~sep:"\n" in
 
-  let ctypes = of_schemas_state state_empty schemas |> fst |> List.rev in
+  let ctypes = of_schemas schemas |> fst in
 
   let cgens = ctypes |> List.map ~f:export in
 
