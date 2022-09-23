@@ -167,6 +167,9 @@ end
 
 type proto_rule =
   | Week of {
+      (* TODO: investigate why schematic.default has such far-reaching impact.
+         Maybe we should preprocess the schemas first by removing anything
+         'special'... *)
       period : int; [@schematic.default 1]
       weekdays : Weekdays.t option;
     }
