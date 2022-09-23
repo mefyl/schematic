@@ -400,6 +400,26 @@ typedef struct {
 } primitive_record_parametric_record;
 |}
 
+let string_option_record_c =
+  {|
+typedef struct {
+  string_wrapper_option maybe;
+} string_option_record;
+|}
+
+let string_wrapper_option_c =
+  {|
+typedef struct {
+  enum {
+    string_wrapper_option_none_tag,
+    string_wrapper_option_some_tag
+  } tag;
+  union {
+    string_wrapper some;
+  }* payload;
+} string_wrapper_option;
+|}
+
 let pretty_string =
   let pp_string ppf x = Fmt.pf ppf "{|\n%s\n|}" x in
   Alcotest.testable pp_string String.( = )
@@ -452,6 +472,10 @@ module Generate_types = struct
     test
       (parametric_record_schema primitive_record_schema)
       [ primitive_record_in_parametric_c; primitive_record_c ]
+
+  let string_option_record () =
+    test string_option_record_schema
+      [ string_option_record_c; string_wrapper_option_c; string_wrapper_c ]
 end
 
 module Of_caml = struct
@@ -543,6 +567,7 @@ let () =
             test_case "behemoth" `Quick behemoth;
             test_case "collection" `Quick collection;
             test_case "reified parametric type" `Quick reified_param;
+            test_case "string_option_record" `Quick string_option_record;
           ] );
       ( "of_caml",
         Of_caml.

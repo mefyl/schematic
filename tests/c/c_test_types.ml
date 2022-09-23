@@ -57,6 +57,9 @@ type record_with_pair_alias = {
 
 type record_with_variant = { v : payload_variant } [@@deriving schema, show, eq]
 
+type string_option_record = { maybe : string_wrapper option }
+[@@deriving schema, show, eq]
+
 (* Roundtrip only *)
 
 type int64_alias = int64 [@@deriving schema, show, eq]
@@ -148,6 +151,3 @@ type payload_variant_with_union_key =
   | A_pair_uk of int * int
   | Nothing2_uk
 [@@deriving schema, show, eq] [@@schematic.union_key "type"]
-
-type string_option_record = { maybe : string_wrapper option }
-[@@deriving schema, show, eq]
