@@ -61,6 +61,9 @@ external payload_variant_with_union_key_rt_id :
   payload_variant_with_union_key -> payload_variant_with_union_key
   = "sch_payload_variant_with_union_key_rt_id"
 
+external string_option_alias_rt_id : string_option_alias -> string_option_alias
+  = "sch_string_option_alias_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -176,10 +179,18 @@ module Tests = struct
 
   let int_option () =
     let t = Alcotest.testable pp_int_option_alias equal_int_option_alias in
-    (* Reminder: nan != nan *)
     [ None; Some 0; Some (-1); Some 1 ]
     |> List.iter (fun x ->
            let new_x = int_option_alias_rt_id x in
+           test t new_x x)
+
+  let string_option () =
+    let t =
+      Alcotest.testable pp_string_option_alias equal_string_option_alias
+    in
+    [ None; Some "hello"; Some "coin" ]
+    |> List.iter (fun x ->
+           let new_x = string_option_alias_rt_id x in
            test t new_x x)
 
   let mapping () =
@@ -271,6 +282,7 @@ let () =
             test_case "bool" `Quick bool;
             test_case "float" `Quick float;
             test_case "int option" `Quick int_option;
+            test_case "string option" `Quick string_option;
             test_case "mapping" `Quick mapping;
             test_case "type alias indirection" `Quick indirection;
             test_case "any (JSON)" `Quick any;

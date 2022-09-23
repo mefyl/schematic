@@ -148,3 +148,5 @@ type payload_variant_with_union_key =
   | A_pair_uk of int * int
   | Nothing2_uk
 [@@deriving schema, show, eq] [@@schematic.union_key "type"]
+
+type string_option_alias = string option [@@deriving schema, show, eq]
