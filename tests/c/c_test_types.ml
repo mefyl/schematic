@@ -123,3 +123,22 @@ type variant_with_inline_record_payload =
 
 (* Purposeful name conflict *)
 type time = Ptime.t [@@deriving schema, show, eq]
+
+(* Nested generics *)
+type ('coin, 'elem, 'a) ultra_generic = {
+  field : 'coin;
+  list : 'elem list;
+  nested_generic : 'a parametric_record;
+}
+[@@deriving schema, show, eq]
+
+type reified_parametric_record = string_wrapper parametric_record
+
+let reified_parametric_record_schema =
+  parametric_record_schema string_wrapper_schema
+
+type reified_ultra_generic =
+  (int, string parametric_record, string) ultra_generic
+
+let reified_ultra_generic_schema : reified_ultra_generic Schema.t =
+  ultra_generic_schema int_schema reified_parametric_record_schema string_schema
