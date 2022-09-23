@@ -57,6 +57,12 @@ let tuple_fields =
 let of_caml_name_for = Identifier.map ~f:(Fmt.str "%s_of_caml")
 let to_caml_name_for = Identifier.map ~f:(Fmt.str "%s_to_caml")
 
+let checking_checked_for c =
+  ( Fmt.str "sch_%a_checking" Identifier.pp c,
+    Fmt.str "sch_%a_checked" Identifier.pp c )
+
+let roundtrip_for = Fmt.str "sch_%a_rt_id" Identifier.pp
+
 (* FIXME: this approach does not protect against collisions *)
 let of_caml_name_for_c = Fn.compose of_caml_name_for c_typename
 let to_caml_name_for_c = Fn.compose to_caml_name_for c_typename

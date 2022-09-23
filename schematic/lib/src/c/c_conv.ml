@@ -22,7 +22,8 @@ let case ~indent case contents =
   in
   vbox ~indent (const string (Fmt.str "case %s:" case) ++ post_case) ++ post_box
 
-let pp_of_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
+let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
+    ((name : Identifier.t), ast) =
   let open Fmt in
   let ptr_type = ptr_type (Identifier.to_string name) in
   let c_function_name = of_caml_name_for name in
@@ -32,7 +33,7 @@ let pp_of_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
       let field_stores =
         fields
         |> List.mapi ~f:(fun i (field_name, field_type) ->
-               Fmt.epr "field_type: %a\n" C_intf.pp field_type;
+               Logs.debug (fun m -> m "field_type: %a\n" C_intf.pp field_type);
                let conv_fn = of_caml_name_for_c field_type in
                Fmt.str "p->%a = %a(Field(v, %d))" Identifier.pp field_name
                  Identifier.pp conv_fn i)
@@ -85,7 +86,7 @@ let pp_of_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
             ]
         in
 
-        Fmt.epr "Case type %a\n" pp c;
+        Logs.debug (fun m -> m "Case type %a\n" pp c);
         case ~indent (Int.to_string i)
           (Some (const pp_statements (stmts @ [ "break" ])))
           fmt ()
@@ -185,6 +186,21 @@ let pp_of_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
       (false, pp)
     | _ -> failwith "no"
   in
+
+  let safety_checks =
+    if safety_checks then
+      let checking, checked = checking_checked_for name in
+      Fmt.str
+        "if (!%s && !%s) {\n\
+        \    %s = true;\n\
+        \    // TODO add structural equality assertion\n\
+        \    %s = true;\n\
+        \  }" checking checked checking checked
+    else ""
+  in
+
+  let body = const string safety_checks ++ body in
+
   let return_type = if is_ptr then ptr_type else Identifier.to_string name in
   let decl =
     signature ~return_type
