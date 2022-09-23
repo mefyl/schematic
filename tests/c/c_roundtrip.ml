@@ -57,6 +57,10 @@ external string_wrapper_parametric_record_rt_id :
   string_wrapper parametric_record -> string_wrapper parametric_record
   = "sch_string_wrapper_parametric_record_rt_id"
 
+external payload_variant_with_union_key_rt_id :
+  payload_variant_with_union_key -> payload_variant_with_union_key
+  = "sch_payload_variant_with_union_key_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -92,7 +96,7 @@ module Tests = struct
     test t new_x x
 
   let payload_variant_plain () =
-    let x = Nothing2 in
+    let x = Nothing3 in
     let new_x = payload_variant_rt_id x in
     let t = Alcotest.testable pp_payload_variant equal_payload_variant in
     test t new_x x
@@ -117,6 +121,17 @@ module Tests = struct
         equal_variant_with_inline_record_payload
     in
     test t new_x x
+
+  let payload_variant_with_union_key () =
+    let t =
+      Alcotest.testable pp_payload_variant_with_union_key
+        equal_payload_variant_with_union_key
+    in
+    (* Reminder: nan != nan *)
+    [ Nothing_uk; A_pair_uk (532, -4433); Nothing2_uk ]
+    |> List.iter (fun x ->
+           let new_x = payload_variant_with_union_key_rt_id x in
+           test t new_x x)
 
   let behemoth () =
     let x : behemoth =
@@ -248,6 +263,8 @@ let () =
             test_case "payload_variant: payload" `Quick payload_variant_with_pl;
             test_case "payload_variant: inline tuple payload" `Quick
               payload_variant_with_inline_tuple_payload;
+            test_case "payload_variant_with_union_key" `Quick
+              payload_variant_with_union_key;
             test_case "behemoth" `Quick behemoth;
             test_case "collection" `Quick collection;
             test_case "int64" `Quick int64;

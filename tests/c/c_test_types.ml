@@ -142,3 +142,9 @@ type reified_ultra_generic =
 
 let reified_ultra_generic_schema : reified_ultra_generic Schema.t =
   ultra_generic_schema int_schema reified_parametric_record_schema string_schema
+
+type payload_variant_with_union_key =
+  | Nothing_uk
+  | A_pair_uk of int * int
+  | Nothing2_uk
+[@@deriving schema, show, eq] [@@schematic.union_key "type"]
