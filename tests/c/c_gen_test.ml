@@ -74,7 +74,7 @@ value wrapper_to_caml(wrapper* p) {
 |}
 
 let string_wrapper_c = {|
-typedef char* string_wrapper;
+typedef const char* string_wrapper;
 |}
 
 let basic_variant_c =
@@ -106,7 +106,7 @@ let tuple_int_string_c =
   {|
 typedef struct {
   int t0;
-  char* t1;
+  const char* t1;
 } tuple_int_string;
 |}
 
@@ -189,7 +189,7 @@ typedef tuple_string_int pair_alias;
 let string_int_tuple_c =
   {|
 typedef struct {
-  char* t0;
+  const char* t0;
   int t1;
 } tuple_string_int;
 |}
@@ -291,14 +291,14 @@ typedef struct {
 let string_wrapper_tuple_c =
   {|
 typedef struct {
-  char* t0;
+  const char* t0;
   wrapper* t1;
 } tuple_string_wrapper;
 |}
 
 let diverse_c = {|
 typedef struct {
-  char* s;
+  const char* s;
 } diverse;
 |}
 

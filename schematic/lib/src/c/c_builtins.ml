@@ -40,14 +40,14 @@ json json_of_caml(value v) {
   ^ {|
   }
   caml_json_string = caml_callback(*f, v);
-  char* json_string = strdup(String_val(caml_json_string));
+  const char* json_string = strdup(String_val(caml_json_string));
   CAMLreturnT(json, json_string);
 }
 |}
 
 let json_to_caml_builtin =
   {|
-value json_to_caml(char* x) {
+value json_to_caml(const char* x) {
   CAMLparam0();
   CAMLlocal1(v);
   
@@ -67,7 +67,7 @@ value json_to_caml(char* x) {
 
 let typedefs =
   {|
-typedef char* json;
+typedef const char* json;
 typedef int unit;
 
 
@@ -82,8 +82,8 @@ let signatures =
     {|
 value int_to_caml(int x);
 int int_of_caml(value x);
-value string_to_caml(char* p);
-char* string_of_caml(value v);
+value string_to_caml(const char* p);
+const char* string_of_caml(value v);
 value int64_t_to_caml(int64_t x);
 int64_t int64_t_of_caml(value v);
 value bool_to_caml(bool x);
@@ -120,17 +120,17 @@ int int_of_caml(value x) {
   CAMLreturnT(int, Int_val(x));
 }
 
-value string_to_caml(char* p) {
+value string_to_caml(const char* p) {
   CAMLparam0();
   CAMLlocal1(v);
   v = caml_copy_string(p);
   CAMLreturn(v);
 }
 
-char* string_of_caml(value v) {
+const char* string_of_caml(value v) {
   CAMLparam1(v);
-  char* p = strdup(String_val(v));
-  CAMLreturnT(char*, p);
+  const char* p = strdup(String_val(v));
+  CAMLreturnT(const char*, p);
 }
 
 
