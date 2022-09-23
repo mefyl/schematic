@@ -171,3 +171,5 @@ type proto_rule =
       weekdays : Weekdays.t option;
     }
 [@@deriving eq, show, schema]
+
+type postpone = { b : bool [@default false] } [@@deriving eq, show, schema]
