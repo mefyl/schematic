@@ -1,22 +1,23 @@
 type never = |
 
-type 'a reason =
+and 'a reason =
   [ `Decoding of Schematic.Error.decoding
   | `Http of 'a
   | `Networking
   ]
 
-type 'a t = {
-  method_ : Cohttp.Code.meth;
-  reason : 'a;
-  status : Cohttp.Code.status_code option;
-  uri : Uri.t; [@main]
-}
-[@@deriving make]
-
-type ('a, 'b) status =
+and ('a, 'b) status =
   | Unexpected_status of 'a
   | Valid_status of 'b
+[@@deriving eq]
+
+type 'a t = {
+  method_ : Cohttp.Code.meth; [@equal ( = )]
+  reason : 'a;
+  status : Cohttp.Code.status_code option; [@equal ( = )]
+  uri : Uri.t; [@main]
+}
+[@@deriving eq, make]
 
 let pp_status unexpected valid f =
   let open Fmt in
