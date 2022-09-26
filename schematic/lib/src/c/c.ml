@@ -39,21 +39,17 @@ let roundtrip_src (name, c) =
   let decl = Fmt.str "CAMLprim value %s(value v)" (roundtrip_for name) in
   let body =
     const pp_statements
-      [
-        "CAMLparam1(v)";
-        "CAMLlocal1(ret)";
-        Fmt.str "%s x = %a(v)" typ Identifier.pp (of_caml_name_for name);
-        Fmt.str "ret = %a(x)" Identifier.pp (to_caml_name_for name);
-        "CAMLreturn(ret)";
-      ]
+      C_statements.
+        [
+          p1 "v";
+          "CAMLlocal1(ret)";
+          Fmt.str "%s x = %a(v)" typ Identifier.pp (of_caml_name_for name);
+          Fmt.str "ret = %a(x)" Identifier.pp (to_caml_name_for name);
+          "CAMLreturn(ret)";
+        ]
   in
   let pp = braced ~indent:2 decl body in
   Fmt.to_to_string pp ()
-
-(* let runtime = C_runtime.runtime
-
-   (** You MUST call this if you want support for arbitrary JSON values. *) let
-   register_callbacks = C_runtime.register_callbacks *)
 
 (** Returns (header file content) * (implementation file content)
 
@@ -96,9 +92,3 @@ let export_schemas ?(safety_checks = false) (schemas : Schema.pack list) =
   in
 
   (header_file_contents, c_file_contents)
-
-(* let () = Fmt.pr "%s\n" Schematic.C.runtime; Fmt.pr "\n"; Fmt.pr "//\n";
-   Fmt.pr "// Generated declarations\n"; Fmt.pr "//\n"; Fmt.pr "%s"
-   declarations; Fmt.pr "\n"; Fmt.pr "//\n"; Fmt.pr "// Generated
-   implementations\n"; Fmt.pr "//\n"; Fmt.pr "%s" impls; Fmt.pr "\n"; Fmt.pr
-   "\n"; Fmt.pr "%s" rts; () *)

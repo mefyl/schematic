@@ -1,4 +1,3 @@
-open Sexplib
 open Base
 
 module String_pair = struct

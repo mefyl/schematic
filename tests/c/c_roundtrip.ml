@@ -265,7 +265,7 @@ let () =
   Schematic.C.Runtime.register_callbacks ();
   run "Schematic.C roundtrip"
     [
-      ( "typegen",
+      ( "roundtrip",
         Tests.
           [
             test_case "wrapper" `Quick wrapper;
