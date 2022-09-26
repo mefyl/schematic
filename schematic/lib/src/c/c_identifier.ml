@@ -2,7 +2,7 @@ open Base
 
 type t = Id of string [@@deriving eq, ord, hash]
 
-let reserved_typenames = [ "time" ]
+let reserved_typenames = [ "time"; "id" ]
 
 let make s =
   if List.mem reserved_typenames s ~equal:String.equal then Id (s ^ "_")
