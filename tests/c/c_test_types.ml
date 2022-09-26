@@ -92,9 +92,6 @@ type any_manual_annotation =
 let pp_any_manual_annotation : any_manual_annotation Fmt.t =
   Fmt.of_to_string Ezjsonm.get_string
 
-(* Recursive type *)
-(* type node = | Nil | Cons of node [@@deriving schema, eq, show] *)
-
 type time_alias = Ptime.t [@@deriving schema, show, eq]
 type time_local_alias = Ptime.local [@@deriving schema, show, eq]
 type date_alias = Ptime.date [@@deriving schema, eq]
@@ -105,12 +102,6 @@ type 'a parametric_record = { parameterized_field : 'a }
 (* TODO: unboxed parameter *)
 (* TODO: nested generics *)
 (* TODO: functors? *)
-
-type polymorphic_variant =
-  [ `A
-  | `B
-  ]
-[@@deriving schema, eq, show]
 
 type record_with_unit = {
   concrete : int;
@@ -176,3 +167,13 @@ type proto_rule =
 [@@deriving eq, show, schema]
 
 type postpone = { b : bool [@default false] } [@@deriving eq, show, schema]
+
+type poly_basic =
+  [ `A
+  | `B
+  | `C
+  ]
+[@@deriving eq, show, schema]
+
+(* Recursive type *)
+(* type node = | Nil | Cons of node [@@deriving schema, eq, show] *)

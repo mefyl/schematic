@@ -71,6 +71,7 @@ module Either = struct
                 };
             ];
           key = None;
+          hashes = [];
         }
     in
     let parametric =
@@ -125,6 +126,7 @@ module Result = struct
                 };
             ];
           key = None;
+          hashes = [];
         }
     in
     let parametric =

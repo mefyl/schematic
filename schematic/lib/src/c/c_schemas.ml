@@ -61,6 +61,7 @@ module Of = C_walk.Walk (struct
 
   (* This could be optimized (null ptr optim), but this approach allows us to
      simplify things *)
+  (* FIXME: we don't need different tags for each option specialization *)
   let nullable (c, marks) =
     let name = c_typename c |> Identifier.map ~f:(fun s -> s ^ "_option") in
     let s () =
@@ -69,6 +70,7 @@ module Of = C_walk.Walk (struct
             name;
             basic = [ Identifier.make "none" ];
             rich = [ (Identifier.make "some", c) ];
+            hashes = [];
           },
         marks )
     in
@@ -103,22 +105,21 @@ module Of = C_walk.Walk (struct
       in
       (Struct { fields }, marks)
 
-  let union ~name ~key:_ cases =
+  let union ~name ~key:_ ~cases ~hashes =
     let constructors, marks =
       cases
       |> List.map ~f:(fun (s, (c, m)) -> ((Identifier.make s, c), m))
       |> List.unzip
     in
     let marks = marks |> Marks.merge in
-
     let basic, rich =
       constructors
       |> List.partition_map ~f:(function
            | s, Void -> First s
            | (_, _) as x -> Second x)
     in
-
-    ( Variant { name = Identifier.make @@ Option.value_exn name; basic; rich },
+    ( Variant
+        { name = Identifier.make @@ Option.value_exn name; basic; rich; hashes },
       marks )
 
   let tuple ts =

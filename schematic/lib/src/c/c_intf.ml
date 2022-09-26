@@ -12,6 +12,7 @@ type t =
       name : Identifier.t;
       basic : Identifier.t list;
       rich : (Identifier.t * t) list;
+      hashes : int list;
     }
   | Tuple of t list
 [@@deriving show, hash]

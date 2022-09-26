@@ -77,6 +77,7 @@ and _ descriptor =
   | Union : {
       key : string option;
       cases : 't case list;
+      hashes : int list;
     }
       -> 't descriptor
 

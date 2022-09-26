@@ -23,6 +23,15 @@ let case ~indent case contents =
   in
   vbox ~indent (const string (Fmt.str "case %s:" case) ++ post_case) ++ post_box
 
+let cases ~indent l =
+  let n = List.length l in
+  let open Fmt in
+  l
+  |> List.map ~f:(fun (condition, contents) -> case ~indent condition contents)
+  |> List.foldi ~init:nop ~f:(fun i acc x ->
+         let post = if i = n - 1 then nop else cut in
+         acc ++ x ++ post)
+
 let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
     ((name : Identifier.t), ast) =
   let open Fmt in
@@ -45,8 +54,8 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         @ [ return_t ptr_type "p" ]
       in
       (`Pointer, const pp_statements statements)
-      (* Plain-only variant *)
-    | Variant { basic; rich = []; _ } ->
+      (* Plain-only regular variant *)
+    | Variant { basic; rich = []; hashes = []; _ } ->
       let pp =
         const pp_statements
           [
@@ -56,7 +65,8 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
           ]
       in
       (`Plain, pp)
-    | Variant { basic; rich; _ } ->
+      (* Regular variant with payloads *)
+    | Variant { basic; rich; hashes = []; _ } ->
       let plain_case =
         const pp_statements
           [
@@ -86,13 +96,11 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
                 Identifier.pp (of_caml_name_for_c c) (field "v" 0);
             ]
         in
-
         Logs.debug (fun m -> m "Case type %a\n" pp c);
         case ~indent (Int.to_string i)
           (Some (const pp_statements (stmts @ [ "break" ])))
           fmt ()
       in
-
       let rich_case =
         let switch =
           vbox ~indent
@@ -112,7 +120,6 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
           ]
         ++ cut ++ switch
       in
-
       let open Fmt in
       ( `Plain,
         vbox
@@ -124,6 +131,29 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
           ++ cut ++ const char '}')
         ++ cut
         ++ const pp_statements [ return_t (Identifier.to_string name) "res" ] )
+      (* Plain-only polymorphic variant*)
+    | Variant { basic; rich = []; hashes; _ } ->
+      let constrs = List.zip_exn basic hashes in
+      let elses =
+        const (list ~sep:cut string)
+          (constrs
+          |> List.map ~f:(fun (id, hash) ->
+                 Fmt.str "else if (v == Val_long(%d)) x = %a_%a;" hash
+                   Identifier.pp name Identifier.pp id))
+      in
+      let if_else_chain =
+        const string "if (0) {}" ++ cut ++ elses ++ cut
+        ++ const string "else assert(0);"
+      in
+      let pp =
+        const pp_statements [ p1 "v"; Fmt.str "%a x" Identifier.pp name ]
+        ++ cut ++ if_else_chain ++ cut
+        ++ const pp_statements [ return_t (Identifier.to_string name) "x" ]
+      in
+      (`Plain, pp)
+      (* Polymorphic variant with payloads *)
+    | Variant { basic; rich; hashes; _ } ->
+      failwith "variant payloads unsupported"
     | Tuple members ->
       let tuptype = tuple_name members in
       let pp =
@@ -235,14 +265,15 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
         @ [ return_val "v" ]
       in
       ("p", `Pointer, const pp_statements statements)
-    (* Plain-only variant *)
-    | Variant { basic; rich = []; _ } ->
+    (* Plain-only regular variant *)
+    | Variant { basic; rich = []; hashes = []; _ } ->
       let pp =
         const pp_statements
           [ Fmt.str "assert(x < %d)" (List.length basic); "return Val_int(x)" ]
       in
       ("x", `Plain, pp)
-    | Variant { name = variant_name; basic; rich } ->
+    (* Regular variant with payloads *)
+    | Variant { name = variant_name; basic; rich; hashes = [] } ->
       let pp =
         let basic_cases : (string * unit Fmt.t) list =
           basic
@@ -302,20 +333,43 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
         let cases =
           basic_cases @ rich_cases
           |> List.map ~f:(fun (constr_name, contents) ->
-                 case ~indent
-                   (case_name (Identifier.to_string variant_name) constr_name)
-                   (Some contents))
-          |> List.fold ~init:nop ~f:(fun acc x -> acc ++ cut ++ x)
+                 ( case_name (Identifier.to_string variant_name) constr_name,
+                   Some contents ))
+          |> cases ~indent
         in
-        let switch =
-          vbox ~indent (const string "switch (x.tag) {" ++ cases)
-          ++ cut ++ const char '}'
-        in
+        let switch = braced ~indent "switch (x.tag)" cases in
         const pp_statements [ p0; "CAMLlocal1(v)" ]
         ++ cut ++ switch ++ cut
         ++ const pp_statements [ return_val "v" ]
       in
       ("x", `Plain, pp)
+    | Variant { basic; rich = []; hashes; _ } ->
+      (* indent:int -> (string * 'a Fmt.t option) list -> 'a Fmt.t *)
+      let constrs = List.zip_exn basic hashes in
+      let cases =
+        let l =
+          constrs
+          |> List.map ~f:(fun (id, hash) ->
+                 let case =
+                   Fmt.str "%a_%a" Identifier.pp name Identifier.pp id
+                 in
+                 let contents =
+                   const pp_statements
+                     [ Fmt.str "v = Val_long(%d)" hash; "break" ]
+                 in
+                 (case, Some contents))
+        in
+        cases ~indent l
+      in
+      let switch = braced ~indent "switch (x)" cases in
+      let pp =
+        const pp_statements [ p0; l1 "v" ]
+        ++ cut ++ switch ++ cut
+        ++ const pp_statements [ return_val "v" ]
+      in
+
+      ("x", `Plain, pp)
+    | Variant { basic; rich; hashes; _ } -> failwith "unsupported"
     | Tuple members ->
       let pp =
         const pp_statements

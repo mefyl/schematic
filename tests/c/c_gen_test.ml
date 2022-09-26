@@ -381,6 +381,40 @@ tuple_int_string tuple_int_string_of_caml(value v) {
 }
 |}
 
+let basic_poly_variant_of_caml =
+  {|
+poly_basic poly_basic_of_caml(value v) {
+  CAMLparam1(v);
+  poly_basic x;
+  if (0) {}
+  else if (v == Val_long(65)) x = poly_basic_a;
+  else if (v == Val_long(66)) x = poly_basic_b;
+  else if (v == Val_long(67)) x = poly_basic_c;
+  else assert(0);
+  CAMLreturnT(poly_basic, x);
+}
+|}
+
+let basic_poly_variant_to_caml =
+  {|
+value poly_basic_to_caml(poly_basic x) {
+  CAMLparam0();
+  CAMLlocal1(v);
+  switch (x) {
+    case poly_basic_a:
+      v = Val_long(65);
+      break;
+    case poly_basic_b:
+      v = Val_long(66);
+      break;
+    case poly_basic_c:
+      v = Val_long(67);
+      break;
+  }
+  CAMLreturn(v);
+}
+|}
+
 let tuple_int_string_to_caml =
   {|
 value tuple_int_string_to_caml(tuple_int_string x) {
@@ -521,6 +555,8 @@ module Of_caml = struct
 
   let collection () =
     test collection_schema [ collection_of_caml; int_array_of_caml ]
+
+  let poly_basic () = test poly_basic_schema [ basic_poly_variant_of_caml ]
 end
 
 module To_caml = struct
@@ -558,6 +594,8 @@ module To_caml = struct
 
   let collection () =
     test collection_schema [ collection_to_caml; int_array_to_caml ]
+
+  let poly_basic () = test poly_basic_schema [ basic_poly_variant_to_caml ]
 end
 
 let () =
@@ -591,6 +629,7 @@ let () =
             test_case "pair_alias" `Quick pair_alias;
             test_case "record_with_pair_alias" `Quick record_with_pair_alias;
             test_case "collection" `Quick collection;
+            test_case "basic polymorphic_variant" `Quick poly_basic;
           ] );
       ( "to_caml",
         To_caml.
@@ -602,5 +641,6 @@ let () =
             test_case "pair_alias" `Quick pair_alias;
             test_case "record_with_pair_alias" `Quick record_with_pair_alias;
             test_case "collection" `Quick collection;
+            test_case "basic polymorphic_variant" `Quick poly_basic;
           ] );
     ]

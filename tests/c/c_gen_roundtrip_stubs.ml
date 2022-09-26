@@ -28,6 +28,7 @@ let schemas =
     (* Schema.pack Weekdays.schema; *)
     Schema.pack proto_rule_schema;
     Schema.pack postpone_schema;
+    Schema.pack poly_basic_schema;
   ]
 
 let () =

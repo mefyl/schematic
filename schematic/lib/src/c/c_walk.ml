@@ -40,7 +40,12 @@ module type WALK = sig
 
   (* Union *)
 
-  val union : name:string option -> key:string option -> (string * t) list -> t
+  val union :
+    name:string option ->
+    key:string option ->
+    cases:(string * t) list ->
+    hashes:int list ->
+    t
 
   (* Descriptors *)
 
@@ -85,13 +90,13 @@ module Walk (W : WALK) = struct
     | String_const s -> W.string_const s
     | Object f -> W.object_ (fields f)
     | Tuple l -> W.tuple @@ tuple l
-    | Union { cases; key } ->
+    | Union { cases; key; hashes } ->
       let cases =
         cases
         |> List.map ~f:(fun (Schema.Case { name; schema = s; _ }) ->
                (name, schema s))
       in
-      W.union ~name:id ~key cases
+      W.union ~name:id ~key ~hashes ~cases
 
   and schema : type t. t Schema_intf.t -> W.t =
    fun { id; descriptor = d; parametric = p } ->

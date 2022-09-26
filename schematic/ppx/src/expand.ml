@@ -1015,8 +1015,11 @@ module Schema = struct
                           decoder = (fun () -> ());
                         }
                     in
+                    (* FIXME: aliases and polymorphic variants don't interact
+                       well *)
                     Union
                       {
+                        hashes = [];
                         key = None;
                         cases =
                           __schematic_case [%e name]
@@ -1079,6 +1082,14 @@ module Schema = struct
       match type_context.attributes.union_key with
       | None -> [%expr None]
       | Some name -> [%expr Some [%e Ast.estring name]]
+    and hashes =
+      if poly then
+        List.map
+          ~f:(fun (txt, _, _, _) ->
+            let hash = Ocaml_common.Btype.hash_variant txt in
+            [%expr [%e Ast.eint hash]])
+          options
+      else []
     in
     expanded_of_descriptor ~loc
       [%expr
@@ -1086,6 +1097,7 @@ module Schema = struct
           {
             cases = [%e Ast.elist (List.filter_map ~f options)];
             key = [%e key];
+            hashes = [%e Ast.elist hashes];
           }]
 
   let expand_abstract_type ~context ~type_context t =

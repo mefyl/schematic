@@ -5,5 +5,7 @@ let store ~dst ~field_idx ~field_val =
 
 let p0 = "CAMLparam0()"
 let p1 = Fmt.str "CAMLparam1(%s)"
+let l1 = Fmt.str "CAMLlocal1(%s)"
 let return_t = Fmt.str "CAMLreturnT(%s, %s)"
 let return_val = Fmt.str "CAMLreturn(%s)"
+let hash_variant = Fmt.str "caml_hash_variant(\"%s\")"

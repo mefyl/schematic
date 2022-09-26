@@ -65,6 +65,8 @@ external string_option_record_rt_id :
   string_option_record -> string_option_record
   = "sch_string_option_record_rt_id"
 
+external poly_basic_rt_id : poly_basic -> poly_basic = "sch_poly_basic_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -256,6 +258,13 @@ module Tests = struct
         (equal_parametric_record equal_string_wrapper)
     in
     test t new_x x
+
+  let poly_basic () =
+    let t = Alcotest.testable pp_poly_basic equal_poly_basic in
+    [ `A; `B; `C ]
+    |> List.iter (fun x ->
+           let new_x = poly_basic_rt_id x in
+           test t new_x x)
 end
 
 let () =
@@ -295,5 +304,6 @@ let () =
             test_case "reified parametric record" `Quick reified_parametric;
             test_case "string option record (Todo bug)" `Quick
               string_option_record;
+            test_case "basic polymorphic variant" `Quick poly_basic;
           ] );
     ]
