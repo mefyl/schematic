@@ -41,6 +41,7 @@
   logs
   ppxlib
   ppx_deriving
+  (ppx_hash (= v0.14.0))
   ppx_here
   (ppx_yojson
    (and

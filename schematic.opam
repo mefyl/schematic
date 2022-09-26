@@ -27,6 +27,7 @@ depends: [
   "logs"
   "ppxlib"
   "ppx_deriving"
+  "ppx_hash" {= "v0.14.0"}
   "ppx_here"
   "ppx_yojson" {>= "1.2.0" & with-test}
   "ptime" {>= "1.0.0"}
