@@ -381,7 +381,7 @@ tuple_int_string tuple_int_string_of_caml(value v) {
 }
 |}
 
-let basic_poly_variant_of_caml =
+let poly_basic_of_caml =
   {|
 poly_basic poly_basic_of_caml(value v) {
   CAMLparam1(v);
@@ -395,7 +395,7 @@ poly_basic poly_basic_of_caml(value v) {
 }
 |}
 
-let basic_poly_variant_to_caml =
+let poly_basic_to_caml =
   {|
 value poly_basic_to_caml(poly_basic x) {
   CAMLparam0();
@@ -412,6 +412,60 @@ value poly_basic_to_caml(poly_basic x) {
       break;
   }
   CAMLreturn(v);
+}
+|}
+
+let poly_payload_to_caml =
+  {|
+value poly_payload_to_caml(poly_payload x) {
+  CAMLparam0();
+  CAMLlocal1(v);
+  switch (x.tag) {
+    case poly_payload_a_tag:
+      v = Val_long(65);
+      break;
+    case poly_payload_b_tag:
+      v = Val_long(66);
+      break;
+    case poly_payload_single_tag:
+      v = caml_alloc_tuple(2);
+      Store_field(v, 0, Val_long(-306849112));
+      Store_field(v, 1, int_to_caml(x.payload->single));
+      break;
+    case poly_payload_tuple_tag:
+      v = caml_alloc_tuple(2);
+      Store_field(v, 0, Val_long(726928360));
+      Store_field(v, 1, tuple_int_string_to_caml(x.payload->tuple));
+      break;
+  }
+  CAMLreturn(v);
+}
+|}
+
+let poly_payload_of_caml =
+  {|
+poly_payload poly_payload_of_caml(value v) {
+  CAMLparam1(v);
+  poly_payload x;
+  if (0) {}
+  else if (v == Val_long(65)) x.tag = poly_payload_a_tag;
+  else if (v == Val_long(66)) x.tag = poly_payload_b_tag;
+  else if (Is_block(v)) {
+    int tag = Field(v, 0);
+    x.payload = malloc(sizeof(*x.payload));
+    if (0) {}
+    else if (tag == Val_long(-306849112)) {
+      x.tag = poly_payload_single_tag;
+      x.payload->single = int_of_caml(Field(v, 1));
+    }
+    else if (tag == Val_long(726928360)) {
+      x.tag = poly_payload_tuple_tag;
+      x.payload->tuple = tuple_int_string_of_caml(Field(v, 1));
+    }
+    else assert(0);
+  }
+  else assert(0);
+  CAMLreturnT(poly_payload, x);
 }
 |}
 
@@ -556,7 +610,10 @@ module Of_caml = struct
   let collection () =
     test collection_schema [ collection_of_caml; int_array_of_caml ]
 
-  let poly_basic () = test poly_basic_schema [ basic_poly_variant_of_caml ]
+  let poly_basic () = test poly_basic_schema [ poly_basic_of_caml ]
+
+  let poly_payload () =
+    test poly_payload_schema [ poly_payload_of_caml; tuple_int_string_of_caml ]
 end
 
 module To_caml = struct
@@ -595,7 +652,10 @@ module To_caml = struct
   let collection () =
     test collection_schema [ collection_to_caml; int_array_to_caml ]
 
-  let poly_basic () = test poly_basic_schema [ basic_poly_variant_to_caml ]
+  let poly_basic () = test poly_basic_schema [ poly_basic_to_caml ]
+
+  let poly_payload () =
+    test poly_payload_schema [ poly_payload_to_caml; tuple_int_string_to_caml ]
 end
 
 let () =
@@ -630,6 +690,7 @@ let () =
             test_case "record_with_pair_alias" `Quick record_with_pair_alias;
             test_case "collection" `Quick collection;
             test_case "basic polymorphic_variant" `Quick poly_basic;
+            test_case "payload polymorphic_variant" `Quick poly_payload;
           ] );
       ( "to_caml",
         To_caml.
@@ -642,5 +703,6 @@ let () =
             test_case "record_with_pair_alias" `Quick record_with_pair_alias;
             test_case "collection" `Quick collection;
             test_case "basic polymorphic_variant" `Quick poly_basic;
+            test_case "payload polymorphic_variant" `Quick poly_payload;
           ] );
     ]

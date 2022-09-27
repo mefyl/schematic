@@ -106,21 +106,26 @@ module Of = C_walk.Walk (struct
       (Struct { fields }, marks)
 
   let union ~name ~key:_ ~cases ~hashes =
+    let name = Option.value_exn name in
     let constructors, marks =
       cases
       |> List.map ~f:(fun (s, (c, m)) -> ((Identifier.make s, c), m))
       |> List.unzip
     in
     let marks = marks |> Marks.merge in
+    Logs.debug (fun m -> m "union %s marks: %a@." name Marks.pp marks);
+    let hashes =
+      match List.zip (constructors |> List.map ~f:fst) hashes with
+      | Ok l -> l
+      | Unequal_lengths -> []
+    in
     let basic, rich =
       constructors
       |> List.partition_map ~f:(function
            | s, Void -> First s
            | (_, _) as x -> Second x)
     in
-    ( Variant
-        { name = Identifier.make @@ Option.value_exn name; basic; rich; hashes },
-      marks )
+    (Variant { name = Identifier.make name; basic; rich; hashes }, marks)
 
   let tuple ts =
     let items, marks = List.unzip ts in
@@ -263,7 +268,9 @@ let of_schemas_state marks schemas =
   List.fold_left ~init:([], marks) ~f schemas
 
 let of_schemas = of_schemas_state Marks.empty
-let of_schema schema = of_schema Marks.empty schema |> fst
+
+let of_schema schema =
+  of_schemas_state Marks.empty [ Schema.pack schema ] |> fst
 
 type state = Marks.t
 

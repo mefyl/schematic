@@ -2,7 +2,7 @@ open Base
 module Identifier = C_identifier
 
 type t =
-  | Void  (** Zero-Sized Type *)
+  | Void  (** Zero-Sized Type *) (* TODO rename to Never *)
   | String  (** Native string *)
   | Array of t
   | Atom of Identifier.t * t option
@@ -12,7 +12,7 @@ type t =
       name : Identifier.t;
       basic : Identifier.t list;
       rich : (Identifier.t * t) list;
-      hashes : int list;
+      hashes : (Identifier.t * int) list;
     }
   | Tuple of t list
 [@@deriving show, hash]

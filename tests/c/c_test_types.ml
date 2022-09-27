@@ -175,5 +175,13 @@ type poly_basic =
   ]
 [@@deriving eq, show, schema]
 
+type poly_payload =
+  [ `A
+  | `Single of int
+  | `B
+  | `Tuple of int * string
+  ]
+[@@deriving eq, show, schema]
+
 (* Recursive type *)
 (* type node = | Nil | Cons of node [@@deriving schema, eq, show] *)

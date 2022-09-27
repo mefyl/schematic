@@ -132,15 +132,57 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         ++ cut
         ++ const pp_statements [ return_t (Identifier.to_string name) "res" ] )
       (* Plain-only polymorphic variant*)
-    | Variant { basic; rich = []; hashes; _ } ->
-      let constrs = List.zip_exn basic hashes in
+    | Variant { basic; rich; hashes; _ } ->
+      let basic_only = List.is_empty rich in
+      let tag_suffix = if basic_only then "" else "_tag" in
+      let get_hash = List.Assoc.find_exn hashes ~equal:Identifier.equal in
       let elses =
-        const (list ~sep:cut string)
-          (constrs
-          |> List.map ~f:(fun (id, hash) ->
-                 Fmt.str "else if (v == Val_long(%d)) x = %a_%a;" hash
-                   Identifier.pp name Identifier.pp id))
+        let basic =
+          const (list ~sep:cut string)
+            (basic
+            |> List.map ~f:(fun id ->
+                   let hash = get_hash id in
+                   let tag = if basic_only then "x" else "x.tag" in
+                   Fmt.str "else if (v == Val_long(%d)) %s = %a_%a%s;" hash tag
+                     Identifier.pp name Identifier.pp id tag_suffix))
+        in
+        if basic_only then basic
+        else
+          let elses =
+            let pp_rich : (Identifier.t * c) Fmt.t =
+             fun fmt (id, constr_c) ->
+              let hash = get_hash id in
+              let elseif = Fmt.str "else if (tag == Val_long(%d))" hash in
+              let body =
+                const pp_statements
+                  [
+                    Fmt.str "x.tag = %a_%a_tag" Identifier.pp name Identifier.pp
+                      id;
+                    Fmt.str "x.payload->%a = %a(Field(v, 1))" Identifier.pp id
+                      Identifier.pp
+                      (of_caml_name_for_c constr_c);
+                  ]
+              in
+              (braced ~indent elseif body) fmt ()
+            in
+            const (list ~sep:cut pp_rich) rich
+          in
+
+          let body =
+            const pp_statements
+              [
+                "int tag = Field(v, 0)";
+                "x.payload = malloc(sizeof(*x.payload))";
+              ]
+            ++ cut
+            ++ (const string "if (0) {}" ++ cut ++ elses ++ cut
+               ++ const string "else assert(0);")
+          in
+
+          let rich = braced ~indent "else if (Is_block(v))" body in
+          basic ++ cut ++ rich
       in
+
       let if_else_chain =
         const string "if (0) {}" ++ cut ++ elses ++ cut
         ++ const string "else assert(0);"
@@ -151,9 +193,6 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         ++ const pp_statements [ return_t (Identifier.to_string name) "x" ]
       in
       (`Plain, pp)
-      (* Polymorphic variant with payloads *)
-    | Variant { basic; rich; hashes; _ } ->
-      failwith "variant payloads unsupported"
     | Tuple members ->
       let tuptype = tuple_name members in
       let pp =
@@ -343,33 +382,60 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
         ++ const pp_statements [ return_val "v" ]
       in
       ("x", `Plain, pp)
-    | Variant { basic; rich = []; hashes; _ } ->
-      (* indent:int -> (string * 'a Fmt.t option) list -> 'a Fmt.t *)
-      let constrs = List.zip_exn basic hashes in
+    | Variant { basic; rich; hashes; _ } ->
+      let basic_only = List.is_empty rich in
+      let get_hash = List.Assoc.find_exn hashes ~equal:Identifier.equal in
+      let case_name id =
+        let tag_suffix = if basic_only then "" else "_tag" in
+        Fmt.str "%a_%a%s" Identifier.pp name Identifier.pp id tag_suffix
+      in
       let cases =
-        let l =
-          constrs
-          |> List.map ~f:(fun (id, hash) ->
-                 let case =
-                   Fmt.str "%a_%a" Identifier.pp name Identifier.pp id
-                 in
+        let basic =
+          basic
+          |> List.map ~f:(fun id ->
+                 let hash = get_hash id in
+                 let case = case_name id in
                  let contents =
                    const pp_statements
                      [ Fmt.str "v = Val_long(%d)" hash; "break" ]
                  in
                  (case, Some contents))
         in
-        cases ~indent l
+        let rich =
+          rich
+          |> List.map ~f:(fun (id, constr_c) ->
+                 let hash = get_hash id in
+                 let case = case_name id in
+                 let c_pl = Fmt.str "x.payload->%a" Identifier.pp id in
+                 let payload_val =
+                   Fmt.str "%a(%s)" Identifier.pp
+                     (to_caml_name_for_c constr_c)
+                     c_pl
+                 in
+                 let contents =
+                   const pp_statements
+                     [
+                       Fmt.str "v = caml_alloc_tuple(2)";
+                       store ~dst:"v" ~field_idx:0
+                         ~field_val:(val_long (Int.to_string hash));
+                       store ~dst:"v" ~field_idx:1 ~field_val:payload_val;
+                       "break";
+                     ]
+                 in
+                 (case, Some contents))
+        in
+        cases ~indent (basic @ rich)
       in
-      let switch = braced ~indent "switch (x)" cases in
+      let switch =
+        let tag = if basic_only then "x" else "x.tag" in
+        braced ~indent (Fmt.str "switch (%s)" tag) cases
+      in
       let pp =
         const pp_statements [ p0; l1 "v" ]
         ++ cut ++ switch ++ cut
         ++ const pp_statements [ return_val "v" ]
       in
-
       ("x", `Plain, pp)
-    | Variant { basic; rich; hashes; _ } -> failwith "unsupported"
     | Tuple members ->
       let pp =
         const pp_statements

@@ -72,7 +72,7 @@ let pp ?(indent = 2) fmt ts =
       | Tuple types ->
         let fields = tuple_fields types in
         const struct_ fields
-      | Variant { name; basic; rich } -> const variant (name, basic, rich)
+      | Variant { name; basic; rich; _ } -> const variant (name, basic, rich)
       | Void -> nop
     in
 
