@@ -166,7 +166,8 @@ type proto_rule =
     }
 [@@deriving eq, show, schema]
 
-type postpone = { b : bool [@default false] } [@@deriving eq, show, schema]
+type postpone = { b : bool [@default false] }
+[@@deriving eq, show, schema] [@@boxed]
 
 type poly_basic =
   [ `A
@@ -182,6 +183,9 @@ type poly_payload =
   | `Tuple of int * string
   ]
 [@@deriving eq, show, schema]
+
+type evil_defaults = { not_option : int [@default 123] }
+[@@deriving eq, show, schema, make] [@@boxed]
 
 (* Recursive type *)
 (* type node = | Nil | Cons of node [@@deriving schema, eq, show] *)

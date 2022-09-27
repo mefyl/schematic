@@ -70,6 +70,9 @@ external poly_basic_rt_id : poly_basic -> poly_basic = "sch_poly_basic_rt_id"
 external poly_payload_rt_id : poly_payload -> poly_payload
   = "sch_poly_payload_rt_id"
 
+external evil_defaults_rt_id : evil_defaults -> evil_defaults
+  = "sch_evil_defaults_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -275,6 +278,13 @@ module Tests = struct
     |> List.iter (fun x ->
            let new_x = poly_payload_rt_id x in
            test t new_x x)
+
+  let evil_defaults () =
+    let t = Alcotest.testable pp_evil_defaults equal_evil_defaults in
+    [ { not_option = -394 }; make_evil_defaults () ]
+    |> List.iter (fun x ->
+           let new_x = evil_defaults_rt_id x in
+           test t new_x x)
 end
 
 let () =
@@ -316,5 +326,6 @@ let () =
               string_option_record;
             test_case "basic polymorphic variant" `Quick poly_basic;
             test_case "payload polymorphic variant" `Quick poly_payload;
+            test_case "evil defaults" `Quick evil_defaults;
           ] );
     ]

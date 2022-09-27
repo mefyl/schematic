@@ -30,6 +30,7 @@ let schemas =
     Schema.pack postpone_schema;
     Schema.pack poly_basic_schema;
     Schema.pack poly_payload_schema;
+    Schema.pack evil_defaults_schema;
   ]
 
 let () =
