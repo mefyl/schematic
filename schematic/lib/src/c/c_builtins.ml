@@ -69,10 +69,6 @@ let typedefs =
   {|
 typedef const char* sch_json;
 typedef int unit;
-
-
-// Individual declarations.
-// Including time.h is likely to lead to conflicts. Let us not.
 typedef struct timespec timespec;
 |}
 
