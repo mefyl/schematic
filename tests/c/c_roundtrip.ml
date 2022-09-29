@@ -73,6 +73,10 @@ external poly_payload_rt_id : poly_payload -> poly_payload
 external evil_defaults_rt_id : evil_defaults -> evil_defaults
   = "sch_evil_defaults_rt_id"
 
+external reified_ultra_generic_rt_id :
+  reified_ultra_generic -> reified_ultra_generic (* FIXME: this is wrong *)
+  = "sch_string_wrapper_parametric_record_ultra_generic_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -285,6 +289,28 @@ module Tests = struct
     |> List.iter (fun x ->
            let new_x = evil_defaults_rt_id x in
            test t new_x x)
+
+  let ultra_generic () =
+    let x : reified_ultra_generic =
+      {
+        (* Fully parameterized field *)
+        field = -432;
+        (* Partially parameterized field, with a builtin *)
+        list = [ { parameterized_field = "cocorico" } ];
+        (* Partially parameterized field, with a user-defined type *)
+        nested_generic = { parameterized_field = "Coin" };
+      }
+    in
+    let new_x = reified_ultra_generic_rt_id x in
+    let pp_reified_param = pp_parametric_record pp_string_wrapper in
+    let equal_reified_param = equal_parametric_record equal_string_wrapper in
+    let open Base in
+    let t =
+      Alcotest.testable
+        (pp_ultra_generic Int.pp pp_reified_param pp_string_wrapper)
+        (equal_ultra_generic Int.equal equal_reified_param equal_string_wrapper)
+    in
+    test t new_x x
 end
 
 let () =
@@ -327,5 +353,6 @@ let () =
             test_case "basic polymorphic variant" `Quick poly_basic;
             test_case "payload polymorphic variant" `Quick poly_payload;
             test_case "evil defaults" `Quick evil_defaults;
+            test_case "ultra generic" `Quick ultra_generic;
           ] );
     ]

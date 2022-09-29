@@ -26,9 +26,6 @@ module type WALK = sig
   (** [schema id parametric schema] *)
   val schema : string option -> (unit -> t) option -> (unit -> t) -> t
 
-  (** [parametric template_name arg_names effective_args t] *)
-  val parametric : string -> string list -> t list -> t -> t
-
   (* Object *)
 
   val fields_empty : unit -> fields
@@ -65,6 +62,7 @@ module type WALK = sig
   val time : unit -> t
   val time_local : unit -> t
   val tuple : t list -> t
+  val name : t -> string
 end
 
 module Walk (W : WALK) = struct
@@ -107,8 +105,9 @@ module Walk (W : WALK) = struct
       | Some p ->
         Some
           (fun () ->
-            let name, args, eff_args, t = parametric p in
-            W.parametric name args eff_args t)
+            let _name, args, eff_args, t = parametric p in
+            let name = W.name t in
+            W.schema (Some name) None (fun () -> t))
     in
     W.schema id parametric schema
 
@@ -117,8 +116,7 @@ module Walk (W : WALK) = struct
     | Plain { name; descriptor = d } -> (name, [], [], descriptor (Some name) d)
     | Parametric { name; parameter; next } ->
       let template_name, args, eff_args, t =
-        parametric
-          (next { parameter with id = Some ("#" ^ name); parametric = None })
+        parametric (next { parameter with parametric = None })
       in
       (template_name, name :: args, schema parameter :: eff_args, t)
 
@@ -158,6 +156,6 @@ module Walk (W : WALK) = struct
     | Item { schema = s; rest } -> schema s :: tuple rest
 
   let parametric p =
-    let name, args, eff_args, t = parametric p in
-    W.parametric name args eff_args t
+    let _name, _args, _eff_args, t = parametric p in
+    t
 end

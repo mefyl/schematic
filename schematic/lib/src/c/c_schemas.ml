@@ -17,6 +17,7 @@ module Of = C_walk.Walk (struct
   type case = string * t
   type t = res
 
+  let name (c, _marks) = c_typename c |> Identifier.to_string
   let make name = (Atom (Identifier.make name, None), Marks.empty)
 
   (* Shallow primitive types *)
@@ -166,78 +167,6 @@ module Of = C_walk.Walk (struct
       (Struct { fields }, Marks.empty)
     in
     schema (Some "date") None s
-
-  (** A parametric type.
-
-      - [template_name]: name of the generic type
-      - [args]: type parameters (abstract)
-      - [effective]: effect types plugging into each of [args]
-      - [marks]: marks carried along, which includes # marks that need to be
-        updated before returning
-      - [c]: almost-fully-instantiated instance of type [c]. Needs to be
-        recursively traversed in order to replace # references. *)
-  let parametric template_name args effective (c, marks) =
-    let sep = Fmt.(const string ", ") in
-    Logs.debug (fun m -> m "template name: %s@." template_name);
-    Logs.debug (fun m -> m "args: %a@." Fmt.(list string ~sep) args);
-    Logs.debug (fun m ->
-        m "effective args: %a@."
-          Fmt.(list pp ~sep)
-          (effective |> List.map ~f:fst));
-    Logs.debug (fun m -> m "c : %a@." pp c);
-    Logs.debug (fun m -> m "marks : %a@." Marks.pp marks);
-
-    let args = List.zip_exn args effective in
-
-    let parameterized s =
-      if String.is_prefix ~prefix:"#" s then Some (String.subo ~pos:1 s)
-      else None
-    in
-
-    let concrete type_param =
-      match Base.List.Assoc.find args ~equal:String.equal type_param with
-      | Some concrete -> fst @@ concrete
-      | None -> failwith "expected matching concrete type"
-    in
-
-    (* Map marks to remove type parameters *)
-    (* FIXME: should recursively traverse marks... *)
-    let marks =
-      Marks.map marks ~f:(fun (name, x) ->
-          match parameterized name with
-          | Some typeparam -> (
-            match concrete typeparam with
-            | Atom (concrete_name, _) -> (Identifier.to_string concrete_name, x)
-            | _ -> failwith "a")
-          | None -> (name, x))
-    in
-
-    let c =
-      match c with
-      | Struct { fields } ->
-        let f ((field_name : Identifier.t), (field_c : c)) =
-          let field_c =
-            match field_c with
-            | Atom (name, _) as atom -> (
-              (* XXX id handling... *)
-              let name = Identifier.to_string name in
-
-              (* Replace parameterized types with concrete types *)
-              match parameterized name with
-              | Some field_type_param -> concrete field_type_param
-              | None -> atom)
-            | _ -> failwith ""
-          in
-          (field_name, field_c)
-        in
-
-        let fields = fields |> List.map ~f in
-
-        Struct { fields }
-      | x -> x
-    in
-
-    (c, marks)
 end)
 
 (* XXX: copied from TypeScript, might be generalizable? *)

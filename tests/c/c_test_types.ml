@@ -60,8 +60,6 @@ type record_with_variant = { v : payload_variant } [@@deriving schema, show, eq]
 type string_option_record = { maybe : string_wrapper option }
 [@@deriving schema, show, eq]
 
-(* Roundtrip only *)
-
 type int64_alias = int64 [@@deriving schema, show, eq]
 type bool_alias = bool [@@deriving schema, show, eq]
 type float_alias = float [@@deriving schema, show, eq]
@@ -99,10 +97,6 @@ type date_alias = Ptime.date [@@deriving schema, eq]
 type 'a parametric_record = { parameterized_field : 'a }
 [@@boxed] [@@deriving schema, eq, show]
 
-(* TODO: unboxed parameter *)
-(* TODO: nested generics *)
-(* TODO: functors? *)
-
 type record_with_unit = {
   concrete : int;
   nothing : unit;
@@ -117,25 +111,6 @@ type variant_with_inline_record_payload =
 
 (* Purposeful name conflict *)
 type time = Ptime.t [@@deriving schema, show, eq]
-
-(* Nested generics *)
-type ('coin, 'elem, 'a) ultra_generic = {
-  field : 'coin;
-  list : 'elem list;
-  nested_generic : 'a parametric_record;
-}
-[@@deriving schema, show, eq]
-
-type reified_parametric_record = string_wrapper parametric_record
-
-let reified_parametric_record_schema =
-  parametric_record_schema string_wrapper_schema
-
-type reified_ultra_generic =
-  (int, string parametric_record, string) ultra_generic
-
-let reified_ultra_generic_schema : reified_ultra_generic Schema.t =
-  ultra_generic_schema int_schema reified_parametric_record_schema string_schema
 
 type payload_variant_with_union_key =
   | Nothing_uk
@@ -189,3 +164,22 @@ type evil_defaults = { not_option : int [@default 123] }
 
 (* Recursive type *)
 (* type node = | Nil | Cons of node [@@deriving schema, eq, show] *)
+
+(* Nested generics *)
+type ('coin, 'elem, 'a) ultra_generic = {
+  field : 'coin;
+  list : 'elem list;
+  nested_generic : 'a parametric_record;
+}
+[@@deriving schema, show, eq]
+
+type reified_parametric_record = string_wrapper parametric_record
+
+let reified_parametric_record_schema =
+  parametric_record_schema string_wrapper_schema
+
+type reified_ultra_generic =
+  (int, string parametric_record, string) ultra_generic
+
+let reified_ultra_generic_schema : reified_ultra_generic Schema.t =
+  ultra_generic_schema int_schema reified_parametric_record_schema string_schema

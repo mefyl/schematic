@@ -2,6 +2,13 @@ open Base
 open Schematic
 open C_test_types
 
+let reified_parametric_record_schema =
+  parametric_record_schema string_wrapper_schema
+
+let reified_ultra_generic_schema =
+  ultra_generic_schema Schemas.int_schema reified_parametric_record_schema
+    Schemas.string_schema
+
 let schemas =
   [
     Schema.pack primitive_record_schema;
@@ -20,7 +27,7 @@ let schemas =
     Schema.pack time_local_alias_schema;
     Schema.pack date_alias_schema;
     Schema.pack record_with_unit_schema;
-    Schema.pack (parametric_record_schema string_wrapper_schema);
+    Schema.pack reified_parametric_record_schema;
     Schema.pack variant_with_inline_record_payload_schema;
     Schema.pack time_schema;
     Schema.pack payload_variant_with_union_key_schema;
@@ -31,6 +38,7 @@ let schemas =
     Schema.pack poly_basic_schema;
     Schema.pack poly_payload_schema;
     Schema.pack evil_defaults_schema;
+    Schema.pack reified_ultra_generic_schema;
   ]
 
 let () =
