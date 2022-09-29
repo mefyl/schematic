@@ -5,26 +5,18 @@ let pp ?(indent = 2) fmt ts =
   let rec pp fmt ts =
     let printer =
       let open Fmt in
-      (* TODO: get rid of this "braced" (redundant with C_pp) *)
-      let braced lhs inner : _ Fmt.t =
-        (vbox ~indent @@ (lhs ++ const string " {" ++ cut ++ inner))
-        ++ cut ++ const char '}'
-      in
-
+      let open C_pp in
       let struct_or_union_field f (name, v) =
         let open Fmt in
         let pp = box (Fmt.pair ~sep:sp (hvbox pp) Fmt.string) in
         pp f (v, Identifier.to_string name ^ ";")
       in
-
       let struct_ : (Identifier.t * _) list Fmt.t =
-        braced (const string "struct") (list ~sep:cut struct_or_union_field)
+        braced ~indent "struct" (list ~sep:cut struct_or_union_field)
       in
-
       let union_ : (Identifier.t * _) list Fmt.t =
-        braced (const string "union") (list ~sep:cut struct_or_union_field)
+        braced ~indent "union" (list ~sep:cut struct_or_union_field)
       in
-
       let variant fmt (name, basic, rich) =
         let is_basic = List.is_empty rich in
         (* An enum declaring each constructor of the variant. *)
@@ -34,7 +26,7 @@ let pp ?(indent = 2) fmt ts =
             @ List.map ~f:(Fn.compose Identifier.to_string fst) rich
           in
           let tag_suffix = if is_basic then "" else "_tag" in
-          braced (const string "enum")
+          braced ~indent "enum"
             (const
                (list
                   ~sep:(const char ',' ++ cut)
@@ -50,20 +42,18 @@ let pp ?(indent = 2) fmt ts =
               const union_ rich ++ const string "* payload;"
             in
             let inner = tag_field ++ cut ++ payload_field in
-
             (* Kind of a special case of struct... *)
-            braced (const string "struct") inner
+            braced ~indent "struct" inner
         in
         printer fmt ()
       in
-
       match ts with
       | Atom (s, Some (Struct _)) ->
         const string (Identifier.to_string s) ++ const char '*'
       | Atom (s, _) -> const string (Identifier.to_string s)
       | Array t ->
         (* We're not using the `struct_` formatter, on purpose. *)
-        C_pp.braced ~indent "struct"
+        braced ~indent "struct"
           (const string "size_t len" ++ semi ++ const pp t ++ const string "* "
          ++ const string "data;")
       | String -> const string "const char*"
@@ -75,7 +65,6 @@ let pp ?(indent = 2) fmt ts =
       | Variant { name; basic; rich; _ } -> const variant (name, basic, rich)
       | Void -> nop
     in
-
     printer fmt ()
   in
   pp fmt ts
