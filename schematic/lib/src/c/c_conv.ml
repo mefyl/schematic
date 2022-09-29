@@ -4,16 +4,12 @@ open C_pp
 open C_statements
 
 (* TODO: prefixes *)
-(* TODO:
-
-   - polymorphic variants (need to hash - prehash? interaction with main?) *)
 
 let force_newline fmt _ = Caml.Format.pp_force_newline fmt ()
 
 let signature ~return_type ~fname ~argtype ~argname =
   Fmt.str "%s %a(%s %s)" return_type Identifier.pp fname argtype argname
 
-(* TODO: use the generic braced *)
 let case ~indent case contents =
   let open Fmt in
   let post_case, post_box =

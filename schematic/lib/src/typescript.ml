@@ -29,7 +29,6 @@ include Marks.Make (struct
 
   let pp = pp
 
-  (* TODO: use type-safe ID for Typescript as well as C *)
   module Id = struct
     include String
 
