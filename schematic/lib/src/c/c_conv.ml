@@ -217,7 +217,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         const pp_statements
           [
             p1 "v";
-            "CAMLlocal1(l)";
+            l1 "l";
             Fmt.str "%a arr = {.len = 0, .data = NULL}" Identifier.pp
               (array_name elem_type);
             "l = v";
@@ -287,7 +287,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
       let statements =
         [
           p0;
-          "CAMLlocal1(v)";
+          l1 "v";
           Fmt.str "int n_fields = %d" n_fields;
           Fmt.str "int tag = %d" tag;
           "v = caml_alloc(n_fields, tag)";
@@ -369,7 +369,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
           |> cases ~indent
         in
         let switch = braced ~indent "switch (x.tag)" cases in
-        const pp_statements [ p0; "CAMLlocal1(v)" ]
+        const pp_statements [ p0; l1 "v" ]
         ++ cut ++ switch ++ cut
         ++ const pp_statements [ return_val "v" ]
       in
@@ -433,7 +433,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
         const pp_statements
         @@ [
              p0;
-             "CAMLlocal1(v)";
+             l1 "v";
              Fmt.str "v = caml_alloc_tuple(%d)" (List.length members);
            ]
         @ (members
@@ -462,8 +462,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
              ])
       in
       let pp =
-        const pp_statements
-          [ p0; "CAMLlocal2(cli, cons)"; "cli = Val_emptylist" ]
+        const pp_statements [ p0; l2 "cli" "cons"; "cli = Val_emptylist" ]
         ++ cut ++ loop ++ cut
         ++ const pp_statements [ return_val "cli" ]
       in
@@ -474,7 +473,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
         const pp_statements
           [
             p0;
-            "CAMLlocal1(v)";
+            l1 "v";
             Fmt.str "v = %a(x)" Identifier.pp (to_caml_name_for_c c);
             return_val "v";
           ]
