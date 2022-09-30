@@ -145,7 +145,8 @@ payload_variant payload_variant_of_caml(value v) {
         res.payload->someint = int_of_caml(Field(v, 0));
         break;
       case 1:
-        res.payload->a_pair = tuple_int_string_of_caml(v);
+        res.payload->a_pair.t0 = int_of_caml(Field(v, 0));
+        res.payload->a_pair.t1 = string_of_caml(Field(v, 1));
         break;
     }
   }

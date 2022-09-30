@@ -72,11 +72,13 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
        fun fmt (i, (field_name, c)) ->
         let stmts =
           match c with
-          | Atom (_, Some (Tuple _)) ->
-            [
-              Fmt.str "res.payload->%a = %a(v)" Identifier.pp field_name
-                Identifier.pp (of_caml_name_for_c c);
-            ]
+          (* FIXME: do not use a function on the tuple *)
+          | Atom (_, Some (Tuple members)) ->
+            members
+            |> List.mapi ~f:(fun field_idx c ->
+                   Fmt.str "res.payload->%a.t%d = %a(Field(v, %d))"
+                     Identifier.pp field_name field_idx Identifier.pp
+                     (of_caml_name_for_c c) field_idx)
           | Struct { fields } ->
             fields
             |> List.mapi ~f:(fun i (inline_field_name, field_c) ->
