@@ -65,6 +65,10 @@ external string_option_record_rt_id :
   string_option_record -> string_option_record
   = "sch_string_option_record_rt_id"
 
+external tuple_int_string_alias_rt_id :
+  tuple_int_string_alias -> tuple_int_string_alias
+  = "sch_tuple_int_string_alias_rt_id"
+
 external poly_basic_rt_id : poly_basic -> poly_basic = "sch_poly_basic_rt_id"
 
 external poly_payload_rt_id : poly_payload -> poly_payload
@@ -113,6 +117,15 @@ module Tests = struct
     let new_x = basic_variant_rt_id x in
     let t = Alcotest.testable pp_basic_variant equal_basic_variant in
     test t new_x x
+
+  let tuple_int_string_alias () =
+    let t =
+      Alcotest.testable pp_tuple_int_string_alias equal_tuple_int_string_alias
+    in
+    [ (214432, "zdqzd"); (-2443, "") ]
+    |> List.iter (fun x ->
+           let new_x = tuple_int_string_alias_rt_id x in
+           test t new_x x)
 
   let payload_variant_plain () =
     let x = Nothing3 in
@@ -365,5 +378,6 @@ let () =
             test_case "evil defaults" `Quick evil_defaults;
             test_case "ultra generic" `Quick ultra_generic;
             test_case "with computed" `Quick with_computed;
+            test_case "tuple_int_string_alias" `Quick tuple_int_string_alias;
           ] );
     ]

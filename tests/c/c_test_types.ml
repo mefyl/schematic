@@ -188,3 +188,5 @@ type with_computed = { non_computed : int }
 [@@schematic.computed { comp : int = 32 }]
 [@@deriving schema, show, eq]
 [@@boxed]
+
+type tuple_int_string_alias = int * string [@@deriving schema, show, eq]

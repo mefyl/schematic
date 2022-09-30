@@ -1,6 +1,8 @@
 open C_runtime
 open C_pp
 
+let poly_compare_symbol = "caml_poly_compare"
+
 (* TODO: include guards *)
 
 let headers =

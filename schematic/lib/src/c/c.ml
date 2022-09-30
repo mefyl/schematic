@@ -4,9 +4,9 @@ include C_schemas
 module Runtime = C_runtime
 module Builtins = C_builtins
 
-let export (name, c) : c_gen =
+let export ?safety_checks (name, c) : c_gen =
   let open Fmt in
-  let of_caml, to_caml = C_conv.converters name c in
+  let of_caml, to_caml = C_conv.converters ?safety_checks name c in
   { name; type_expr = const C_typeexpr.pp c; to_caml; of_caml }
 
 let typedef_src { name; type_expr; _ } =
@@ -55,7 +55,7 @@ let roundtrip_src (name, c) =
 let export_schemas ?(safety_checks = false) (schemas : Schema.pack list) =
   let nl_concat = String.concat ~sep:"\n" in
   let ctypes = of_schemas schemas in
-  let cgens = ctypes |> List.map ~f:export in
+  let cgens = ctypes |> List.map ~f:(export ~safety_checks) in
   let user_declarations, user_impls =
     let typedefs = cgens |> List.map ~f:typedef_src |> nl_concat in
     let signatures, impls =
@@ -73,7 +73,15 @@ let export_schemas ?(safety_checks = false) (schemas : Schema.pack list) =
   (* Would be nice to generate signature for the roundtrip functions too, though
      that isn't strictly needed. *)
   let statics =
-    if safety_checks then cgens |> List.map ~f:statics_src |> nl_concat else ""
+    if safety_checks then
+      let per_type_statics = cgens |> List.map ~f:statics_src |> nl_concat in
+      nl_concat
+        [
+          Fmt.str "static const value* %s = NULL;"
+            C_builtins.poly_compare_symbol;
+          per_type_statics;
+        ]
+    else ""
   in
   let rts = ctypes |> List.map ~f:roundtrip_src |> nl_concat in
   (* TODO include declaration file *)

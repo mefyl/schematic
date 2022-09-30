@@ -246,25 +246,35 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
     | Void ->
       failwith "Void may not be instantiated, and therefore cannot be converted"
   in
+  let fname = name |> of_caml_name_for in
+  let argname = "v" in
   let safety_checks =
     if safety_checks then
       let checking, checked = checking_checked_for name in
+      (* FIXME: clean up this horror. A template string ppx maybe? *)
       Fmt.str
-        "if (!%s && !%s) {\n\
+        "if (!%s && !(%s)) {\n\
         \    %s = true;\n\
-        \    // TODO add structural equality assertion\n\
-        \    %s = true;\n\
-        \  }" checking checked checking checked
+        \    if (%s == NULL) {\n\
+        \      %s = caml_named_value(\"%s\");\n\
+        \    }\n\
+        \     printf(\"checking type %a\\n\");\n\
+        \     assert(Bool_val(caml_callback2(*%s, %a(%a(%s)), %s))); \n\
+        \    %s = true; \n\
+        \    %s = false;\n\
+         }"
+        checking checked checking C_builtins.poly_compare_symbol
+        C_builtins.poly_compare_symbol C_runtime.poly_cmp_callback_name
+        Identifier.pp name C_builtins.poly_compare_symbol Identifier.pp
+        (name |> to_caml_name_for) Identifier.pp fname argname argname checked
+        checking
     else ""
   in
   let body = const string safety_checks ++ body in
   let return_type =
     match kind with `Pointer -> ptr_type | `Plain -> Identifier.to_string name
   in
-  let decl =
-    signature ~return_type ~fname:(name |> of_caml_name_for) ~argtype:"value"
-      ~argname:"v"
-  in
+  let decl = signature ~return_type ~fname ~argtype:"value" ~argname in
   { signature = decl; impl = body }
 
 let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
@@ -494,5 +504,6 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
 
 (* TODO: generate *_free() functions *)
 
-let converters name ast =
-  (pp_of_caml_converter (name, ast), pp_to_caml_converter (name, ast))
+let converters ?(safety_checks = false) name ast =
+  ( pp_of_caml_converter ~safety_checks (name, ast),
+    pp_to_caml_converter (name, ast) )
