@@ -54,7 +54,7 @@ let roundtrip_src (name, c) =
     consumers of this function. *)
 let export_schemas ?(safety_checks = false) (schemas : Schema.pack list) =
   let nl_concat = String.concat ~sep:"\n" in
-  let ctypes = of_schemas schemas |> fst in
+  let ctypes = of_schemas schemas in
   let cgens = ctypes |> List.map ~f:export in
   let user_declarations, user_impls =
     let typedefs = cgens |> List.map ~f:typedef_src |> nl_concat in

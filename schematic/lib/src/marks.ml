@@ -101,4 +101,48 @@ module Make (S : MARK) = struct
       in
       let l, marks = Marks.fold ~init:([], marks) ~f deps in
       (l @ leaf, marks)
+
+  module Make_mark_converter (M : sig
+    val of_descriptor :
+      string option -> 'a Schema_intf.descriptor -> S.t * Marks.t
+
+    val of_parametric : 'a Schema_intf.parametric -> S.t * Marks.t
+  end) =
+  struct
+    let mark_of_schema Schema.{ id; descriptor; parametric } =
+      match parametric with
+      | None ->
+        (Option.value_exn ~here:[%here] id, lazy (M.of_descriptor id descriptor))
+      | Some parametric ->
+        (Option.value_exn ~here:[%here] id, lazy (M.of_parametric parametric))
+
+    let of_schema marks s = of_mark marks @@ mark_of_schema s
+
+    let unpacker marks =
+      let unpack : type a. a Schema.t -> (S.Id.t * S.t) list * Marks.t =
+       fun s -> of_schema marks s
+      in
+      { Schema.unpack }
+
+    let of_schemas_state marks schemas =
+      let f (res, marks) s =
+        let ts, marks = Schema.unpack (unpacker marks) s in
+        (res @ ts, marks)
+      in
+      List.fold_left ~init:([], marks) ~f schemas
+
+    type state = Marks.t
+
+    let state_empty = Marks.empty
+
+    let state_exclude schemas =
+      Marks.of_list
+        (List.map ~f:(Schema.unpack { unpack = mark_of_schema }) schemas)
+
+    let of_schemas ?(exclude = []) schemas =
+      let marks = state_exclude exclude in
+      of_schemas_state marks schemas |> fst
+
+    let of_schema schema = of_schema Marks.empty schema |> fst
+  end
 end

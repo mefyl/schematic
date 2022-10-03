@@ -158,34 +158,7 @@ module Of = C_walk.Walk (struct
     schema (Some "date") None s
 end)
 
-(* XXX: copied from TypeScript, might be generalizable? *)
-let mark_of_schema Schema.{ id; descriptor; parametric } =
-  match parametric with
-  | None ->
-    (Option.value_exn ~here:[%here] id, lazy (Of.descriptor id descriptor))
-  | Some parametric ->
-    (Option.value_exn ~here:[%here] id, lazy (Of.parametric parametric))
-
-let of_schema marks s = of_mark marks (mark_of_schema s)
-
-let unpacker marks =
-  let unpack : type a. a Schema.t -> (Identifier.t * t) list * Marks.t =
-   fun s -> of_schema marks s
-  in
-  { Schema.unpack }
-
-let of_schemas_state marks schemas =
-  let f (res, marks) s =
-    let new_ts, marks = Schema.unpack (unpacker marks) s in
-    (res @ new_ts, marks)
-  in
-  List.fold_left ~init:([], marks) ~f schemas
-
-let of_schemas = of_schemas_state Marks.empty
-
-let of_schema schema =
-  of_schemas_state Marks.empty [ Schema.pack schema ] |> fst
-
-type state = Marks.t
-
-let state_empty = Marks.empty
+include Make_mark_converter (struct
+  let of_descriptor = Of.descriptor
+  let of_parametric = Of.parametric
+end)
