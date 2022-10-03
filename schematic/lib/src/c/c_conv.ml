@@ -39,13 +39,11 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         |> List.mapi ~f:(fun field_idx (field_name, field_type) ->
                Logs.debug (fun m -> m "field_type: %a\n" C_intf.pp field_type);
                let conv_fn = of_caml_name_for_c field_type in
-               Fmt.str "p->%a = %a(%s)" Identifier.pp field_name Identifier.pp
+               Fmt.str "res->%a = %a(%s)" Identifier.pp field_name Identifier.pp
                  conv_fn (field "v" field_idx))
       in
       let statements =
-        [ p1 "v"; Fmt.str "%s p = malloc(sizeof(*p))" ptr_type ]
-        @ field_stores
-        @ [ return_t ptr_type "p" ]
+        [ Fmt.str "%s res = malloc(sizeof(*res))" ptr_type ] @ field_stores
       in
       (`Pointer, const pp_statements statements)
       (* Plain-only regular variant *)
@@ -53,9 +51,8 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
       let pp =
         const pp_statements
           [
-            Fmt.str "%a x = Int_val(v)" Identifier.pp name;
-            Fmt.str "assert(x < %d)" (List.length basic);
-            "return x";
+            Fmt.str "%a res = Int_val(v)" Identifier.pp name;
+            Fmt.str "assert(res < %d)" (List.length basic);
           ]
       in
       (`Plain, pp)
@@ -119,14 +116,12 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
       let open Fmt in
       ( `Plain,
         vbox
-          (const pp_statements [ p1 "v"; Fmt.str "%a res" Identifier.pp name ]
+          (const pp_statements [ Fmt.str "%a res" Identifier.pp name ]
           ++ cut
           ++ vbox ~indent (const string "if (Is_long(v)) {" ++ cut ++ plain_case)
           ++ cut
           ++ vbox ~indent (const string "} else {" ++ cut ++ rich_case)
-          ++ cut ++ const char '}')
-        ++ cut
-        ++ const pp_statements [ return_t (Identifier.to_string name) "res" ] )
+          ++ cut ++ const char '}') )
     (* Polymorphic variant *)
     | Variant { basic; rich; hashes; _ } ->
       let basic_only = List.is_empty rich in
@@ -138,7 +133,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
             (basic
             |> List.map ~f:(fun id ->
                    let hash = get_hash id in
-                   let tag = if basic_only then "x" else "x.tag" in
+                   let tag = if basic_only then "res" else "res.tag" in
                    Fmt.str "else if (v == Val_long(%d)) %s = %a;" hash tag
                      Identifier.pp (case_name name id)))
         in
@@ -152,8 +147,8 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
               let body =
                 const pp_statements
                   [
-                    Fmt.str "x.tag = %a" Identifier.pp (case_name name id);
-                    Fmt.str "x.payload->%a = %a(Field(v, 1))" Identifier.pp id
+                    Fmt.str "res.tag = %a" Identifier.pp (case_name name id);
+                    Fmt.str "res.payload->%a = %a(Field(v, 1))" Identifier.pp id
                       Identifier.pp
                       (of_caml_name_for_c constr_c);
                   ]
@@ -167,7 +162,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
             const pp_statements
               [
                 "int tag = Field(v, 0)";
-                "x.payload = malloc(sizeof(*x.payload))";
+                "res.payload = malloc(sizeof(*res.payload))";
               ]
             ++ cut
             ++ (const string "if (0) {}" ++ cut ++ elses ++ cut
@@ -182,33 +177,31 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         ++ const string "else assert(0);"
       in
       let pp =
-        const pp_statements [ p1 "v"; Fmt.str "%a x" Identifier.pp name ]
-        ++ cut ++ if_else_chain ++ cut
-        ++ const pp_statements [ return_t (Identifier.to_string name) "x" ]
+        const pp_statements [ Fmt.str "%a res" Identifier.pp name ]
+        ++ cut ++ if_else_chain
       in
       (`Plain, pp)
     | Tuple members ->
       let tuptype = tuple_name members in
       let pp =
         const pp_statements
-        @@ [ p1 "v"; Fmt.str "%a res" Identifier.pp tuptype ]
+        @@ [ Fmt.str "%a res" Identifier.pp tuptype ]
         @ (members
           |> List.mapi ~f:(fun field_idx c ->
                  Fmt.str "res.t%d = %a(%s)" field_idx Identifier.pp
                    (of_caml_name_for_c c) (field "v" field_idx)))
-        @ [ return_t (Identifier.to_string tuptype) "res" ]
       in
       (`Plain, pp)
     | Array elem_type ->
       let length_while =
         braced ~indent "while (l != Val_emptylist)"
-          (const pp_statements [ Fmt.str "l = %s" (field "l" 1); "arr.len++" ])
+          (const pp_statements [ Fmt.str "l = %s" (field "l" 1); "res.len++" ])
       in
       let set_for =
-        braced ~indent "for (int64_t i = 0; i < arr.len; i++)"
+        braced ~indent "for (int64_t i = 0; i < res.len; i++)"
           (const pp_statements
              [
-               Fmt.str "arr.data[i] = %a(%s)" Identifier.pp
+               Fmt.str "res.data[i] = %a(%s)" Identifier.pp
                  (of_caml_name_for_c elem_type)
                  (field "l" 0);
                Fmt.str "l = %s" (field "l" 1);
@@ -217,18 +210,15 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
       let pp =
         const pp_statements
           [
-            p1 "v";
             l1 "l";
-            Fmt.str "%a arr = {.len = 0, .data = NULL}" Identifier.pp
+            Fmt.str "%a res = {.len = 0, .data = NULL}" Identifier.pp
               (array_name elem_type);
             "l = v";
           ]
         ++ cut ++ length_while ++ cut
         ++ const pp_statements
-             [ "l = v"; "arr.data = malloc(sizeof(*arr.data) * arr.len)" ]
-        ++ cut ++ set_for ++ cut
-        ++ const pp_statements
-             [ return_t (Identifier.to_string (array_name elem_type)) "arr" ]
+             [ "l = v"; "res.data = malloc(sizeof(*res.data) * res.len)" ]
+        ++ cut ++ set_for
       in
       (`Plain, pp)
     (* The considered type is merely an alias for another *)
@@ -236,15 +226,21 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
       let pp =
         const pp_statements
           [
-            p1 "v";
             Fmt.str "%a res = %a(v)" (C_typeexpr.pp ~indent) c Identifier.pp
               (of_caml_name_for_c c);
-            return_t (Identifier.to_string name) "res";
           ]
       in
       (`Plain, pp)
     | Void ->
       failwith "Void may not be instantiated, and therefore cannot be converted"
+  in
+  let return_type =
+    match kind with `Pointer -> ptr_type | `Plain -> Identifier.to_string name
+  in
+  let body =
+    const pp_statements [ p1 "v" ]
+    ++ cut ++ body ++ cut
+    ++ const pp_statements [ return_t return_type "res" ]
   in
   let fname = name |> of_caml_name_for in
   let argname = "v" in
@@ -284,9 +280,6 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
     else Fmt.nop
   in
   let body = const safety_checks () ++ body in
-  let return_type =
-    match kind with `Pointer -> ptr_type | `Plain -> Identifier.to_string name
-  in
   let decl = signature ~return_type ~fname ~argtype:"value" ~argname in
   { signature = decl; impl = body }
 

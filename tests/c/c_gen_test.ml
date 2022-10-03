@@ -15,10 +15,10 @@ let primitive_record_of_caml =
   {|
 primitive_record* primitive_record_of_caml(value v) {
   CAMLparam1(v);
-  primitive_record* p = malloc(sizeof(*p));
-  p->a = int_of_caml(Field(v, 0));
-  p->b = int_of_caml(Field(v, 1));
-  CAMLreturnT(primitive_record*, p);
+  primitive_record* res = malloc(sizeof(*res));
+  res->a = int_of_caml(Field(v, 0));
+  res->b = int_of_caml(Field(v, 1));
+  CAMLreturnT(primitive_record*, res);
 }
 |}
 
@@ -52,10 +52,10 @@ let wrapper_of_caml =
   {|
 wrapper* wrapper_of_caml(value v) {
   CAMLparam1(v);
-  wrapper* p = malloc(sizeof(*p));
-  p->somevar = int_of_caml(Field(v, 0));
-  p->r = primitive_record_of_caml(Field(v, 1));
-  CAMLreturnT(wrapper*, p);
+  wrapper* res = malloc(sizeof(*res));
+  res->somevar = int_of_caml(Field(v, 0));
+  res->r = primitive_record_of_caml(Field(v, 1));
+  CAMLreturnT(wrapper*, res);
 }
 |}
 
@@ -88,9 +88,10 @@ typedef enum {
 let basic_variant_of_caml =
   {|
 basic_variant basic_variant_of_caml(value v) {
-  basic_variant x = Int_val(v);
-  assert(x < 2);
-  return x;
+  CAMLparam1(v);
+  basic_variant res = Int_val(v);
+  assert(res < 2);
+  CAMLreturnT(basic_variant, res);
 }
 |}
 
@@ -257,10 +258,10 @@ let record_with_pair_alias_of_caml =
   {|
 record_with_pair_alias* record_with_pair_alias_of_caml(value v) {
   CAMLparam1(v);
-  record_with_pair_alias* p = malloc(sizeof(*p));
-  p->a = int_of_caml(Field(v, 0));
-  p->pair_alias = pair_alias_of_caml(Field(v, 1));
-  CAMLreturnT(record_with_pair_alias*, p);
+  record_with_pair_alias* res = malloc(sizeof(*res));
+  res->a = int_of_caml(Field(v, 0));
+  res->pair_alias = pair_alias_of_caml(Field(v, 1));
+  CAMLreturnT(record_with_pair_alias*, res);
 }
 |}
 
@@ -338,19 +339,19 @@ let int_array_of_caml =
 int_array int_array_of_caml(value v) {
   CAMLparam1(v);
   CAMLlocal1(l);
-  int_array arr = {.len = 0, .data = NULL};
+  int_array res = {.len = 0, .data = NULL};
   l = v;
   while (l != Val_emptylist) {
     l = Field(l, 1);
-    arr.len++;
+    res.len++;
   }
   l = v;
-  arr.data = malloc(sizeof(*arr.data) * arr.len);
-  for (int64_t i = 0; i < arr.len; i++) {
-    arr.data[i] = int_of_caml(Field(l, 0));
+  res.data = malloc(sizeof(*res.data) * res.len);
+  for (int64_t i = 0; i < res.len; i++) {
+    res.data[i] = int_of_caml(Field(l, 0));
     l = Field(l, 1);
   }
-  CAMLreturnT(int_array, arr);
+  CAMLreturnT(int_array, res);
 }
 |}
 
@@ -386,13 +387,13 @@ let poly_basic_of_caml =
   {|
 poly_basic poly_basic_of_caml(value v) {
   CAMLparam1(v);
-  poly_basic x;
+  poly_basic res;
   if (0) {}
-  else if (v == Val_long(65)) x = poly_basic_a;
-  else if (v == Val_long(66)) x = poly_basic_b;
-  else if (v == Val_long(67)) x = poly_basic_c;
+  else if (v == Val_long(65)) res = poly_basic_a;
+  else if (v == Val_long(66)) res = poly_basic_b;
+  else if (v == Val_long(67)) res = poly_basic_c;
   else assert(0);
-  CAMLreturnT(poly_basic, x);
+  CAMLreturnT(poly_basic, res);
 }
 |}
 
@@ -447,26 +448,26 @@ let poly_payload_of_caml =
   {|
 poly_payload poly_payload_of_caml(value v) {
   CAMLparam1(v);
-  poly_payload x;
+  poly_payload res;
   if (0) {}
-  else if (v == Val_long(65)) x.tag = poly_payload_a_tag;
-  else if (v == Val_long(66)) x.tag = poly_payload_b_tag;
+  else if (v == Val_long(65)) res.tag = poly_payload_a_tag;
+  else if (v == Val_long(66)) res.tag = poly_payload_b_tag;
   else if (Is_block(v)) {
     int tag = Field(v, 0);
-    x.payload = malloc(sizeof(*x.payload));
+    res.payload = malloc(sizeof(*res.payload));
     if (0) {}
     else if (tag == Val_long(-306849112)) {
-      x.tag = poly_payload_single_tag;
-      x.payload->single = int_of_caml(Field(v, 1));
+      res.tag = poly_payload_single_tag;
+      res.payload->single = int_of_caml(Field(v, 1));
     }
     else if (tag == Val_long(726928360)) {
-      x.tag = poly_payload_tuple_tag;
-      x.payload->tuple = tuple_int_string_of_caml(Field(v, 1));
+      res.tag = poly_payload_tuple_tag;
+      res.payload->tuple = tuple_int_string_of_caml(Field(v, 1));
     }
     else assert(0);
   }
   else assert(0);
-  CAMLreturnT(poly_payload, x);
+  CAMLreturnT(poly_payload, res);
 }
 |}
 
