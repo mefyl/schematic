@@ -66,8 +66,10 @@ let roundtrip_for = Fmt.str "sch_%a_rt_id" Identifier.pp
 let of_caml_name_for_c = Fn.compose of_caml_name_for c_typename
 let to_caml_name_for_c = Fn.compose to_caml_name_for c_typename
 
-let case_name variant_name constr_name =
-  Fmt.str "%s_%s_tag" variant_name constr_name
+let case_name ~rich variant_name constr_name =
+  let suffix = if rich then "_tag" else "" in
+  Fmt.str "%a_%a%s" Identifier.pp variant_name Identifier.pp constr_name suffix
+  |> Identifier.make
 
 let rec concrete_type = function
   | Atom (_, Some t) -> concrete_type t

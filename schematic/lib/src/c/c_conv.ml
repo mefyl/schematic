@@ -130,7 +130,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
     (* Polymorphic variant *)
     | Variant { basic; rich; hashes; _ } ->
       let basic_only = List.is_empty rich in
-      let tag_suffix = if basic_only then "" else "_tag" in
+      let case_name = case_name ~rich:(not basic_only) in
       let get_hash = List.Assoc.find_exn hashes ~equal:Identifier.equal in
       let elses =
         let basic =
@@ -139,8 +139,8 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
             |> List.map ~f:(fun id ->
                    let hash = get_hash id in
                    let tag = if basic_only then "x" else "x.tag" in
-                   Fmt.str "else if (v == Val_long(%d)) %s = %a_%a%s;" hash tag
-                     Identifier.pp name Identifier.pp id tag_suffix))
+                   Fmt.str "else if (v == Val_long(%d)) %s = %a;" hash tag
+                     Identifier.pp (case_name name id)))
         in
         if basic_only then basic
         else
@@ -152,8 +152,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
               let body =
                 const pp_statements
                   [
-                    Fmt.str "x.tag = %a_%a_tag" Identifier.pp name Identifier.pp
-                      id;
+                    Fmt.str "x.tag = %a" Identifier.pp (case_name name id);
                     Fmt.str "x.payload->%a = %a(Field(v, 1))" Identifier.pp id
                       Identifier.pp
                       (of_caml_name_for_c constr_c);
@@ -366,8 +365,12 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
         let cases =
           basic_cases @ rich_cases
           |> List.map ~f:(fun (constr_name, contents) ->
-                 ( case_name (Identifier.to_string variant_name) constr_name,
-                   Some contents ))
+                 let case_name =
+                   case_name ~rich:true variant_name
+                     (Identifier.make constr_name)
+                   |> Identifier.to_string
+                 in
+                 (case_name, Some contents))
           |> cases ~indent
         in
         let switch = braced ~indent "switch (x.tag)" cases in
@@ -379,16 +382,13 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
     | Variant { basic; rich; hashes; _ } ->
       let basic_only = List.is_empty rich in
       let get_hash = List.Assoc.find_exn hashes ~equal:Identifier.equal in
-      let case_name id =
-        let tag_suffix = if basic_only then "" else "_tag" in
-        Fmt.str "%a_%a%s" Identifier.pp name Identifier.pp id tag_suffix
-      in
+      let case_name = case_name ~rich:(not basic_only) in
       let cases =
         let basic =
           basic
           |> List.map ~f:(fun id ->
                  let hash = get_hash id in
-                 let case = case_name id in
+                 let case = case_name name id |> Identifier.to_string in
                  let contents =
                    const pp_statements
                      [ Fmt.str "v = Val_long(%d)" hash; "break" ]
@@ -399,7 +399,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
           rich
           |> List.map ~f:(fun (id, constr_c) ->
                  let hash = get_hash id in
-                 let case = case_name id in
+                 let case = case_name name id |> Identifier.to_string in
                  let c_pl = Fmt.str "x.payload->%a" Identifier.pp id in
                  let payload_val =
                    Fmt.str "%a(%s)" Identifier.pp
@@ -468,7 +468,6 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
         ++ cut ++ loop ++ cut
         ++ const pp_statements [ return_val "cli" ]
       in
-
       ("arr", `Plain, pp)
     | (Atom _ | String) as c ->
       let pp =

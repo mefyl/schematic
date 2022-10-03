@@ -4,6 +4,7 @@ type t = Id of string [@@deriving eq, ord, hash]
 
 let reserved_typenames = [ "time"; "id" ]
 
+(* This is assumed to be idempotent. *)
 let make s =
   if List.mem reserved_typenames s ~equal:String.equal then Id (s ^ "_")
   else

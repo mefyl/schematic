@@ -21,17 +21,14 @@ let pp ?(indent = 2) fmt ts =
         let is_basic = List.is_empty rich in
         (* An enum declaring each constructor of the variant. *)
         let enum =
-          let variant_names =
-            (basic |> List.map ~f:Identifier.to_string)
-            @ List.map ~f:(Fn.compose Identifier.to_string fst) rich
-          in
-          let tag_suffix = if is_basic then "" else "_tag" in
+          let variant_names = basic @ List.map ~f:fst rich in
           braced ~indent "enum"
             (const
                (list
                   ~sep:(const char ',' ++ cut)
                   (fun fmt s ->
-                    Fmt.fmt "%a_%s%s" fmt Identifier.pp name s tag_suffix))
+                    Fmt.fmt "%a" fmt Identifier.pp
+                      (case_name ~rich:(not is_basic) name s)))
                variant_names)
         in
         let printer =
