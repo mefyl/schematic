@@ -253,16 +253,18 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
       let checking, checked = checking_checked_for name in
       (* FIXME: clean up this horror. A template string ppx maybe? *)
       Fmt.str
-        "if (!%s && !(%s)) {\n\
-        \    %s = true;\n\
-        \    if (%s == NULL) {\n\
-        \      %s = caml_named_value(\"%s\");\n\
-        \    }\n\
-        \     printf(\"checking type %a\\n\");\n\
-        \     assert(Bool_val(caml_callback2(*%s, %a(%a(%s)), %s))); \n\
-        \    %s = true; \n\
-        \    %s = false;\n\
-         }"
+        {|
+        if (!%s && !(%s)) {
+          %s = true;
+          if (%s == NULL) {
+            %s = caml_named_value("%s");
+          }
+          printf("checking type %a\n");
+          assert(Bool_val(caml_callback2(*%s, %a(%a(%s)), %s)));
+          %s = true;
+          %s = false;
+        }
+        |}
         checking checked checking C_builtins.poly_compare_symbol
         C_builtins.poly_compare_symbol C_runtime.poly_cmp_callback_name
         Identifier.pp name C_builtins.poly_compare_symbol Identifier.pp
