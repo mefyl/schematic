@@ -14,7 +14,7 @@ let json_string_of_value (v : Ezjsonm.value) : string =
 let json_string_to_value (s : string) : Ezjsonm.value =
   Ezjsonm.value_from_string s
 
-let register_callbacks () =
+let register_static_callbacks () =
   (* This callbacks are meant to be invoked by our bundled runtime. *)
   Stdlib.Callback.register json_of_value_callback_name json_string_of_value;
   Stdlib.Callback.register json_to_value_callback_name json_string_to_value;
