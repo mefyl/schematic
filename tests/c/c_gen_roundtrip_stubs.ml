@@ -39,6 +39,7 @@ let schemas =
     Schema.pack poly_payload_schema;
     Schema.pack evil_defaults_schema;
     Schema.pack reified_ultra_generic_schema;
+    Schema.pack with_computed_schema;
   ]
 
 let () =

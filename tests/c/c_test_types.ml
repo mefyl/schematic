@@ -183,3 +183,8 @@ type reified_ultra_generic =
 
 let reified_ultra_generic_schema : reified_ultra_generic Schema.t =
   ultra_generic_schema int_schema reified_parametric_record_schema string_schema
+
+type with_computed = { non_computed : int }
+[@@schematic.computed { comp : int = 32 }]
+[@@deriving schema, show, eq]
+[@@boxed]

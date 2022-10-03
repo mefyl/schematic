@@ -77,18 +77,9 @@ module Of = C_walk.Walk (struct
 
   let fields_empty () = ([], Marks.empty)
 
-  let field :
-      type a b.
-      string -> (a, b) Schema_intf.requirement -> t -> fields -> fields =
-   fun name requirement (ast, marks) (rest_ast, rest_marks) ->
-    let ast, marks =
-      match requirement with
-      | Computed_optional | Optional -> nullable (ast, marks)
-      | Required | Default _ -> (ast, marks)
-      | Computed ->
-        (* TODO: skip over the field instead of failing *)
-        failwith "unhandled computed property"
-    in
+  let field : string -> required:bool -> t -> fields -> fields =
+   fun name ~required (ast, marks) (rest_ast, rest_marks) ->
+    let ast, marks = if required then (ast, marks) else nullable (ast, marks) in
     let marks = Marks.merge [ marks; rest_marks ] in
     ((name, ast) :: rest_ast, marks)
 

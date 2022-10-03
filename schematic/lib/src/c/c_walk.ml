@@ -31,7 +31,7 @@ module type WALK = sig
   val fields_empty : unit -> fields
 
   (** [field name required t rest]*)
-  val field : string -> (_, _) requirement -> t -> fields -> fields
+  val field : string -> required:bool -> t -> fields -> fields
 
   val object_ : fields -> t
 
@@ -146,10 +146,13 @@ module Walk (W : WALK) = struct
               _;
             };
           rest;
-        } ->
+        } -> (
       let rest = fields rest
       and schema = schema s in
-      W.field name requirement schema rest
+      match requirement with
+      | Computed | Computed_optional -> rest
+      | Optional -> W.field name ~required:false schema rest
+      | Required | Default _ -> W.field name ~required:true schema rest)
 
   and tuple : type t. t tuple -> W.t list = function
     | ItemEnd -> []

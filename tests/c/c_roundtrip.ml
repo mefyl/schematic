@@ -77,6 +77,9 @@ external reified_ultra_generic_rt_id :
   reified_ultra_generic -> reified_ultra_generic (* FIXME: this is wrong *)
   = "sch_string_wrapper_parametric_record_ultra_generic_rt_id"
 
+external with_computed_rt_id : with_computed -> with_computed
+  = "sch_with_computed_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -311,6 +314,13 @@ module Tests = struct
         (equal_ultra_generic Int.equal equal_reified_param equal_string_wrapper)
     in
     test t new_x x
+
+  let with_computed () =
+    let t = Alcotest.testable pp_with_computed equal_with_computed in
+    [ { non_computed = 4243 } ]
+    |> List.iter (fun x ->
+           let new_x = with_computed_rt_id x in
+           test t new_x x)
 end
 
 let () =
@@ -354,5 +364,6 @@ let () =
             test_case "payload polymorphic variant" `Quick poly_payload;
             test_case "evil defaults" `Quick evil_defaults;
             test_case "ultra generic" `Quick ultra_generic;
+            test_case "with computed" `Quick with_computed;
           ] );
     ]
