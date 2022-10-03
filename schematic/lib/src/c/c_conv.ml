@@ -250,29 +250,40 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
   let argname = "v" in
   let safety_checks =
     if safety_checks then
+      let open Fmt in
       let checking, checked = checking_checked_for name in
-      (* FIXME: clean up this horror. A template string ppx maybe? *)
-      Fmt.str
-        {|
-        if (!%s && !(%s)) {
-          %s = true;
-          if (%s == NULL) {
-            %s = caml_named_value("%s");
-          }
-          printf("checking type %a\n");
-          assert(Bool_val(caml_callback2(*%s, %a(%a(%s)), %s)));
-          %s = true;
-          %s = false;
-        }
-        |}
-        checking checked checking C_builtins.poly_compare_symbol
-        C_builtins.poly_compare_symbol C_runtime.poly_cmp_callback_name
-        Identifier.pp name C_builtins.poly_compare_symbol Identifier.pp
-        (name |> to_caml_name_for) Identifier.pp fname argname argname checked
-        checking
-    else ""
+      let main_if =
+        let if_cond = Fmt.str "if (!(%s || %s))" checking checked in
+        let body =
+          let if_inner =
+            braced ~indent
+              (Fmt.str "if (%s == NULL)" C_builtins.poly_compare_symbol)
+              (const pp_statements
+                 [
+                   Fmt.str {|%s = caml_named_value("%s")|}
+                     C_builtins.poly_compare_symbol
+                     C_runtime.poly_cmp_callback_name;
+                 ])
+          in
+          const pp_statements [ Fmt.str "%s = true" checking ]
+          ++ cut ++ if_inner ++ cut
+          ++ const pp_statements
+               [
+                 Fmt.str {|printf("checking type %a\n")|} Identifier.pp name;
+                 Fmt.str "assert(Bool_val(caml_callback2(*%s, %a(%a(%s)), %s)))"
+                   C_builtins.poly_compare_symbol Identifier.pp
+                   (name |> to_caml_name_for) Identifier.pp fname argname
+                   argname;
+                 Fmt.str "%s = true" checked;
+                 Fmt.str "%s = false" checking;
+               ]
+        in
+        braced ~indent if_cond body
+      in
+      main_if ++ cut
+    else Fmt.nop
   in
-  let body = const string safety_checks ++ body in
+  let body = const safety_checks () ++ body in
   let return_type =
     match kind with `Pointer -> ptr_type | `Plain -> Identifier.to_string name
   in
