@@ -25,13 +25,6 @@
  (action
   (run %{dep:c_gen_roundtrip_stubs.exe} %{targets})))
 
-; (rule
-;  (deps c_roundtrip_stubs.c)
-;  (target c_roundtrip_stubs.o)
-;  (action
-;   (progn
-;    (run gcc -c -I %{ocaml_where} c_roundtrip_stubs.c -o %{target}))))
-
 (test
  (name c_roundtrip)
  (package schematic)
