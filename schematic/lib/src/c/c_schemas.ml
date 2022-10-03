@@ -1,8 +1,6 @@
 open Base
 include C_intf
 
-(* XXX: legacy, need to review & test identifier conversion *)
-
 include Marks.Make (struct
   type t = c
 

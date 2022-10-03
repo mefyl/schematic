@@ -33,15 +33,13 @@ type c_gen = {
 
 open Base
 
-(* XXX: tuples of tuples - name conflicts? *)
-
 let rec c_typename : c -> Identifier.t = function
   | String -> Identifier.make "string"
   | Atom (s, _) -> s
   | Tuple members -> tuple_name members
   | Array t -> array_name t
   | Variant { name; _ } -> name
-  (* Fallback: hash the structure of the type. *)
+  (* Fallback: hash the physical structure of the type. *)
   | c -> Identifier.make (Fmt.str "_sch_%d" (hash c))
 
 and tuple_name items =

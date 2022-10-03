@@ -1,10 +1,5 @@
 open Base
 include C_intf
-
-(* End of shameless copy *)
-
-(* XXX: Butchering the boxing logic while I learn it. *)
-
 include C_schemas
 module Runtime = C_runtime
 module Builtins = C_builtins
@@ -33,9 +28,10 @@ let roundtrip_src (name, c) =
   let open Fmt in
   let open C_pp in
   (* Bit of a hack... *)
-  let c = Atom (name, Some c) in
-  let typ = Fmt.to_to_string C_typeexpr.pp c in
-
+  let typ =
+    let c = Atom (name, Some c) in
+    Fmt.to_to_string C_typeexpr.pp c
+  in
   let decl = Fmt.str "CAMLprim value %s(value v)" (roundtrip_for name) in
   let body =
     const pp_statements
@@ -51,18 +47,15 @@ let roundtrip_src (name, c) =
   let pp = braced ~indent:2 decl body in
   Fmt.to_to_string pp ()
 
-(** Returns (header file content) * (implementation file content)
+(** Returns (header file content) * (implementation file content).
 
-    XXX: need to include header in impl! *)
-
-(* TODO: static for unexported symbols? *)
+    Please note: the implementation has no `#include "..."` for the header file,
+    since its name and location are not yet determined. It must be added by
+    consumers of this function. *)
 let export_schemas ?(safety_checks = false) (schemas : Schema.pack list) =
   let nl_concat = String.concat ~sep:"\n" in
-
   let ctypes = of_schemas schemas |> fst in
-
   let cgens = ctypes |> List.map ~f:export in
-
   let user_declarations, user_impls =
     let typedefs = cgens |> List.map ~f:typedef_src |> nl_concat in
     let signatures, impls =
@@ -76,19 +69,16 @@ let export_schemas ?(safety_checks = false) (schemas : Schema.pack list) =
     let impls = List.concat impls |> nl_concat in
     ([ typedefs; signatures ] |> nl_concat, impls)
   in
-
   let header_file_contents = Builtins.declarations ^ user_declarations in
-
-  (* TODO: gen roundtrip signatures too *)
+  (* Would be nice to generate signature for the roundtrip functions too, though
+     that isn't strictly needed. *)
   let statics =
     if safety_checks then cgens |> List.map ~f:statics_src |> nl_concat else ""
   in
   let rts = ctypes |> List.map ~f:roundtrip_src |> nl_concat in
-
   (* TODO include declaration file *)
   let c_file_contents =
     [ Builtins.implementations; statics; rts; user_impls ]
     |> String.concat ~sep:"\n\n"
   in
-
   (header_file_contents, c_file_contents)

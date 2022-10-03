@@ -3,8 +3,6 @@ open C_intf
 open C_pp
 open C_statements
 
-(* TODO: prefixes *)
-
 let force_newline fmt _ = Caml.Format.pp_force_newline fmt ()
 
 let signature ~return_type ~fname ~argtype ~argname =
@@ -104,7 +102,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
             ++ cut
             ++ const (list ~sep:cut case)
                  (rich
-                 (* XXX: this must exist already? :( )*)
+                 (* This function must exist already? :( *)
                  |> List.mapi ~f:(fun i x -> (i, x))))
           ++ cut ++ const char '}'
         in
