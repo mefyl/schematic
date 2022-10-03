@@ -18,7 +18,5 @@ let register_callbacks () =
   (* This callbacks are meant to be invoked by our bundled runtime. *)
   Stdlib.Callback.register json_of_value_callback_name json_string_of_value;
   Stdlib.Callback.register json_to_value_callback_name json_string_to_value;
-  Stdlib.Callback.register poly_cmp_callback_name
-    (* (Poly.( = ) : 'a -> 'a -> bool) *)
-    eq;
+  Stdlib.Callback.register poly_cmp_callback_name eq;
   ()
