@@ -30,7 +30,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
     ((name : Identifier.t), ast) =
   let open Fmt in
   let ptr_type = ptr_type (Identifier.to_string name) in
-  let kind, (body : unit Fmt.t) =
+  let kind, caml_locals, (body : unit Fmt.t) =
     let open C_statements in
     match ast with
     | Struct { fields } ->
@@ -45,7 +45,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
       let statements =
         [ Fmt.str "%s res = malloc(sizeof(*res))" ptr_type ] @ field_stores
       in
-      (`Pointer, const pp_statements statements)
+      (`Pointer, [], const pp_statements statements)
       (* Plain-only regular variant *)
     | Variant { basic; rich = []; hashes = []; _ } ->
       let pp =
@@ -55,7 +55,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
             Fmt.str "assert(res < %d)" (List.length basic);
           ]
       in
-      (`Plain, pp)
+      (`Plain, [], pp)
       (* Regular variant with payloads *)
     | Variant { basic; rich; hashes = []; _ } ->
       let plain_case =
@@ -115,6 +115,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
       in
       let open Fmt in
       ( `Plain,
+        [],
         vbox
           (const pp_statements [ Fmt.str "%a res" Identifier.pp name ]
           ++ cut
@@ -168,7 +169,6 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
             ++ (const string "if (0) {}" ++ cut ++ elses ++ cut
                ++ const string "else assert(0);")
           in
-
           let rich = braced ~indent "else if (Is_block(v))" body in
           basic ++ cut ++ rich
       in
@@ -180,7 +180,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         const pp_statements [ Fmt.str "%a res" Identifier.pp name ]
         ++ cut ++ if_else_chain
       in
-      (`Plain, pp)
+      (`Plain, [], pp)
     | Tuple members ->
       let tuptype = tuple_name members in
       let pp =
@@ -191,7 +191,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
                  Fmt.str "res.t%d = %a(%s)" field_idx Identifier.pp
                    (of_caml_name_for_c c) (field "v" field_idx)))
       in
-      (`Plain, pp)
+      (`Plain, [], pp)
     | Array elem_type ->
       let length_while =
         braced ~indent "while (l != Val_emptylist)"
@@ -210,7 +210,6 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
       let pp =
         const pp_statements
           [
-            l1 "l";
             Fmt.str "%a res = {.len = 0, .data = NULL}" Identifier.pp
               (array_name elem_type);
             "l = v";
@@ -220,7 +219,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
              [ "l = v"; "res.data = malloc(sizeof(*res.data) * res.len)" ]
         ++ cut ++ set_for
       in
-      (`Plain, pp)
+      (`Plain, [ "l" ], pp)
     (* The considered type is merely an alias for another *)
     | (Atom _ | String) as c ->
       let pp =
@@ -230,56 +229,63 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
               (of_caml_name_for_c c);
           ]
       in
-      (`Plain, pp)
+      (`Plain, [], pp)
     | Void ->
       failwith "Void may not be instantiated, and therefore cannot be converted"
   in
   let return_type =
     match kind with `Pointer -> ptr_type | `Plain -> Identifier.to_string name
   in
-  let body =
-    const pp_statements [ p1 "v" ]
-    ++ cut ++ body ++ cut
-    ++ const pp_statements [ return_t return_type "res" ]
-  in
   let fname = name |> of_caml_name_for in
   let argname = "v" in
-  let safety_checks =
-    if safety_checks then
-      let open Fmt in
-      let checking, checked = checking_checked_for name in
-      let main_if =
-        let if_cond = Fmt.str "if (!(%s || %s))" checking checked in
-        let body =
-          let if_inner =
-            braced ~indent
-              (Fmt.str "if (%s == NULL)" C_builtins.poly_compare_symbol)
-              (const pp_statements
+  let body =
+    let safety_checks =
+      if safety_checks then
+        let open Fmt in
+        let checking, checked = checking_checked_for name in
+        let main_if =
+          let if_cond = Fmt.str "if (!(%s || %s))" checking checked in
+          let body =
+            let if_inner =
+              braced ~indent
+                (Fmt.str "if (%s == NULL)" C_builtins.poly_compare_symbol)
+                (const pp_statements
+                   [
+                     Fmt.str {|%s = caml_named_value("%s")|}
+                       C_builtins.poly_compare_symbol
+                       C_runtime.poly_cmp_callback_name;
+                   ])
+            in
+            const pp_statements [ Fmt.str "%s = true" checking ]
+            ++ cut ++ if_inner ++ cut
+            ++ const pp_statements
                  [
-                   Fmt.str {|%s = caml_named_value("%s")|}
-                     C_builtins.poly_compare_symbol
-                     C_runtime.poly_cmp_callback_name;
-                 ])
+                   Fmt.str {|printf("checking type %a\n")|} Identifier.pp name;
+                   Fmt.str
+                     "assert(Bool_val(caml_callback2(*%s, %a(%a(%s)), %s)))"
+                     C_builtins.poly_compare_symbol Identifier.pp
+                     (name |> to_caml_name_for) Identifier.pp fname argname
+                     argname;
+                   Fmt.str "%s = true" checked;
+                   Fmt.str "%s = false" checking;
+                 ]
           in
-          const pp_statements [ Fmt.str "%s = true" checking ]
-          ++ cut ++ if_inner ++ cut
-          ++ const pp_statements
-               [
-                 Fmt.str {|printf("checking type %a\n")|} Identifier.pp name;
-                 Fmt.str "assert(Bool_val(caml_callback2(*%s, %a(%a(%s)), %s)))"
-                   C_builtins.poly_compare_symbol Identifier.pp
-                   (name |> to_caml_name_for) Identifier.pp fname argname
-                   argname;
-                 Fmt.str "%s = true" checked;
-                 Fmt.str "%s = false" checking;
-               ]
+          braced ~indent if_cond body
         in
-        braced ~indent if_cond body
-      in
-      main_if ++ cut
-    else Fmt.nop
+        main_if ++ cut
+      else Fmt.nop
+    in
+    (* TODO: factor this across of/to_caml *)
+    let caml_params = const pp_statements [ p1 "v" ] ++ cut in
+    let caml_locals =
+      match caml_locals with
+      | [] -> nop
+      | [ x ] -> const pp_statements [ l1 x ] ++ cut
+      | _ -> failwith "CAMLlocalN with n > 1 unsupported yet"
+    in
+    caml_params ++ caml_locals ++ const safety_checks () ++ body ++ cut
+    ++ const pp_statements [ return_t return_type "res" ]
   in
-  let body = const safety_checks () ++ body in
   let decl = signature ~return_type ~fname ~argtype:"value" ~argname in
   { signature = decl; impl = body }
 
