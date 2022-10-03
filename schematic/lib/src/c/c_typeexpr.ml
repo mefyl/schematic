@@ -42,20 +42,22 @@ let pp ?(indent = 2) fmt ts =
               const union_ rich ++ const string "* payload;"
             in
             let inner = tag_field ++ cut ++ payload_field in
-            (* Kind of a special case of struct... *)
             braced ~indent "struct" inner
         in
         printer fmt ()
+      in
+      let array =
+        (* We're not using the `struct_` formatter, on purpose. *)
+        braced ~indent "struct"
+          (const string "size_t len" ++ semi ++ pp ++ const string "* "
+         ++ const string "data;")
       in
       match ts with
       | Atom (s, Some (Struct _)) ->
         const string (Identifier.to_string s) ++ const char '*'
       | Atom (s, _) -> const string (Identifier.to_string s)
-      | Array t ->
-        (* We're not using the `struct_` formatter, on purpose. *)
-        braced ~indent "struct"
-          (const string "size_t len" ++ semi ++ const pp t ++ const string "* "
-         ++ const string "data;")
+      | Array t -> const array t
+      (* TODO: do a pass over const-correctness *)
       | String -> const string "const char*"
       | Struct { fields; _ } -> const struct_ fields
       (* Tuples are structs with types named according to their indices *)

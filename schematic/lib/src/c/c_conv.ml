@@ -125,7 +125,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
           ++ cut ++ const char '}')
         ++ cut
         ++ const pp_statements [ return_t (Identifier.to_string name) "res" ] )
-      (* Plain-only polymorphic variant*)
+    (* Polymorphic variant *)
     | Variant { basic; rich; hashes; _ } ->
       let basic_only = List.is_empty rich in
       let tag_suffix = if basic_only then "" else "_tag" in
@@ -176,7 +176,6 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
           let rich = braced ~indent "else if (Is_block(v))" body in
           basic ++ cut ++ rich
       in
-
       let if_else_chain =
         const string "if (0) {}" ++ cut ++ elses ++ cut
         ++ const string "else assert(0);"
@@ -230,7 +229,6 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         ++ const pp_statements
              [ return_t (Identifier.to_string (array_name elem_type)) "arr" ]
       in
-
       (`Plain, pp)
     (* The considered type is merely an alias for another *)
     | (Atom _ | String) as c ->

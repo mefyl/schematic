@@ -20,12 +20,11 @@ module Of = C_walk.Walk (struct
 
   (* Shallow primitive types *)
 
-  (* unit descriptors *)
   let ignore () = make "unit"
   let null = ignore
-  let string_const _s = (Void, Marks.empty)
 
-  (* Primitive types without indirection *)
+  (* Mainly used for individual union constructors *)
+  let string_const _s = (Void, Marks.empty)
   let int () = make "int"
   let bool () = make "bool"
 
@@ -36,12 +35,7 @@ module Of = C_walk.Walk (struct
   let int64 () = make "int64_t"
   let string () = (String, Marks.empty)
 
-  (* Some careful considerations to make here:
-
-     - Recursive data will most definitely need to use pointers.
-
-     - If we try to force the schema here and there is a cycle, we'll enter an
-     infinite loop. *)
+  (* This will recurse forever if given a recursive schema. *)
   let schema (id : string option) parametric s =
     Logs.debug (fun m -> m "id: %a\n@." Fmt.(option string) id);
     match parametric with
@@ -59,8 +53,10 @@ module Of = C_walk.Walk (struct
         (Atom (Identifier.make id, Some referenced_type), Marks.make id s))
 
   (* This could be optimized (null ptr optim), but this approach allows us to
-     simplify things *)
-  (* FIXME: we don't need different tags for each option specialization *)
+     simplify things
+
+     TODO: better representation, as we don't need different tags for each
+     option specialization. *)
   let nullable (c, marks) =
     let name = c_typename c |> Identifier.map ~f:(fun s -> s ^ "_option") in
     let s () =
@@ -79,7 +75,8 @@ module Of = C_walk.Walk (struct
 
   let field : string -> required:bool -> t -> fields -> fields =
    fun name ~required (ast, marks) (rest_ast, rest_marks) ->
-    let ast, marks = if required then (ast, marks) else nullable (ast, marks) in
+    let transform = if required then Fn.id else nullable in
+    let ast, marks = transform (ast, marks) in
     let marks = Marks.merge [ marks; rest_marks ] in
     ((name, ast) :: rest_ast, marks)
 

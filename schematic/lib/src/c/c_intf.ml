@@ -2,7 +2,7 @@ open Base
 module Identifier = C_identifier
 
 type t =
-  | Void  (** Zero-Sized Type *) (* TODO rename to Never *)
+  | Void
   | String  (** Native string *)
   | Array of t
   | Atom of Identifier.t * t option

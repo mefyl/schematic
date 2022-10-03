@@ -86,7 +86,7 @@ module Make (S : MARK) = struct
       pp f l
   end
 
-  (** [of_marks marks mark]*)
+  (** [of_marks marks mark] *)
   let rec of_mark marks mark : (S.Id.t * S.t) list * Marks.t =
     if Marks.has marks mark then ([], marks)
     else
