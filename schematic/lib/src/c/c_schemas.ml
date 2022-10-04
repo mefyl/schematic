@@ -134,7 +134,7 @@ module Of = C_walk.Walk (struct
     Lazy.force C_sanity_checks.ptime_local;
     tuple [ time (); int () ]
 
-  let any () = (Atom (Identifier.make "json", Some String), Marks.empty)
+  let any () = (Atom (Identifier.make "sch_json", Some String), Marks.empty)
 
   let date () =
     Lazy.force C_sanity_checks.date;
@@ -152,7 +152,7 @@ module Of = C_walk.Walk (struct
       in
       (Struct { fields }, Marks.empty)
     in
-    schema (Some "date") None s
+    schema (Some "sch_date") None s
 
   let mapped : string option -> t -> t =
    fun id (c, marks) ->

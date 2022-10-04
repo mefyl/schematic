@@ -32,7 +32,7 @@ let headers =
 (* FIXME: null byte handling *)
 let json_of_caml_builtin =
   {|
-json json_of_caml(value v) {
+sch_json sch_json_of_caml(value v) {
   CAMLparam1(v);
   CAMLlocal1(caml_json_string);
   static const value* f = NULL;
@@ -43,18 +43,16 @@ json json_of_caml(value v) {
   }
   caml_json_string = caml_callback(*f, v);
   const char* json_string = strdup(String_val(caml_json_string));
-  CAMLreturnT(json, json_string);
+  CAMLreturnT(sch_json, json_string);
 }
 |}
 
 let json_to_caml_builtin =
   {|
-value json_to_caml(const char* x) {
+value sch_json_to_caml(const char* x) {
   CAMLparam0();
   CAMLlocal1(v);
-  
   v = caml_copy_string(x);
-  
   static const value* f = NULL;
   if (f == NULL) {
 |}
@@ -69,7 +67,7 @@ value json_to_caml(const char* x) {
 
 let typedefs =
   {|
-typedef const char* json;
+typedef const char* sch_json;
 typedef int unit;
 
 
