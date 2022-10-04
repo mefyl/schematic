@@ -1043,7 +1043,7 @@ module Schema = struct
             else
               expanded_of_descriptor ~loc
                 [%expr
-                  Object { fields = FieldEnd; encode = Fn.id; decode = Fn.id }]
+                  Object { fields = FieldEnd; encode = (fun x -> x); decode = (fun x -> x) }]
           in
           (schema, None, None, None, None)
         | Some { ctor_pattern; ctor_value; pattern; type_; value; _ } ->
