@@ -12,7 +12,7 @@ module type MARK = sig
   end
 end
 
-module type FOO = sig
+module type V = sig
   type u
 
   include Comparable.S with type t = u
@@ -21,7 +21,7 @@ module type FOO = sig
 end
 
 module Make (S : MARK) = struct
-  module rec Mark : (FOO with type u = string * (S.t * Marks.t) Lazy.t) = struct
+  module rec Mark : (V with type u = string * (S.t * Marks.t) Lazy.t) = struct
     module T = struct
       type t = string * (S.t * Marks.t) Lazy.t
       type u = t
