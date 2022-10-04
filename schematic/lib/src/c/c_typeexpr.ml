@@ -62,6 +62,7 @@ let pp ?(indent = 2) fmt ts =
         let fields = tuple_fields types in
         const struct_ fields
       | Variant { name; basic; rich; _ } -> const variant (name, basic, rich)
+      | Mapped { front_facing } -> const pp front_facing
       | Void -> nop
     in
     printer fmt ()

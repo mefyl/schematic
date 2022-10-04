@@ -15,6 +15,8 @@ type t =
       hashes : (Identifier.t * int) list;
     }
   | Tuple of t list
+  | Mapped of { (* "serialized" type *)
+                front_facing : t }
 [@@deriving show, hash]
 
 type c = t
@@ -65,6 +67,15 @@ let roundtrip_for = Fmt.str "sch_%a_rt_id" Identifier.pp
 (* FIXME: this approach does not protect against collisions *)
 let of_caml_name_for_c = Fn.compose of_caml_name_for c_typename
 let to_caml_name_for_c = Fn.compose to_caml_name_for c_typename
+let value_name = Fmt.str "schematic_%s"
+let encode_name_for typ = Fmt.str "%s_encode" typ |> value_name
+let decode_name_for typ = Fmt.str "%s_decode" typ |> value_name
+
+let encode_name_for_c c =
+  c_typename c |> Identifier.to_string |> encode_name_for
+
+let decode_name_for_c c =
+  c_typename c |> Identifier.to_string |> decode_name_for
 
 let case_name ~rich variant_name constr_name =
   let suffix = if rich then "_tag" else "" in

@@ -230,6 +230,27 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
           ]
       in
       (`Plain, [], pp)
+    | Mapped { front_facing } ->
+      (* TODO: factor lazy named value retrieval *)
+      let if_encode =
+        braced ~indent "if (encode == NULL)"
+          (const pp_statements
+             [
+               Fmt.str {|encode = caml_named_value("%s")|}
+                 (name |> Identifier.to_string |> encode_name_for);
+             ])
+      in
+      let pp =
+        const pp_statements [ {|static const value* encode = NULL|} ]
+        ++ cut ++ if_encode ++ cut
+        ++ const pp_statements
+             [
+               "v_back = caml_callback(*encode, v)";
+               Fmt.str "%a res = %a(v_back)" Identifier.pp name Identifier.pp
+                 (of_caml_name_for_c front_facing);
+             ]
+      in
+      (`Plain, [ "v_back" ], pp)
     | Void ->
       failwith "Void may not be instantiated, and therefore cannot be converted"
   in
@@ -500,6 +521,28 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
             Fmt.str "v = %a(x)" Identifier.pp (to_caml_name_for_c c);
             return_val "v";
           ]
+      in
+      ("x", `Plain, pp)
+    | Mapped { front_facing } ->
+      let if_decode =
+        braced ~indent "if (decode == NULL)"
+          (const pp_statements
+             [
+               Fmt.str {|decode = caml_named_value("%s")|}
+                 (name |> Identifier.to_string |> decode_name_for);
+             ])
+      in
+      let pp =
+        const pp_statements
+          [ p0; l2 "v_front" "v"; {|static const value* decode = NULL|} ]
+        ++ cut ++ if_decode ++ cut
+        ++ const pp_statements
+             [
+               Fmt.str {|v_front = %a(x)|} Identifier.pp
+                 (to_caml_name_for_c front_facing);
+               {|v = caml_callback(*decode, v_front)|};
+               {|CAMLreturn(v)|};
+             ]
       in
       ("x", `Plain, pp)
     | Void ->

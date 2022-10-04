@@ -21,7 +21,7 @@ end
 module type WALK = sig
   include WALK_TYPES
 
-  (* Schema *)
+  val name : t -> string
 
   (** [schema id parametric schema] *)
   val schema : string option -> (unit -> t) option -> (unit -> t) -> t
@@ -62,7 +62,7 @@ module type WALK = sig
   val time : unit -> t
   val time_local : unit -> t
   val tuple : t list -> t
-  val name : t -> string
+  val mapped : string option -> t -> t
 end
 
 module Walk (W : WALK) = struct
@@ -82,12 +82,14 @@ module Walk (W : WALK) = struct
     | String -> W.string ()
     | Time -> W.time ()
     | Time_local -> W.time_local ()
-    | Map { descriptor = d; _ } -> descriptor id d
+    | Map { descriptor = d; _ } ->
+      (* XXX reused id *)
+      W.mapped id (descriptor id d)
     | Mapping s -> W.mapping (schema s)
     | Nullable s -> W.nullable (schema s)
     | String_const s -> W.string_const s
-    | Object f -> W.object_ (fields f)
-    | Tuple l -> W.tuple @@ tuple l
+    | Object { fields = f; _ } -> W.object_ (fields f)
+    | Tuple { items; _ } -> W.tuple @@ tuple items
     | Union { cases; key; hashes } ->
       let cases =
         cases
@@ -105,7 +107,7 @@ module Walk (W : WALK) = struct
       | Some p ->
         Some
           (fun () ->
-            let _name, args, eff_args, t = parametric p in
+            let _name, _args, _eff_args, t = parametric p in
             let name = W.name t in
             W.schema (Some name) None (fun () -> t))
     in

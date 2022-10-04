@@ -15,8 +15,12 @@ let json_string_to_value (s : string) : Ezjsonm.value =
   Ezjsonm.value_from_string s
 
 let register_static_callbacks () =
-  (* This callbacks are meant to be invoked by our bundled runtime. *)
+  (* These callbacks are meant to be invoked by our bundled runtime. *)
   Stdlib.Callback.register json_of_value_callback_name json_string_of_value;
   Stdlib.Callback.register json_to_value_callback_name json_string_to_value;
   Stdlib.Callback.register poly_cmp_callback_name eq;
   ()
+
+(* Declare a schema against our runtime, in order to recursively make
+   user-defined encoders/decoders accessible, where needed. *)
+let register_schema schema : unit = C_schema_registration.traverse_schema schema

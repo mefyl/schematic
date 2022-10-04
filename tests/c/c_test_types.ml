@@ -190,3 +190,39 @@ type with_computed = { non_computed : int }
 [@@boxed]
 
 type tuple_int_string_alias = int * string [@@deriving schema, show, eq]
+
+module Mapped = struct
+  type t =
+    | A
+    | B
+  [@@deriving show, eq]
+
+  module Serialization = struct
+    type t = string [@@deriving schema]
+  end
+
+  let schema =
+    let decode s =
+      Fmt.epr "decode: %s@." s;
+      match s with
+      | "a" -> Result.return A
+      | "b" -> Result.return B
+      | s -> Result.failf "unknown repr: %s" s
+    and encode (x : t) =
+      Fmt.epr "encode: %a@." pp x;
+      match x with A -> "a" | B -> "b"
+    in
+    let open Schematic.Schema in
+    {
+      id = Some "mapped";
+      descriptor =
+        Map { decode; encode; descriptor = Serialization.schema.descriptor };
+      parametric = None;
+    }
+end
+
+type mapped = Mapped.t
+
+let mapped_schema = Mapped.schema
+let pp_mapped = Mapped.pp
+let equal_mapped = Mapped.equal

@@ -510,6 +510,36 @@ typedef struct {
 } string_wrapper_option;
 |}
 
+let mapped_to_caml =
+  {|
+value mapped_to_caml(mapped x) {
+  CAMLparam0();
+  CAMLlocal2(v_front, v);
+  static const value* decode = NULL;
+  if (decode == NULL) {
+    decode = caml_named_value("schematic_mapped_decode");
+  }
+  v_front = string_to_caml(x);
+  v = caml_callback(*decode, v_front);
+  CAMLreturn(v);
+}
+|}
+
+let mapped_of_caml =
+  {|
+mapped mapped_of_caml(value v) {
+  CAMLparam1(v);
+  CAMLlocal1(v_back);
+  static const value* encode = NULL;
+  if (encode == NULL) {
+    encode = caml_named_value("schematic_mapped_encode");
+  }
+  v_back = caml_callback(*encode, v);
+  mapped res = string_of_caml(v_back);
+  CAMLreturnT(mapped, res);
+}
+|}
+
 let pretty_string =
   let pp_string ppf x = Fmt.pf ppf "{|\n%s\n|}" x in
   Alcotest.testable pp_string String.( = )
@@ -616,6 +646,8 @@ module Of_caml = struct
 
   let poly_payload () =
     test poly_payload_schema [ poly_payload_of_caml; tuple_int_string_of_caml ]
+
+  let mapped () = test mapped_schema [ mapped_of_caml ]
 end
 
 module To_caml = struct
@@ -658,6 +690,8 @@ module To_caml = struct
 
   let poly_payload () =
     test poly_payload_schema [ poly_payload_to_caml; tuple_int_string_to_caml ]
+
+  let mapped () = test mapped_schema [ mapped_to_caml ]
 end
 
 let () =
@@ -693,6 +727,7 @@ let () =
             test_case "collection" `Quick collection;
             test_case "basic polymorphic_variant" `Quick poly_basic;
             test_case "payload polymorphic_variant" `Quick poly_payload;
+            test_case "mapped" `Quick mapped;
           ] );
       ( "to_caml",
         To_caml.
@@ -706,5 +741,6 @@ let () =
             test_case "collection" `Quick collection;
             test_case "basic polymorphic_variant" `Quick poly_basic;
             test_case "payload polymorphic_variant" `Quick poly_payload;
+            test_case "mapped" `Quick mapped;
           ] );
     ]

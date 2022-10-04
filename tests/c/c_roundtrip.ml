@@ -84,6 +84,8 @@ external reified_ultra_generic_rt_id :
 external with_computed_rt_id : with_computed -> with_computed
   = "sch_with_computed_rt_id"
 
+external mapped_rt_id : mapped -> mapped = "sch_mapped_rt_id"
+
 (* Most robust way of testing conversion, for sure:
 
    Converts values from Caml to C, then back to Caml, and check equality.
@@ -334,6 +336,13 @@ module Tests = struct
     |> List.iter (fun x ->
            let new_x = with_computed_rt_id x in
            test t new_x x)
+
+  let encode_decode () =
+    let t = Alcotest.testable pp_mapped equal_mapped in
+    [ B; A ]
+    |> List.iter (fun x ->
+           let new_x = mapped_rt_id x in
+           test t new_x x)
 end
 
 let () =
@@ -341,6 +350,7 @@ let () =
   Logs.set_level (Some Logs.Debug);
   Logs.set_reporter (Logs_fmt.reporter ());
   Schematic.C.Runtime.register_static_callbacks ();
+  Schematic.C.Runtime.register_schema mapped_schema;
   run "Schematic.C roundtrip"
     [
       ( "roundtrip",
@@ -379,5 +389,6 @@ let () =
             test_case "ultra generic" `Quick ultra_generic;
             test_case "with computed" `Quick with_computed;
             test_case "tuple_int_string_alias" `Quick tuple_int_string_alias;
+            test_case "encode / decode" `Quick encode_decode;
           ] );
     ]

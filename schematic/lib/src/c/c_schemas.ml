@@ -153,6 +153,12 @@ module Of = C_walk.Walk (struct
       (Struct { fields }, Marks.empty)
     in
     schema (Some "date") None s
+
+  let mapped : string option -> t -> t =
+   fun id (c, marks) ->
+    Logs.err (fun m -> m "mapped: %a@." (Fmt.option Fmt.string) id);
+    Logs.err (fun m -> m "c: %a@." C_intf.pp c);
+    (Mapped { front_facing = c }, marks)
 end)
 
 include Make_mark_converter (struct

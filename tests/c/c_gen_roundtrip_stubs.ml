@@ -41,15 +41,20 @@ let schemas =
     Schema.pack reified_ultra_generic_schema;
     Schema.pack tuple_int_string_alias_schema;
     Schema.pack with_computed_schema;
+    Schema.pack mapped_schema;
   ]
 
 let () =
   Logs.set_level (Some Logs.Info);
   Logs.set_reporter (Logs_fmt.reporter ());
 
+  Logs.err (fun m ->
+      m "primitive_record schema: %a@." Schematic.Schema.pp
+        primitive_record_schema);
+
   let argv = Sys.get_argv () in
   let h_filename, c_filename = (argv.(1), argv.(2)) in
-  let h_contents, c_contents = C.export_schemas ~safety_checks:true schemas in
+  let h_contents, c_contents = C.export_schemas ~safety_checks:false schemas in
   let c_contents = Fmt.str "#include \"%s\"" h_filename ^ c_contents in
   let open Stdio.Out_channel in
   write_all h_filename ~data:h_contents;
