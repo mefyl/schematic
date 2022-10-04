@@ -53,12 +53,12 @@ let rec pp_descriptor : type u. u descriptor Fmt.t =
     | String_const v -> escape v
     | Time -> const string "Time"
     | Time_local -> const string "Time_local"
-    | Object fields ->
+    | Object { fields; _ } ->
       box
       @@ (hvbox ~indent
          @@ (const string "{" ++ sp ++ const (hvbox pp_fields) fields))
          ++ sp ++ const string "}"
-    | Tuple items ->
+    | Tuple { items; _ } ->
       box
       @@ (hvbox ~indent
          @@ (const string "[" ++ sp ++ const (hvbox pp_tuple) items))
@@ -139,7 +139,7 @@ let rec walk_fields :
   | Fixpoint d -> walk_fields (Lazy.force d) f
   | Map { descriptor; _ } -> walk_fields descriptor f
   | Nullable d -> walk_fields d.descriptor f
-  | Object o -> Result.return [ f.f o ]
+  | Object { fields; _ } -> Result.return [ f.f fields ]
   | Union { cases; key } ->
     List.map
       ~f:(fun (Case { schema; name; _ }) ->
@@ -217,12 +217,12 @@ let inline desc fold f =
       | Optional -> inline descriptor Optional acc f
       | Required -> inline descriptor Required acc f)
     | Nullable d -> inline d.descriptor Optional acc f
-    | Object fields ->
+    | Object { fields; encode; _ } -> (
       let rec inline_fields :
-          type req t.
-          (t, req) requirement ->
+          type req f.
+          (f, req) requirement ->
           'fold ->
-          t fields ->
+          f fields ->
           ('fold * res list list, string) Result.t =
        fun req acc -> function
         | FieldEnd -> Result.return (acc, [ [] ])
@@ -315,7 +315,12 @@ let inline desc fold f =
               |> map ~f:(fun (h, t) -> h @ t)
               |> to_list) )
       in
-      inline_fields req acc fields
+      match req with
+      | Computed -> inline_fields Computed acc fields
+      | Computed_optional -> inline_fields Computed_optional acc fields
+      | Default v -> inline_fields (Default (encode v)) acc fields
+      | Required -> inline_fields Required acc fields
+      | Optional -> inline_fields Optional acc fields)
     | Union { cases; key } ->
       let f acc (Case { schema; name; _ }) =
         let acc, key =
@@ -412,7 +417,9 @@ let inline_v_fold (f : ('fold, 'res) inline_v_fold) fields =
     | Nullable schema -> (
       let+ f = inline_descriptor schema.descriptor in
       fun fold -> function Some v -> f fold v | None -> (fold, []))
-    | Object fields -> inline_fields fields
+    | Object { fields; encode; _ } ->
+      let+ f = inline_fields fields in
+      fun fold v -> f fold (encode v)
     | Union { cases; key } -> (
       let+ cases =
         let f (Case { encoder; name; schema; _ }) =
@@ -494,8 +501,8 @@ module Walk (W : WALK) = struct
     | Mapping s -> W.mapping (schema s)
     | Nullable s -> W.nullable (schema s)
     | String_const s -> W.string_const s
-    | Object f -> W.object_ (fields f)
-    | Tuple l -> W.tuple @@ tuple l
+    | Object { fields = f; _ } -> W.object_ (fields f)
+    | Tuple { items; _ } -> W.tuple @@ tuple items
     | Union { cases; key } -> W.union @@ List.map ~f:(case key) cases
 
   and case : type t. string option -> t case -> W.t =
@@ -639,13 +646,15 @@ let compare schema =
     | Time_local -> (
       fun (l, lz) (r, rz) ->
         match Int.compare lz rz with 0 -> Ptime.compare l r | v -> v)
-    | Object fields ->
+    | Object { fields; encode; _ } ->
       let rec compare_fields : type u. u fields -> u -> u -> int = function
         | Field { field = { schema; requirement; _ }; rest } ->
           let schema = field_schema schema in
           let f (type field req) (schema : field t)
               (requirement : (field, req) requirement) ((l : req), lr)
               ((r : req), rr) =
+            (* let l = decode l in *)
+            (* let r = decode r in *)
             let c =
               match requirement with
               | Computed -> Option.compare (compare schema.descriptor) l r
@@ -660,8 +669,8 @@ let compare schema =
           f schema requirement
         | FieldEnd -> fun () () -> 0
       in
-      compare_fields fields
-    | Tuple items ->
+      fun l r -> compare_fields fields (encode l) (encode r)
+    | Tuple { items; encode; _ } ->
       let rec compare_items : type t. t tuple -> t -> t -> int = function
         | ItemEnd -> fun () () -> 0
         | Item { schema; rest } -> (
@@ -670,7 +679,7 @@ let compare schema =
             | 0 -> compare_items rest lr rr
             | v -> v)
       in
-      compare_items items
+      fun l r -> compare_items items (encode l) (encode r)
     | Union { cases; _ } ->
       fun l r ->
         let f (Case { schema; encoder; _ }) =
