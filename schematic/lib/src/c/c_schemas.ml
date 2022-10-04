@@ -160,7 +160,8 @@ module Of = C_walk.Walk (struct
     Logs.debug (fun m -> m "c: %a@." C_intf.pp c);
     let (front_facing, marks) =
       let s () = (c, marks) in
-      let id = Fmt.str "%s_external" (Option.value_exn id) in
+      let default = (c_typename c |> Identifier.to_string) in
+      let id = Fmt.str "%s_external" (Option.value id ~default) in
       schema (Some id) None s
     in
     (Mapped { front_facing  }, marks)
