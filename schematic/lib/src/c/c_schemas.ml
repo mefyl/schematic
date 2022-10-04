@@ -156,9 +156,14 @@ module Of = C_walk.Walk (struct
 
   let mapped : string option -> t -> t =
    fun id (c, marks) ->
-    Logs.err (fun m -> m "mapped: %a@." (Fmt.option Fmt.string) id);
-    Logs.err (fun m -> m "c: %a@." C_intf.pp c);
-    (Mapped { front_facing = c }, marks)
+    Logs.debug (fun m -> m "mapped: %a@." (Fmt.option Fmt.string) id);
+    Logs.debug (fun m -> m "c: %a@." C_intf.pp c);
+    let (front_facing, marks) =
+      let s () = (c, marks) in
+      let id = Fmt.str "%s_external" (Option.value_exn id) in
+      schema (Some id) None s
+    in
+    (Mapped { front_facing  }, marks)
 end)
 
 include Make_mark_converter (struct

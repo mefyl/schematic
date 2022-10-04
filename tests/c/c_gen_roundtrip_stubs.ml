@@ -45,7 +45,7 @@ let schemas =
   ]
 
 let () =
-  Logs.set_level (Some Logs.Info);
+  Logs.set_level (Some Logs.Debug);
   Logs.set_reporter (Logs_fmt.reporter ());
 
   Logs.err (fun m ->
