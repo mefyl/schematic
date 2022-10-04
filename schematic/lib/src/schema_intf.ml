@@ -72,8 +72,18 @@ and _ descriptor =
   | String_const : string -> unit descriptor
   | Time : Ptime.t descriptor
   | Time_local : (Ptime.t * Ptime.tz_offset_s) descriptor
-  | Object : 't fields -> 't descriptor
-  | Tuple : 't tuple -> 't descriptor
+  | Object : {
+      decode : 'fields -> 't;
+      encode : 't -> 'fields;
+      fields : 'fields fields;
+    }
+      -> 't descriptor
+  | Tuple : {
+      decode : 'tuple -> 't;
+      encode : 't -> 'tuple;
+      items : 'tuple tuple;
+    }
+      -> 't descriptor
   | Union : {
       key : string option;
       cases : 't case list;
@@ -175,7 +185,6 @@ type ('fold, 'res) inline = {
 (** A ['res inline] maps a field and a value for that field to a ['res]. *)
 type 'res inline_v = { f : 't 'req. ('t, 'req) field -> 'req -> 'res }
 
-(** A ['res inline] maps a field and a value for that field to a ['res]. *)
 type ('fold, 'res) inline_v_fold = {
   f : 't 'req. ('t, 'req) field -> 'fold -> 'req -> 'fold * 'res;
 }

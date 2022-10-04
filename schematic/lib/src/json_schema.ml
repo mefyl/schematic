@@ -147,7 +147,7 @@ let of_schema schema =
       | l ->
         let one_of = List.map ~f:(fun applicator -> make ~applicator ()) l in
         (marks, make ~applicator:(make_applicator ~one_of ()) ~validation ()))
-    | Schema.Tuple items ->
+    | Schema.Tuple { items; _ } ->
       let marks, fields =
         let rec tuple_applicator : type u. ids -> u Schema.tuple -> ids * t list
             =

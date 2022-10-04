@@ -37,7 +37,7 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
       '}'
   | Null -> const string "()"
   | Nullable schema -> option ~none:(const string "None") (of_schema schema)
-  | Object fields ->
+  | Object { fields; encode; _ } ->
     let pp =
       let f (type req t) (field : (t, req) Schema.field) =
         let pp_value : req Fmt.t =
@@ -61,16 +61,21 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
       in
       Schema.inline_v_fold { f } fields |> Result.ok_or_failwith
     in
-    composite_object '{'
-      (fun fmt v ->
-        ignore (pp (true, fmt) v);
-        char fmt ';')
-      '}'
+    let printer =
+      composite_object '{'
+        (fun fmt v ->
+          ignore (pp (true, fmt) v);
+          char fmt ';')
+        '}'
+    in
+    fun fmt v -> printer fmt (encode v)
   | String -> Dump.string
   | String_const s -> const Dump.string s
   | Time -> Ptime.pp
   | Time_local -> fun f (t, tz_offset_s) -> Ptime.pp_human ~tz_offset_s () f t
-  | Tuple tuple -> composite '(' (of_tuple tuple) ')'
+  | Tuple { items; encode = t_encode; _ } ->
+    let printer = composite '(' (of_tuple items) ')' in
+    fun fmt v -> printer fmt (t_encode v)
   | Union { cases; _ } -> of_cases cases
 
 and of_tuple : type t. t Schema.tuple -> t Fmt.t = function

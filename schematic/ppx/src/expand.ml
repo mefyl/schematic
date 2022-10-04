@@ -730,8 +730,18 @@ module Schema = struct
           Ast.ppat_tuple (List.mapi ~f types)
         in
         let body =
+          let mapper ~construct ~deconstruct =
+            [%expr
+              Schema.Tuple
+                {
+                  decode = [%e construct];
+                  encode = [%e deconstruct];
+                  items = [%e tuple_items ~context ~type_context types];
+                }]
+          in
+
           combinator ~loc types field_name field_value constructed deconstructed
-            (tuple_descriptor ~context ~type_context types)
+            mapper
         in
         expanded_of_descriptor ~loc body
       (* Type variable *)
@@ -750,7 +760,7 @@ module Schema = struct
         Ppxlib.Location.raise_errorf ~loc "schematic-ppx: unsupported type %a"
           Pprintast.core_type core_type)
 
-  and tuple_descriptor ~context ~type_context types =
+  and tuple_items ~context ~type_context types =
     let loc = type_context.loc in
     let items =
       let args =
@@ -763,7 +773,7 @@ module Schema = struct
       let f r l = [%expr Item { schema = [%e r]; rest = [%e l] }] in
       List.fold_right ~f ~init args
     in
-    [%expr Tuple [%e items]]
+    [%expr [%e items]]
 
   and combinator :
       type f.
@@ -773,9 +783,9 @@ module Schema = struct
       (int -> f -> expression) ->
       expression ->
       pattern ->
-      expression ->
+      (construct:expression -> deconstruct:expression -> expression) ->
       expression =
-   fun ~loc fields field_name field_value constructed deconstructed obj ->
+   fun ~loc fields field_name field_value constructed deconstructed mapper ->
     let module Ast = (val Ast_builder.make loc) in
     let construct =
       let pattern =
@@ -789,7 +799,7 @@ module Schema = struct
         in
         List.fold_righti ~f ~init:[%pat? ()] fields
       in
-      Ast.pexp_fun Nolabel None pattern [%expr Result.Ok [%e constructed]]
+      Ast.pexp_fun Nolabel None pattern [%expr [%e constructed]]
     and deconstruct =
       let value =
         let expr i f = field_value i f in
@@ -801,13 +811,7 @@ module Schema = struct
       in
       Ast.pexp_fun Nolabel None deconstructed value
     in
-    [%expr
-      Schema.Map
-        {
-          decode = [%e construct];
-          encode = [%e deconstruct];
-          descriptor = [%e obj];
-        }]
+    mapper ~construct ~deconstruct
 
   and expand_record ~context ~type_context fields =
     _expand_record false ~context ~type_context fields
@@ -929,9 +933,19 @@ module Schema = struct
         in
         [%pat? ([%p deconstructed] : [%t type_])]
     in
+    let mapped ~construct ~deconstruct =
+      [%expr
+        Schema.Object
+          {
+            decode = [%e construct];
+            encode = [%e deconstruct];
+            fields = [%e fields_schema];
+          }]
+    in
+
     expanded_of_descriptor ~loc
     @@ combinator ~loc fields field_name field_value constructed deconstructed
-         [%expr Object [%e fields_schema]]
+         mapped
 
   and expand_variant ~context ~type_context options =
     let f
@@ -1022,7 +1036,10 @@ module Schema = struct
                           __schematic_case [%e name]
                           :: Stdlib.List.map __schematic_case [%e aliases];
                       }]
-            else expanded_of_descriptor ~loc [%expr Object FieldEnd]
+            else
+              expanded_of_descriptor ~loc
+                [%expr
+                  Object { fields = FieldEnd; encode = Fn.id; decode = Fn.id }]
           in
           (schema, None, None, None, None)
         | Some { ctor_pattern; ctor_value; pattern; type_; value; _ } ->
