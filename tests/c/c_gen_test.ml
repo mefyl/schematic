@@ -568,6 +568,27 @@ mapped_external mapped_external_of_caml(value v) {
 }
 |}
 
+let inline_payload_c =
+  {|
+typedef struct {
+  int field;
+} variant_with_inline_record_payload__inline_payload;
+|}
+
+let variant_with_inline_record_payload_c =
+  {|
+typedef struct {
+  enum {
+    variant_with_inline_record_payload_payloads_are_overrated_anyway_tag,
+    variant_with_inline_record_payload_inline_payload_tag
+  } tag;
+  union {
+    struct {
+      int field;} inline_payload;
+  }* payload;
+} variant_with_inline_record_payload;
+|}
+
 let pretty_string =
   let pp_string ppf x = Fmt.pf ppf "{|\n%s\n|}" x in
   Alcotest.testable pp_string String.( = )
@@ -632,6 +653,10 @@ module Generate_types = struct
   let string_option_record () =
     test string_option_record_schema
       [ string_option_record_c; string_wrapper_option_c; string_wrapper_c ]
+
+  let variant_with_inline_record_payload () =
+    test variant_with_inline_record_payload_schema
+      [ variant_with_inline_record_payload_c; inline_payload_c]
 end
 
 module Of_caml = struct
@@ -742,6 +767,8 @@ let () =
             test_case "collection" `Quick collection;
             test_case "reified parametric type" `Quick reified_param;
             test_case "string_option_record" `Quick string_option_record;
+            test_case "variant: inline record" `Quick
+              variant_with_inline_record_payload;
           ] );
       ( "of_caml",
         Of_caml.
