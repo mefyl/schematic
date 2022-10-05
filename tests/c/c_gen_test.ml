@@ -656,7 +656,7 @@ module Generate_types = struct
 
   let variant_with_inline_record_payload () =
     test variant_with_inline_record_payload_schema
-      [ variant_with_inline_record_payload_c; inline_payload_c]
+      [ variant_with_inline_record_payload_c; inline_payload_c ]
 end
 
 module Of_caml = struct
