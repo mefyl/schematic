@@ -46,13 +46,8 @@ let schemas =
   ]
 
 let () =
-  Logs.set_level (Some Logs.Debug);
+  Logs.set_level (Some Logs.Info);
   Logs.set_reporter (Logs_fmt.reporter ());
-
-  Logs.err (fun m ->
-      m "primitive_record schema: %a@." Schematic.Schema.pp
-        primitive_record_schema);
-
   let argv = Sys.get_argv () in
   let h_filename, c_filename = (argv.(1), argv.(2)) in
   let h_contents, c_contents = C.export_schemas ~safety_checks:false schemas in

@@ -340,7 +340,7 @@ end
 
 let () =
   let open Alcotest in
-  Logs.set_level (Some Logs.Debug);
+  Logs.set_level (Some Logs.Info);
   Logs.set_reporter (Logs_fmt.reporter ());
   C.Runtime.register_static_callbacks ();
   C.Runtime.register_schema mapped_schema;
