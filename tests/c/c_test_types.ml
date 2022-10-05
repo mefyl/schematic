@@ -59,6 +59,7 @@ type record_with_variant = { v : payload_variant } [@@deriving schema, show, eq]
 
 type string_option_record = { maybe : string_wrapper option }
 [@@deriving schema, show, eq]
+[@@boxed]
 
 type int64_alias = int64 [@@deriving schema, show, eq]
 type bool_alias = bool [@@deriving schema, show, eq]
