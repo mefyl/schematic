@@ -22,6 +22,7 @@ let rec traverse_descriptor :
       let default = c |> c_typename |> Identifier.to_string in
       id |> Option.value ~default
     in
+    Logs.info (fun m -> m "Registering Map encode/decode for '%s'" id);
     register_map id ~encode ~decode;
     traverse_descriptor (Some id) d
   | Mapping s -> traverse_schema s
