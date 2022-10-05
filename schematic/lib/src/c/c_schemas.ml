@@ -158,13 +158,13 @@ module Of = C_walk.Walk (struct
    fun id (c, marks) ->
     Logs.debug (fun m -> m "mapped: %a@." (Fmt.option Fmt.string) id);
     Logs.debug (fun m -> m "c: %a@." C_intf.pp c);
-    let (front_facing, marks) =
+    let front_facing, marks =
       let s () = (c, marks) in
-      let default = (c_typename c |> Identifier.to_string) in
+      let default = c_typename c |> Identifier.to_string in
       let id = Fmt.str "%s_external" (Option.value id ~default) in
       schema (Some id) None s
     in
-    (Mapped { front_facing  }, marks)
+    (Mapped { front_facing }, marks)
 end)
 
 include Make_mark_converter (struct

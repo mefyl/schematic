@@ -19,8 +19,9 @@ let rec traverse_descriptor :
   | Map { descriptor = d; encode; decode } ->
     let id =
       let c, _ = C_schemas.of_descriptor None d in
-      let default = c |> c_typename  |> Identifier.to_string in
-      id |> Option.value ~default in
+      let default = c |> c_typename |> Identifier.to_string in
+      id |> Option.value ~default
+    in
     register_map id ~encode ~decode;
     traverse_descriptor (Some id) d
   | Mapping s -> traverse_schema s

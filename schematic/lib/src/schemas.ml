@@ -184,8 +184,7 @@ module Uri = struct
   include Uri
 
   let schema =
-    Schema.make
-      ~id:"uri"
+    Schema.make ~id:"uri"
       (Map
          {
            decode = (fun s -> Result.return @@ Uri.of_string s);

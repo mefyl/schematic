@@ -43,9 +43,11 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
                  conv_fn (field "v" field_idx))
       in
       let statements =
-        [ Fmt.str "%s res = malloc(sizeof(*res))" ptr_type ;
-          Fmt.str "assert(Wosize_val(v) == %d)" (List.length fields)
-        ] @ field_stores
+        [
+          Fmt.str "%s res = malloc(sizeof(*res))" ptr_type;
+          assert_block_size "v" (List.length fields);
+        ]
+        @ field_stores
       in
       (`Pointer, [], const pp_statements statements)
       (* Plain-only regular variant *)
@@ -69,7 +71,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
       in
       let case : (int * (Identifier.t * c)) Fmt.t =
        fun fmt (i, (field_name, c)) ->
-        let stmts =
+        let accessor_stmts =
           match c with
           (* FIXME: do not use a function on the tuple *)
           | Atom (_, Some (Tuple members)) ->
@@ -93,7 +95,11 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         in
         Logs.debug (fun m -> m "Case type %a\n" pp c);
         case ~indent (Int.to_string i)
-          (Some (const pp_statements (stmts @ [ "break" ])))
+          (Some
+             (const pp_statements
+                (assert_block_size "v" (List.length accessor_stmts)
+                 :: accessor_stmts
+                @ [ "break" ])))
           fmt ()
       in
       let rich_case =
@@ -164,6 +170,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
           let body =
             const pp_statements
               [
+                assert_block_size "v" 2;
                 "int tag = Field(v, 0)";
                 "res.payload = malloc(sizeof(*res.payload))";
               ]
@@ -187,7 +194,10 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
       let tuptype = tuple_name members in
       let pp =
         const pp_statements
-        @@ [ Fmt.str "%a res" Identifier.pp tuptype ]
+        @@ [
+             Fmt.str "%a res" Identifier.pp tuptype;
+             assert_block_size "v" (List.length members);
+           ]
         @ (members
           |> List.mapi ~f:(fun field_idx c ->
                  Fmt.str "res.t%d = %a(%s)" field_idx Identifier.pp
@@ -203,6 +213,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         braced ~indent "for (int64_t i = 0; i < res.len; i++)"
           (const pp_statements
              [
+               assert_block_size "l" 2;
                Fmt.str "res.data[i] = %a(%s)" Identifier.pp
                  (of_caml_name_for_c elem_type)
                  (field "l" 0);

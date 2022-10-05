@@ -534,8 +534,8 @@ value mapped_to_caml(mapped x) {
 }
 |}
 
-
-let mapped_external_to_caml = {|
+let mapped_external_to_caml =
+  {|
 value mapped_external_to_caml(mapped_external x) {
   CAMLparam0();
   CAMLlocal1(v);
@@ -559,7 +559,8 @@ mapped mapped_of_caml(value v) {
 }
 |}
 
-let mapped_external_of_caml = {|
+let mapped_external_of_caml =
+  {|
 mapped_external mapped_external_of_caml(value v) {
   CAMLparam1(v);
   const char* res = string_of_caml(v);
@@ -674,7 +675,7 @@ module Of_caml = struct
   let poly_payload () =
     test poly_payload_schema [ poly_payload_of_caml; tuple_int_string_of_caml ]
 
-  let mapped () = test mapped_schema [ mapped_of_caml ; mapped_external_of_caml ]
+  let mapped () = test mapped_schema [ mapped_of_caml; mapped_external_of_caml ]
 end
 
 module To_caml = struct
@@ -718,7 +719,7 @@ module To_caml = struct
   let poly_payload () =
     test poly_payload_schema [ poly_payload_to_caml; tuple_int_string_to_caml ]
 
-  let mapped () = test mapped_schema [ mapped_to_caml ; mapped_external_to_caml; ]
+  let mapped () = test mapped_schema [ mapped_to_caml; mapped_external_to_caml ]
 end
 
 let () =
