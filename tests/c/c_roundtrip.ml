@@ -1,4 +1,5 @@
 open C_test_types
+open Schematic_c
 
 (* A first step (outside of this file) generates a C file exposing primitives
    that convert values from Caml to C, then back to Caml (a "roundtrip"). This
@@ -341,8 +342,8 @@ let () =
   let open Alcotest in
   Logs.set_level (Some Logs.Debug);
   Logs.set_reporter (Logs_fmt.reporter ());
-  Schematic.C.Runtime.register_static_callbacks ();
-  Schematic.C.Runtime.register_schema mapped_schema;
+  C.Runtime.register_static_callbacks ();
+  C.Runtime.register_schema mapped_schema;
   run "Schematic.C roundtrip"
     [
       ( "roundtrip",

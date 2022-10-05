@@ -1,7 +1,7 @@
 open Base
 include C_intf
 
-include Marks.Make (struct
+include Schematic.Marks.Make (struct
   type t = c
 
   let pp = pp

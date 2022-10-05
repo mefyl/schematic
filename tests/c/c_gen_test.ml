@@ -1,5 +1,6 @@
 open Base
 open C_test_types
+open Schematic_c
 
 (* TODO: prefixing, for lack of namespacing *)
 
@@ -601,9 +602,9 @@ let check_unordered_strings name expected actual =
 module Generate_types = struct
   let test schema expected =
     let actual =
-      Schematic.C.of_schema schema
-      |> List.map ~f:Schematic.C.export
-      |> List.map ~f:(fun gen -> "\n" ^ Schematic.C.typedef_src gen)
+      C.of_schema schema
+      |> List.map ~f:C.export
+      |> List.map ~f:(fun gen -> "\n" ^ C.typedef_src gen)
       |> List.sort ~compare:String.compare
     in
     check_unordered_strings "typedefs" expected actual
@@ -662,10 +663,10 @@ end
 module Of_caml = struct
   let test schema expected =
     let actual =
-      Schematic.C.of_schema schema
-      |> List.map ~f:Schematic.C.export
-      |> List.map ~f:(fun Schematic.C.{ of_caml; _ } ->
-             Schematic.C.impl_src of_caml |> fun s -> "\n" ^ s ^ "\n")
+      C.of_schema schema
+      |> List.map ~f:C.export
+      |> List.map ~f:(fun C.{ of_caml; _ } ->
+             C.impl_src of_caml |> fun s -> "\n" ^ s ^ "\n")
     in
     check_unordered_strings "*_of_caml" expected actual
 
@@ -706,10 +707,10 @@ end
 module To_caml = struct
   let test schema expected =
     let actual =
-      Schematic.C.of_schema schema
-      |> List.map ~f:Schematic.C.export
-      |> List.map ~f:(fun Schematic.C.{ to_caml; _ } ->
-             Schematic.C.impl_src to_caml |> fun s -> "\n" ^ s ^ "\n")
+      C.of_schema schema
+      |> List.map ~f:C.export
+      |> List.map ~f:(fun C.{ to_caml; _ } ->
+             C.impl_src to_caml |> fun s -> "\n" ^ s ^ "\n")
     in
     check_unordered_strings "*_to_caml" expected actual
 

@@ -1,6 +1,7 @@
 open Base
 open Schematic
 open C_test_types
+open Schematic_c
 
 let reified_parametric_record_schema =
   parametric_record_schema string_wrapper_schema

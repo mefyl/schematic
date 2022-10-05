@@ -1,7 +1,7 @@
 (* XXX: we should probably merge this back into a generalized walker in
    schemas *)
 
-open Schema
+open Schematic
 open Base
 include C_intf
 
@@ -66,7 +66,7 @@ module type WALK = sig
 end
 
 module Walk (W : WALK) = struct
-  let rec descriptor : type t. string option -> t descriptor -> W.t =
+  let rec descriptor : type t. string option -> t Schema.descriptor -> W.t =
    fun id d ->
     match d with
     | Any -> W.any ()
@@ -98,7 +98,7 @@ module Walk (W : WALK) = struct
       in
       W.union ~name:id ~key ~hashes ~cases
 
-  and schema : type t. t Schema_intf.t -> W.t =
+  and schema : type t. t Schema.t -> W.t =
    fun { id; descriptor = d; parametric = p } ->
     let schema () = descriptor id d
     and parametric =
@@ -113,7 +113,7 @@ module Walk (W : WALK) = struct
     in
     W.schema id parametric schema
 
-  and parametric : type t. t parametric -> string * string list * W.t list * W.t
+  and parametric : type t. t Schema.parametric -> string * string list * W.t list * W.t
       = function
     | Plain { name; descriptor = d } -> (name, [], [], descriptor (Some name) d)
     | Parametric { name; parameter; next } ->
@@ -122,7 +122,7 @@ module Walk (W : WALK) = struct
       in
       (template_name, name :: args, schema parameter :: eff_args, t)
 
-  and fields : type t. t fields -> W.fields = function
+  and fields : type t. t Schema.fields -> W.fields = function
     | FieldEnd -> W.fields_empty ()
     | Field
         {
@@ -156,7 +156,7 @@ module Walk (W : WALK) = struct
       | Optional -> W.field name ~required:false schema rest
       | Required | Default _ -> W.field name ~required:true schema rest)
 
-  and tuple : type t. t tuple -> W.t list = function
+  and tuple : type t. t Schema.tuple -> W.t list = function
     | ItemEnd -> []
     | Item { schema = s; rest } -> schema s :: tuple rest
 

@@ -52,7 +52,7 @@ let roundtrip_src (name, c) =
     Please note: the implementation has no `#include "..."` for the header file,
     since its name and location are not yet determined. It must be added by
     consumers of this function. *)
-let export_schemas ?(safety_checks = false) (schemas : Schema.pack list) =
+let export_schemas ?(safety_checks = false) (schemas : Schematic.Schema.pack list) =
   let nl_concat = String.concat ~sep:"\n" in
   let ctypes = of_schemas schemas in
   let cgens = ctypes |> List.map ~f:(export ~safety_checks) in

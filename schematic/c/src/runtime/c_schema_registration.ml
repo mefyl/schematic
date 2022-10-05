@@ -1,5 +1,6 @@
 open Base
 open C_intf
+open Schematic
 
 let register_map type_name ~encode ~decode =
   Stdlib.Callback.register (encode_name_for type_name) encode;
@@ -7,7 +8,7 @@ let register_map type_name ~encode ~decode =
   Stdlib.Callback.register (decode_name_for type_name) decode
 
 let rec traverse_descriptor :
-    type t. string option -> t Schema_intf.descriptor -> unit =
+    type t. string option -> t Schema.descriptor -> unit =
  fun id d ->
   match d with
   (* Shallow types *)
@@ -34,23 +35,23 @@ let rec traverse_descriptor :
     cases
     |> List.iter ~f:(fun (Schema.Case { schema = s; _ }) -> traverse_schema s)
 
-and traverse_schema : type t. t Schema_intf.t -> unit =
+and traverse_schema : type t. t Schema.t -> unit =
  fun { id; descriptor = d; parametric = p } ->
   traverse_descriptor id d;
   match p with None -> () | Some p -> traverse_parametric p
 
-and traverse_tuple : type t. t Schema_intf.tuple -> unit = function
+and traverse_tuple : type t. t Schema.tuple -> unit = function
   | ItemEnd -> ()
   | Item { schema = s; rest } ->
     traverse_schema s;
     traverse_tuple rest
 
-and traverse_parametric : type t. t Schema_intf.parametric -> unit = function
+and traverse_parametric : type t. t Schema.parametric -> unit = function
   | Plain { name; descriptor = d } -> traverse_descriptor (Some name) d
   | Parametric { parameter; next; _ } ->
     traverse_parametric (next { parameter with parametric = None })
 
-and traverse_fields : type t. t Schema_intf.fields -> unit = function
+and traverse_fields : type t. t Schema.fields -> unit = function
   | FieldEnd -> ()
   | Field
       {
