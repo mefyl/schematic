@@ -3,7 +3,7 @@
 (library
  (name schematic)
  (public_name schematic)
- (libraries base base64 ezjsonm fmt logs ptime semver2 uri)
+ (libraries base base64 ezjsonm fmt ptime semver2 uri)
  (preprocess
   (pps
    schematic_ppx_inside
@@ -11,5 +11,4 @@
    ppx_deriving.make
    ppx_deriving.ord
    ppx_deriving.show
-   ppx_here
-   ppx_hash)))
+   ppx_here)))
