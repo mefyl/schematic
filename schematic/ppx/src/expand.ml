@@ -933,7 +933,6 @@ module Schema = struct
         in
         [%pat? ([%p deconstructed] : [%t type_])]
     in
-
     let mapped ~construct ~deconstruct =
       [%expr
         Schema.Object

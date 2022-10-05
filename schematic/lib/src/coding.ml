@@ -401,7 +401,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         fun v ->
           let fields = f (encode v) |> List.filter_map ~f:Fn.id in
           Coding.of_fields fields
-      | Tuple { items; encode = t_encode; _ } ->
+      | Tuple { items; encode = t_encode; decode = _ } ->
         let encode =
           let rec encode_tuple : type t. t Schema.tuple -> t -> Coding.t list =
             function

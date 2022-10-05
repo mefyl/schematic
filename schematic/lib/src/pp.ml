@@ -61,15 +61,14 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
       in
       Schema.inline_v_fold { f } fields |> Result.ok_or_failwith
     in
-    fun fmt v ->
-      let printer =
-        composite_object '{'
-          (fun fmt v ->
-            ignore (pp (true, fmt) v);
-            char fmt ';')
-          '}'
-      in
-      printer fmt (encode v)
+    let printer =
+      composite_object '{'
+        (fun fmt v ->
+          ignore (pp (true, fmt) v);
+          char fmt ';')
+        '}'
+    in
+    fun fmt v -> printer fmt (encode v)
   | String -> Dump.string
   | String_const s -> const Dump.string s
   | Time -> Ptime.pp

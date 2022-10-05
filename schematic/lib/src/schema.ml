@@ -646,7 +646,7 @@ let compare schema =
     | Time_local -> (
       fun (l, lz) (r, rz) ->
         match Int.compare lz rz with 0 -> Ptime.compare l r | v -> v)
-    | Object { fields; encode; _ } ->
+    | Object { fields; encode; decode = _ } ->
       let rec compare_fields : type u. u fields -> u -> u -> int = function
         | Field { field = { schema; requirement; _ }; rest } ->
           let schema = field_schema schema in
@@ -669,8 +669,9 @@ let compare schema =
           f schema requirement
         | FieldEnd -> fun () () -> 0
       in
-      fun l r -> compare_fields fields (encode l) (encode r)
-    | Tuple { items; encode; _ } ->
+      let compare_items = compare_fields fields in
+      fun l r -> compare_items (encode l) (encode r)
+    | Tuple { items; encode; decode = _ } ->
       let rec compare_items : type t. t tuple -> t -> t -> int = function
         | ItemEnd -> fun () () -> 0
         | Item { schema; rest } -> (
@@ -679,7 +680,8 @@ let compare schema =
             | 0 -> compare_items rest lr rr
             | v -> v)
       in
-      fun l r -> compare_items items (encode l) (encode r)
+      let compare_items = compare_items items in
+      fun l r -> compare_items (encode l) (encode r)
     | Union { cases; _ } ->
       fun l r ->
         let f (Case { schema; encoder; _ }) =
