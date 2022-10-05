@@ -145,9 +145,11 @@ payload_variant payload_variant_of_caml(value v) {
     assert(Tag_val(v) < 2);
     switch (Tag_val(v)) {
       case 0:
+        assert(Wosize_val(v) == 1);
         res.payload->someint = int_of_caml(Field(v, 0));
         break;
       case 1:
+        assert(Wosize_val(v) == 2);
         res.payload->a_pair.t0 = int_of_caml(Field(v, 0));
         res.payload->a_pair.t1 = string_of_caml(Field(v, 1));
         break;
@@ -223,6 +225,7 @@ let tuple_string_int_of_caml =
 tuple_string_int tuple_string_int_of_caml(value v) {
   CAMLparam1(v);
   tuple_string_int res;
+  assert(Wosize_val(v) == 2);
   res.t0 = string_of_caml(Field(v, 0));
   res.t1 = int_of_caml(Field(v, 1));
   CAMLreturnT(tuple_string_int, res);
@@ -351,6 +354,7 @@ int_array int_array_of_caml(value v) {
   l = v;
   res.data = malloc(sizeof(*res.data) * res.len);
   for (int64_t i = 0; i < res.len; i++) {
+    assert(Wosize_val(l) == 2);
     res.data[i] = int_of_caml(Field(l, 0));
     l = Field(l, 1);
   }
@@ -380,6 +384,7 @@ let tuple_int_string_of_caml =
 tuple_int_string tuple_int_string_of_caml(value v) {
   CAMLparam1(v);
   tuple_int_string res;
+  assert(Wosize_val(v) == 2);
   res.t0 = int_of_caml(Field(v, 0));
   res.t1 = string_of_caml(Field(v, 1));
   CAMLreturnT(tuple_int_string, res);
@@ -456,6 +461,7 @@ poly_payload poly_payload_of_caml(value v) {
   else if (v == Val_long(65)) res.tag = poly_payload_a_tag;
   else if (v == Val_long(66)) res.tag = poly_payload_b_tag;
   else if (Is_block(v)) {
+    assert(Wosize_val(v) == 2);
     int tag = Field(v, 0);
     res.payload = malloc(sizeof(*res.payload));
     if (0) {}
