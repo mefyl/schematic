@@ -17,8 +17,12 @@ let rec traverse_descriptor :
   | Fixpoint d -> traverse_descriptor id (Lazy.force d)
   | List s -> traverse_schema s
   | Map { descriptor = d; encode; decode } ->
-    register_map (Option.value_exn id) ~encode ~decode;
-    traverse_descriptor id d
+    let id =
+      let c, _ = C_schemas.of_descriptor None d in
+      let default = c |> c_typename  |> Identifier.to_string in
+      id |> Option.value ~default in
+    register_map id ~encode ~decode;
+    traverse_descriptor (Some id) d
   | Mapping s -> traverse_schema s
   | Nullable s -> traverse_schema s
   | Object { fields; _ } -> traverse_fields fields
