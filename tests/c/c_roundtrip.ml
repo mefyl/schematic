@@ -331,7 +331,7 @@ module Tests = struct
 
   let encode_decode () =
     let t = Alcotest.testable pp_mapped equal_mapped in
-    [ B; A ]
+    ([ B; A ] : mapped list)
     |> List.iter (fun x ->
            let new_x = mapped_rt_id x in
            test t new_x x)
