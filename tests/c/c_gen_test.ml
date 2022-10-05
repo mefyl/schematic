@@ -16,6 +16,7 @@ let primitive_record_of_caml =
 primitive_record* primitive_record_of_caml(value v) {
   CAMLparam1(v);
   primitive_record* res = malloc(sizeof(*res));
+  assert(Wosize_val(v) == 2);
   res->a = int_of_caml(Field(v, 0));
   res->b = int_of_caml(Field(v, 1));
   CAMLreturnT(primitive_record*, res);
@@ -53,6 +54,7 @@ let wrapper_of_caml =
 wrapper* wrapper_of_caml(value v) {
   CAMLparam1(v);
   wrapper* res = malloc(sizeof(*res));
+  assert(Wosize_val(v) == 2);
   res->somevar = int_of_caml(Field(v, 0));
   res->r = primitive_record_of_caml(Field(v, 1));
   CAMLreturnT(wrapper*, res);
@@ -259,6 +261,7 @@ let record_with_pair_alias_of_caml =
 record_with_pair_alias* record_with_pair_alias_of_caml(value v) {
   CAMLparam1(v);
   record_with_pair_alias* res = malloc(sizeof(*res));
+  assert(Wosize_val(v) == 2);
   res->a = int_of_caml(Field(v, 0));
   res->pair_alias = pair_alias_of_caml(Field(v, 1));
   CAMLreturnT(record_with_pair_alias*, res);

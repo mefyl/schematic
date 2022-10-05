@@ -43,7 +43,9 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
                  conv_fn (field "v" field_idx))
       in
       let statements =
-        [ Fmt.str "%s res = malloc(sizeof(*res))" ptr_type ] @ field_stores
+        [ Fmt.str "%s res = malloc(sizeof(*res))" ptr_type ;
+          Fmt.str "assert(Wosize_val(v) == %d)" (List.length fields)
+        ] @ field_stores
       in
       (`Pointer, [], const pp_statements statements)
       (* Plain-only regular variant *)
