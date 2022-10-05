@@ -164,7 +164,7 @@ let of_schema schema =
         make
           ~applicator:(make_applicator ~items:(Tuple_schema fields) ())
           ~validation () )
-    | Schema.Union { cases; key } ->
+    | Schema.Union { cases; key; _ } ->
       let marks, schemas =
         let f marks (Schema.Case { name; schema; _ }) =
           let marks, schema = of_schema marks schema in

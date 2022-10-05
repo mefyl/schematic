@@ -140,7 +140,7 @@ let rec walk_fields :
   | Map { descriptor; _ } -> walk_fields descriptor f
   | Nullable d -> walk_fields d.descriptor f
   | Object { fields; _ } -> Result.return [ f.f fields ]
-  | Union { cases; key } ->
+  | Union { cases; key; _ } ->
     List.map
       ~f:(fun (Case { schema; name; _ }) ->
         let f =
@@ -321,7 +321,7 @@ let inline desc fold f =
       | Default v -> inline_fields (Default (encode v)) acc fields
       | Required -> inline_fields Required acc fields
       | Optional -> inline_fields Optional acc fields)
-    | Union { cases; key } ->
+    | Union { cases; key; _ } ->
       let f acc (Case { schema; name; _ }) =
         let acc, key =
           match key with
@@ -420,7 +420,7 @@ let inline_v_fold (f : ('fold, 'res) inline_v_fold) fields =
     | Object { fields; encode; _ } ->
       let+ f = inline_fields fields in
       fun fold v -> f fold (encode v)
-    | Union { cases; key } -> (
+    | Union { cases; key; _ } -> (
       let+ cases =
         let f (Case { encoder; name; schema; _ }) =
           let+ res = inline_descriptor schema.descriptor in
@@ -503,7 +503,7 @@ module Walk (W : WALK) = struct
     | String_const s -> W.string_const s
     | Object { fields = f; _ } -> W.object_ (fields f)
     | Tuple { items; _ } -> W.tuple @@ tuple items
-    | Union { cases; key } -> W.union @@ List.map ~f:(case key) cases
+    | Union { cases; key; _ } -> W.union @@ List.map ~f:(case key) cases
 
   and case : type t. string option -> t case -> W.t =
    fun key (Case { name; schema = s; _ }) -> W.case key name (schema s)
