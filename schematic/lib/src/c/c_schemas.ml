@@ -108,6 +108,20 @@ module Of = C_walk.Walk (struct
            | s, Void -> First s
            | (_, _) as x -> Second x)
     in
+    (* Give names to inline payload types that would otherwise be impossible to
+       refer to from Swift *)
+    let inline_payload_marks =
+      rich
+      |> List.map ~f:(fun (id, constr_c) ->
+             match constr_c with
+             | Tuple _ | Struct _ ->
+               let id = Fmt.str "%s__%a" name Identifier.pp id in
+               let s () = (constr_c, marks) in
+               Marks.make id s
+             | _ -> Marks.empty)
+      |> Marks.merge
+    in
+    let marks = Marks.merge [ marks; inline_payload_marks ] in
     (Variant { name = Identifier.make name; basic; rich; hashes }, marks)
 
   let tuple ts =
