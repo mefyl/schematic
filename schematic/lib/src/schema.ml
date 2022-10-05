@@ -653,8 +653,6 @@ let compare schema =
           let f (type field req) (schema : field t)
               (requirement : (field, req) requirement) ((l : req), lr)
               ((r : req), rr) =
-            (* let l = decode l in *)
-            (* let r = decode r in *)
             let c =
               match requirement with
               | Computed -> Option.compare (compare schema.descriptor) l r
