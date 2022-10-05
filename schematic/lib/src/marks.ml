@@ -109,6 +109,9 @@ module Make (S : MARK) = struct
     val of_parametric : 'a Schema_intf.parametric -> S.t * Marks.t
   end) =
   struct
+    let of_descriptor = M.of_descriptor
+    let of_parametric = M.of_parametric
+
     let mark_of_schema Schema.{ id; descriptor; parametric } =
       match parametric with
       | None ->
