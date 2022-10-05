@@ -113,8 +113,9 @@ module Walk (W : WALK) = struct
     in
     W.schema id parametric schema
 
-  and parametric : type t. t Schema.parametric -> string * string list * W.t list * W.t
-      = function
+  and parametric :
+      type t. t Schema.parametric -> string * string list * W.t list * W.t =
+    function
     | Plain { name; descriptor = d } -> (name, [], [], descriptor (Some name) d)
     | Parametric { name; parameter; next } ->
       let template_name, args, eff_args, t =

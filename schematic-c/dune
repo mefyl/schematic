@@ -2,7 +2,7 @@
 
 (library
  (name schematic_c)
- (public_name schematic.c)
+ (public_name schematic-c)
  (libraries base base64 ezjsonm fmt logs ptime schematic semver2 uri)
  (preprocess
   (pps

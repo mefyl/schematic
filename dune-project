@@ -38,10 +38,8 @@
   (ocaml
    (>= 4.12.0))
   fmt
-  logs
   ppxlib
   ppx_deriving
-  (ppx_hash (= v0.14.0))
   ppx_here
   (ppx_yojson
    (and
@@ -110,6 +108,15 @@
     (< 5.1.0)))
   (lwt
    (>= 5.6.0))
+  (schematic
+   (= :version))))
+
+(package
+ (name schematic-c)
+ (synopsis "Generate C types and converters based on schemas")
+ (depends
+  logs
+  (ppx_hash (= v0.14.0))
   (schematic
    (= :version))))
 
