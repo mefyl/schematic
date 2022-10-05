@@ -224,7 +224,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | Some (Some v) ->
           decode s.id ids s.descriptor v |> Result.map ~f:Option.return
         | None -> type_error "option" None)
-      | Object fields_schema ->
+      | Object { fields = fields_schema; decode = o_decode; _ } ->
         let* fields = Coding.to_fields v |> type_error "object" in
         let rec decode_object :
             type t. t Schema.fields -> (t, E.decoding) Result.t = function
@@ -273,7 +273,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
               in
               Result.Let_syntax.Let_syntax.both field (decode_object rest))
         in
-        decode_object fields_schema
+        decode_object fields_schema |> Result.map ~f:o_decode
       | String -> Coding.to_string v |> type_error "string"
       | String_const expected -> (
         match Coding.to_string v with
@@ -290,7 +290,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | Result.Ok _ as ok -> ok
         | Result.Error None -> type_error "localtime" None
         | Result.Error (Some e) -> Result.fail (error "%s" e))
-      | Tuple items ->
+      | Tuple { items; decode = t_decode; _ } ->
         let* v = Coding.to_list v |> type_error "list" in
         let rec decode_tuple :
             type t. t Schema.tuple -> Coding.t list -> (t, E.decoding) Result.t
@@ -304,7 +304,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           | Item _, [] -> Result.fail (error "not enough tuple elements")
           | ItemEnd, _ -> Result.fail (error "too many tuple elements")
         in
-        decode_tuple items v
+        decode_tuple items v |> Result.map ~f:t_decode
       | Union { cases; key } -> (
         match key with
         | None -> (
@@ -394,14 +394,14 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         let encode = encode_schema fields_schema in
         fun v ->
           Coding.of_fields (List.map ~f:(fun (name, v) -> (name, encode v)) v)
-      | Object o ->
+      | Object { fields; encode; _ } ->
         let f =
-          Schema.inline_v { f = encode_field } o |> Result.ok_or_failwith
+          Schema.inline_v { f = encode_field } fields |> Result.ok_or_failwith
         in
         fun v ->
-          let fields = f v |> List.filter_map ~f:Fn.id in
+          let fields = f (encode v) |> List.filter_map ~f:Fn.id in
           Coding.of_fields fields
-      | Tuple items ->
+      | Tuple { items; encode = t_encode; decode = _ } ->
         let encode =
           let rec encode_tuple : type t. t Schema.tuple -> t -> Coding.t list =
             function
@@ -416,7 +416,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           in
           encode_tuple items
         in
-        fun v -> Coding.of_list (encode v)
+        fun v -> Coding.of_list (encode (t_encode v))
       | String -> Coding.of_string
       | String_const v -> fun () -> Coding.of_string v
       | Time -> Coding.of_time
