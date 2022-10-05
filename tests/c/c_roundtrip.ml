@@ -1,5 +1,10 @@
 open C_test_types
 
+(* A first step (outside of this file) generates a C file exposing primitives
+   that convert values from Caml to C, then back to Caml (a "roundtrip"). This
+   module is linked with those primitives. It calls them for a variety of types
+   and ensures that values are preserved and not trigger assertions. *)
+
 external wrapper_rt_id : wrapper -> wrapper = "sch_wrapper_rt_id"
 external diverse_rt_id : diverse -> diverse = "sch_diverse_rt_id"
 
@@ -85,19 +90,6 @@ external with_computed_rt_id : with_computed -> with_computed
   = "sch_with_computed_rt_id"
 
 external mapped_rt_id : mapped -> mapped = "sch_mapped_rt_id"
-
-(* Most robust way of testing conversion, for sure:
-
-   Converts values from Caml to C, then back to Caml, and check equality.
-
-   To do so, have a first test suite step that generates the C file. This C file
-   will expose primitives (or just one? XXX).
-
-   It is then compiled. Finally, an alcotest binary will be LINKED with the
-   generated object files, and call for each type a test primitive that takes an
-   OCaml value, makes it jump through hoops, then returns it.
-
-   Then it checks for equality. *)
 
 module Tests = struct
   let test t got expected = Alcotest.(check t "" expected) got
