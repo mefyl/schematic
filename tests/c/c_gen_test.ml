@@ -137,13 +137,15 @@ let payload_variant_of_caml =
 payload_variant payload_variant_of_caml(value v) {
   CAMLparam1(v);
   payload_variant res;
+  const int n_basic = 3;
+  const int n_rich = 2;
   if (Is_long(v)) {
     res.tag = Int_val(v);
-    assert(res.tag < 3);
+    assert(res.tag < n_basic);
   } else {
-    res.tag = 3 + Tag_val(v);
+    res.tag = n_basic + Tag_val(v);
     res.payload = malloc(sizeof(*res.payload));
-    assert(Tag_val(v) < 2);
+    assert(Tag_val(v) < n_rich);
     switch (Tag_val(v)) {
       case 0:
         assert(Is_block(v) && Wosize_val(v) == 1);

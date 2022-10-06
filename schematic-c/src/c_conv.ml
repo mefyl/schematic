@@ -64,10 +64,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
     | Variant { basic; rich; hashes = []; _ } ->
       let plain_case =
         const pp_statements
-          [
-            "res.tag = Int_val(v)";
-            Fmt.str "assert(res.tag < %d)" (List.length basic);
-          ]
+          [ "res.tag = Int_val(v)"; "assert(res.tag < n_basic)" ]
       in
       let case : (int * (Identifier.t * c)) Fmt.t =
        fun fmt (i, (field_name, c)) ->
@@ -117,9 +114,9 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         in
         const pp_statements
           [
-            Fmt.str "res.tag = %d + Tag_val(v)" (List.length basic);
+            "res.tag = n_basic + Tag_val(v)";
             "res.payload = malloc(sizeof(*res.payload))";
-            Fmt.str "assert(Tag_val(v) < %d)" (List.length rich);
+            "assert(Tag_val(v) < n_rich)";
           ]
         ++ cut ++ switch
       in
@@ -127,7 +124,12 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
       ( `Plain,
         [],
         vbox
-          (const pp_statements [ Fmt.str "%a res" Identifier.pp name ]
+          (const pp_statements
+             [
+               Fmt.str "%a res" Identifier.pp name;
+               Fmt.str "const int n_basic = %d" (List.length basic);
+               Fmt.str "const int n_rich = %d" (List.length rich);
+             ]
           ++ cut
           ++ vbox ~indent (const string "if (Is_long(v)) {" ++ cut ++ plain_case)
           ++ cut
