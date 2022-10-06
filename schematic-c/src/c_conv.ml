@@ -64,7 +64,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
     | Variant { basic; rich; hashes = []; _ } ->
       let plain_case =
         const pp_statements
-          [ "assert(res.tag < n_basic)"; "res.tag = Int_val(v)"; ]
+          [ "assert(res.tag < n_basic)"; "res.tag = Int_val(v)" ]
       in
       let case : (int * (Identifier.t * c)) Fmt.t =
        fun fmt (i, (field_name, c)) ->

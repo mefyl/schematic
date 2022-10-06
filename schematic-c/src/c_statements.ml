@@ -12,4 +12,6 @@ let return_val = Fmt.str "CAMLreturn(%s)"
 let hash_variant = Fmt.str "caml_hash_variant(\"%s\")"
 let val_long = Fmt.str "Val_long(%s)"
 let c_assert = Fmt.str "assert(%s)"
-let assert_block_size v n = c_assert (Fmt.str "Is_block(%s) && Wosize_val(%s) == %d" v v n)
+
+let assert_block_size v n =
+  c_assert (Fmt.str "Is_block(%s) && Wosize_val(%s) == %d" v v n)
