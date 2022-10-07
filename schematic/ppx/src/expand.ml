@@ -244,6 +244,7 @@ module Attributes = struct
     computed : expression option;
     inline : inline option;
     loc : location;
+    mutable_ : bool; [@default false]
     name : string; [@main]
     schema : expression versioned; [@default []]
     specs : specs; [@default specs_empty]
@@ -511,8 +512,14 @@ let version_match ~f init options =
   List.fold ~init ~f options
 
 let expand_field _
-    { pld_attributes; pld_loc = loc; pld_name = { txt = name; _ }; pld_type; _ }
-    =
+    {
+      pld_attributes;
+      pld_loc = loc;
+      pld_name = { txt = name; _ };
+      pld_type;
+      pld_mutable;
+      _;
+    } =
   let read_attribute (attrs : Attributes.field)
       { attr_name; attr_loc = loc; attr_payload } =
     let default f req omit =
@@ -635,7 +642,10 @@ let expand_field _
       attrs
   in
   List.fold_left ~f:read_attribute
-    ~init:(Attributes.make_field ~loc ~type_:pld_type name)
+    ~init:
+      (Attributes.make_field ~loc
+         ~mutable_:Poly.(pld_mutable = Mutable)
+         ~type_:pld_type name)
     pld_attributes
 
 module Schema = struct
@@ -1427,7 +1437,9 @@ module Jsoo_type = struct
   and expand_record ~context ~type_context fields =
     let loc = type_context.loc in
     let module Ast = (val Ast_builder.make loc) in
-    let f Attributes.({ alias; inline; loc; name; type_; _ } as attributes) =
+    let f
+        Attributes.(
+          { alias; inline; loc; mutable_; name; type_; _ } as attributes) =
       let desc =
         match Option.value ~default:Outline inline with
         | Inline -> (
@@ -1444,22 +1456,21 @@ module Jsoo_type = struct
         | Inline_try -> None
         | Outline ->
           let t =
-            match context.global.version with
-            | Some { major = 0; minor = 13; patch; _ } when patch < 1 ->
-              [%type:
-                [%t expand_type ~loc ~context ~type_context type_]
-                Js_of_ocaml.Js.readonly_prop]
-            | _ -> (
-              match Attributes.requirement attributes with
-              | (Computed | Required), type_ ->
-                [%type:
-                  [%t expand_type ~loc ~context ~type_context type_]
-                  Js_of_ocaml.Js.readonly_prop]
-              | (Computed_optional | Default_opt _ | Optional), type_ ->
-                [%type:
-                  [%t expand_type ~loc ~context ~type_context type_]
-                  Js_of_ocaml.Js.Optdef.t
-                  Js_of_ocaml.Js.readonly_prop])
+            let js_t =
+              match context.global.version with
+              | Some { major = 0; minor = 13; patch; _ } when patch < 1 ->
+                expand_type ~loc ~context ~type_context type_
+              | _ -> (
+                match Attributes.requirement attributes with
+                | (Computed | Required), type_ ->
+                  expand_type ~loc ~context ~type_context type_
+                | (Computed_optional | Default_opt _ | Optional), type_ ->
+                  [%type:
+                    [%t expand_type ~loc ~context ~type_context type_]
+                    Js_of_ocaml.Js.Optdef.t])
+            in
+            if mutable_ then [%type: [%t js_t] Js_of_ocaml.Js.prop]
+            else [%type: [%t js_t] Js_of_ocaml.Js.readonly_prop]
           and alias =
             List.find_map
               ~f:(function { txt = alias, None; _ } -> Some alias | _ -> None)
