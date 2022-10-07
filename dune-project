@@ -112,6 +112,16 @@
    (= :version))))
 
 (package
+ (name schematic-c)
+ (synopsis "Generate C types and converters based on schemas")
+ (authors "Yohaï-Eliel BERREBY <yberreby@pm.me>")
+ (depends
+  logs
+  (ppx_hash (= v0.14.0))
+  (schematic
+   (= :version))))
+
+(package
  (name schematic-cli)
  (synopsis "Schematic CLI tools")
  (depends

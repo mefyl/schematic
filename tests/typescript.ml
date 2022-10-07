@@ -101,12 +101,21 @@ let record_typescript =
 let variant_typescript = ("Variant", {|Record | { "i": number }|})
 
 module Generate_types = struct
-  let test t expected =
-    Alcotest.(
-      check (list (pair string string)) "typescript declarations" expected
-      @@ List.map ~f:(fun (id, schema) ->
+  open Test_utils
+
+  let test t (expected : _ list) =
+    let expected = Base.Set.of_list (module String_pair) expected in
+
+    let actual =
+      Schematic.Typescript.of_schema t
+      |> List.map ~f:(fun (id, schema) ->
              (id, Schematic.Typescript.to_string schema))
-      @@ Schematic.Typescript.of_schema t)
+      |> Base.Set.of_list (module String_pair)
+    in
+
+    Alcotest.(
+      check Testables.Set.String_pair.set "typescript declarations" expected
+        actual)
 
   let nullable () = test nullable_schema [ ("Nullable", "boolean | null") ]
   let record () = test record_schema [ record_typescript ]

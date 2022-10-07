@@ -8,6 +8,7 @@ type (_, _) requirement =
 type _ case =
   | Case : {
       name : string;
+      raw_name : string;
       schema : 'a t;
       encoder : 't -> 'a option;
       decoder : 'a -> 't;
@@ -59,6 +60,7 @@ and _ descriptor =
   | Int : int descriptor
   | Int64 : int64 descriptor
   | List : 'a t -> 'a list descriptor
+  (* 'a: facing, 'b: underlying *)
   | Map : {
       decode : 'a -> ('b, string) Result.t;
       encode : 'b -> 'a;
@@ -87,6 +89,7 @@ and _ descriptor =
   | Union : {
       key : string option;
       cases : 't case list;
+      polymorphic : bool;
     }
       -> 't descriptor
 
@@ -136,13 +139,20 @@ module type WALK = sig
   (* Object *)
 
   val fields_empty : unit -> fields
+
+  (** [field_inline required fields rest] *)
   val field_inline : bool -> fields list -> fields -> fields
+
+  (** [field_outline name required t rest]*)
   val field_outline : string -> bool -> t -> fields -> fields
+
   val object_ : fields -> t
 
   (* Union *)
 
+  (** [case key name t] *)
   val case : string option -> string -> t -> t
+
   val union : t list -> t
 
   (* Descriptors *)

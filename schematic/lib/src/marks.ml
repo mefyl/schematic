@@ -1,0 +1,151 @@
+open Base
+
+module type MARK = sig
+  type t
+
+  val pp : t Fmt.t
+
+  module Id : sig
+    type t
+
+    val make : string -> t
+  end
+end
+
+module type V = sig
+  type u
+
+  include Comparable.S with type t = u
+
+  val pp : ?with_value:bool -> t Fmt.t
+end
+
+module Make (S : MARK) = struct
+  module rec Mark : (V with type u = string * (S.t * Marks.t) Lazy.t) = struct
+    module T = struct
+      type t = string * (S.t * Marks.t) Lazy.t
+      type u = t
+
+      let sexp_of_t (id, _) = Sexp.Atom id
+      let compare (l, _) (r, _) = String.compare l r
+    end
+
+    include T
+    include Base.Comparable.Make (T)
+
+    let pp : ?with_value:bool -> t Fmt.t =
+     fun ?(with_value = true) f (s, v) ->
+      if with_value then
+        let open Fmt in
+        let inner : (_ * (_ * _)) Fmt.t =
+         fun f (s, (v, _r)) ->
+          (const string s ++ const char ',' ++ sp ++ const char '{'
+         ++ const S.pp v ++ const char ','
+         (* XXX: cannot use Marks.pp here (unsafe module recursiveness) *)
+         ++ const string " ..."
+          ++ const char '}')
+            f ()
+        in
+        (const char '(' ++ inner ++ const char ')') f (s, Lazy.force v)
+      else Fmt.string f s
+  end
+
+  and Marks : sig
+    type t
+
+    val empty : t
+    val make : string -> (unit -> S.t * Marks.t) -> t
+    val add : t -> Mark.t -> t
+    val map : t -> f:(Mark.t -> Mark.t) -> t
+    val fold : t -> init:'a -> f:('a -> Mark.t -> 'a) -> 'a
+    val has : t -> Mark.t -> bool
+    val merge : t list -> t
+    val of_list : Mark.t list -> t
+    val pp : t Fmt.t
+  end = struct
+    type t = (Mark.t, Mark.comparator_witness) Set.t
+
+    let empty = Set.empty (module Mark)
+    let make id f = Set.of_list (module Mark) [ (id, lazy (f ())) ]
+    let add = Set.add
+    let map t = Set.map (module Mark) t
+    let fold = Set.fold
+    let has = Set.mem
+    let merge = Set.union_list (module Mark)
+    let of_list = Set.of_list (module Mark)
+
+    let pp : t Fmt.t =
+     fun f t ->
+      let l = Set.to_list t in
+      let open Fmt in
+      let sep = const char ',' ++ sp in
+      let pp =
+        const string "Marks:" ++ sp ++ const char '(' ++ list Mark.pp ~sep
+        ++ const char ')'
+      in
+      pp f l
+  end
+
+  (** [of_marks marks mark] *)
+  let rec of_mark marks mark : (S.Id.t * S.t) list * Marks.t =
+    if Marks.has marks mark then ([], marks)
+    else
+      let leaf, deps =
+        let res, deps = Lazy.force @@ snd mark in
+        ([ (S.Id.make @@ fst mark, res) ], deps)
+      in
+      let marks = Marks.add marks mark in
+      let f (res, marks) mark =
+        let deps, marks = of_mark marks mark in
+        (res @ deps, marks)
+      in
+      let l, marks = Marks.fold ~init:([], marks) ~f deps in
+      (l @ leaf, marks)
+
+  module Make_mark_converter (M : sig
+    val of_descriptor :
+      string option -> 'a Schema_intf.descriptor -> S.t * Marks.t
+
+    val of_parametric : 'a Schema_intf.parametric -> S.t * Marks.t
+  end) =
+  struct
+    let of_descriptor = M.of_descriptor
+    let of_parametric = M.of_parametric
+
+    let mark_of_schema Schema.{ id; descriptor; parametric } =
+      match parametric with
+      | None ->
+        (Option.value_exn ~here:[%here] id, lazy (M.of_descriptor id descriptor))
+      | Some parametric ->
+        (Option.value_exn ~here:[%here] id, lazy (M.of_parametric parametric))
+
+    let of_schema marks s = of_mark marks @@ mark_of_schema s
+
+    let unpacker marks =
+      let unpack : type a. a Schema.t -> (S.Id.t * S.t) list * Marks.t =
+       fun s -> of_schema marks s
+      in
+      { Schema.unpack }
+
+    let of_schemas_state marks schemas =
+      let f (res, marks) s =
+        let ts, marks = Schema.unpack (unpacker marks) s in
+        (res @ ts, marks)
+      in
+      List.fold_left ~init:([], marks) ~f schemas
+
+    type state = Marks.t
+
+    let state_empty = Marks.empty
+
+    let state_exclude schemas =
+      Marks.of_list
+        (List.map ~f:(Schema.unpack { unpack = mark_of_schema }) schemas)
+
+    let of_schemas ?(exclude = []) schemas =
+      let marks = state_exclude exclude in
+      of_schemas_state marks schemas |> fst
+
+    let of_schema schema = of_schema Marks.empty schema |> fst
+  end
+end

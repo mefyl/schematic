@@ -305,7 +305,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           | ItemEnd, _ -> Result.fail (error "too many tuple elements")
         in
         decode_tuple items v |> Result.map ~f:t_decode
-      | Union { cases; key } -> (
+      | Union { cases; key; _ } -> (
         match key with
         | None -> (
           let conv (Schema.Case { decoder; schema; _ }) =
@@ -421,7 +421,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       | String_const v -> fun () -> Coding.of_string v
       | Time -> Coding.of_time
       | Time_local -> Coding.of_time_local
-      | Union { cases; key } -> (
+      | Union { cases; key; _ } -> (
         let cases =
           let f (Schema.Case { encoder; name; schema; _ }) =
             let encode = encode_schema schema in

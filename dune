@@ -1,3 +1,8 @@
+(env
+ (dev
+  (flags
+   (:standard -warn-error -A))))
+
 (alias
  (name default)
  (deps
@@ -6,12 +11,14 @@
   schematic-jsoo.opam
   schematic-sexp.opam
   schematic-sqml.opam
+  schematic-c.opam
   schematic.opam
   (alias_rec schematic/default)
   (alias_rec schematic-http/default)
   (alias_rec schematic-jsoo/default)
   (alias_rec schematic-sexp/default)
-  (alias_rec schematic-sqml/default)))
+  (alias_rec schematic-sqml/default)
+  (alias_rec schematic-c/default)))
 
 (rule
  (target schematic.%{version:schematic}.opam)
@@ -77,6 +84,18 @@
  (target schematic-sexp.%{version:schematic}.opam)
  (deps
   (:opam schematic-sexp.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (echo
+     "url {\n  src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic}\"\n}\n")))))
+
+(rule
+ (target schematic-c.%{version:schematic}.opam)
+ (deps
+  (:opam schematic-c.opam))
  (action
   (with-stdout-to
    %{target}
@@ -198,3 +217,22 @@
     %{bin:awk}
     "/^build: / { exit 0 }; !/^  \"(ocaml|schematic)/ { print($0) }"
     %{dep:schematic-sexp.opam.locked}))))
+
+(rule
+ (deps (universe))
+ (target schematic-c.opam.locked)
+ (action
+  (run %{bin:opam} lock schematic-c)))
+
+(rule
+ (mode
+  (promote (until-clean)))
+ (target schematic-c.opam.extdeps)
+ (alias extdeps)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    %{bin:awk}
+    "/^build: / { exit 0 }; !/^  \"(ocaml|schematic)/ { print($0) }"
+    %{dep:schematic-c.opam.locked}))))

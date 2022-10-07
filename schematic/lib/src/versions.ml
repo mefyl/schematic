@@ -16,6 +16,7 @@ module V0_14_8 = struct
   module Pp = Pp
   module Typescript = Typescript
   module Version = Version
+  module Marks = Marks
 end
 
 module V0_14_7 = V0_14_8

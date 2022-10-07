@@ -1,0 +1,25 @@
+(include_subdirs unqualified)
+
+(library
+ (name schematic_c)
+ (public_name schematic-c)
+ (libraries
+  base
+  base64
+  ezjsonm
+  fmt
+  logs
+  ocaml-compiler-libs.common
+  ptime
+  schematic
+  semver2
+  uri)
+ (preprocess
+  (pps
+   schematic_ppx_inside
+   ppx_deriving.eq
+   ppx_deriving.make
+   ppx_deriving.ord
+   ppx_deriving.show
+   ppx_here
+   ppx_hash)))

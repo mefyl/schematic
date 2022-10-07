@@ -53,6 +53,8 @@ end
 module Ptime : sig
   include module type of Ptime with type t = Ptime.t and type span = Ptime.span
 
+  type t = Ptime.t
+
   val schema : Ptime.t Schema.t
   val schema_versioned : Schema.version -> Ptime.t Schema.t
 
@@ -61,8 +63,10 @@ module Ptime : sig
   type local = Ptime.t * Ptime.tz_offset_s
 
   val equal_local : local -> local -> bool
+  val pp_local : local Fmt.t
   val local_schema : local Schema.t
   val local_schema_versioned : Schema.version -> local Schema.t
+  val equal_date : date -> date -> bool
   val date_schema : date Schema.t
   val date_schema_versioned : Schema.version -> date Schema.t
   val span_schema : span Schema.t

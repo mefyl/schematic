@@ -13,43 +13,9 @@ type t =
     }  (** [Template<T1, T2, ..., TN>] *)
   | Tuple of t list  (** [\[T1, T2, ..., TN \]]*)
   | Union of t list  (** [T1 | T2 | ... | TN] *)
+[@@deriving show]
 
 type typescript = t
-
-module rec Mark :
-  (Comparable.S with type t = string * (typescript * Marks.t) Lazy.t) = struct
-  module T = struct
-    type t = string * (typescript * Marks.t) Lazy.t
-
-    let sexp_of_t (id, _) = Sexp.Atom id
-    let compare (l, _) (r, _) = String.compare l r
-  end
-
-  include T
-  include Base.Comparable.Make (T)
-end
-
-and Marks : sig
-  type t
-
-  val empty : t
-  val make : string -> (unit -> typescript * Marks.t) -> t
-  val add : t -> Mark.t -> t
-  val fold : t -> init:'a -> f:('a -> Mark.t -> 'a) -> 'a
-  val has : t -> Mark.t -> bool
-  val merge : t list -> t
-  val of_list : Mark.t list -> t
-end = struct
-  type t = (Mark.t, Mark.comparator_witness) Set.t
-
-  let empty = Set.empty (module Mark)
-  let make id f = Set.of_list (module Mark) [ (id, lazy (f ())) ]
-  let add = Set.add
-  let fold = Set.fold
-  let has = Set.mem
-  let merge = Set.union_list (module Mark)
-  let of_list = Set.of_list (module Mark)
-end
 
 let name s =
   String.split ~on:'_' s
@@ -57,6 +23,18 @@ let name s =
   |> List.concat
   |> List.map ~f:String.capitalize
   |> String.concat ~sep:""
+
+include Marks.Make (struct
+  type t = typescript
+
+  let pp = pp
+
+  module Id = struct
+    include String
+
+    let make s = name s
+  end
+end)
 
 module Of = Schema.Walk (struct
   type res = t * Marks.t
@@ -162,50 +140,11 @@ module Of = Schema.Walk (struct
     (Union t, Marks.merge marks)
 end)
 
-let rec of_mark marks mark =
-  if Marks.has marks mark then ([], marks)
-  else
-    let res, deps =
-      let res, deps = Lazy.force @@ snd mark in
-      ([ (name @@ fst mark, res) ], deps)
-    in
-    let marks = Marks.add marks mark in
-    let f (res, marks) mark =
-      let deps, marks = of_mark marks mark in
-      (res @ deps, marks)
-    in
-    Marks.fold ~init:(res, marks) ~f deps
+include Make_mark_converter (struct
+  let of_descriptor _ = Of.descriptor
+  let of_parametric = Of.parametric
+end)
 
-let mark_of_schema Schema.{ id; descriptor; parametric } =
-  match parametric with
-  | None -> (Option.value_exn ~here:[%here] id, lazy (Of.descriptor descriptor))
-  | Some parametric ->
-    (Option.value_exn ~here:[%here] id, lazy (Of.parametric parametric))
-
-let of_schema marks s = of_mark marks @@ mark_of_schema s
-
-let unpacker marks =
-  let unpack : type a. a Schema.t -> (string * t) list * Marks.t =
-   fun s -> of_schema marks s
-  in
-  { Schema.unpack }
-
-let of_schemas_state marks schemas =
-  let f (res, marks) s =
-    let ts, marks = Schema.unpack (unpacker marks) s in
-    (res @ ts, marks)
-  in
-  List.fold_left ~init:([], marks) ~f schemas
-
-let state_exclude schemas =
-  Marks.of_list
-    (List.map ~f:(Schema.unpack { unpack = mark_of_schema }) schemas)
-
-let of_schemas ?(exclude = []) schemas =
-  let marks = state_exclude exclude in
-  of_schemas_state marks schemas |> fst
-
-let of_schema schema = of_schema Marks.empty schema |> fst
 let of_descriptor d = Of.descriptor d |> fst
 let break sp id fmt _ = Caml.Format.pp_print_break fmt sp id
 

@@ -1013,12 +1013,19 @@ module Schema = struct
               | None ->
                 expanded_of_descriptor ~loc [%expr String_const [%e name]]
               | Some aliases ->
+                (* FIXME: aliases, polymorphic variants and C codegen don't
+                   interact well.
+
+                   Encountering an alias wil most likely break C codegen for
+                   now. *)
                 expanded_of_descriptor ~loc
                   [%expr
                     let __schematic_case name =
                       Case
                         {
                           name;
+                          (* FIXME: see above. *)
+                          raw_name = name;
                           schema =
                             {
                               descriptor = String_const name;
@@ -1032,6 +1039,7 @@ module Schema = struct
                     Union
                       {
                         key = None;
+                        polymorphic = false;
                         cases =
                           __schematic_case [%e name]
                           :: Stdlib.List.map __schematic_case [%e aliases];
@@ -1093,6 +1101,7 @@ module Schema = struct
           Schema.Case
             {
               name = [%e name];
+              raw_name = [%e Ast.estring txt];
               schema = [%e schema_of_expanded ~loc schema];
               encoder = [%e construct];
               decoder = [%e destruct];
@@ -1106,6 +1115,7 @@ module Schema = struct
       [%expr
         Schema.Union
           {
+            polymorphic = [%e Ast.ebool poly];
             cases = [%e Ast.elist (List.filter_map ~f options)];
             key = [%e key];
           }]

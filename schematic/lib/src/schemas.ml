@@ -53,11 +53,13 @@ module Either = struct
     let descriptor first second =
       Schema.Union
         {
+          polymorphic = false;
           cases =
             [
               Case
                 {
                   name = "first";
+                  raw_name = "First";
                   schema = first;
                   encoder = (function First x -> Some x | Second _ -> None);
                   decoder = Either.first;
@@ -65,6 +67,7 @@ module Either = struct
               Case
                 {
                   name = "second";
+                  raw_name = "Second";
                   schema = second;
                   encoder = (function Second x -> Some x | First _ -> None);
                   decoder = Either.second;
@@ -106,11 +109,13 @@ module Result = struct
     let descriptor t error_schema =
       Schema.Union
         {
+          polymorphic = false;
           cases =
             [
               Case
                 {
                   name = "t";
+                  raw_name = "Ok";
                   schema = t;
                   encoder = (function Ok x -> Some x | Error _ -> None);
                   decoder = Result.return;
@@ -118,6 +123,7 @@ module Result = struct
               Case
                 {
                   name = "error";
+                  raw_name = "Error";
                   schema = error_schema;
                   encoder =
                     (function Result.Error x -> Some x | Result.Ok _ -> None);
@@ -158,8 +164,10 @@ module Ptime = struct
   type local = Ptime.t * Ptime.tz_offset_s
 
   let equal_local (t1, o1) (t2, o2) = Ptime.equal t1 t2 && o1 = o2
+  let pp_local = Fmt.(pair Ptime.pp Int.pp)
   let local_schema = Schema.make Time_local
   let local_schema_versioned (_ : Schema.version) = local_schema
+  let equal_date (y1, m1, d1) (y2, m2, d2) = y1 = y2 && m1 = m2 && d1 = d2
   let date_schema = Schema.make Date
   let date_schema_versioned (_ : Schema.version) = date_schema
 
@@ -180,7 +188,7 @@ module Uri = struct
   include Uri
 
   let schema =
-    Schema.make
+    Schema.make ~id:"uri"
       (Map
          {
            decode = (fun s -> Result.return @@ Uri.of_string s);
