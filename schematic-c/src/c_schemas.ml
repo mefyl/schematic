@@ -1,6 +1,18 @@
 open Base
 include C_intf
 
+(* Shamelessly copy-pasted, because depending on either ppx_deriving.api or
+   ocaml-compiler-libs.common confuses esy .*)
+let hash_variant s =
+  let accu = ref 0 in
+  for i = 0 to String.length s - 1 do
+    accu := (223 * !accu) + Stdlib.Char.code s.[i]
+  done;
+  (* reduce to 31 bits *)
+  accu := !accu land ((1 lsl 31) - 1);
+  (* make it signed for 64 bits architectures *)
+  if !accu > 0x3FFFFFFF then !accu - (1 lsl 31) else !accu
+
 include Schematic.Marks.Make (struct
   type t = c
 
@@ -124,15 +136,11 @@ module Of = C_walk.Walk (struct
     let name = Identifier.make name in
     if polymorphic then
       let basic =
-        List.map
-          ~f:(fun (id, raw_name) ->
-            (id, Ppx_deriving.hash_variant raw_name))
-          basic
+        List.map ~f:(fun (id, raw_name) -> (id, hash_variant raw_name)) basic
       in
       let rich =
         List.map
-          ~f:(fun (id, raw_name, c) ->
-            (id, Ppx_deriving.hash_variant raw_name, c))
+          ~f:(fun (id, raw_name, c) -> (id, hash_variant raw_name, c))
           rich
       in
       (Poly_variant { name; basic; rich }, marks)

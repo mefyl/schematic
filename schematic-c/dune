@@ -9,7 +9,6 @@
   ezjsonm
   fmt
   logs
-  ppx_deriving.api
   ptime
   schematic
   semver2
