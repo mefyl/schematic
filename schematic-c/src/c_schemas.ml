@@ -126,13 +126,13 @@ module Of = C_walk.Walk (struct
       let basic =
         List.map
           ~f:(fun (id, raw_name) ->
-            (id, Ocaml_common.Btype.hash_variant raw_name))
+            (id, Ppx_deriving.hash_variant raw_name))
           basic
       in
       let rich =
         List.map
           ~f:(fun (id, raw_name, c) ->
-            (id, Ocaml_common.Btype.hash_variant raw_name, c))
+            (id, Ppx_deriving.hash_variant raw_name, c))
           rich
       in
       (Poly_variant { name; basic; rich }, marks)

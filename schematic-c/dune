@@ -9,7 +9,7 @@
   ezjsonm
   fmt
   logs
-  ocaml-compiler-libs.common
+  ppx_deriving.api
   ptime
   schematic
   semver2
