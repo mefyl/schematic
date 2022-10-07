@@ -62,6 +62,10 @@ let pp ?(indent = 2) fmt ts =
         let fields = tuple_fields types in
         const struct_ fields
       | Variant { name; basic; rich; _ } -> const variant (name, basic, rich)
+      | Poly_variant { name; basic; rich; _ } ->
+        let basic = List.map ~f:fst basic in
+        let rich = List.map ~f:(fun (id, _, c) -> (id, c)) rich in
+        const variant (name, basic, rich)
       | Mapped { front_facing } -> const pp front_facing
       | Void -> nop
     in

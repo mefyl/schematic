@@ -8,6 +8,7 @@ type (_, _) requirement =
 type _ case =
   | Case : {
       name : string;
+      raw_name : string;
       schema : 'a t;
       encoder : 't -> 'a option;
       decoder : 'a -> 't;
@@ -88,7 +89,7 @@ and _ descriptor =
   | Union : {
       key : string option;
       cases : 't case list;
-      hashes : int list;
+      polymorphic : bool;
     }
       -> 't descriptor
 

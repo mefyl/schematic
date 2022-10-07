@@ -39,9 +39,8 @@ module type WALK = sig
 
   val union :
     name:string option ->
-    key:string option ->
-    cases:(string * t) list ->
-    hashes:int list ->
+    polymorphic:bool ->
+    cases:(string * string * t) list ->
     t
 
   (* Descriptors *)
@@ -82,21 +81,19 @@ module Walk (W : WALK) = struct
     | String -> W.string ()
     | Time -> W.time ()
     | Time_local -> W.time_local ()
-    | Map { descriptor = d; _ } ->
-      (* XXX reused id *)
-      W.mapped id (descriptor id d)
+    | Map { descriptor = d; _ } -> W.mapped id (descriptor id d)
     | Mapping s -> W.mapping (schema s)
     | Nullable s -> W.nullable (schema s)
     | String_const s -> W.string_const s
     | Object { fields = f; _ } -> W.object_ (fields f)
     | Tuple { items; _ } -> W.tuple @@ tuple items
-    | Union { cases; key; hashes } ->
+    | Union { cases; polymorphic; key = _ } ->
       let cases =
         cases
-        |> List.map ~f:(fun (Schema.Case { name; schema = s; _ }) ->
-               (name, schema s))
+        |> List.map ~f:(fun (Schema.Case { name; raw_name; schema = s; _ }) ->
+               (name, raw_name, schema s))
       in
-      W.union ~name:id ~key ~hashes ~cases
+      W.union ~name:id ~cases ~polymorphic
 
   and schema : type t. t Schema.t -> W.t =
    fun { id; descriptor = d; parametric = p } ->

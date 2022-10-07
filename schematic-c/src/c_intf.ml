@@ -12,7 +12,12 @@ type t =
       name : Identifier.t;
       basic : Identifier.t list;
       rich : (Identifier.t * t) list;
-      hashes : (Identifier.t * int) list;
+    }
+  | Poly_variant of {
+      name : Identifier.t;
+      (* int: hash *)
+      basic : (Identifier.t * int) list;
+      rich : (Identifier.t * int * t) list;
     }
   | Tuple of t list
   | Mapped of { (* "serialized" type *)

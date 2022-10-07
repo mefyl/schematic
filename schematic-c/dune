@@ -3,7 +3,17 @@
 (library
  (name schematic_c)
  (public_name schematic-c)
- (libraries base base64 ezjsonm fmt logs ptime schematic semver2 uri)
+ (libraries
+  base
+  base64
+  ezjsonm
+  fmt
+  logs
+  ocaml-compiler-libs.common
+  ptime
+  schematic
+  semver2
+  uri)
  (preprocess
   (pps
    schematic_ppx_inside

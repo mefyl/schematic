@@ -65,7 +65,6 @@ module Of = C_walk.Walk (struct
             name;
             basic = [ Identifier.make "none" ];
             rich = [ (Identifier.make "some", c) ];
-            hashes = [];
           },
         marks )
     in
@@ -88,31 +87,31 @@ module Of = C_walk.Walk (struct
       in
       (Struct { fields }, marks)
 
-  let union ~name ~key:_ ~cases ~hashes =
+  let union ~name ~polymorphic ~(cases : (string * string * (c * Marks.t)) list)
+      =
     let name = Option.value_exn name in
     let constructors, marks =
       cases
-      |> List.map ~f:(fun (s, (c, m)) -> ((Identifier.make s, c), m))
+      |> List.map ~f:(fun (s, raw_s, (c, m)) ->
+             ((Identifier.make s, raw_s, c), m))
       |> List.unzip
     in
     let marks = marks |> Marks.merge in
-    Logs.debug (fun m -> m "union %s marks: %a@." name Marks.pp marks);
-    let hashes =
-      match List.zip (constructors |> List.map ~f:fst) hashes with
-      | Ok l -> l
-      | Unequal_lengths -> []
-    in
     let basic, rich =
       constructors
       |> List.partition_map ~f:(function
-           | s, Void -> First s
-           | (_, _) as x -> Second x)
+           | s, raw_s, Void -> First (s, raw_s)
+           | x -> Second x)
     in
     (* Give names to inline payload types that would otherwise be impossible to
-       refer to from Swift *)
+       refer to from Swift. We do this by creating extra marks.
+
+       XXX: would be nice to reference those marks in the converter, but as it
+       stands, this might break the distinction between inline and regular
+       payloads *)
     let inline_payload_marks =
       rich
-      |> List.map ~f:(fun (id, constr_c) ->
+      |> List.map ~f:(fun (id, _, constr_c) ->
              match constr_c with
              | Tuple _ | Struct _ ->
                let id = Fmt.str "%s__%a" name Identifier.pp id in
@@ -122,7 +121,25 @@ module Of = C_walk.Walk (struct
       |> Marks.merge
     in
     let marks = Marks.merge [ marks; inline_payload_marks ] in
-    (Variant { name = Identifier.make name; basic; rich; hashes }, marks)
+    let name = Identifier.make name in
+    if polymorphic then
+      let basic =
+        List.map
+          ~f:(fun (id, raw_name) ->
+            (id, Ocaml_common.Btype.hash_variant raw_name))
+          basic
+      in
+      let rich =
+        List.map
+          ~f:(fun (id, raw_name, c) ->
+            (id, Ocaml_common.Btype.hash_variant raw_name, c))
+          rich
+      in
+      (Poly_variant { name; basic; rich }, marks)
+    else
+      let basic = List.map ~f:(fun (id, _) -> id) basic in
+      let rich = List.map ~f:(fun (id, _, c) -> (id, c)) rich in
+      (Variant { name; basic; rich }, marks)
 
   let tuple ts =
     let items, marks = List.unzip ts in

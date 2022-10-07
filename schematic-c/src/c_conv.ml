@@ -51,7 +51,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
       in
       (`Pointer, [], const pp_statements statements)
       (* Plain-only regular variant *)
-    | Variant { basic; rich = []; hashes = []; _ } ->
+    | Variant { basic; rich = []; _ } ->
       let pp =
         const pp_statements
           [
@@ -61,7 +61,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
       in
       (`Plain, [], pp)
       (* Regular variant with payloads *)
-    | Variant { basic; rich; hashes = []; _ } ->
+    | Variant { basic; rich; _ } ->
       let plain_case =
         const pp_statements
           [ "assert(res.tag < n_basic)"; "res.tag = Int_val(v)" ]
@@ -136,16 +136,14 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
           ++ vbox ~indent (const string "} else {" ++ cut ++ rich_case)
           ++ cut ++ const char '}') )
     (* Polymorphic variant *)
-    | Variant { basic; rich; hashes; _ } ->
+    | Poly_variant { basic; rich; _ } ->
       let basic_only = List.is_empty rich in
       let case_name = case_name ~rich:(not basic_only) in
-      let get_hash = List.Assoc.find_exn hashes ~equal:Identifier.equal in
       let elses =
         let basic =
           const (list ~sep:cut string)
             (basic
-            |> List.map ~f:(fun id ->
-                   let hash = get_hash id in
+            |> List.map ~f:(fun (id, hash) ->
                    let tag = if basic_only then "res" else "res.tag" in
                    Fmt.str "else if (v == Val_long(%d)) %s = %a;" hash tag
                      Identifier.pp (case_name name id)))
@@ -153,9 +151,8 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         if basic_only then basic
         else
           let elses =
-            let pp_rich : (Identifier.t * c) Fmt.t =
-             fun fmt (id, constr_c) ->
-              let hash = get_hash id in
+            let pp_rich : (Identifier.t * int * c) Fmt.t =
+             fun fmt (id, hash, constr_c) ->
               let elseif = Fmt.str "else if (tag == Val_long(%d))" hash in
               let body =
                 const pp_statements
@@ -358,14 +355,14 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
       in
       ("p", `Pointer, const pp_statements statements)
     (* Plain-only regular variant *)
-    | Variant { basic; rich = []; hashes = []; _ } ->
+    | Variant { basic; rich = []; _ } ->
       let pp =
         const pp_statements
           [ Fmt.str "assert(x < %d)" (List.length basic); "return Val_int(x)" ]
       in
       ("x", `Plain, pp)
     (* Regular variant with payloads *)
-    | Variant { name = variant_name; basic; rich; hashes = [] } ->
+    | Variant { name = variant_name; basic; rich; } ->
       let pp =
         let basic_cases : (string * unit Fmt.t) list =
           basic
@@ -439,15 +436,13 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
         ++ const pp_statements [ return_val "v" ]
       in
       ("x", `Plain, pp)
-    | Variant { basic; rich; hashes; _ } ->
+    | Poly_variant { basic; rich;  _ } ->
       let basic_only = List.is_empty rich in
-      let get_hash = List.Assoc.find_exn hashes ~equal:Identifier.equal in
       let case_name = case_name ~rich:(not basic_only) in
       let cases =
         let basic =
           basic
-          |> List.map ~f:(fun id ->
-                 let hash = get_hash id in
+          |> List.map ~f:(fun (id , hash ) ->
                  let case = case_name name id |> Identifier.to_string in
                  let contents =
                    const pp_statements
@@ -457,8 +452,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
         in
         let rich =
           rich
-          |> List.map ~f:(fun (id, constr_c) ->
-                 let hash = get_hash id in
+          |> List.map ~f:(fun (id, hash, constr_c) ->
                  let case = case_name name id |> Identifier.to_string in
                  let c_pl = Fmt.str "x.payload->%a" Identifier.pp id in
                  let payload_val =

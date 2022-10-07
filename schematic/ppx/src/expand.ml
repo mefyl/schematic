@@ -1013,12 +1013,19 @@ module Schema = struct
               | None ->
                 expanded_of_descriptor ~loc [%expr String_const [%e name]]
               | Some aliases ->
+                (* FIXME: aliases, polymorphic variants and C codegen don't
+                   interact well.
+
+                   Encountering an alias wil most likely break C codegen for
+                   now. *)
                 expanded_of_descriptor ~loc
                   [%expr
                     let __schematic_case name =
                       Case
                         {
                           name;
+                          (* FIXME: see above. *)
+                          raw_name = name;
                           schema =
                             {
                               descriptor = String_const name;
@@ -1029,12 +1036,10 @@ module Schema = struct
                           decoder = (fun () -> ());
                         }
                     in
-                    (* FIXME: aliases and polymorphic variants don't interact
-                       well *)
                     Union
                       {
-                        hashes = [];
                         key = None;
+                        polymorphic = false;
                         cases =
                           __schematic_case [%e name]
                           :: Stdlib.List.map __schematic_case [%e aliases];
@@ -1096,6 +1101,7 @@ module Schema = struct
           Schema.Case
             {
               name = [%e name];
+              raw_name = [%e Ast.estring txt];
               schema = [%e schema_of_expanded ~loc schema];
               encoder = [%e construct];
               decoder = [%e destruct];
@@ -1104,22 +1110,14 @@ module Schema = struct
       match type_context.attributes.union_key with
       | None -> [%expr None]
       | Some name -> [%expr Some [%e Ast.estring name]]
-    and hashes =
-      if poly then
-        List.map
-          ~f:(fun (txt, _, _, _) ->
-            let hash = Ocaml_common.Btype.hash_variant txt in
-            [%expr [%e Ast.eint hash]])
-          options
-      else []
     in
     expanded_of_descriptor ~loc
       [%expr
         Schema.Union
           {
+            polymorphic = [%e Ast.ebool poly];
             cases = [%e Ast.elist (List.filter_map ~f options)];
             key = [%e key];
-            hashes = [%e Ast.elist hashes];
           }]
 
   let expand_abstract_type ~context ~type_context t =

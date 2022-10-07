@@ -53,11 +53,13 @@ module Either = struct
     let descriptor first second =
       Schema.Union
         {
+          polymorphic = false;
           cases =
             [
               Case
                 {
                   name = "first";
+                  raw_name = "First";
                   schema = first;
                   encoder = (function First x -> Some x | Second _ -> None);
                   decoder = Either.first;
@@ -65,13 +67,13 @@ module Either = struct
               Case
                 {
                   name = "second";
+                  raw_name = "Second";
                   schema = second;
                   encoder = (function Second x -> Some x | First _ -> None);
                   decoder = Either.second;
                 };
             ];
           key = None;
-          hashes = [];
         }
     in
     let parametric =
@@ -107,11 +109,13 @@ module Result = struct
     let descriptor t error_schema =
       Schema.Union
         {
+          polymorphic = false;
           cases =
             [
               Case
                 {
                   name = "t";
+                  raw_name = "Ok";
                   schema = t;
                   encoder = (function Ok x -> Some x | Error _ -> None);
                   decoder = Result.return;
@@ -119,6 +123,7 @@ module Result = struct
               Case
                 {
                   name = "error";
+                  raw_name = "Error";
                   schema = error_schema;
                   encoder =
                     (function Result.Error x -> Some x | Result.Ok _ -> None);
@@ -126,7 +131,6 @@ module Result = struct
                 };
             ];
           key = None;
-          hashes = [];
         }
     in
     let parametric =
