@@ -10,7 +10,7 @@
    ppx_deriving.show
    ppx_deriving.ord
    ppx_here))
- (libraries alcotest schematic base fmt sexplib))
+ (libraries alcotest schematic base fmt))
 
 (test
  (name test)
