@@ -1,4 +1,4 @@
-(lang dune 2.8)
+(lang dune 2.9)
 
 (name schematic)
 
@@ -15,6 +15,8 @@
 (homepage https://gitlab.routine.co/routine/schematic)
 
 (bug_reports https://gitlab.routine.co/routine/schematic/-/issues)
+
+(executables_implicit_empty_intf true)
 
 (source
  (uri git+https://gitlab.routine.co/routine/schematic.git))
@@ -114,10 +116,11 @@
 (package
  (name schematic-c)
  (synopsis "Generate C types and converters based on schemas")
- (authors "Yohaï-Eliel BERREBY <yberreby@pm.me>")
+ (authors "Yoha\195\175-Eliel BERREBY <yberreby@pm.me>")
  (depends
   logs
-  (ppx_hash (= v0.14.0))
+  (ppx_hash
+   (= v0.14.0))
   (schematic
    (= :version))))
 

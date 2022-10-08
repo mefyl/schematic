@@ -40,7 +40,7 @@ external record_with_indir_field_rt_id :
    a type that itself contains a type whose boxed/unboxed status is ambiguous.
    This is dangerous. For now (4.12.1) it will work by default, but this may
    break in the future. @@boxed will help. *)
-external record_containing_ambiguous_record_rt_id :
+external _record_containing_ambiguous_record_rt_id :
   record_containing_ambiguous_record -> record_containing_ambiguous_record
   = "sch_record_containing_ambiguous_record_rt_id"
 

@@ -8,4 +8,5 @@ end
 
 type jsoo = { jsoo : int } [@@deriving schema ~jsoo:false]
 
+let _ignore (_ : jsoo_js) = ()
 let () = Fmt.pr "%a" Schematic.Schema.pp jsoo_schema
