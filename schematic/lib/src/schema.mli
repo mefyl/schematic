@@ -54,7 +54,7 @@ val make : ?id:string -> ?parametric:'t parametric -> 't descriptor -> 't t
 val fixpoint : ('a descriptor -> 'a descriptor) -> 'a descriptor
 
 module Walk (W : WALK) : sig
-  val descriptor : 't descriptor -> W.t
-  val parametric : 't parametric -> W.t
-  val schema : 't t -> W.t
+  val descriptor : 't descriptor -> W.t W.M.t
+  val parametric : 't parametric -> W.t W.M.t
+  val schema : 't t -> W.t W.M.t
 end

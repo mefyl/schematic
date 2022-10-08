@@ -95,36 +95,6 @@ and pp : type u. u t Fmt.t =
 
 (* Inline helpers *)
 
-module Default_walk (Default : WALK_DEFAULT) :
-  WALK with type t = Default.t and type fields = Default.fields = struct
-  include Default
-
-  let schema _ _ _ = t
-  let parametric _ _ _ _ = t
-  let fields_empty _ = fields
-  let field_inline _ _ f = f
-  let field_outline _ _ _ f = f
-  let object_ _ = t
-  let case _ _ _ = t
-  let union _ = t
-  let any _ = t
-  let bool _ = t
-  let float _ = t
-  let date _ = t
-  let mapping _ = t
-  let int _ = t
-  let ignore _ = t
-  let int64 _ = t
-  let list _ = t
-  let null _ = t
-  let nullable t = t
-  let string _ = t
-  let string_const _ = t
-  let time _ = t
-  let time_local _ = t
-  let tuple _ = t
-end
-
 type 'res walk_fields = { f : 't. 't fields -> 'res }
 
 let rec walk_fields :
@@ -479,32 +449,37 @@ let inline_v (f : _ inline_v) fields =
 (* Walker *)
 
 module Walk (W : WALK) = struct
-  let rec descriptor : type t. t descriptor -> W.t = function
-    | Any -> W.any ()
-    | Bool -> W.bool ()
-    | Float -> W.float ()
-    | Date -> W.date ()
+  let ( let+ ) = W.M.Let_syntax.( >>| )
+  let ( and+ ) = W.M.Let_syntax.Let_syntax.both
+
+  let rec descriptor : type t. t descriptor -> W.t W.M.t = function
+    | Any -> W.any
+    | Bool -> W.bool
+    | Float -> W.float
+    | Date -> W.date
     | Fixpoint s -> descriptor (Lazy.force s)
-    | Int -> W.int ()
-    | Ignore -> W.ignore ()
-    | Int64 -> W.int64 ()
+    | Int -> W.int
+    | Ignore -> W.ignore
+    | Int64 -> W.int64
     | List l -> W.list (schema l)
-    | Null -> W.null ()
-    | String -> W.string ()
-    | Time -> W.time ()
-    | Time_local -> W.time_local ()
+    | Null -> W.null
+    | String -> W.string
+    | Time -> W.time
+    | Time_local -> W.time_local
     | Map { descriptor = d; _ } -> descriptor d
     | Mapping s -> W.mapping (schema s)
     | Nullable s -> W.nullable (schema s)
     | String_const s -> W.string_const s
     | Object { fields = f; _ } -> W.object_ (fields f)
     | Tuple { items; _ } -> W.tuple @@ tuple items
-    | Union { cases; key; _ } -> W.union @@ List.map ~f:(case key) cases
+    | Union { cases; key; _ } ->
+      let cases = List.map ~f:(case key) cases |> W.M.all in
+      W.union cases
 
-  and case : type t. string option -> t case -> W.t =
+  and case : type t. string option -> t case -> W.t W.M.t =
    fun key (Case { name; schema = s; _ }) -> W.case key name (schema s)
 
-  and schema : type t. t Schema_intf.t -> W.t =
+  and schema : type t. t Schema_intf.t -> W.t W.M.t =
    fun { id; descriptor = d; parametric = p } ->
     let schema () = descriptor d
     and parametric =
@@ -518,7 +493,8 @@ module Walk (W : WALK) = struct
     in
     W.schema id parametric schema
 
-  and parametric : type t. t parametric -> string * string list * W.t list * W.t
+  and parametric :
+      type t. t parametric -> string * string list * W.t W.M.t list * W.t W.M.t
       = function
     | Plain { name; descriptor = d } -> (name, [], [], descriptor d)
     | Parametric { name; parameter; next } ->
@@ -528,8 +504,8 @@ module Walk (W : WALK) = struct
       in
       (template_name, name :: args, schema parameter :: eff_args, t)
 
-  and fields : type t. t fields -> W.fields = function
-    | FieldEnd -> W.fields_empty ()
+  and fields : type t. t fields -> W.fields W.M.t = function
+    | FieldEnd -> W.fields_empty
     | Field
         {
           field =
@@ -553,7 +529,7 @@ module Walk (W : WALK) = struct
       ->
       let fields =
         match walk_fields descriptor { f = (fun f -> fields f) } with
-        | Result.Ok v -> v
+        | Result.Ok v -> W.M.all v
         | Result.Error e -> failwith e
       and rest = fields rest in
       W.field_inline (required requirement) fields rest
@@ -570,13 +546,17 @@ module Walk (W : WALK) = struct
         } -> (
       let rest = fields rest in
       match walk_fields descriptor { f = (fun f -> fields f) } with
-      | Result.Ok fields -> W.field_inline (required requirement) fields rest
+      | Result.Ok fields ->
+        W.field_inline (required requirement) (W.M.all fields) rest
       | Result.Error _ ->
         W.field_outline name (required requirement) (schema s) rest)
 
-  and tuple : type t. t tuple -> W.t list = function
-    | ItemEnd -> []
-    | Item { schema = s; rest } -> schema s :: tuple rest
+  and tuple : type t. t tuple -> W.t list W.M.t = function
+    | ItemEnd -> W.M.return []
+    | Item { schema = s; rest } ->
+      let+ s = schema s
+      and+ rest = tuple rest in
+      s :: rest
 
   let parametric p =
     let name, args, eff_args, t = parametric p in
