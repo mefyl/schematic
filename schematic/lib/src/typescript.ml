@@ -40,26 +40,9 @@ module Of = Schema.Walk (struct
   type field = string * t * bool
   type nonrec t = t
 
-  module M = struct
-    type 'a t = Marks.t -> 'a * Marks.t
-
-    include Base.Monad.Make (struct
-      type nonrec 'a t = 'a t
-
-      let return v marks = (v, marks)
-
-      let bind v ~f marks =
-        let v, marks = v marks in
-        f v marks
-
-      let map =
-        let map v ~f marks =
-          let v, marks = v marks in
-          (f v, marks)
-        in
-        `Custom map
-    end)
-  end
+  module M = State_monad.Make (struct
+    type t = Marks.t
+  end)
 
   let ( let* ) = M.Let_syntax.( >>= )
   let ( and* ) = M.Let_syntax.Let_syntax.both

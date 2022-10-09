@@ -174,14 +174,10 @@ type 't flatten =
     }
       -> 't flatten
 
-(** A ['res inline] maps a field to a ['res]. *)
-type ('fold, 'res) inline = {
-  f : 't 'req. 'fold -> ('t, 'req) field -> 'fold * 'res;
-}
+module Make_inline (M : Base.Monad.S) = struct
+  (** A ['res inline] maps a field to a ['res]. *)
+  type 'res inline = { f : 't 'req. ('t, 'req) field -> 'res M.t }
 
-(** A ['res inline] maps a field and a value for that field to a ['res]. *)
-type 'res inline_v = { f : 't 'req. ('t, 'req) field -> 'req -> 'res }
-
-type ('fold, 'res) inline_v_fold = {
-  f : 't 'req. ('t, 'req) field -> 'fold -> 'req -> 'fold * 'res;
-}
+  (** A ['res inline] maps a field and a value for that field to a ['res]. *)
+  type 'res inline_v = { f : 't 'req. ('t, 'req) field -> 'req -> 'res M.t }
+end

@@ -20,22 +20,20 @@ type 'res walk_fields = { f : 't. 't fields -> 'res }
 val walk_fields :
   't descriptor -> 'res walk_fields -> ('res list, string) result
 
-(** [inline descriptor inline] attemps to inline [descriptor] according to
-    [inline].
+module Make_inline (M : Base.Monad.S) : sig
+  include module type of Make_inline (M)
 
-    This can only succeed on a non-leaf descriptor. *)
-val inline :
-  't descriptor ->
-  'fold ->
-  ('fold, 'res) inline ->
-  ('fold * 'res list list, string) Result.t
+  (** [inline descriptor inline] attemps to inline [descriptor] according to
+      [inline].
 
-val inline_v : 'res inline_v -> 't fields -> ('t -> 'res list, string) result
+      This can only succeed on a non-leaf descriptor. *)
+  val schema :
+    't descriptor -> 'res inline -> ('res list list M.t, string) Result.t
 
-val inline_v_fold :
-  ('fold, 'res) inline_v_fold ->
-  't fields ->
-  ('fold -> 't -> 'fold * 'res list, string) result
+  val value : 'res inline_v -> 't fields -> ('t -> 'res list M.t, string) result
+end
+
+module Inline : module type of Make_inline (Base.Monad.Ident)
 
 val field_ignored : ('t, 'req) field -> bool
 val field_schema : 't field_schema -> 't t

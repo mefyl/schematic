@@ -601,9 +601,9 @@ module Inline = struct
   let descriptor_fields descriptor =
     match
       Schematic.Schema.(
-        inline descriptor () { f = (fun () { name; _ } -> ((), name)) })
+        Inline.schema descriptor { f = (fun { name; _ } -> name) })
     with
-    | Result.Ok ((), sets) -> sets
+    | Result.Ok sets -> sets
     | Result.Error e -> Alcotest.fail e
 
   let record () =

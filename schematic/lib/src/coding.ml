@@ -251,7 +251,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
                   let inline Schema.{ descriptor; _ } =
                     let missing = missing descriptor fields
                     and inlinable =
-                      Schema.inline descriptor () { f = (fun () _ -> ((), ())) }
+                      Schema.Inline.schema descriptor { f = (fun _ -> ()) }
                       |> Result.is_ok
                     in
                     (missing, inlinable)
@@ -396,7 +396,8 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           Coding.of_fields (List.map ~f:(fun (name, v) -> (name, encode v)) v)
       | Object { fields; encode; _ } ->
         let f =
-          Schema.inline_v { f = encode_field } fields |> Result.ok_or_failwith
+          Schema.Inline.value { f = encode_field } fields
+          |> Result.ok_or_failwith
         in
         fun v ->
           let fields = f (encode v) |> List.filter_map ~f:Fn.id in
