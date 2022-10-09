@@ -113,13 +113,10 @@ and 't parametric =
     }
       -> 't parametric
 
-module type WALK_TYPES = sig
-  type t
-  type fields
-end
-
 module type WALK = sig
-  include WALK_TYPES
+  type t
+  type field
+
   module M : Base.Monad.S
 
   (* Schema *)
@@ -133,15 +130,10 @@ module type WALK = sig
 
   (* Object *)
 
-  val fields_empty : fields M.t
-
-  (** [field_inline required fields rest] *)
-  val field_inline : bool -> fields list M.t -> fields M.t -> fields M.t
-
   (** [field_outline name required t rest]*)
-  val field_outline : string -> bool -> t M.t -> fields M.t -> fields M.t
+  val field : string -> bool -> t M.t -> field M.t
 
-  val object_ : fields M.t -> t M.t
+  val object_ : field list list M.t -> t M.t
 
   (* Union *)
 

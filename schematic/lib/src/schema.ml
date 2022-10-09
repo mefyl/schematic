@@ -470,7 +470,7 @@ module Walk (W : WALK) = struct
     | Mapping s -> W.mapping (schema s)
     | Nullable s -> W.nullable (schema s)
     | String_const s -> W.string_const s
-    | Object { fields = f; _ } -> W.object_ (fields f)
+    | Object { fields = f; _ } -> W.object_ (fields true f)
     | Tuple { items; _ } -> W.tuple @@ tuple items
     | Union { cases; key; _ } ->
       let cases = List.map ~f:(case key) cases |> W.M.all in
@@ -504,52 +504,60 @@ module Walk (W : WALK) = struct
       in
       (template_name, name :: args, schema parameter :: eff_args, t)
 
-  and fields : type t. t fields -> W.fields W.M.t = function
-    | FieldEnd -> W.fields_empty
-    | Field
-        {
-          field =
-            {
-              schema =
-                ( Outline { descriptor = Ignore; _ }
-                | Inline { descriptor = Ignore; _ }
-                | Inline_try { descriptor = Ignore; _ } );
-              _;
-            };
-          rest;
-        } ->
-      fields rest
-    | Field { field = { omit = true; _ }; rest } -> fields rest
-    | Field { field = { name; requirement; schema = Outline s; _ }; rest } ->
-      let rest = fields rest
-      and schema = schema s in
-      W.field_outline name (required requirement) schema rest
-    | Field
-        { field = { requirement; schema = Inline { descriptor; _ }; _ }; rest }
-      ->
-      let fields =
-        match walk_fields descriptor { f = (fun f -> fields f) } with
-        | Result.Ok v -> W.M.all v
-        | Result.Error e -> failwith e
-      and rest = fields rest in
-      W.field_inline (required requirement) fields rest
-    | Field
-        {
-          field =
-            {
-              name;
-              requirement;
-              schema = Inline_try ({ descriptor; _ } as s);
-              _;
-            };
-          rest;
-        } -> (
-      let rest = fields rest in
-      match walk_fields descriptor { f = (fun f -> fields f) } with
-      | Result.Ok fields ->
-        W.field_inline (required requirement) (W.M.all fields) rest
-      | Result.Error _ ->
-        W.field_outline name (required requirement) (schema s) rest)
+  and fields : type t. bool -> t fields -> W.field list list W.M.t =
+    let field_outline inline_required name requirement s rest =
+      let+ field =
+        W.field name (required requirement && inline_required) (schema s)
+      and+ rest = fields inline_required rest in
+      List.map ~f:(List.cons field) rest
+    and field_inline inline_required requirement s rest =
+      match
+        walk_fields s.descriptor
+          { f = (fun f -> fields (required requirement && inline_required) f) }
+      with
+      | Result.Error _ as e -> e
+      | Result.Ok v ->
+        Result.return
+        @@ let+ fields = W.M.all v
+           and+ rest = fields (inline_required && required requirement) rest in
+           let fields =
+             Base.Sequence.(of_list fields |> map ~f:of_list |> concat)
+           in
+           Base.Sequence.(
+             cartesian_product fields (of_list rest)
+             |> map ~f:(fun (l, r) -> l @ r)
+             |> to_list)
+    in
+    fun inline_required -> function
+      | FieldEnd -> W.M.return [ [] ]
+      | Field
+          {
+            field =
+              {
+                schema =
+                  ( Outline { descriptor = Ignore; _ }
+                  | Inline { descriptor = Ignore; _ }
+                  | Inline_try { descriptor = Ignore; _ } );
+                _;
+              };
+            rest;
+          } ->
+        fields inline_required rest
+      | Field { field = { omit = true; _ }; rest } ->
+        fields inline_required rest
+      | Field { field = { name; requirement; schema = Outline s; _ }; rest } ->
+        field_outline inline_required name requirement s rest
+      | Field { field = { requirement; schema = Inline schema; _ }; rest } -> (
+        match field_inline inline_required requirement schema rest with
+        | Result.Ok v -> v
+        | Result.Error e -> failwith e)
+      | Field
+          { field = { name; requirement; schema = Inline_try schema; _ }; rest }
+        -> (
+        match field_inline inline_required requirement schema rest with
+        | Result.Ok v -> v
+        | Result.Error _ ->
+          field_outline inline_required name requirement schema rest)
 
   and tuple : type t. t tuple -> W.t list W.M.t = function
     | ItemEnd -> W.M.return []

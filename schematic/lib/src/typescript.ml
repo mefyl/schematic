@@ -37,7 +37,7 @@ include Marks.Make (struct
 end)
 
 module Of = Schema.Walk (struct
-  type fields = (string * t * bool) list list
+  type field = string * t * bool
   type nonrec t = t
 
   module M = struct
@@ -64,7 +64,6 @@ module Of = Schema.Walk (struct
   let ( let* ) = M.Let_syntax.( >>= )
   let ( and* ) = M.Let_syntax.Let_syntax.both
   let ( let+ ) = M.Let_syntax.( >>| )
-  let ( and+ ) = M.Let_syntax.Let_syntax.both
 
   (* Schema *)
 
@@ -100,29 +99,10 @@ module Of = Schema.Walk (struct
   let atom name marks = (Atom name, marks)
   let any = atom "any"
   let bool = atom "boolean"
-  let fields_empty marks = ([ [] ], marks)
 
-  let field_inline inline_required fields rest =
-    let+ fields = fields
-    and+ rest = rest in
-    let fields = Base.Sequence.(of_list fields |> map ~f:of_list |> concat) in
-    let fields =
-      Base.Sequence.(
-        cartesian_product fields (of_list rest)
-        |> map ~f:(fun (l, r) ->
-               List.map
-                 ~f:(fun (name, t, required) ->
-                   (name, t, required && inline_required))
-                 l
-               @ r)
-        |> to_list)
-    in
-    fields
-
-  let field_outline name required schema rest =
-    let+ schema = schema
-    and+ rest = rest in
-    List.map ~f:(List.cons (name, schema, required)) rest
+  let field name required schema =
+    let+ schema = schema in
+    (name, schema, required)
 
   let float = atom "number"
   let date = atom "Date"
