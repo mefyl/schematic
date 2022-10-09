@@ -143,6 +143,7 @@ let rec walk_fields :
 
 let field_ignored : type req t. (t, req) field -> bool = function
   | { schema = Outline { descriptor = Ignore; _ }; _ } -> true
+  | { schema = Inline { descriptor = Ignore; _ }; _ } -> true
   | { schema = Inline_try { descriptor = Ignore; _ }; _ } -> true
   | { omit; _ } -> omit
 
@@ -530,20 +531,7 @@ module Walk (W : WALK) = struct
     in
     fun inline_required -> function
       | FieldEnd -> W.M.return [ [] ]
-      | Field
-          {
-            field =
-              {
-                schema =
-                  ( Outline { descriptor = Ignore; _ }
-                  | Inline { descriptor = Ignore; _ }
-                  | Inline_try { descriptor = Ignore; _ } );
-                _;
-              };
-            rest;
-          } ->
-        fields inline_required rest
-      | Field { field = { omit = true; _ }; rest } ->
+      | Field { field; rest } when field_ignored field ->
         fields inline_required rest
       | Field { field = { name; requirement; schema = Outline s; _ }; rest } ->
         field_outline inline_required name requirement s rest
