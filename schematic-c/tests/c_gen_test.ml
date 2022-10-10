@@ -140,8 +140,8 @@ payload_variant payload_variant_of_caml(value v) {
   const int n_basic = 3;
   const int n_rich = 2;
   if (Is_long(v)) {
-    assert(res.tag < n_basic);
     res.tag = Int_val(v);
+    assert(res.tag < n_basic);
   } else {
     assert(Tag_val(v) < n_rich);
     res.tag = n_basic + Tag_val(v);
