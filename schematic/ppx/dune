@@ -2,7 +2,7 @@
 
 (library
  (name schematic_ppx_expand)
- (modules expand)
+ (modules attributes attributes_intf expand intf jsoo schema sqml utils)
  (public_name schematic.ppx_expand)
  (libraries base fmt ppxlib semver2)
  (preprocess
