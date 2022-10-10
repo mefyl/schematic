@@ -9,12 +9,8 @@ let required : type a b. (a, b) requirement -> bool = function
   | Computed | Required -> true
   | _ -> false
 
-let map ~decode ~encode { descriptor; _ } =
-  {
-    id = None;
-    descriptor = Map { decode; encode; descriptor };
-    parametric = None;
-  }
+let map ~decode ~encode { descriptor; id; _ } =
+  { id; descriptor = Map { decode; encode; descriptor }; parametric = None }
 
 let field_schema = function
   | Inline schema -> schema
