@@ -140,6 +140,7 @@ let of_schema schema =
                            validation = { t.validation with maximum; minimum };
                          } ),
                        marks ));
+                 filter = None;
                }
         in
         f marks

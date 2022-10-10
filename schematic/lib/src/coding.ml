@@ -251,7 +251,8 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
                   let inline Schema.{ descriptor; _ } =
                     let missing = missing descriptor fields
                     and inlinable =
-                      Schema.Inline.schema descriptor { f = (fun _ -> ()) }
+                      Schema.Inline.schema descriptor
+                        { f = (fun _ -> ()); filter = None }
                       |> Result.is_ok
                     in
                     (missing, inlinable)

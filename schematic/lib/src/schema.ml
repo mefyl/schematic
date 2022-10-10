@@ -171,6 +171,14 @@ module Make_inline (M : Base.Monad.S) = struct
   let ( let++ ) = M.Let_syntax.( >>| )
   let ( and++ ) = M.Let_syntax.Let_syntax.both
 
+  let inline_try ~inline ~outline = function
+    | Inline schema -> inline schema
+    | Inline_try schema -> (
+      match inline schema with
+      | Result.Ok _ as ok -> ok
+      | Result.Error _ -> outline schema)
+    | Outline schema -> outline schema
+
   let schema desc f =
     let rec inline :
         type req res t.
@@ -207,25 +215,7 @@ module Make_inline (M : Base.Monad.S) = struct
             | Required -> inline_fields Required rest)
           | Field { field; rest } ->
             let+ head =
-              let inline =
-                match field.schema with
-                | Inline schema | Inline_try schema -> (
-                  match (field.requirement, req) with
-                  | (Computed | Computed_optional | Default _ | Optional), _
-                  | Required, Required ->
-                    inline schema.descriptor field.requirement f
-                  | Required, Default (head, _) ->
-                    inline schema.descriptor (Default head) f
-                  | Required, ((Computed | Optional) as requirement) ->
-                    inline schema.descriptor requirement f
-                  | Required, Computed_optional ->
-                    inline schema.descriptor Computed_optional f)
-                | Outline _ -> Result.fail "unused"
-              in
-              match (field.schema, inline) with
-              | Inline _, _ -> inline
-              | Inline_try _, Result.Ok _ -> inline
-              | Inline_try _, Result.Error _ | Outline _, _ ->
+              let outline _schema =
                 Result.return
                 @@ let++ head =
                      match (field.requirement, req) with
@@ -273,6 +263,30 @@ module Make_inline (M : Base.Monad.S) = struct
                          }
                    in
                    [ [ head ] ]
+              and inline schema =
+                let next () =
+                  match (field.requirement, req) with
+                  | (Computed | Computed_optional | Default _ | Optional), _
+                  | Required, Required ->
+                    inline schema.descriptor field.requirement f
+                  | Required, Default (head, _) ->
+                    inline schema.descriptor (Default head) f
+                  | Required, ((Computed | Optional) as requirement) ->
+                    inline schema.descriptor requirement f
+                  | Required, Computed_optional ->
+                    inline schema.descriptor Computed_optional f
+                in
+                match f.filter with
+                | None -> next ()
+                | Some filter -> (
+                  match filter schema with
+                  | None -> next ()
+                  | Some res ->
+                    Result.return
+                    @@ let++ res = res in
+                       [ [ res ] ])
+              in
+              inline_try ~inline ~outline field.schema
             and+ tail =
               match req with
               | Computed -> inline_fields Computed rest
@@ -335,29 +349,25 @@ module Make_inline (M : Base.Monad.S) = struct
     let rec inline_field :
         type req t. (t, req) field -> (req -> 'res list M.t, string) Result.t =
      fun field ->
-      let inline : (req -> 'res list M.t, string) Result.t =
-        match field.schema with
-        | Inline schema | Inline_try schema -> (
-          let+ f = inline_descriptor schema.descriptor in
-          match field.requirement with
-          | Required -> (f : req -> 'res list M.t)
-          | Default _ -> f
-          | Computed -> ( function Some v -> f v | None -> M.return [])
-          | Computed_optional -> (
-            function Some (Some v) -> f v | _ -> M.return [])
-          | Optional -> ( function Some v -> f v | None -> M.return []))
-        | Outline _ -> Result.fail "unused"
-      in
-      match (field.schema, inline) with
-      | Inline _, _ -> inline
-      | Inline_try _, Result.Ok _ -> inline
-      | Inline_try _, Result.Error _ | Outline _, _ ->
+      let outline _schema =
         Result.return
         @@
         let f = f.f field in
         fun v ->
           let++ res = f v in
           [ res ]
+      and inline : t Schema_intf.t -> (req -> 'res list M.t, string) Result.t =
+       fun schema ->
+        let+ f = inline_descriptor schema.descriptor in
+        match field.requirement with
+        | Required -> (f : req -> 'res list M.t)
+        | Default _ -> f
+        | Computed -> ( function Some v -> f v | None -> M.return [])
+        | Computed_optional -> (
+          function Some (Some v) -> f v | _ -> M.return [])
+        | Optional -> ( function Some v -> f v | None -> M.return [])
+      in
+      inline_try ~inline ~outline field.schema
     and inline_fields :
         type t. t fields -> (t -> 'res list M.t, string) Result.t = function
       | FieldEnd -> Result.return (fun () -> M.return [])
@@ -469,6 +479,7 @@ module Walk (W : WALK) = struct
             f =
               (fun { name; requirement; schema = s; _ } ->
                 W.field name (required requirement) (schema @@ field_schema s));
+            filter = None;
           }
       in
       match fields with Ok fields -> W.object_ fields | Error e -> failwith e)
@@ -524,6 +535,7 @@ let object_fields descriptor =
         f =
           (fun { name; requirement; _ } ->
             Option.some_if (required requirement) name);
+        filter = None;
       }
   in
   List.map ~f:(List.filter_map ~f:Fn.id) names

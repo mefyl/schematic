@@ -176,7 +176,10 @@ type 't flatten =
 
 module Make_inline (M : Base.Monad.S) = struct
   (** A ['res inline] maps a field to a ['res]. *)
-  type 'res inline = { f : 't 'req. ('t, 'req) field -> 'res M.t }
+  type 'res inline = {
+    f : 't 'req. ('t, 'req) field -> 'res M.t;
+    filter : 't 'req. ('t t -> 'res M.t option) option;
+  }
 
   (** A ['res inline] maps a field and a value for that field to a ['res]. *)
   type 'res inline_v = { f : 't 'req. ('t, 'req) field -> 'req -> 'res M.t }
