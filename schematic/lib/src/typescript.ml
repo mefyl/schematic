@@ -53,16 +53,16 @@ module Of = Schema.Walk (struct
 
   (* Schema *)
 
-  let schema id parametric s marks =
+  let schema id parametric s =
     match parametric with
-    | Some parametric -> parametric () marks
+    | Some parametric -> parametric ()
     | None -> (
       match id with
-      | None -> s () marks
+      | None -> s ()
       | Some id ->
         if String.is_prefix ~prefix:"#" id then
-          (Atom (name @@ String.subo ~pos:1 id), marks)
-        else
+          M.return (Atom (name @@ String.subo ~pos:1 id))
+        else fun marks ->
           let mark = (id, lazy (s () marks)) in
           (Atom (name id), Marks.add marks mark))
 
