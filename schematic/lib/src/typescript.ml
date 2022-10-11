@@ -37,7 +37,10 @@ include Marks.Make (struct
 end)
 
 module Of = Schema.Walk (struct
-  type field = string * t * bool
+  type field =
+    | Field of (string * t * bool)
+    | Type of string
+
   type nonrec t = t
 
   module M = State_monad.Make (struct
@@ -85,9 +88,16 @@ module Of = Schema.Walk (struct
 
   let field name required schema =
     let+ schema = schema in
-    (name, schema, required)
+    Field (name, schema, required)
 
-  let inline _ _ = None
+  let inline s = function
+    | Schema.{ schema = Inline { id = Some id; _ }; _ } ->
+      Some
+        (fun marks ->
+          let mark = Marks.make id @@ fun () -> s () marks in
+          (Type (name id), mark))
+    | _ -> None
+
   let float = atom "number"
   let date = atom "Date"
   let int = float
@@ -109,7 +119,18 @@ module Of = Schema.Walk (struct
     Union [ schema; Atom "null" ]
 
   let object_ fields =
-    let f fields = Object { fields } in
+    let f fields =
+      let fields, types =
+        List.partition_map fields ~f:(function
+          | Field f -> First f
+          | Type t -> Second t)
+      in
+      let object_ = Object { fields } in
+      match types with
+      | [] -> object_
+      | _ -> Intersection (object_ :: List.map ~f:(fun t -> Atom t) types)
+    in
+
     let+ fields = fields in
     match fields with
     | [] -> failwith "typescript: of_objects yielded no result"

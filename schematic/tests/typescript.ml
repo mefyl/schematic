@@ -33,6 +33,7 @@ and option_option = { oo : int option option }
 and option_default = { od : int option hidden_option [@default None] }
 [@@deriving schema]
 
+let inline_typescript = ("Inline", {|{ "b"?: number }|})
 let tuple_typescript = ("Tuple", "[ string, number, null ]")
 
 type keyed_variant =
@@ -96,7 +97,7 @@ module ShouldInlineOptions = struct
 end
 
 let record_typescript =
-  ("Record", {|{ "a": number; "b"?: number; "c": string }|})
+  [ inline_typescript; ("Record", {|{ "a": number; "c": string } & Inline|}) ]
 
 let variant_typescript = ("Variant", {|Record | { "i": number }|})
 
@@ -120,7 +121,7 @@ module Generate_types = struct
   let nullable () =
     test ~here:[%here] nullable_schema [ ("Nullable", "boolean | null") ]
 
-  let record () = test ~here:[%here] record_schema [ record_typescript ]
+  let record () = test ~here:[%here] record_schema record_typescript
 
   type string_or_int = (string, int) Either.t [@@deriving schema]
 
@@ -140,12 +141,10 @@ module Generate_types = struct
         ("Either<First, Second>", "First | Second");
       ];
     test ~here:[%here] record_res_schema
-      [
-        ("RecordRes", "Result<Record, string>");
-        ( "Result<T, Error>",
-          {|T & { "status": "ok" } | Error & { "status": "error" }|} );
-        record_typescript;
-      ]
+    @@ ("RecordRes", "Result<Record, string>")
+       :: ( "Result<T, Error>",
+            {|T & { "status": "ok" } | Error & { "status": "error" }|} )
+       :: record_typescript
 
   let tuple () = test ~here:[%here] tuple_schema [ tuple_typescript ]
 
@@ -155,26 +154,25 @@ module Generate_types = struct
         {|Record & { "kind": "krecord" } | { "i": number } & { "kind": "kotherwise" }|}
       )
     and record = record_typescript in
-    test ~here:[%here] variant_schema [ variant_typescript; record ];
-    test ~here:[%here] keyed_variant_schema [ keyed; record ]
+    test ~here:[%here] variant_schema (variant_typescript :: record);
+    test ~here:[%here] keyed_variant_schema (keyed :: record)
 
   let inline_variant () =
     test ~here:[%here] inline_variant_schema
       [
-        ( "InlineVariant",
-          {|{ "coin": string; "a": number; "b"?: number; "c": string } |
-{ "coin": string; "i": number }|}
-        );
+        inline_typescript;
+        ("InlineVariant", {|{ "coin": string } & Variant|});
+        ("Record", "{ \"a\": number; \"c\": string } & Inline");
+        ("Variant", "Record | { \"i\": number }");
       ]
 
   let inline_keyed_variant () =
     test ~here:[%here] inline_keyed_variant_schema
-      [
-        ( "InlineKeyedVariant",
-          {|{ "coin": string; "kind": "krecord"; "a": number; "b"?: number; "c": string } |
-{ "coin": string; "kind": "kotherwise"; "i": number }|}
-        );
-      ]
+    @@ ("InlineKeyedVariant", {|{ "coin": string } & KeyedVariant|})
+       :: ( "KeyedVariant",
+            {|Record & { "kind": "krecord" } | { "i": number } & { "kind": "kotherwise" }|}
+          )
+       :: record_typescript
 
   type 'a inline_try = {
     maybe : bool;
@@ -186,8 +184,9 @@ module Generate_types = struct
     test ~here:[%here]
       { (inline_try_schema record_schema) with parametric = None }
       [
+        inline_typescript;
         ( "RecordInlineTry",
-          {|{ "maybe": boolean; "a": number; "b"?: number; "c": string }|} );
+          {|{ "maybe": boolean; "a": number; "c": string } & Inline|} );
       ];
     test ~here:[%here]
       { (inline_try_schema tuple_schema) with parametric = None }
@@ -205,8 +204,8 @@ module Generate_types = struct
   let hidden_inline_optional () =
     test ~here:[%here] ShouldInlineOptions.schema
       [
-        ( "Shouldinlineoptions",
-          {|{ "mandatory_id"?: string; "a"?: string; "a_opt"?: string }|} );
+        ("Fields", {|{ "a": string; "a_opt"?: string }|});
+        ("Shouldinlineoptions", {|{ "mandatory_id"?: string } & Fields|});
       ]
 
   let computed () =
