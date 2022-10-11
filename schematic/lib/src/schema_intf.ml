@@ -113,6 +113,8 @@ and 't parametric =
     }
       -> 't parametric
 
+type ('t, 'req) schema_field = ('t, 'req) field
+
 module type WALK = sig
   type t
   type field
@@ -134,6 +136,7 @@ module type WALK = sig
   val field : string -> bool -> t M.t -> field M.t
 
   val object_ : field list list M.t -> t M.t
+  val inline : (unit -> t M.t) -> ('t, 'req) schema_field -> field M.t option
 
   (* Union *)
 
@@ -178,7 +181,7 @@ module Make_inline (M : Base.Monad.S) = struct
   (** A ['res inline] maps a field to a ['res]. *)
   type 'res inline = {
     f : 't 'req. ('t, 'req) field -> 'res M.t;
-    filter : 't 'req. ('t t -> 'res M.t option) option;
+    filter : 't 'req. (('t, 'req) field -> 'res M.t option) option;
   }
 
   (** A ['res inline] maps a field and a value for that field to a ['res]. *)

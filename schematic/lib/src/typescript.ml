@@ -87,6 +87,7 @@ module Of = Schema.Walk (struct
     let+ schema = schema in
     (name, schema, required)
 
+  let inline _ _ = None
   let float = atom "number"
   let date = atom "Date"
   let int = float

@@ -279,7 +279,7 @@ module Make_inline (M : Base.Monad.S) = struct
                 match f.filter with
                 | None -> next ()
                 | Some filter -> (
-                  match filter schema with
+                  match filter field with
                   | None -> next ()
                   | Some res ->
                     Result.return
@@ -474,13 +474,14 @@ module Walk (W : WALK) = struct
     | String_const s -> W.string_const s
     | Object _ as o -> (
       let fields =
-        Inline.schema o
-          {
-            f =
-              (fun { name; requirement; schema = s; _ } ->
-                W.field name (required requirement) (schema @@ field_schema s));
-            filter = None;
-          }
+        let f { name; requirement; schema = s; _ } =
+          W.field name (required requirement) (schema @@ field_schema s)
+        and filter field =
+          W.inline
+            (fun () -> descriptor (field_schema field.schema).descriptor)
+            field
+        in
+        Inline.schema o { f; filter = Some filter }
       in
       match fields with Ok fields -> W.object_ fields | Error e -> failwith e)
     | Tuple { items; _ } -> W.tuple @@ tuple items
