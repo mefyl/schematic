@@ -37,5 +37,8 @@
    ppx_deriving.show
    ppx_deriving.ord
    ppx_here
-   schematic_ppx))
+   schematic_ppx
+   --
+   --cookie
+   "schematic-version=\"0.15.0\""))
  (libraries alcotest schematic test_utils))

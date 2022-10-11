@@ -199,10 +199,10 @@ let add ~inside ~jsoo ~version =
     lazy
       (let () =
          match !version with
-         | None | Some Semver.{ major = 0; minor = 14; _ } -> ()
+         | None | Some Semver.{ major = 0; minor = 15; _ } -> ()
          | Some version ->
            Fmt.failwith
-             "schematic ppx version mismatch: expecting 0.14.x, got %a"
+             "schematic ppx version mismatch: expecting 0.15.x, got %a"
              Semver.pp version Ast_pattern.parse
        in
        { inside; enable_jsoo = !jsoo; version = !version })

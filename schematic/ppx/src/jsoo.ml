@@ -62,17 +62,13 @@ and expand_record ~context ~type_context fields =
       | Outline ->
         let t =
           let js_t =
-            match context.global.version with
-            | Some { major = 0; minor = 13; patch; _ } when patch < 1 ->
+            match Attributes.requirement attributes with
+            | (Computed | Required), type_ ->
               expand_type ~loc ~context ~type_context type_
-            | _ -> (
-              match Attributes.requirement attributes with
-              | (Computed | Required), type_ ->
-                expand_type ~loc ~context ~type_context type_
-              | (Computed_optional | Default_opt _ | Optional), type_ ->
-                [%type:
-                  [%t expand_type ~loc ~context ~type_context type_]
-                  Js_of_ocaml.Js.Optdef.t])
+            | (Computed_optional | Default_opt _ | Optional), type_ ->
+              [%type:
+                [%t expand_type ~loc ~context ~type_context type_]
+                Js_of_ocaml.Js.Optdef.t]
           in
           if mutable_ then [%type: [%t js_t] Js_of_ocaml.Js.prop]
           else [%type: [%t js_t] Js_of_ocaml.Js.readonly_prop]
@@ -115,7 +111,7 @@ and expand_polymorphic_variant ~loc ~context ~type_context options =
   in
   expand_any_variant ~loc ~context ~type_context true @@ List.map ~f options
 
-and expand_any_variant ~loc ~context ~type_context _ options =
+and expand_any_variant ~loc ~context:_ ~type_context _ options =
   let module Ast = (val Ast_builder.make loc) in
   if
     Option.is_some
@@ -123,10 +119,9 @@ and expand_any_variant ~loc ~context ~type_context _ options =
          ~f:(function _, Pcstr_tuple [], _, _ -> false | _ -> true)
          options
   then
-    match (context.global.version, type_context.attributes.union_key) with
-    | _, None | Some { major = 0; minor = 13; patch = 0; _ }, _ ->
-      [%type: Js_of_ocaml.Js.Unsafe.any]
-    | _, Some key ->
+    match type_context.attributes.union_key with
+    | None -> [%type: Js_of_ocaml.Js.Unsafe.any]
+    | Some key ->
       let fields =
         let string_prop =
           [%type:
