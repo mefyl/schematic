@@ -14,8 +14,8 @@ end
 
 type ('a, 'body, 'response) request =
   ?headers:(string * string) list ->
-  ?body:'body Schematic.schema * 'body ->
-  'response Schematic.schema ->
+  ?body:'body Schematic.Schema.t * 'body ->
+  'response Schematic.Schema.t ->
   'a
 
 module type S = sig
