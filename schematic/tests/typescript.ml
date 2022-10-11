@@ -103,7 +103,7 @@ let variant_typescript = ("Variant", {|Record | { "i": number }|})
 module Generate_types = struct
   open Test_utils
 
-  let test t (expected : _ list) =
+  let test ~here t (expected : _ list) =
     let expected = Base.Set.of_list (module String_pair) expected in
 
     let actual =
@@ -114,11 +114,13 @@ module Generate_types = struct
     in
 
     Alcotest.(
-      check Testables.Set.String_pair.set "typescript declarations" expected
-        actual)
+      check ~here Testables.Set.String_pair.set "typescript declarations"
+        expected actual)
 
-  let nullable () = test nullable_schema [ ("Nullable", "boolean | null") ]
-  let record () = test record_schema [ record_typescript ]
+  let nullable () =
+    test ~here:[%here] nullable_schema [ ("Nullable", "boolean | null") ]
+
+  let record () = test ~here:[%here] record_schema [ record_typescript ]
 
   type string_or_int = (string, int) Either.t [@@deriving schema]
 
@@ -132,12 +134,12 @@ module Generate_types = struct
   type record_res = (record, string) res [@@deriving schema]
 
   let parametric () =
-    test string_or_int_schema
+    test ~here:[%here] string_or_int_schema
       [
         ("StringOrInt", "Either<string, number>");
         ("Either<First, Second>", "First | Second");
       ];
-    test record_res_schema
+    test ~here:[%here] record_res_schema
       [
         ("RecordRes", "Result<Record, string>");
         ( "Result<T, Error>",
@@ -145,7 +147,7 @@ module Generate_types = struct
         record_typescript;
       ]
 
-  let tuple () = test tuple_schema [ tuple_typescript ]
+  let tuple () = test ~here:[%here] tuple_schema [ tuple_typescript ]
 
   let variant () =
     let keyed =
@@ -153,11 +155,11 @@ module Generate_types = struct
         {|Record & { "kind": "krecord" } | { "i": number } & { "kind": "kotherwise" }|}
       )
     and record = record_typescript in
-    test variant_schema [ variant_typescript; record ];
-    test keyed_variant_schema [ keyed; record ]
+    test ~here:[%here] variant_schema [ variant_typescript; record ];
+    test ~here:[%here] keyed_variant_schema [ keyed; record ]
 
   let inline_variant () =
-    test inline_variant_schema
+    test ~here:[%here] inline_variant_schema
       [
         ( "InlineVariant",
           {|{ "coin": string; "a": number; "b"?: number; "c": string } |
@@ -166,7 +168,7 @@ module Generate_types = struct
       ]
 
   let inline_keyed_variant () =
-    test inline_keyed_variant_schema
+    test ~here:[%here] inline_keyed_variant_schema
       [
         ( "InlineKeyedVariant",
           {|{ "coin": string; "kind": "krecord"; "a": number; "b"?: number; "c": string } |
@@ -181,13 +183,13 @@ module Generate_types = struct
   [@@deriving schema]
 
   let inline_try () =
-    test
+    test ~here:[%here]
       { (inline_try_schema record_schema) with parametric = None }
       [
         ( "RecordInlineTry",
           {|{ "maybe": boolean; "a": number; "b"?: number; "c": string }|} );
       ];
-    test
+    test ~here:[%here]
       { (inline_try_schema tuple_schema) with parametric = None }
       [
         ("TupleInlineTry", {|{ "maybe": boolean; "inline": Tuple }|});
@@ -197,28 +199,29 @@ module Generate_types = struct
   let recursive () =
     let rec_a = ("RecA", {|{ "self_a": RecA; "other_a": RecB }|})
     and rec_b = ("RecB", {|{ "self_b": RecB; "other_b": RecA }|}) in
-    test rec_a_schema [ rec_a; rec_b ];
-    test rec_b_schema [ rec_b; rec_a ]
+    test ~here:[%here] rec_a_schema [ rec_a; rec_b ];
+    test ~here:[%here] rec_b_schema [ rec_b; rec_a ]
 
   let hidden_inline_optional () =
-    test ShouldInlineOptions.schema
+    test ~here:[%here] ShouldInlineOptions.schema
       [
         ( "Shouldinlineoptions",
           {|{ "mandatory_id"?: string; "a"?: string; "a_opt"?: string }|} );
       ]
 
   let computed () =
-    test Computed.schema
+    test ~here:[%here] Computed.schema
       [
         ( "Computed",
           {|{ "x": number; "y": number; "ratio"?: number; "sum": number }|} );
       ]
 
   let option_option () =
-    test option_option_schema [ ("OptionOption", {|{ "oo"?: number | null }|}) ]
+    test ~here:[%here] option_option_schema
+      [ ("OptionOption", {|{ "oo"?: number | null }|}) ]
 
   let option_default () =
-    test option_default_schema
+    test ~here:[%here] option_default_schema
       [
         ("OptionDefault", {|{ "od"?: HiddenOption }|});
         ("HiddenOption", {|number | null | null|});
