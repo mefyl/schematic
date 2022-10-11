@@ -38,7 +38,7 @@
   (ezjsonm
    (>= 1.1.0))
   (ocaml
-   (>= 4.12.0))
+   (>= 4.14.0))
   fmt
   ppxlib
   ppx_deriving
