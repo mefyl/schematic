@@ -61,10 +61,10 @@ module Of = Schema.Walk (struct
       | None -> s () marks
       | Some id ->
         if String.is_prefix ~prefix:"#" id then
-          (Atom (name @@ String.subo ~pos:1 id), Marks.empty)
+          (Atom (name @@ String.subo ~pos:1 id), marks)
         else
-          let mark = Marks.make id @@ fun () -> s () marks in
-          (Atom (name id), mark))
+          let mark = (id, lazy (s () marks)) in
+          (Atom (name id), Marks.add marks mark))
 
   let parametric template_name args effective t =
     let* t = t
@@ -94,8 +94,8 @@ module Of = Schema.Walk (struct
     | Schema.{ schema = Inline { id = Some id; _ }; _ } ->
       Some
         (fun marks ->
-          let mark = Marks.make id @@ fun () -> s () marks in
-          (Type (name id), mark))
+          let mark = (id, lazy (s () marks)) in
+          (Type (name id), Marks.add marks mark))
     | _ -> None
 
   let float = atom "number"
@@ -130,7 +130,6 @@ module Of = Schema.Walk (struct
       | [] -> object_
       | _ -> Intersection (object_ :: List.map ~f:(fun t -> Atom t) types)
     in
-
     let+ fields = fields in
     match fields with
     | [] -> failwith "typescript: of_objects yielded no result"

@@ -106,14 +106,12 @@ module Generate_types = struct
 
   let test ~here t (expected : _ list) =
     let expected = Base.Set.of_list (module String_pair) expected in
-
     let actual =
       Schematic.Typescript.of_schema t
       |> List.map ~f:(fun (id, schema) ->
              (id, Schematic.Typescript.to_string schema))
       |> Base.Set.of_list (module String_pair)
     in
-
     Alcotest.(
       check ~here Testables.Set.String_pair.set "typescript declarations"
         expected actual)
@@ -225,6 +223,27 @@ module Generate_types = struct
         ("OptionDefault", {|{ "od"?: HiddenOption }|});
         ("HiddenOption", {|number | null | null|});
       ]
+
+  type a = A
+  and b = B
+  and c = C
+
+  and duplicate = {
+    a : a;
+    b : b;
+    b' : b;
+    c : c;
+  }
+  [@@deriving schema]
+
+  let duplicate () =
+    test ~here:[%here] duplicate_schema
+      [
+        ("A", {|"a"|});
+        ("B", {|"b"|});
+        ("C", {|"c"|});
+        ("Duplicate", {|{ "a": A; "b": B; "b'": B; "c": C }|});
+      ]
 end
 
 let () =
@@ -247,5 +266,6 @@ let () =
           test_case "computed" `Quick Generate_types.computed;
           test_case "option option" `Quick Generate_types.option_option;
           test_case "option option" `Quick Generate_types.option_default;
+          test_case "duplicate type" `Quick Generate_types.duplicate;
         ] );
     ]
