@@ -46,6 +46,17 @@ let rec extract ?(alias = false) ?(computed = false) ?(gadt_variant = false)
       Ppxlib.Location.raise_errorf ~loc
         "schematic-ppx: duplicate schematic.%s annotation on schema" name
   in
+  let attribute_name ~loc opt attr_payload attrs =
+    match attrs with
+    | { name = None; _ } ->
+      let expr =
+        expect ~loc Ast_pattern.(single_expr_payload __) attr_payload
+      in
+      { attrs with name = Some (if opt then expr else [%expr Some [%e expr]]) }
+    | _ ->
+      Ppxlib.Location.raise_errorf ~loc
+        "schematic-ppx: duplicate name annotation on schema"
+  in
   function
   | { attr_name = { txt; _ }; attr_loc = loc; attr_payload } :: attrs -> (
     let attrs = extract ~alias ~computed ~name ~union_key attrs in
@@ -99,17 +110,9 @@ let rec extract ?(alias = false) ?(computed = false) ?(gadt_variant = false)
                Ast_pattern.(single_expr_payload (pexp_ident (lident __)))
                attr_payload;
       }
-    | "schematic.name" when name -> (
-      match attrs with
-      | { name = None; _ } ->
-        {
-          attrs with
-          name =
-            Some (expect ~loc Ast_pattern.(single_expr_payload __) attr_payload);
-        }
-      | _ ->
-        Ppxlib.Location.raise_errorf ~loc
-          "schematic-ppx: duplicate schematic.name annotation on schema")
+    | "schematic.name" when name -> attribute_name ~loc false attr_payload attrs
+    | "schematic.name_opt" when name ->
+      attribute_name ~loc true attr_payload attrs
     | "schematic.schema" when schema ->
       {
         attrs with

@@ -492,7 +492,7 @@ let close ~configuration:_ ~context ~type_context schema =
           @@ Ppxlib.Code_path.submodule_path context.code_path
         | name -> name
       in
-      Ast.estring str
+      [%expr Some [%e Ast.estring str]]
     in
     Option.value ~default type_context.attributes.name
   in
@@ -556,9 +556,13 @@ let close ~configuration:_ ~context ~type_context schema =
             else [%expr Schematic.Schema.name_combine]
           in
           [%expr
-            [%e combine]
-              [%e Ast.evar (param_prefix ^ schema_name_versioned name)]
-              [%e exp]]
+            match [%e exp] with
+            | None -> None
+            | Some id ->
+              Some
+                ([%e combine]
+                   [%e Ast.evar (param_prefix ^ schema_name_versioned name)]
+                   id)]
         | [%type: _], _ -> exp
         | t, _ ->
           Ppxlib.Location.raise_errorf ~loc
@@ -576,7 +580,8 @@ let close ~configuration:_ ~context ~type_context schema =
         | _ ->
           let init =
             [%expr
-              Plain { name = [%e schema_id]; descriptor = [%e descriptor] }]
+              Plain
+                { name = __schematic_schema_id; descriptor = [%e descriptor] }]
           and f i parametric arg =
             match arg with
             | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
@@ -647,15 +652,18 @@ let close ~configuration:_ ~context ~type_context schema =
           Schema.
             {
               descriptor = [%e descriptor];
-              id = Some id;
-              parametric = [%e parametric];
+              id;
+              parametric =
+                (match [%e schema_id] with
+                | None -> None
+                | Some __schematic_schema_id -> [%e parametric]);
             }],
         cache )
     | Expression e ->
       let e =
         if context.global.inside then
-          [%expr { ([%e e]) with Schema.id = Some [%e id] }]
-        else [%expr { ([%e e]) with Schematic.Schema.id = Some [%e id] }]
+          [%expr { ([%e e]) with Schema.id = [%e id] }]
+        else [%expr { ([%e e]) with Schematic.Schema.id = [%e id] }]
       in
       (e, false)
   in
