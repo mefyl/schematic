@@ -132,10 +132,22 @@ module type WALK = sig
 
   (* Object *)
 
-  (** [field_outline name required t rest]*)
+  (** [field name required t] walks an object field.
+
+      All schema details such as ignored fields and inlining are handled by the
+      walker. *)
   val field : string -> bool -> t M.t -> field M.t
 
+  (** [object_ fields] combines the fields alternatives in a single object.
+
+      There can be multiple [field list] alternative in case a variant is
+      inlined. *)
   val object_ : field list list M.t -> t M.t
+
+  (** [inline schema field] potentially intercepts inline fields.
+
+      The field is not inlined and replaced with the return value if it is not
+      [None]. The [schema] argument can be used to walk the field schema. *)
   val inline : (unit -> t M.t) -> ('t, 'req) schema_field -> field M.t option
 
   (* Union *)
