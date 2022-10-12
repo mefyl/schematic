@@ -166,7 +166,7 @@ module Of = C_walk.Walk (struct
 
   let time () =
     Lazy.force C_sanity_checks.ptime;
-    make "timespec"
+    make "sch_time"
 
   (* TODO: for clarity, use a struct *)
   let time_local () =
