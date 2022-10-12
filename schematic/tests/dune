@@ -1,6 +1,5 @@
 (library
  (name test_utils)
- (package schematic)
  (modules test_utils)
  (preprocess
   (pps
