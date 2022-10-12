@@ -11,7 +11,7 @@ bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "dune" {>= "2.9"}
   "alcotest" {>= "1.1.0" & with-test}
-  "sqml" {>= "0.7.0" & < "0.8.0"}
+  "sqml" {>= "0.8.0" & < "0.9.0"}
   "schematic" {= version}
   "odoc" {with-doc}
 ]

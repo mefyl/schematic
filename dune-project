@@ -95,8 +95,8 @@
     :with-test))
   (sqml
    (and
-    (>= 0.7.0)
-    (< 0.8.0)))
+    (>= 0.8.0)
+    (< 0.9.0)))
   (schematic
    (= :version))))
 
