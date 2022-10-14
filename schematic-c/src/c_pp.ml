@@ -1,9 +1,12 @@
-let braced ~indent lhs body =
+(* TODO rename this *)
+let braced ?(delim = ('{', '}')) ?(open_sp = true) ~indent lhs body =
+  let delim_open, delim_close = delim in
   let open Fmt in
   let opening =
-    hbox @@ (const string lhs ++ const char ' ' ++ const char '{')
+    let sp = if open_sp then const char ' ' else nop in
+    hbox @@ (const string lhs ++ sp ++ const char delim_open)
   in
-  vbox ~indent (opening ++ cut ++ vbox body) ++ cut ++ const char '}'
+  vbox ~indent (opening ++ cut ++ vbox body) ++ cut ++ const char delim_close
 
 let pp_statements = Fmt.((vbox @@ list ~sep:semi string) ++ const char ';')
 let ptr_type = Fmt.str "%s*"

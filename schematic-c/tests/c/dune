@@ -9,36 +9,36 @@
  (libraries schematic schematic_c ptime))
 
 (test
- (name c_gen_test)
+ (name gen_test)
  (package schematic-c)
- (modules c_gen_test)
+ (modules gen_test)
  (preprocess
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
  (libraries alcotest schematic schematic_c c_test_types))
 
 (executable
- (name c_gen_roundtrip_stubs)
- (modules c_gen_roundtrip_stubs)
+ (name gen_roundtrip_stubs)
+ (modules gen_roundtrip_stubs)
  (libraries alcotest schematic schematic_c c_test_types stdio logs logs.fmt))
 
 (rule
- (targets c_roundtrip_stubs.h c_roundtrip_stubs.c)
+ (targets roundtrip_stubs.h roundtrip_stubs.c)
  (deps (universe))
  (action
-  (run %{dep:c_gen_roundtrip_stubs.exe} %{targets})))
+  (run %{dep:gen_roundtrip_stubs.exe} %{targets})))
 
 (test
- (name c_roundtrip)
+ (name roundtrip)
  (package schematic-c)
  (modes exe)
- (deps c_roundtrip_stubs.o (universe))
+ (deps roundtrip_stubs.o (universe))
  (foreign_stubs
   (language c)
-  (names c_roundtrip_stubs)
+  (names roundtrip_stubs)
   ; When debugging:
   ; (flags -O0)
   )
- (modules c_roundtrip)
+ (modules roundtrip)
  (preprocess
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
- (libraries alcotest schematic schematic_c c_test_types ptime logs logs.fmt))
+ (libraries alcotest schematic_c c_test_types ptime logs logs.fmt))

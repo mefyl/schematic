@@ -1,0 +1,155 @@
+open C_test_types
+open Schematic
+open Swift_test_utils
+
+module Primitive_record : Schema_test = struct
+  let swift =
+    {|
+public struct PrimitiveRecord {
+  typealias C = primitive_record
+  let a: Int
+  let b: Int
+  public func toC() -> primitive_record {
+    primitive_record(
+      a: a.toC(),
+      b: b.toC()
+    )
+  }
+  public static func ofC(_ c: primitive_record) -> PrimitiveRecord {
+    PrimitiveRecord(
+      a: Int.ofC(c.a),
+      b: Int.ofC(c.b)
+    )
+  }
+}
+|}
+
+  let schema = Schema.pack primitive_record_schema
+end
+
+module Wrapper : Schema_test = struct
+  let swift =
+    {|
+public struct Wrapper {
+  typealias C = wrapper
+  let somevar: Int
+  let r: PrimitiveRecord
+  public func toC() -> wrapper {
+    wrapper(
+      somevar: somevar.toC(),
+      r: r.toC()
+    )
+  }
+  public static func ofC(_ c: wrapper) -> Wrapper {
+    Wrapper(
+      somevar: Int.ofC(c.somevar),
+      r: PrimitiveRecord.ofC(c.r)
+    )
+  }
+}
+|}
+
+  let schema = Schema.pack wrapper_schema
+end
+
+module Basic_variant : Schema_test = struct
+  let swift =
+    {|
+public enum BasicVariant {
+  typealias C = basic_variant
+  case a
+  case b
+  public func toC() -> basic_variant {
+    switch self {
+    case .a:
+      return basic_variant_a
+    case .b:
+      return basic_variant_b
+    }
+  }
+  public static func ofC(_ c: basic_variant) -> BasicVariant {
+    switch c {
+    case basic_variant_a:
+      return BasicVariant.a
+    case basic_variant_b:
+      return BasicVariant.b
+    }
+  }
+}
+|}
+
+  let schema = Schema.pack basic_variant_schema
+end
+
+module Payload_variant = struct
+  let swift =
+    {|
+public enum PayloadVariant {
+  typealias C = payload_variant
+  case nothing
+  case nothing2
+  case nothing3
+  case someint(Int)
+  case aPair(Int, String)
+  public func toC() -> payload_variant {
+    switch self {
+    case .nothing:
+      return payload_variant(
+               tag: payload_variant_nothing_tag,
+               payload: nil
+      )
+    case .nothing2:
+      return payload_variant(
+               tag: payload_variant_nothing2_tag,
+               payload: nil
+      )
+    case .nothing3:
+      return payload_variant(
+               tag: payload_variant_nothing3_tag,
+               payload: nil
+      )
+    case let .someint(x):
+      return payload_variant(
+               tag: payload_variant_someint_tag,
+               payload: OpaquePointer(
+                          heapAlloc(
+                            x.toC()
+                          ))
+      )
+    case let .aPair(t0, t1):
+      return payload_variant(
+               tag: payload_variant_a_pair_tag,
+               payload: OpaquePointer(
+                          heapAlloc(
+                            tuple_int_string(
+                              t0: t0.toC(),
+                              t1: t1.toC()
+                            )
+                          )
+               )
+      )
+    }
+  }
+  public static func ofC(_ c: payload_variant) -> PayloadVariant {
+    switch c.tag {
+    case payload_variant_nothing_tag:
+      return PayloadVariant.nothing
+    case payload_variant_nothing2_tag:
+      return PayloadVariant.nothing2
+    case payload_variant_nothing3_tag:
+      return PayloadVariant.nothing3
+    case payload_variant_someint_tag:
+      let payload = UnsafePointer<CInt>(x.payload).pointee
+      return PayloadVariant.someint(payload.toC())
+    case payload_variant_a_pair_tag:
+      let payload = UnsafePointer<tuple_int_string>(x.payload).pointee
+      let t0 = Int.ofC(payload.t0)
+      let t1 = String.ofC(payload.t1)
+      return PayloadVariant.aPair(t0, t1)
+    }
+  }
+}
+|}
+
+  let schema = Schema.pack payload_variant_schema
+end

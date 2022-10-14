@@ -3,6 +3,7 @@ include C_intf
 include C_schemas
 module Runtime = C_runtime
 module Builtins = C_builtins
+module Swift = Swift
 
 let export ?safety_checks (name, c) : c_gen =
   let open Fmt in

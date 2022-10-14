@@ -63,8 +63,7 @@ let pp ?(indent = 2) fmt ts =
         const struct_ fields
       | Variant { name; basic; rich; _ } -> const variant (name, basic, rich)
       | Poly_variant { name; basic; rich; _ } ->
-        let basic = List.map ~f:fst basic in
-        let rich = List.map ~f:(fun (id, _, c) -> (id, c)) rich in
+        let basic, rich = normalize_poly_variant_members basic rich in
         const variant (name, basic, rich)
       | Mapped { front_facing } -> const pp front_facing
       | Void -> nop

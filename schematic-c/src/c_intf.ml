@@ -91,3 +91,8 @@ let rec concrete_type = function
   | Atom (_, Some t) -> concrete_type t
   | Atom (_, None) -> None
   | t -> Some t
+
+let normalize_poly_variant_members basic rich =
+    let basic = List.map ~f:fst basic in
+    let rich = List.map ~f:(fun (id, _, c) -> (id, c)) rich in
+    (basic, rich)
