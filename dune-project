@@ -116,6 +116,7 @@
  (synopsis "Generate C types and converters based on schemas")
  (authors "Yohaï-Eliel BERREBY <yberreby@pm.me>")
  (depends
+  bake
   logs
   (ppx_hash (= v0.14.0))
   (schematic

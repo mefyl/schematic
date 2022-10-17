@@ -9,6 +9,7 @@ homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "dune" {>= "2.8"}
+  "bake"
   "logs"
   "ppx_hash" {= "v0.14.0"}
   "schematic" {= version}

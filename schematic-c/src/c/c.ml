@@ -23,8 +23,6 @@ let signature_src { signature; _ } = Fmt.str "%s;" signature
 let impl_src { signature; impl } =
   Fmt.to_to_string (C_pp.braced ~indent:2 signature impl) ()
 
-let free_src (_ : c_gen) = failwith "no free() yet"
-
 let roundtrip_src (name, c) =
   let open Fmt in
   let open C_pp in

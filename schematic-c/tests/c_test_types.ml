@@ -227,7 +227,6 @@ let mapped_schema = Mapped.schema
 let pp_mapped = Mapped.pp
 let equal_mapped = Mapped.equal
 
-
 (* Exports *)
 
 let reified_parametric_record_schema =

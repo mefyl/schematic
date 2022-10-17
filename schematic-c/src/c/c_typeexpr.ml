@@ -50,8 +50,6 @@ let pp ?(indent = 2) fmt ts =
          ++ const string "data;")
       in
       match ts with
-      | Atom (s, Some (Struct _)) ->
-        const string (Identifier.to_string s) ++ const char '*'
       | Atom (s, _) -> const string (Identifier.to_string s)
       | Array t -> const array t
       (* TODO: do a pass over const-correctness *)

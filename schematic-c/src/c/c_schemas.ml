@@ -16,15 +16,15 @@ let hash_variant s =
 include Schematic.Marks.Make (struct
   type t = c
 
-  let pp = pp
+  let pp = pp_c
 
   module Id = Identifier
 end)
 
 module Of = C_walk.Walk (struct
-  type res = t * Marks.t
-  type fields = (string * t) list * Marks.t
-  type case = string * t
+  type res = c * Marks.t
+  type fields = (string * c) list * Marks.t
+  type case = string * c
   type t = res
 
   let name (c, _marks) = c_typename c |> Identifier.to_string
@@ -57,7 +57,7 @@ module Of = C_walk.Walk (struct
       | None ->
         Logs.debug (fun m -> m "no id\n");
         let c, marks = s () in
-        Logs.debug (fun m -> m "c: %a\n" pp c);
+        Logs.debug (fun m -> m "c: %a\n" pp_c c);
         (c, marks)
       | Some id ->
         Logs.debug (fun m -> m "has id: %s\n" id);
@@ -126,7 +126,7 @@ module Of = C_walk.Walk (struct
       |> List.map ~f:(fun (id, _, constr_c) ->
              match constr_c with
              | Tuple _ | Struct _ ->
-               let id = Fmt.str "%s__%a" name Identifier.pp id in
+               let id = inline_record_c_name ~variant_name:name ~constructor_name:id  in
                let s () = (constr_c, marks) in
                Marks.make id s
              | _ -> Marks.empty)
@@ -195,8 +195,6 @@ module Of = C_walk.Walk (struct
 
   let mapped : string option -> t -> t =
    fun id (c, marks) ->
-    Logs.debug (fun m -> m "mapped: %a@." (Fmt.option Fmt.string) id);
-    Logs.debug (fun m -> m "c: %a@." C_intf.pp c);
     let front_facing, marks =
       let s () = (c, marks) in
       let default = c_typename c |> Identifier.to_string in

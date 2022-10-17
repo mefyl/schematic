@@ -1,4 +1,4 @@
-(include_subdirs no) 
+(include_subdirs no)
 
 (library
  (name c_test_types)
@@ -8,10 +8,14 @@
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show ppx_deriving.make))
  (libraries schematic schematic_c ptime))
 
-
 (executable
  (name gen_roundtrip_stubs)
  (modules gen_roundtrip_stubs)
+ (libraries alcotest schematic schematic_c c_test_types stdio logs logs.fmt))
+
+(executable
+ (name gen_swift_schemas)
+ (modules gen_swift_schemas)
  (libraries alcotest schematic schematic_c c_test_types stdio logs logs.fmt))
 
 (rule
@@ -19,18 +23,36 @@
  (action
   (run %{dep:gen_roundtrip_stubs.exe} %{targets})))
 
+(rule
+ (targets Schemas.swift)
+ (action
+  (run %{dep:gen_swift_schemas.exe} roundtrip_stubs.h %{targets})))
+
+(rule
+ (targets swift.o)
+ (action
+  (run
+   swiftc
+   %{dep:Schemas.swift}
+   -import-objc-header
+   %{dep:roundtrip_stubs.h}
+   -I
+   %{ocaml_where})))
+
 (test
- (name roundtrip)
+ (name c_roundtrip)
  (package schematic-c)
  (modes exe)
- (deps (file roundtrip_stubs.h) (file roundtrip_stubs.h))
+ (deps
+  (file roundtrip_stubs.h)
+  (file roundtrip_stubs.h))
  (foreign_stubs
   (language c)
-   (names roundtrip_stubs)
+  (names roundtrip_stubs)
   ; When debugging:
   ; (flags -O0)
   )
- (modules roundtrip)
+ (modules c_roundtrip)
  (preprocess
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
  (libraries alcotest schematic_c c_test_types ptime logs logs.fmt))

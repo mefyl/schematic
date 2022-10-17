@@ -1,30 +1,28 @@
 open Base
 module Identifier = C_identifier
 
-type t =
+type c =
   | Void
   | String  (** Native string *)
-  | Array of t
-  | Atom of Identifier.t * t option
+  | Array of c
+  | Atom of Identifier.t * c option
       (** The RHS is the referenced type, if known. *)
-  | Struct of { fields : (Identifier.t * t) list }
+  | Struct of { fields : (Identifier.t * c) list }
   | Variant of {
       name : Identifier.t;
       basic : Identifier.t list;
-      rich : (Identifier.t * t) list;
+      rich : (Identifier.t * c) list;
     }
   | Poly_variant of {
       name : Identifier.t;
       (* int: hash *)
       basic : (Identifier.t * int) list;
-      rich : (Identifier.t * int * t) list;
+      rich : (Identifier.t * int * c) list;
     }
-  | Tuple of t list
+  | Tuple of c list
   | Mapped of { (* "serialized" type *)
-                front_facing : t }
-[@@deriving show, hash]
-
-type c = t
+                front_facing : c }
+[@@deriving show, hash, eq, ord]
 
 type c_function = {
   signature : string;
@@ -35,7 +33,7 @@ type c_gen = {
   name : Identifier.t;
   type_expr : unit Fmt.t;
   to_caml : c_function;
-  of_caml : c_function; (* TODO free *)
+  of_caml : c_function;
 }
 
 open Base
@@ -47,7 +45,7 @@ let rec c_typename : c -> Identifier.t = function
   | Array t -> array_name t
   | Variant { name; _ } -> name
   (* Fallback: hash the physical structure of the type. *)
-  | c -> Identifier.make (Fmt.str "_sch_%d" (hash c))
+  | c -> Identifier.make (Fmt.str "_sch_%d" (hash_c c))
 
 and tuple_name items =
   Identifier.make @@ "tuple_"
@@ -93,6 +91,9 @@ let rec concrete_type = function
   | t -> Some t
 
 let normalize_poly_variant_members basic rich =
-    let basic = List.map ~f:fst basic in
-    let rich = List.map ~f:(fun (id, _, c) -> (id, c)) rich in
-    (basic, rich)
+  let basic = List.map ~f:fst basic in
+  let rich = List.map ~f:(fun (id, _, c) -> (id, c)) rich in
+  (basic, rich)
+
+let inline_record_c_name ~variant_name ~constructor_name =
+  Fmt.str "%s__%a" variant_name Identifier.pp constructor_name

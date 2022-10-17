@@ -5,8 +5,8 @@ open Swift_test_utils
 module Primitive_record : Schema_test = struct
   let swift =
     {|
-public struct PrimitiveRecord {
-  typealias C = primitive_record
+public struct PrimitiveRecord: CConvertible {
+  public typealias C = primitive_record
   let a: Int
   let b: Int
   public func toC() -> primitive_record {
@@ -30,8 +30,8 @@ end
 module Wrapper : Schema_test = struct
   let swift =
     {|
-public struct Wrapper {
-  typealias C = wrapper
+public struct Wrapper: CConvertible {
+  public typealias C = wrapper
   let somevar: Int
   let r: PrimitiveRecord
   public func toC() -> wrapper {
@@ -55,8 +55,8 @@ end
 module Basic_variant : Schema_test = struct
   let swift =
     {|
-public enum BasicVariant {
-  typealias C = basic_variant
+public enum BasicVariant: CConvertible {
+  public typealias C = basic_variant
   case a
   case b
   public func toC() -> basic_variant {
@@ -73,6 +73,8 @@ public enum BasicVariant {
       return BasicVariant.a
     case basic_variant_b:
       return BasicVariant.b
+    default:
+      fatalError("malformed C variant")
     }
   }
 }
@@ -84,8 +86,8 @@ end
 module Payload_variant = struct
   let swift =
     {|
-public enum PayloadVariant {
-  typealias C = payload_variant
+public enum PayloadVariant: CConvertible {
+  public typealias C = payload_variant
   case nothing
   case nothing2
   case nothing3
@@ -139,13 +141,15 @@ public enum PayloadVariant {
     case payload_variant_nothing3_tag:
       return PayloadVariant.nothing3
     case payload_variant_someint_tag:
-      let payload = UnsafePointer<CInt>(x.payload).pointee
-      return PayloadVariant.someint(payload.toC())
+      let payload = UnsafePointer<CInt>(c.payload).pointee
+      return PayloadVariant.someint(Int.ofC(payload))
     case payload_variant_a_pair_tag:
-      let payload = UnsafePointer<tuple_int_string>(x.payload).pointee
+      let payload = UnsafePointer<tuple_int_string>(c.payload).pointee
       let t0 = Int.ofC(payload.t0)
       let t1 = String.ofC(payload.t1)
       return PayloadVariant.aPair(t0, t1)
+    default:
+      fatalError("malformed C variant")
     }
   }
 }

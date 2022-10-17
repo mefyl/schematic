@@ -14,26 +14,26 @@ typedef struct {
 
 let primitive_record_of_caml =
   {|
-primitive_record* primitive_record_of_caml(value v) {
+primitive_record primitive_record_of_caml(value v) {
   CAMLparam1(v);
-  primitive_record* res = malloc(sizeof(*res));
+  primitive_record res;
   assert(Is_block(v) && Wosize_val(v) == 2);
-  res->a = int_of_caml(Field(v, 0));
-  res->b = int_of_caml(Field(v, 1));
-  CAMLreturnT(primitive_record*, res);
+  res.a = int_of_caml(Field(v, 0));
+  res.b = int_of_caml(Field(v, 1));
+  CAMLreturnT(primitive_record, res);
 }
 |}
 
 let primitive_record_to_caml =
   {|
-value primitive_record_to_caml(primitive_record* p) {
+value primitive_record_to_caml(primitive_record p) {
   CAMLparam0();
   CAMLlocal1(v);
   int n_fields = 2;
   int tag = 0;
   v = caml_alloc(n_fields, tag);
-  Store_field(v, 0, int_to_caml(p->a));
-  Store_field(v, 1, int_to_caml(p->b));
+  Store_field(v, 0, int_to_caml(p.a));
+  Store_field(v, 1, int_to_caml(p.b));
   CAMLreturn(v);
 }
 |}
@@ -46,32 +46,32 @@ let wrapper_c =
   {|
 typedef struct {
   int somevar;
-  primitive_record* r;
+  primitive_record r;
 } wrapper;
 |}
 
 let wrapper_of_caml =
   {|
-wrapper* wrapper_of_caml(value v) {
+wrapper wrapper_of_caml(value v) {
   CAMLparam1(v);
-  wrapper* res = malloc(sizeof(*res));
+  wrapper res;
   assert(Is_block(v) && Wosize_val(v) == 2);
-  res->somevar = int_of_caml(Field(v, 0));
-  res->r = primitive_record_of_caml(Field(v, 1));
-  CAMLreturnT(wrapper*, res);
+  res.somevar = int_of_caml(Field(v, 0));
+  res.r = primitive_record_of_caml(Field(v, 1));
+  CAMLreturnT(wrapper, res);
 }
 |}
 
 let wrapper_to_caml =
   {|
-value wrapper_to_caml(wrapper* p) {
+value wrapper_to_caml(wrapper p) {
   CAMLparam0();
   CAMLlocal1(v);
   int n_fields = 2;
   int tag = 0;
   v = caml_alloc(n_fields, tag);
-  Store_field(v, 0, int_to_caml(p->somevar));
-  Store_field(v, 1, primitive_record_to_caml(p->r));
+  Store_field(v, 0, int_to_caml(p.somevar));
+  Store_field(v, 1, primitive_record_to_caml(p.r));
   CAMLreturn(v);
 }
 |}
@@ -264,26 +264,26 @@ typedef struct {
 
 let record_with_pair_alias_of_caml =
   {|
-record_with_pair_alias* record_with_pair_alias_of_caml(value v) {
+record_with_pair_alias record_with_pair_alias_of_caml(value v) {
   CAMLparam1(v);
-  record_with_pair_alias* res = malloc(sizeof(*res));
+  record_with_pair_alias res;
   assert(Is_block(v) && Wosize_val(v) == 2);
-  res->a = int_of_caml(Field(v, 0));
-  res->pair_alias = pair_alias_of_caml(Field(v, 1));
-  CAMLreturnT(record_with_pair_alias*, res);
+  res.a = int_of_caml(Field(v, 0));
+  res.pair_alias = pair_alias_of_caml(Field(v, 1));
+  CAMLreturnT(record_with_pair_alias, res);
 }
 |}
 
 let record_with_pair_alias_to_caml =
   {|
-value record_with_pair_alias_to_caml(record_with_pair_alias* p) {
+value record_with_pair_alias_to_caml(record_with_pair_alias p) {
   CAMLparam0();
   CAMLlocal1(v);
   int n_fields = 2;
   int tag = 0;
   v = caml_alloc(n_fields, tag);
-  Store_field(v, 0, int_to_caml(p->a));
-  Store_field(v, 1, pair_alias_to_caml(p->pair_alias));
+  Store_field(v, 0, int_to_caml(p.a));
+  Store_field(v, 1, pair_alias_to_caml(p.pair_alias));
   CAMLreturn(v);
 }
 |}
@@ -291,7 +291,7 @@ value record_with_pair_alias_to_caml(record_with_pair_alias* p) {
 let behemoth_c =
   {|
 typedef struct {
-  diverse* d;
+  diverse d;
   basic_variant b;
   payload_variant p;
   tuple_string_wrapper pair;
@@ -303,7 +303,7 @@ let string_wrapper_tuple_c =
   {|
 typedef struct {
   const char* t0;
-  wrapper* t1;
+  wrapper t1;
 } tuple_string_wrapper;
 |}
 
@@ -498,7 +498,7 @@ value tuple_int_string_to_caml(tuple_int_string x) {
 let primitive_record_in_parametric_c =
   {|
 typedef struct {
-  primitive_record* parameterized_field;
+  primitive_record parameterized_field;
 } primitive_record_parametric_record;
 |}
 

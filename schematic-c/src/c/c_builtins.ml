@@ -77,6 +77,17 @@ typedef struct {
 } sch_time;
 
 typedef const char* sch_json;
+
+
+typedef struct {
+  size_t len;
+  void* data;
+} type_erased_array;
+
+typedef struct {
+  int tag;
+  void* payload;
+} type_erased_option;
 |}
 
 (* TODO: DRY builtin sigs / impls. *)

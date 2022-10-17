@@ -26,12 +26,13 @@ let test ?name ?(deps = []) t =
 let () =
   let open Alcotest in
   run "Schematic.C.Swift"
-    Cases.[
-      ( "typegen",
-        [
-          test (module Primitive_record);
-          test ~deps:[ (module Primitive_record) ] (module Wrapper);
-          test (module Basic_variant);
-          test (module Payload_variant);
-        ] );
-    ]
+    Cases.
+      [
+        ( "typegen",
+          [
+            test (module Primitive_record);
+            test ~deps:[ (module Primitive_record) ] (module Wrapper);
+            test (module Basic_variant);
+            test (module Payload_variant);
+          ] );
+      ]

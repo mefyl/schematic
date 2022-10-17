@@ -40,8 +40,8 @@ module Swiftify = struct
 
     let id id = Identifier.to_string id |> s
 
-    (* ~ FIXME? might not always hold*)
-    let c c = c |> c_typename |> id
+    (* If you ever find yourself reaching for a [c] in this module, stop and use
+       the recursive pp. *)
   end
 
   module Binding = struct

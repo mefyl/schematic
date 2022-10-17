@@ -7,7 +7,9 @@ let () =
   Logs.set_reporter (Logs_fmt.reporter ());
   let argv = Sys.get_argv () in
   let h_filename, c_filename = (argv.(1), argv.(2)) in
-  let h_contents, c_contents = C.export_schemas ~safety_checks:false exported_schemas in
+  let h_contents, c_contents =
+    C.export_schemas ~safety_checks:false exported_schemas
+  in
   let c_contents = Fmt.str "#include \"%s\"" h_filename ^ c_contents in
   let open Stdio.Out_channel in
   write_all h_filename ~data:h_contents;
