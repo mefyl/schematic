@@ -16,19 +16,17 @@
 
 (rule
  (targets roundtrip_stubs.h roundtrip_stubs.c)
- (deps (universe))
  (action
   (run %{dep:gen_roundtrip_stubs.exe} %{targets})))
-
-
 
 (test
  (name roundtrip)
  (package schematic-c)
  (modes exe)
- (deps roundtrip_stubs.o (universe))
+ (deps (file roundtrip_stubs.h) (file roundtrip_stubs.h))
  (foreign_stubs
   (language c)
+   (names roundtrip_stubs)
   ; When debugging:
   ; (flags -O0)
   )
