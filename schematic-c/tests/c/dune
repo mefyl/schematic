@@ -1,13 +1,5 @@
 (include_subdirs no)
 
-(library
- (name c_test_types)
- (package schematic-c)
- (modules c_test_types)
- (preprocess
-  (pps schematic_ppx ppx_deriving.eq ppx_deriving.show ppx_deriving.make))
- (libraries schematic schematic_c ptime))
-
 (test
  (name gen_test)
  (package schematic-c)
@@ -16,29 +8,3 @@
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
  (libraries alcotest schematic schematic_c c_test_types))
 
-(executable
- (name gen_roundtrip_stubs)
- (modules gen_roundtrip_stubs)
- (libraries alcotest schematic schematic_c c_test_types stdio logs logs.fmt))
-
-(rule
- (targets roundtrip_stubs.h roundtrip_stubs.c)
- (deps (universe))
- (action
-  (run %{dep:gen_roundtrip_stubs.exe} %{targets})))
-
-(test
- (name roundtrip)
- (package schematic-c)
- (modes exe)
- (deps roundtrip_stubs.o (universe))
- (foreign_stubs
-  (language c)
-  (names roundtrip_stubs)
-  ; When debugging:
-  ; (flags -O0)
-  )
- (modules roundtrip)
- (preprocess
-  (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
- (libraries alcotest schematic_c c_test_types ptime logs logs.fmt))
