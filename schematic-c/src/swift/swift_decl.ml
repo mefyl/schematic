@@ -168,5 +168,5 @@ let type_decl (c_name, c) : string option =
   Logs.debug (fun m -> m "Encountering %a: %a" Identifier.pp c_name pp_c c);
   match c with
   (* Some types do not need to be individually declared *)
-  | Tuple _ | Array _ | Mapped _ -> None
+  | Tuple _ | Array _ -> None
   | c -> Some (Fmt.to_to_string type_decl (c_name, c))
