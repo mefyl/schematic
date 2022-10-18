@@ -4,8 +4,6 @@ open Base
 open Swift_utils
 
 let indent = 2
-
-(* XXX visibility *)
 let typealias f = Fmt.fmt "public typealias C = %s" f
 let applied = block ~indent ~open_sp:false ~delim:('(', ')')
 
@@ -26,7 +24,6 @@ let switch ?(default : unit Fmt.t option) (on : string)
     (cases : (string * unit Fmt.t) list) : unit Fmt.t =
   let open Fmt in
   let case_ish header body = vbox ~indent @@ (header ++ cut ++ body) in
-
   (* We don't use ablock: because we don't want to increase the indentation
      level inside the switch. *)
   let case : (string * unit Fmt.t) Fmt.t =
@@ -47,95 +44,72 @@ let switch ?(default : unit Fmt.t option) (on : string)
 
 let tuple_bindings n = List.init n ~f:(Fmt.str "t%d")
 
-(* { return tuple_string_wrapper( t0: x.0.toC(), t1: x.1.toC() ) } *)
-
 let rec pp_swift_type f c =
   Logs.debug (fun m -> m "pp_swift_type: %a" pp_c c);
   let open Fmt in
   let array : c Fmt.t = fun f -> Fmt.fmt "Array<%a>" f pp_swift_type in
   let pp =
-    match c with
-    (* Array<T> specialization. Aliases won't help with protocols so no use
-       keeping them around on the Swift side. *)
-    | Array t | Atom (_, Some (Array t)) -> const array t
-    | String -> const string "String"
-    (* Unlike C, Swift has native tuple support. Leverage that. *)
-    | Tuple members | Atom (_, Some (Tuple members)) ->
+    match tuple_members c with
+    | Some members ->
       const char '('
       ++ const (list ~sep:(const string ", ") pp_swift_type) members
       ++ const char ')'
-    | Atom (s, _) ->
-      (* XXX this is ugly *)
-      let override =
-        match s |> Identifier.to_string with
-        | "int64_t" -> Some "Int64"
-        | "sch_json" -> Some "String"
-        (* XXX not bijective *)
-        | "sch_time" -> Some "SchematicTime"
-        | _ -> None
-      in
-      const string (Option.value override ~default:(Swiftify.Type.id s))
-    | Void -> const string "Void"
-    | Mapped { front_facing } -> const pp_swift_type front_facing
-    | Struct _ | Variant _ | Poly_variant _ ->
-      failwith "tried to ref to %a without going through an Atom" pp_c c
+    | None -> (
+      match c with
+      (* Array<T> specialization. Aliases won't help with protocols so no use
+         keeping them around on the Swift side. *)
+      | Array t | Atom (_, Some (Array t)) -> const array t
+      | String -> const string "String"
+      | Atom (s, _) ->
+        (* XXX this is ugly *)
+        let override =
+          match s |> Identifier.to_string with
+          | "int64_t" -> Some "Int64"
+          | "sch_json" -> Some "String"
+          | "sch_time" -> Some "SchematicTime"
+          | _ -> None
+        in
+        const string (Option.value override ~default:(Swiftify.Type.id s))
+      | Void -> const string "Void"
+      | Mapped { front_facing } -> const pp_swift_type front_facing
+      | Struct _ | Variant _ | Poly_variant _ ->
+        failwith "tried to ref to %a without going through an Atom" pp_c c
+      | Tuple _ -> failwith "unreachable")
   in
   pp f ()
 
-let to_c_expr ~c_type ~c_local =
-  (* TODO: handle unnamed types (which cannot be extended )*)
-  match c_type with
-  | Tuple _
-  | Atom (_, Some (Tuple _))
-  (* FIXME recursive traversal to find the hidden type *)
-  | Atom (_, Some (Atom (_, Some (Tuple _)))) ->
-    Fmt.str "tupleToC(%s)" c_local
-  | x -> (
-    let inner = Fmt.str "%s.toC()" c_local in
-    match x with
+let to_c_expr ~c_type ~c_expr =
+  if is_tuple c_type then Fmt.str "tupleToC(%s)" c_expr
+  else
+    let inner = Fmt.str "%s.toC()" c_expr in
+    match c_type with
     | Array c | Atom (_, Some (Array c)) ->
       Fmt.str "unsafeBitCast(%s, to: %a.self)" inner Identifier.pp
         (array_name c)
-    | _ -> inner)
-
-(* XXX/TODO: storage_requires_indirection? *)
+    | _ -> inner
 
 (* Similar to to_c_expr, but takes into account constraints for storing `c_type`
    (i.e. need for indirection.) *)
-let to_c_stored ~c_type ~c_local =
-  let direct = to_c_expr ~c_type ~c_local in
-  match c_type with
-  (* XXX will hopefully remove soon *)
-  (* | Struct _ | Atom (_, Some (Struct _)) -> Fmt.str "heapAlloc(%s)" direct *)
-  | _ -> direct
+let to_c_stored ~c_type ~c_expr =
+  (* Currently, no such constraint exists as we don't support recursive types. *)
+  (*  Previously: "heapAlloc(%s)" *)
+  to_c_expr ~c_type ~c_expr
 
-(* TODO rename c_local c_expr *)
-let of_c_expr ~c_type ~c_local =
-  match c_type with
-  (* Unnamed types cannot be extended *)
-  | Tuple _
-  | Atom (_, Some (Tuple _))
-  (* FIXME recursive traversal to find the hidden type *)
-  | Atom (_, Some (Atom (_, Some (Tuple _)))) ->
-    Fmt.str "tupleOfC(%s)" c_local
-  | c ->
+let of_c_expr ~c_type ~c_expr =
+  if is_tuple c_type then
+    (* Unnamed types cannot be extended *)
+    Fmt.str "tupleOfC(%s)" c_expr
+  else
     let inner =
-      match c with
-      | Array _ | Atom (_, Some (Array _)) ->
-        Fmt.str "unsafeBitCast(%s, to: type_erased_array.self)" c_local
-      | _ -> c_local
+      if is_array c_type then
+        Fmt.str "unsafeBitCast(%s, to: type_erased_array.self)" c_expr
+      else c_expr
     in
     Fmt.str "%a.ofC(%s)" pp_swift_type c_type inner
 
-let of_c_stored ~c_type ~c_local =
-  let c_local =
-    c_local
-    ^
-    match c_type with
-    (* | Struct _ | Atom (_, Some (Struct _)) -> ".pointee" *)
-    | _ -> ""
-  in
-  of_c_expr ~c_type ~c_local
+let of_c_stored ~c_type ~c_expr =
+  (* See `to_c_stored` comment *)
+  of_c_expr ~c_type ~c_expr
 
 let of_c ~c_type_name ~swift_type_name body =
   let of_c_decl =
@@ -159,8 +133,8 @@ let tuple_conv_decl members : unit Fmt.t * unit Fmt.t =
     let inits =
       List.zip_exn bindings members
       |> List.mapi ~f:(fun i (id, c) ->
-             let c_local = Fmt.str "x.%d" i in
-             let v = to_c_stored ~c_type:c ~c_local in
+             let c_expr = Fmt.str "x.%d" i in
+             let v = to_c_stored ~c_type:c ~c_expr in
              (id, const string v))
     in
     let body = invoke_named tname inits in
@@ -174,8 +148,8 @@ let tuple_conv_decl members : unit Fmt.t * unit Fmt.t =
       let items =
         members
         |> List.mapi ~f:(fun i c ->
-               let c_local = Fmt.str "c.t%d" i in
-               of_c_stored ~c_type:c ~c_local)
+               let c_expr = Fmt.str "c.t%d" i in
+               of_c_stored ~c_type:c ~c_expr)
       in
       const char '('
       ++ const (list ~sep:(const string ", ") string) items
@@ -210,7 +184,7 @@ let to_c_case ~all_basic ~c_variant_name ~c_constructor_name
               (c_tuple_type_name |> Identifier.to_string)
               (List.zip_exn bindings members
               |> List.map ~f:(fun (name, c) ->
-                     (name, const string (to_c_stored ~c_type:c ~c_local:name)))
+                     (name, const string (to_c_stored ~c_type:c ~c_expr:name)))
               )
           in
           (bindings |> String.concat ~sep:", ", tuple_construction)
@@ -226,12 +200,12 @@ let to_c_case ~all_basic ~c_variant_name ~c_constructor_name
                  ~constructor_name:c_constructor_name)
               (fields
               |> List.map ~f:(fun (name, c) ->
-                     (name, const string (to_c_stored ~c_type:c ~c_local:name)))
+                     (name, const string (to_c_stored ~c_type:c ~c_expr:name)))
               )
           in
           let bindings = List.map fields ~f:(fun (name, _c) -> name) in
           (bindings |> String.concat ~sep:", ", construction)
-        | _ -> ("x", const string (to_c_stored ~c_type:c ~c_local:"x"))
+        | _ -> ("x", const string (to_c_stored ~c_type:c ~c_expr:"x"))
       in
       (Fmt.str "let .%s(%s)" sw_id bindings, opaque_alloc body)
   in
@@ -270,8 +244,8 @@ let of_c_case ~all_basic ~swift_type_name ~c_variant_name ~c_constructor_name
           let stmts =
             List.zip_exn bindings members
             |> List.map ~f:(fun (tx, c) ->
-                   let c_local = Fmt.str "payload.%s" tx in
-                   Fmt.str "let %s = %s" tx (of_c_stored ~c_type:c ~c_local))
+                   let c_expr = Fmt.str "payload.%s" tx in
+                   Fmt.str "let %s = %s" tx (of_c_stored ~c_type:c ~c_expr))
           in
           let args = bindings |> String.concat ~sep:", " in
           (Swiftify.C_type.c c, stmts, args)
@@ -283,8 +257,8 @@ let of_c_case ~all_basic ~swift_type_name ~c_variant_name ~c_constructor_name
           let args =
             fields
             |> List.map ~f:(fun (label, c) ->
-                   let c_local = Fmt.str "payload.%s" label in
-                   let converted = of_c_expr ~c_type:c ~c_local in
+                   let c_expr = Fmt.str "payload.%s" label in
+                   let converted = of_c_expr ~c_type:c ~c_expr in
                    Fmt.str "%s: %s" label converted)
           in
           ( inline_record_c_name
@@ -292,7 +266,7 @@ let of_c_case ~all_basic ~swift_type_name ~c_variant_name ~c_constructor_name
               ~constructor_name:c_constructor_name,
             [],
             args |> String.concat ~sep:", " )
-        | _ -> (Swiftify.C_type.c c, [], of_c_expr ~c_type:c ~c_local:"payload")
+        | _ -> (Swiftify.C_type.c c, [], of_c_expr ~c_type:c ~c_expr:"payload")
       in
       let inter =
         if List.is_empty intermediate_stmts then nop
@@ -358,8 +332,6 @@ let type_decl fmt (c_name, ts) =
           box pp
         in
         let fields_decl = const (list ~sep:cut field) fields in
-        (* FIXME: handling pointers coming from structs. And what about
-           freeing? *)
         let to_c =
           let body =
             invoke_named
@@ -367,7 +339,7 @@ let type_decl fmt (c_name, ts) =
               (fields
               |> List.map ~f:(fun (id, c) ->
                      let x =
-                       to_c_stored ~c_type:c ~c_local:(Swiftify.Binding.id id)
+                       to_c_stored ~c_type:c ~c_expr:(Swiftify.Binding.id id)
                      in
                      (Identifier.to_string id, const string x)))
           in
@@ -379,16 +351,15 @@ let type_decl fmt (c_name, ts) =
               (fields
               |> List.map ~f:(fun (id, c) ->
                      let x =
-                       let c_local =
+                       let c_expr =
                          Fmt.str "c.%s" (id |> Identifier.to_string)
                        in
-                       of_c_stored ~c_type:c ~c_local
+                       of_c_stored ~c_type:c ~c_expr
                      in
                      (Swiftify.Binding.id id, const string x)))
           in
           of_c body
         in
-        (* FIXME extra leading spaces on blank lines... *)
         let body =
           associated_typealias ++ cut ++ fields_decl ++ cut ++ to_c ++ cut
           ++ of_c
@@ -435,7 +406,6 @@ let type_decl fmt (c_name, ts) =
           |> of_c
         in
         let body : unit Fmt.t =
-          (* FIXME cuts *)
           associated_typealias ++ cut ++ case_decls basic rich ++ cut ++ to_c
           ++ cut ++ of_c
         in
@@ -444,16 +414,16 @@ let type_decl fmt (c_name, ts) =
           body fmt ()
       in
       match ts with
-      (* Proper named types, getting their own declaration. *)
+      (* Structs and enums are named types *)
       | Struct { fields } -> const struct_ fields
       | Variant { name; basic; rich } -> const variant (name, basic, rich)
       | Poly_variant { name; basic; rich } ->
         let basic, rich = normalize_poly_variant_members basic rich in
         const variant (name, basic, rich)
-      (* Special case: mapped types *)
+      (* Mapped types delegate to their external representation *)
       | Mapped { front_facing } -> const pp_swift_decl front_facing
-      (* XXX (failwith?) *)
-      | Void -> failwith "Void?"
+      | Void -> failwith "Tried to declare Void"
+      (* Other types don't get their own declaration, and are just aliases *)
       | aliased ->
         const string
         @@ Fmt.str "public typealias %s = %a" swift_type_name pp_swift_type
@@ -466,11 +436,6 @@ let type_decl fmt (c_name, ts) =
 let type_decl (c_name, c) : string option =
   Logs.debug (fun m -> m "Encountering %a: %a" Identifier.pp c_name pp_c c);
   match c with
-  (* We do not re-declare built-in types *)
-  (* | String | Tuple _ | Array _ -> None *)
-  (* | Atom (_, Some (Tuple _ | Array _ | String)) -> None *)
-  (* Tuple and array specializations *)
-  | Tuple _ -> None
-  | Array _ -> None
-  | Mapped _ -> None
+  (* Some types do not need to be individually declared *)
+  | Tuple _ | Array _ | Mapped _ -> None
   | c -> Some (Fmt.to_to_string type_decl (c_name, c))

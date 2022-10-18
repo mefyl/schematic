@@ -57,7 +57,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
             Fmt.str "assert(res < %d)" (List.length basic);
           ]
       in
-      ( [], pp)
+      ([], pp)
       (* Regular variant with payloads *)
     | Variant { basic; rich; _ } ->
       let plain_case =
@@ -119,8 +119,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         ++ cut ++ switch
       in
       let open Fmt in
-      (
-        [],
+      ( [],
         vbox
           (const pp_statements
              [
@@ -188,7 +187,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         const pp_statements [ Fmt.str "%a res" Identifier.pp name ]
         ++ cut ++ if_else_chain
       in
-      ( [], pp)
+      ([], pp)
     | Tuple members ->
       let tuptype = tuple_name members in
       let pp =
@@ -202,7 +201,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
                  Fmt.str "res.t%d = %a(%s)" field_idx Identifier.pp
                    (of_caml_name_for_c c) (field "v" field_idx)))
       in
-      ( [], pp)
+      ([], pp)
     | Array elem_type ->
       let length_while =
         block ~indent "while (l != Val_emptylist)"
@@ -231,7 +230,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
              [ "l = v"; "res.data = malloc(sizeof(*res.data) * res.len)" ]
         ++ cut ++ set_for
       in
-      ( [ "l" ], pp)
+      ([ "l" ], pp)
     (* The considered type is merely an alias for another *)
     | (Atom _ | String) as c ->
       let pp =
@@ -241,7 +240,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
               (of_caml_name_for_c c);
           ]
       in
-      ( [], pp)
+      ([], pp)
     | Mapped { front_facing } ->
       (* TODO: factor lazy named value retrieval *)
       let if_encode =
@@ -262,13 +261,11 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
                  (of_caml_name_for_c front_facing);
              ]
       in
-      ( [ "v_back" ], pp)
+      ([ "v_back" ], pp)
     | Void ->
       failwith "Void may not be instantiated, and therefore cannot be converted"
   in
-  let return_type =
-    Identifier.to_string name
-  in
+  let return_type = Identifier.to_string name in
   let fname = name |> of_caml_name_for in
   let argname = "v" in
   let body =
@@ -357,7 +354,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
         const pp_statements
           [ Fmt.str "assert(x < %d)" (List.length basic); "return Val_int(x)" ]
       in
-      ("x",  pp)
+      ("x", pp)
     (* Regular variant with payloads *)
     | Variant { name = variant_name; basic; rich } ->
       let pp =
@@ -432,7 +429,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
         ++ cut ++ switch ++ cut
         ++ const pp_statements [ return_val "v" ]
       in
-      ("x",  pp)
+      ("x", pp)
     | Poly_variant { basic; rich; _ } ->
       let basic_only = List.is_empty rich in
       let case_name = case_name ~rich:(not basic_only) in
@@ -480,7 +477,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
         ++ cut ++ switch ++ cut
         ++ const pp_statements [ return_val "v" ]
       in
-      ("x",  pp)
+      ("x", pp)
     | Tuple members ->
       let pp =
         const pp_statements
@@ -498,7 +495,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
                  store ~dst:"v" ~field_idx ~field_val))
         @ [ return_val "v" ]
       in
-      ("x",  pp)
+      ("x", pp)
     | Array elem_type ->
       let loop =
         block ~indent "for (int64_t i = arr.len - 1; i >= 0; i--)"
@@ -519,7 +516,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
         ++ cut ++ loop ++ cut
         ++ const pp_statements [ return_val "cli" ]
       in
-      ("arr",  pp)
+      ("arr", pp)
     | (Atom _ | String) as c ->
       let pp =
         const pp_statements
@@ -530,7 +527,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
             return_val "v";
           ]
       in
-      ("x",  pp)
+      ("x", pp)
     | Mapped { front_facing } ->
       let if_decode =
         block ~indent "if (decode == NULL)"
@@ -556,9 +553,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
     | Void ->
       failwith "Void may not be instantiated and is unsupported in to_caml"
   in
-  let argtype =
-    Identifier.to_string name
-  in
+  let argtype = Identifier.to_string name in
   let decl =
     signature ~return_type:"value" ~fname:(name |> to_caml_name_for) ~argtype
       ~argname

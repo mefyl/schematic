@@ -1,5 +1,5 @@
 import Foundation
-//
+
 // XXX: should this be here? visibility?
 func heapAlloc<T>(_ to: T) -> UnsafeMutablePointer<T> {
   let p = UnsafeMutablePointer<T>.allocate(capacity: 1)
@@ -62,6 +62,8 @@ extension Int: CConvertible {
   }
 }
 
+
+
 extension Double: CConvertible {
   public typealias C = CDouble
   public static func ofC(_ c: CDouble) -> Double {
@@ -74,24 +76,26 @@ extension Double: CConvertible {
 }
 
 
-// FIXME: probably broken, just there to compile for now
 public struct SchematicTime: CConvertible {
   public typealias C = time_
 
-  let floatLiteral: Double
+  let sec: Int
+  let nsec: Int64
 
   public func toC() -> C {
     let timespec = timespec(
-      tv_sec: Int(floatLiteral),
-      tv_nsec: 0
+      tv_sec: sec,
+      tv_nsec: CLong(nsec)
     )
     return timespec_to_sch_time(timespec)
   }
 
   public static func ofC(_ c: C) -> SchematicTime {
     let ts = timespec_of_sch_time(c)
-    return SchematicTime(floatLiteral: Double(ts
-        .tv_sec)) /// We can safely ignore `ns`
+    return SchematicTime(
+      sec: Int(ts.tv_sec),
+      nsec: Int64(ts.tv_nsec)
+    )
   }
 }
 
@@ -108,7 +112,6 @@ extension URL: CConvertible {
 }
 
 
-// Types with unavoidable allocations.
 
 extension String: CConvertible {
   public typealias C = UnsafePointer<CChar>
@@ -124,7 +127,7 @@ extension String: CConvertible {
 }
 
 
-// XXX: debatable
+// Won't work on tuples.
 extension Array: OfC where Element: OfC {
   public typealias C = type_erased_array
 

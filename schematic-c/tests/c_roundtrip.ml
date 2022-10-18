@@ -84,7 +84,7 @@ external evil_defaults_rt_id : evil_defaults -> evil_defaults
   = "sch_evil_defaults_rt_id"
 
 external reified_ultra_generic_rt_id :
-  reified_ultra_generic -> reified_ultra_generic (* FIXME: this is wrong *)
+  reified_ultra_generic -> reified_ultra_generic (* XXX *)
   = "sch_string_wrapper_parametric_record_ultra_generic_rt_id"
 
 external with_computed_rt_id : with_computed -> with_computed

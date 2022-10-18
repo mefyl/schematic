@@ -1,6 +1,22 @@
 open C_intf
 open Base
 
+let rec tuple_members = function
+  | Atom (_, None) -> None
+  | Atom (_, Some c) -> tuple_members c
+  | Tuple members -> Some members
+  | _ -> None
+
+let is_tuple = Fn.compose Option.is_some tuple_members
+
+let rec array_element = function
+  | Atom (_, None) -> None
+  | Atom (_, Some c) -> array_element c
+  | Array c -> Some c
+  | _ -> None
+
+let is_array = Fn.compose Option.is_some array_element
+
 module Swiftify = struct
   module C_type = struct
     (** Get the Swift name of a C type.

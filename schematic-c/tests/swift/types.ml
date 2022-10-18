@@ -2,8 +2,6 @@ open Base
 open Schematic
 open Swift_test_utils
 
-(* TODO maybe use extensions to keep things separate *)
-
 let test ?name ?(deps = []) t =
   let module M = (val t : Schema_test) in
   let name =

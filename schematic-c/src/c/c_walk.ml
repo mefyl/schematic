@@ -1,5 +1,5 @@
-(* XXX: we should probably merge this back into a generalized walker in
-   schemas *)
+(* TODO: see how much of this could be factored, similarly to new walker from
+   0.15.0 (or into it) *)
 
 open Schematic
 open Base

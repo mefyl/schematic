@@ -24,21 +24,24 @@ let export_schemas schemas =
     let decl = Option.value (type_decl (id, c)) ~default:"" in
     let emitted_tuples, tuple_decls =
       match c with
-      | Tuple members | Atom (_, Some (Tuple members)) when not (Set.mem emitted_tuples members) ->
-          let pp_of, pp_to = Swift_typeexpr.tuple_conv_decl members in
-          let of_src, to_src =
-            (Fmt.to_to_string pp_of (), Fmt.to_to_string pp_to ())
-          in
-          let emitted_tuples = Set.add emitted_tuples members in
-          emitted_tuples, of_src ^ "\n\n" ^ to_src
-      | _ -> emitted_tuples, ""
+      | (Tuple members | Atom (_, Some (Tuple members)))
+        when not (Set.mem emitted_tuples members) ->
+        let pp_of, pp_to = Swift_typeexpr.tuple_conv_decl members in
+        let of_src, to_src =
+          (Fmt.to_to_string pp_of (), Fmt.to_to_string pp_to ())
+        in
+        let emitted_tuples = Set.add emitted_tuples members in
+        (emitted_tuples, of_src ^ "\n\n" ^ to_src)
+      | _ -> (emitted_tuples, "")
     in
     (emitted_tuples, (tuple_decls ^ "\n\n" ^ decl) :: l)
   in
   let user_dependent_code =
     let _, l =
       schemas |> C_schemas.of_schemas
-      |> List.fold ~init:(Base.Set.empty (module C_tuple_members), []) ~f:process_type
+      |> List.fold
+           ~init:(Base.Set.empty (module C_tuple_members), [])
+           ~f:process_type
     in
     l |> String.concat ~sep:"\n\n"
   in

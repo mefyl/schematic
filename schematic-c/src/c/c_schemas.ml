@@ -126,7 +126,9 @@ module Of = C_walk.Walk (struct
       |> List.map ~f:(fun (id, _, constr_c) ->
              match constr_c with
              | Tuple _ | Struct _ ->
-               let id = inline_record_c_name ~variant_name:name ~constructor_name:id  in
+               let id =
+                 inline_record_c_name ~variant_name:name ~constructor_name:id
+               in
                let s () = (constr_c, marks) in
                Marks.make id s
              | _ -> Marks.empty)

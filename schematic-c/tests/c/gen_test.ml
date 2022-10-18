@@ -114,7 +114,6 @@ typedef struct {
 } tuple_int_string;
 |}
 
-(* FIXME: possible collisions with "tag" and "payload" *)
 let payload_variant_c =
   {|
 typedef struct {
@@ -203,7 +202,6 @@ typedef struct {
 } tuple_string_int;
 |}
 
-(* XXX tuple naming *)
 let pair_alias_of_caml =
   {|
 pair_alias pair_alias_of_caml(value v) {

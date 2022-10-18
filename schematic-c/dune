@@ -4,7 +4,8 @@
  (name schematic_c)
  (public_name schematic-c)
  (libraries bake base base64 ezjsonm fmt logs ptime schematic semver2 uri)
-  (preprocessor_deps (file src/swift/Prelude.swift))
+ (preprocessor_deps
+  (file src/swift/Prelude.swift))
  (preprocess
   (pps
    bake.ppx
