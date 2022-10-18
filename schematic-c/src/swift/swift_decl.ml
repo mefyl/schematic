@@ -59,7 +59,9 @@ let type_decl fmt (c_name, ts) =
         const typealias (Identifier.to_string c_name)
       in
       let to_c = to_c ~c_type_name:(Identifier.to_string c_name) in
-      let of_c = of_c ~c_type_name:(Identifier.to_string c_name) ~swift_type_name in
+      let of_c =
+        of_c ~c_type_name:(Identifier.to_string c_name) ~swift_type_name
+      in
       (* Kinds of structures *)
       let struct_ : (Identifier.t * c) list Fmt.t =
        fun f fields ->

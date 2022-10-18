@@ -45,7 +45,7 @@ end
 
 module Binding = struct
   let s = function
-    | "self" -> "_self"
+    | "self_" -> "self_"
     | s -> (
       match String.split s ~on:'_' with
       | h :: t ->
