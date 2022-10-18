@@ -63,6 +63,32 @@ extension Int: CConvertible {
 }
 
 
+extension Int32: CConvertible {
+  public typealias C = Int32
+  public static func ofC(_ c: Int32) -> Int32 {
+    return c
+  }
+
+  public func toC() -> Int32 {
+    return self
+  }
+}
+
+extension Int64: CConvertible {
+  public typealias C = Int64
+  public static func ofC(_ c: Int64) -> Int64 {
+    return c
+  }
+
+  public func toC() -> Int64 {
+    return self
+  }
+}
+
+
+
+
+
 
 extension Double: CConvertible {
   public typealias C = CDouble
