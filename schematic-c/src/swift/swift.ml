@@ -11,24 +11,27 @@ let prelude = [%file "Prelude.swift"]
 let export_schemas schemas =
   let process_type (specialized, l) (id, c) =
     let decl = Option.value (type_decl (id, c)) ~default:"" in
-    let specialized, tuple_decls =
+    let f (pp_of, pp_to) flattened_c =
+      let of_src, to_src =
+        (Fmt.to_to_string pp_of (), Fmt.to_to_string pp_to ())
+      in
+      (Set.add specialized flattened_c, [ of_src; to_src ])
+    in
+    let specialized, extra_decls =
       match array_element c with
-      | Some c -> failwith "TODO"
-      | None -> (
+      | Some c when not (Set.mem specialized (Array c)) ->
+        f (Swift_conv.array_conv_decl c) (Array c)
+      | _ -> (
         match tuple_members c with
         | Some members when not (Set.mem specialized (Tuple members)) ->
-          let pp_of, pp_to = Swift_conv.tuple_conv_decl members in
-          let of_src, to_src =
-            (Fmt.to_to_string pp_of (), Fmt.to_to_string pp_to ())
-          in
-          (Set.add specialized (Tuple members), of_src ^ "\n\n" ^ to_src)
-        | _ -> (specialized, ""))
+          f (Swift_conv.tuple_conv_decl members) (Tuple members)
+        | _ -> (specialized, []))
     in
-    (specialized, (tuple_decls ^ "\n\n" ^ decl) :: l)
+    (specialized, extra_decls @ [ decl ] @ l)
   in
   let module C_for_set = struct
     module T = struct
-      type t = C_intf.c [@@deriving ord, show]
+      type t = C_intf.c [@@deriving ord]
 
       let sexp_of_t _ = Sexp.Atom "N/A"
     end
@@ -41,6 +44,6 @@ let export_schemas schemas =
       schemas |> C_schemas.of_schemas
       |> List.fold ~init:(Base.Set.empty (module C_for_set), []) ~f:process_type
     in
-    l |> String.concat ~sep:"\n\n"
+    l |> List.rev |> String.concat ~sep:"\n\n"
   in
   prelude ^ "\n\n\n" ^ user_dependent_code

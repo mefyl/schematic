@@ -8,8 +8,8 @@ let to_c_expr ~c_type ~c_expr =
   if is_tuple c_type then Fmt.str "schematicToC(%s)" c_expr
   else
     let inner = Fmt.str "%s.toC()" c_expr in
-    match c_type with
-    | Array c | Atom (_, Some (Array c)) ->
+    match array_element c_type with
+    | Some c ->
       Fmt.str "unsafeBitCast(%s, to: %a.self)" inner Identifier.pp
         (array_name c)
     | _ -> inner
@@ -204,6 +204,71 @@ let tuple_conv_decl members : unit Fmt.t * unit Fmt.t =
       const char '('
       ++ const (list ~sep:(const string ", ") string) items
       ++ const char ')'
+    in
+    block ~indent signature body
+  in
+  (of_c, to_c)
+
+(* TODO: de-uglify this *)
+let array_conv_decl c : unit Fmt.t * unit Fmt.t =
+  let open Fmt in
+  let tname = array_name c |> Identifier.to_string in
+  let to_c =
+    let signature =
+      Fmt.str "func schematicToC(_ x: %a) -> %s" pp_swift_type (Array c) tname
+    in
+    let body =
+      let s =
+        if is_tuple c || is_array c then
+          Fmt.str
+            {|
+    let data = UnsafeMutablePointer<%a>.allocate(capacity: x.count)
+    for (i, x) in x.enumerated() {
+      data.advanced(by: i).initialize(to: %s)
+    }
+
+|}
+            Identifier.pp (c_typename c)
+            (to_c_expr ~c_type:c ~c_expr:"x")
+          ^ Fmt.str
+              {|
+    return %s(
+      len: x.count,
+      data: data
+    )
+|}
+              tname
+        else to_c_expr ~c_type:(Array c) ~c_expr:"x"
+      in
+      const string s
+    in
+    block ~indent signature body
+  in
+  let of_c =
+    let signature =
+      Fmt.str "func schematicOfC(_ c: %s) -> %a" tname pp_swift_type (Array c)
+    in
+    let body =
+      let s =
+        if is_tuple c || is_array c then
+          (* XXX this is ugly *)
+          Fmt.str "  typealias Element = %a" pp_swift_type c
+          ^ Fmt.str
+              {|
+    assert(c.len >= 0)
+    if c.len == 0 { return [] }
+
+    let res: Array<Element> = (0 ..< (c.len)).map {
+      let p = c.data.advanced(by: $0)
+      return %s
+    }
+    free(c.data)
+    return res
+|}
+              (of_c_expr ~c_type:c ~c_expr:"p.pointee")
+        else of_c_expr ~c_type:(Array c) ~c_expr:"c"
+      in
+      const string s
     in
     block ~indent signature body
   in
