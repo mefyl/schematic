@@ -1,4 +1,3 @@
-open C_pp
 open C_intf
 open Base
 open Swift_utils
