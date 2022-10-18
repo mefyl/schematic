@@ -162,11 +162,15 @@ extension Array: OfC where Element: OfC {
     assert(c.len >= 0)
     if c.len == 0 { return [] }
 
-    return (0 ..< (c.len)).map {
+    let res: Array<Element> = (0 ..< (c.len)).map {
       let p = c.data.assumingMemoryBound(to: Element.C.self)
         .advanced(by: $0)
       return Element.ofC(p.pointee)
     }
+
+    free(c.data)
+
+    return res
   }
 }
 
