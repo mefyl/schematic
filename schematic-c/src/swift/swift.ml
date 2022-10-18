@@ -2,7 +2,7 @@ open Base
 
 let type_decl (name, c) : string option =
   Logs.debug (fun m -> m "Swift type_decl: %a@." C_intf.pp_c c);
-  Swift_typeexpr.type_decl (name, c)
+  Swift_decl.type_decl (name, c)
 
 let prelude = [%file "Prelude.swift"]
 
@@ -26,7 +26,7 @@ let export_schemas schemas =
       match c with
       | (Tuple members | Atom (_, Some (Tuple members)))
         when not (Set.mem emitted_tuples members) ->
-        let pp_of, pp_to = Swift_typeexpr.tuple_conv_decl members in
+        let pp_of, pp_to = Swift_conv.tuple_conv_decl members in
         let of_src, to_src =
           (Fmt.to_to_string pp_of (), Fmt.to_to_string pp_to ())
         in

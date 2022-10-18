@@ -1,21 +1,8 @@
-open C_intf
 open Base
+open C_intf
+open C_pp
 
-let rec tuple_members = function
-  | Atom (_, None) -> None
-  | Atom (_, Some c) -> tuple_members c
-  | Tuple members -> Some members
-  | _ -> None
-
-let is_tuple = Fn.compose Option.is_some tuple_members
-
-let rec array_element = function
-  | Atom (_, None) -> None
-  | Atom (_, Some c) -> array_element c
-  | Array c -> Some c
-  | _ -> None
-
-let is_array = Fn.compose Option.is_some array_element
+let indent = 2
 
 module Swiftify = struct
   module C_type = struct
@@ -71,3 +58,59 @@ module Swiftify = struct
     let id id = Identifier.to_string id |> s
   end
 end
+
+let rec tuple_members = function
+  | Atom (_, None) -> None
+  | Atom (_, Some c) -> tuple_members c
+  | Tuple members -> Some members
+  | _ -> None
+
+let is_tuple = Fn.compose Option.is_some tuple_members
+
+let rec array_element = function
+  | Atom (_, None) -> None
+  | Atom (_, Some c) -> array_element c
+  | Array c -> Some c
+  | _ -> None
+
+let is_array = Fn.compose Option.is_some array_element
+let tuple_bindings n = List.init n ~f:(Fmt.str "t%d")
+let typealias f = Fmt.fmt "public typealias C = %s" f
+
+let applied opening body =
+  block ~indent ~open_sp:false ~delim:('(', ')') opening body
+
+let vertical_comma_sep pp l =
+  let open Fmt in
+  const (list ~sep:(const char ',' ++ cut) pp) l
+
+(* Function invocation / initializer call. *)
+let invoke_named callee named_params =
+  let open Fmt in
+  let pp : (string * unit Fmt.t) Fmt.t =
+   fun f (s, pp) -> box (Fmt.pair ~sep:(const string ": ") string pp) f (s, ())
+  in
+  applied callee (vertical_comma_sep pp named_params)
+
+(* A Swift switch statement *)
+let switch ?(default : unit Fmt.t option) (on : string)
+    (cases : (string * unit Fmt.t) list) : unit Fmt.t =
+  let open Fmt in
+  let case_ish header body = vbox ~indent @@ (header ++ cut ++ body) in
+  (* We don't use a block because we don't want to increase the indentation
+     level inside the switch. *)
+  let case : (string * unit Fmt.t) Fmt.t =
+   fun f (case_match, case_body) ->
+    let pp =
+      case_ish (const string (Fmt.str "case %s:" case_match)) case_body
+    in
+    pp f ()
+  in
+  let cases : unit Fmt.t = const (list ~sep:cut case) cases in
+  let maybe_default =
+    match default with
+    | Some body -> case_ish (const string "default:") body ++ cut
+    | None -> nop
+  in
+  const string ("switch " ^ on ^ " {")
+  ++ cut ++ cases ++ cut ++ maybe_default ++ const char '}'
