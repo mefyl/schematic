@@ -164,7 +164,10 @@ let of_c_case ~all_basic ~swift_type_name ~c_variant_name ~c_constructor_name
         else const (list ~sep:cut string) intermediate_stmts ++ cut
       in
       payload_let pointee ++ cut ++ inter
-      ++ const string (Fmt.str "return %s(%s)" qualified_swift_constr params)
+      ++ const string (Fmt.str "let res = %s(%s)" qualified_swift_constr params)
+      ++ cut
+      ++ const string "free(UnsafeMutableRawPointer(c.payload))"
+      ++ cut ++ const string "return res"
   in
   (c_case |> Identifier.to_string, pp)
 

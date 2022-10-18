@@ -142,12 +142,16 @@ public enum PayloadVariant: CConvertible {
       return PayloadVariant.nothing3
     case payload_variant_someint_tag:
       let payload = UnsafePointer<CInt>(c.payload).pointee
-      return PayloadVariant.someint(Int.ofC(payload))
+      let res = PayloadVariant.someint(Int.ofC(payload))
+      free(UnsafeMutableRawPointer(c.payload))
+      return res
     case payload_variant_a_pair_tag:
       let payload = UnsafePointer<tuple_int_string>(c.payload).pointee
       let t0 = Int.ofC(payload.t0)
       let t1 = String.ofC(payload.t1)
-      return PayloadVariant.aPair(t0, t1)
+      let res = PayloadVariant.aPair(t0, t1)
+      free(UnsafeMutableRawPointer(c.payload))
+      return res
     default:
       fatalError("malformed C variant")
     }
