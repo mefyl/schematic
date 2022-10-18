@@ -9,13 +9,13 @@ public struct PrimitiveRecord: CConvertible {
   public typealias C = primitive_record
   let a: Int
   let b: Int
-  public func toC() -> Schemas.primitive_record {
+  public func toC() -> primitive_record {
     Schemas.primitive_record(
       a: a.toC(),
       b: b.toC()
     )
   }
-  public static func ofC(_ c: Schemas.primitive_record) -> PrimitiveRecord {
+  public static func ofC(_ c: primitive_record) -> PrimitiveRecord {
     PrimitiveRecord(
       a: Int.ofC(c.a),
       b: Int.ofC(c.b)
@@ -34,13 +34,13 @@ public struct Wrapper: CConvertible {
   public typealias C = wrapper
   let somevar: Int
   let r: PrimitiveRecord
-  public func toC() -> Schemas.wrapper {
+  public func toC() -> wrapper {
     Schemas.wrapper(
       somevar: somevar.toC(),
       r: r.toC()
     )
   }
-  public static func ofC(_ c: Schemas.wrapper) -> Wrapper {
+  public static func ofC(_ c: wrapper) -> Wrapper {
     Wrapper(
       somevar: Int.ofC(c.somevar),
       r: PrimitiveRecord.ofC(c.r)
@@ -59,7 +59,7 @@ public enum BasicVariant: CConvertible {
   public typealias C = basic_variant
   case a
   case b
-  public func toC() -> Schemas.basic_variant {
+  public func toC() -> basic_variant {
     switch self {
     case .a:
       return basic_variant_a
@@ -67,7 +67,7 @@ public enum BasicVariant: CConvertible {
       return basic_variant_b
     }
   }
-  public static func ofC(_ c: Schemas.basic_variant) -> BasicVariant {
+  public static func ofC(_ c: basic_variant) -> BasicVariant {
     switch c {
     case basic_variant_a:
       return BasicVariant.a
@@ -93,7 +93,7 @@ public enum PayloadVariant: CConvertible {
   case nothing3
   case someint(Int)
   case aPair(Int, String)
-  public func toC() -> Schemas.payload_variant {
+  public func toC() -> payload_variant {
     switch self {
     case .nothing:
       return payload_variant(
@@ -132,7 +132,7 @@ public enum PayloadVariant: CConvertible {
       )
     }
   }
-  public static func ofC(_ c: Schemas.payload_variant) -> PayloadVariant {
+  public static func ofC(_ c: payload_variant) -> PayloadVariant {
     switch c.tag {
     case payload_variant_nothing_tag:
       return PayloadVariant.nothing
