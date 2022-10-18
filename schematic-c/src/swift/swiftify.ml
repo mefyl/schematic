@@ -44,12 +44,14 @@ module Type = struct
 end
 
 module Binding = struct
-  let s s =
-    match String.split s ~on:'_' with
-    | h :: t ->
-      let t = List.map ~f:String.capitalize t in
-      String.concat ~sep:"" (h :: t)
-    | [] -> ""
+  let s = function
+    | "self" -> "_self"
+    | s -> (
+      match String.split s ~on:'_' with
+      | h :: t ->
+        let t = List.map ~f:String.capitalize t in
+        String.concat ~sep:"" (h :: t)
+      | [] -> "")
 
   let id id = Identifier.to_string id |> s
 end
