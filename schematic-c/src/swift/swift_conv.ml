@@ -41,13 +41,12 @@ let of_c_stored ~c_type ~c_expr =
 
 let of_c ~c_type_name ~swift_type_name body =
   let of_c_decl =
-    Fmt.str "public static func ofC(_ c: %a) -> %s" Identifier.pp c_type_name
-      swift_type_name
+    Fmt.str "public static func ofC(_ c: %s) -> %s" c_type_name swift_type_name
   in
   block ~indent of_c_decl body
 
 let to_c ~c_type_name body =
-  let to_c_decl = Fmt.str "public func toC() -> %a" Identifier.pp c_type_name in
+  let to_c_decl = Fmt.str "public func toC() -> %s" c_type_name in
   block ~indent to_c_decl body
 
 let to_c_case ~all_basic ~c_variant_name ~c_constructor_name

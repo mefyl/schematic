@@ -2,6 +2,7 @@ open Base
 open C_intf
 open C_pp
 
+let exported_module_name = "Schemas"
 let indent = 2
 
 let rec tuple_members = function

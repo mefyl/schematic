@@ -48,6 +48,9 @@ let struct_field : (Identifier.t * c) Fmt.t =
 
 (* Type definitions *)
 let type_decl fmt (c_name, ts) =
+  let qualified_c_name =
+    Fmt.str "%s.%a" exported_module_name Identifier.pp c_name
+  in
   let swift_type_name = Swiftify.Type.id c_name in
   let rec pp_swift_decl f ts =
     let printer =
@@ -55,16 +58,15 @@ let type_decl fmt (c_name, ts) =
       let associated_typealias =
         const typealias (Identifier.to_string c_name)
       in
-      let to_c = to_c ~c_type_name:c_name in
-      let of_c = of_c ~c_type_name:c_name ~swift_type_name in
+      let to_c = to_c ~c_type_name:qualified_c_name in
+      let of_c = of_c ~c_type_name:qualified_c_name ~swift_type_name in
       (* Kinds of structures *)
       let struct_ : (Identifier.t * c) list Fmt.t =
        fun f fields ->
         let fields_decl = const (list ~sep:cut struct_field) fields in
         let to_c =
           let body =
-            invoke_named
-              (Identifier.to_string c_name)
+            invoke_named qualified_c_name
               (fields
               |> List.map ~f:(fun (id, c) ->
                      let x =
