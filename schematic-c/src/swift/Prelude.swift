@@ -51,6 +51,7 @@ extension Bool: CConvertible {
   }
 }
 
+
 extension Int: CConvertible {
   public typealias C = CInt
   public static func ofC(_ c: CInt) -> Int {
@@ -183,4 +184,19 @@ extension Array: ToC where Element: ToC {
       data: data
     )
   }
+}
+
+
+// Freestanding generic functions let us work around some of the limitations of
+// protocols.
+//
+// These functions are overloaded for tuples.
+// The present blanket impletations are provided for convenience.
+
+func schematicOfC<T: OfC>(_ c: T.C) -> T {
+    T.ofC(c)
+}
+
+func schematicToC<T: ToC>(_ x: T) -> T.C{
+    x.toC()
 }

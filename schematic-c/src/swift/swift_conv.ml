@@ -4,11 +4,8 @@ open C_pp
 open Swift_utils
 open Swift_typeexpr
 
-
-
-
 let to_c_expr ~c_type ~c_expr =
-  if is_tuple c_type then Fmt.str "tupleToC(%s)" c_expr
+  if is_tuple c_type then Fmt.str "schematicToC(%s)" c_expr
   else
     let inner = Fmt.str "%s.toC()" c_expr in
     match c_type with
@@ -27,13 +24,15 @@ let to_c_stored ~c_type ~c_expr =
 let of_c_expr ~c_type ~c_expr =
   if is_tuple c_type then
     (* Unnamed types cannot be extended *)
-    Fmt.str "tupleOfC(%s)" c_expr
+    Fmt.str "schematicOfC(%s)" c_expr
   else
     let inner =
       if is_array c_type then
         Fmt.str "unsafeBitCast(%s, to: type_erased_array.self)" c_expr
       else c_expr
     in
+    (* Using a top-level function implies more ambiguity, so we refer to the
+       desired type explicitly whenever possible *)
     Fmt.str "%a.ofC(%s)" pp_swift_type c_type inner
 
 let of_c_stored ~c_type ~c_expr =
@@ -169,14 +168,14 @@ let of_c_case ~all_basic ~swift_type_name ~c_variant_name ~c_constructor_name
   in
   (c_case |> Identifier.to_string, pp)
 
-
 let tuple_conv_decl members : unit Fmt.t * unit Fmt.t =
   let open Fmt in
   let tname = tuple_name members |> Identifier.to_string in
   let bindings = tuple_bindings (List.length members) in
   let to_c =
     let signature =
-      Fmt.str "func tupleToC(_ x: %a) -> %s" pp_swift_type (Tuple members) tname
+      Fmt.str "func schematicToC(_ x: %a) -> %s" pp_swift_type (Tuple members)
+        tname
     in
     let inits =
       List.zip_exn bindings members
@@ -190,7 +189,8 @@ let tuple_conv_decl members : unit Fmt.t * unit Fmt.t =
   in
   let of_c =
     let signature =
-      Fmt.str "func tupleOfC(_ c: %s) -> %a" tname pp_swift_type (Tuple members)
+      Fmt.str "func schematicOfC(_ c: %s) -> %a" tname pp_swift_type
+        (Tuple members)
     in
     let body =
       let items =
