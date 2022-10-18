@@ -12,17 +12,17 @@ let pp ?(indent = 2) fmt ts =
         pp f (v, Identifier.to_string name ^ ";")
       in
       let struct_ : (Identifier.t * _) list Fmt.t =
-        braced ~indent "struct" (list ~sep:cut struct_or_union_field)
+        block ~indent "struct" (list ~sep:cut struct_or_union_field)
       in
       let union_ : (Identifier.t * _) list Fmt.t =
-        braced ~indent "union" (list ~sep:cut struct_or_union_field)
+        block ~indent "union" (list ~sep:cut struct_or_union_field)
       in
       let variant fmt (name, basic, rich) =
         let is_basic = List.is_empty rich in
         (* An enum declaring each constructor of the variant. *)
         let enum =
           let variant_names = basic @ List.map ~f:fst rich in
-          braced ~indent "enum"
+          block ~indent "enum"
             (const
                (list
                   ~sep:(const char ',' ++ cut)
@@ -39,13 +39,13 @@ let pp ?(indent = 2) fmt ts =
               const union_ rich ++ const string "* payload;"
             in
             let inner = tag_field ++ cut ++ payload_field in
-            braced ~indent "struct" inner
+            block ~indent "struct" inner
         in
         printer fmt ()
       in
       let array =
         (* We're not using the `struct_` formatter, on purpose. *)
-        braced ~indent "struct"
+        block ~indent "struct"
           (const string "size_t len" ++ semi ++ pp ++ const string "* "
          ++ const string "data;")
       in

@@ -7,7 +7,7 @@ let indent = 2
 
 (* XXX visibility *)
 let typealias f = Fmt.fmt "public typealias C = %s" f
-let applied = braced ~indent ~open_sp:false ~delim:('(', ')')
+let applied = block ~indent ~open_sp:false ~delim:('(', ')')
 
 let vertical_comma_sep pp l =
   let open Fmt in
@@ -27,7 +27,7 @@ let switch ?(default : unit Fmt.t option) (on : string)
   let open Fmt in
   let case_ish header body = vbox ~indent @@ (header ++ cut ++ body) in
 
-  (* We don't use abraced: because we don't want to increase the indentation
+  (* We don't use ablock: because we don't want to increase the indentation
      level inside the switch. *)
   let case : (string * unit Fmt.t) Fmt.t =
    fun f (case_match, case_body) ->
@@ -142,11 +142,11 @@ let of_c ~c_type_name ~swift_type_name body =
     Fmt.str "public static func ofC(_ c: %a) -> %s" Identifier.pp c_type_name
       swift_type_name
   in
-  braced ~indent of_c_decl body
+  block ~indent of_c_decl body
 
 let to_c ~c_type_name body =
   let to_c_decl = Fmt.str "public func toC() -> %a" Identifier.pp c_type_name in
-  braced ~indent to_c_decl body
+  block ~indent to_c_decl body
 
 let tuple_conv_decl members : unit Fmt.t * unit Fmt.t =
   let open Fmt in
@@ -164,7 +164,7 @@ let tuple_conv_decl members : unit Fmt.t * unit Fmt.t =
              (id, const string v))
     in
     let body = invoke_named tname inits in
-    braced ~indent signature body
+    block ~indent signature body
   in
   let of_c =
     let signature =
@@ -181,7 +181,7 @@ let tuple_conv_decl members : unit Fmt.t * unit Fmt.t =
       ++ const (list ~sep:(const string ", ") string) items
       ++ const char ')'
     in
-    braced ~indent signature body
+    block ~indent signature body
   in
   (of_c, to_c)
 
@@ -393,7 +393,7 @@ let type_decl fmt (c_name, ts) =
           associated_typealias ++ cut ++ fields_decl ++ cut ++ to_c ++ cut
           ++ of_c
         in
-        braced ~indent
+        block ~indent
           (Fmt.str "public struct %s: CConvertible" swift_type_name)
           body f ()
       in
@@ -439,7 +439,7 @@ let type_decl fmt (c_name, ts) =
           associated_typealias ++ cut ++ case_decls basic rich ++ cut ++ to_c
           ++ cut ++ of_c
         in
-        braced ~indent
+        block ~indent
           (Fmt.str "public enum %s: CConvertible" swift_type_name)
           body fmt ()
       in

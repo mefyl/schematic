@@ -161,7 +161,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
                       (of_caml_name_for_c constr_c);
                   ]
               in
-              (braced ~indent elseif body) fmt ()
+              (block ~indent elseif body) fmt ()
             in
             const (list ~sep:cut pp_rich) rich
           in
@@ -177,7 +177,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
             ++ (const string "if (0) {}" ++ cut ++ elses ++ cut
                ++ const string "else assert(0);")
           in
-          let rich = braced ~indent "else if (Is_block(v))" body in
+          let rich = block ~indent "else if (Is_block(v))" body in
           basic ++ cut ++ rich
       in
       let if_else_chain =
@@ -205,11 +205,11 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
       ( [], pp)
     | Array elem_type ->
       let length_while =
-        braced ~indent "while (l != Val_emptylist)"
+        block ~indent "while (l != Val_emptylist)"
           (const pp_statements [ Fmt.str "l = %s" (field "l" 1); "res.len++" ])
       in
       let set_for =
-        braced ~indent "for (int64_t i = 0; i < res.len; i++)"
+        block ~indent "for (int64_t i = 0; i < res.len; i++)"
           (const pp_statements
              [
                assert_block_size "l" 2;
@@ -245,7 +245,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
     | Mapped { front_facing } ->
       (* TODO: factor lazy named value retrieval *)
       let if_encode =
-        braced ~indent "if (encode == NULL)"
+        block ~indent "if (encode == NULL)"
           (const pp_statements
              [
                Fmt.str {|encode = caml_named_value("%s")|}
@@ -280,7 +280,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
           let if_cond = Fmt.str "if (!(%s || %s))" checking checked in
           let body =
             let if_inner =
-              braced ~indent
+              block ~indent
                 (Fmt.str "if (%s == NULL)" C_builtins.poly_compare_symbol)
                 (const pp_statements
                    [
@@ -303,7 +303,7 @@ let pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
                    Fmt.str "%s = false" checking;
                  ]
           in
-          braced ~indent if_cond body
+          block ~indent if_cond body
         in
         main_if ++ cut
       else Fmt.nop
@@ -427,7 +427,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
                  (case_name, Some contents))
           |> cases ~indent
         in
-        let switch = braced ~indent "switch (x.tag)" cases in
+        let switch = block ~indent "switch (x.tag)" cases in
         const pp_statements [ p0; l1 "v" ]
         ++ cut ++ switch ++ cut
         ++ const pp_statements [ return_val "v" ]
@@ -473,7 +473,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
       in
       let switch =
         let tag = if basic_only then "x" else "x.tag" in
-        braced ~indent (Fmt.str "switch (%s)" tag) cases
+        block ~indent (Fmt.str "switch (%s)" tag) cases
       in
       let pp =
         const pp_statements [ p0; l1 "v" ]
@@ -501,7 +501,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
       ("x",  pp)
     | Array elem_type ->
       let loop =
-        braced ~indent "for (int64_t i = arr.len - 1; i >= 0; i--)"
+        block ~indent "for (int64_t i = arr.len - 1; i >= 0; i--)"
           (const pp_statements
              [
                "cons = caml_alloc(2, 0)";
@@ -533,7 +533,7 @@ let pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
       ("x",  pp)
     | Mapped { front_facing } ->
       let if_decode =
-        braced ~indent "if (decode == NULL)"
+        block ~indent "if (decode == NULL)"
           (const pp_statements
              [
                Fmt.str {|decode = caml_named_value("%s")|}

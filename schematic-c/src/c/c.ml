@@ -21,7 +21,7 @@ let statics_src { name; _ } =
 let signature_src { signature; _ } = Fmt.str "%s;" signature
 
 let impl_src { signature; impl } =
-  Fmt.to_to_string (C_pp.braced ~indent:2 signature impl) ()
+  Fmt.to_to_string (C_pp.block ~indent:2 signature impl) ()
 
 let roundtrip_src (name, c) =
   let open Fmt in
@@ -43,7 +43,7 @@ let roundtrip_src (name, c) =
           "CAMLreturn(ret)";
         ]
   in
-  let pp = braced ~indent:2 decl body in
+  let pp = block ~indent:2 decl body in
   Fmt.to_to_string pp ()
 
 (** Returns (header file content) * (implementation file content).
