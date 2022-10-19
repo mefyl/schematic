@@ -64,21 +64,10 @@ module Of = C_walk.Walk (struct
         let referenced_type : c = fst @@ s () in
         (Atom (Identifier.make id, Some referenced_type), Marks.make id s))
 
-  (* This could be optimized (null ptr optim), but this approach allows us to
-     simplify things
-
-     TODO: better representation, as we don't need different tags for each
-     option specialization. *)
   let nullable (c, marks) =
-    let name = c_typename c |> Identifier.map ~f:(fun s -> s ^ "_option") in
+    let name = option_name c in
     let s () =
-      ( Variant
-          {
-            name;
-            basic = [ Identifier.make "none" ];
-            rich = [ (Identifier.make "some", c) ];
-          },
-        marks )
+      (Option c, marks)
     in
     schema (Some (Identifier.to_string name)) None s
 
