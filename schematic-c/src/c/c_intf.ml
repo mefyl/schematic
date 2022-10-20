@@ -43,10 +43,15 @@ let rec c_typename : c -> Identifier.t = function
   | String -> Identifier.make "string"
   | Atom (s, _) -> s
   | Tuple members -> tuple_name members
-  | Array t -> array_name t
-  | Variant { name; _ } -> name
+  | Array c -> array_name c
+  | Variant { name; _ } | Poly_variant { name; _ } -> name
+  | Option c -> option_name c
+  | Mapped { front_facing } -> c_typename front_facing
   (* Fallback: hash the physical structure of the type. *)
-  | c -> Identifier.make (Fmt.str "_sch_%d" (hash_c c))
+  | (Void | Struct _) as c ->
+    let s = (Fmt.str "_sch_%d" (hash_c c)) in
+    Logs.warn (fun m -> m "Using hash-based name '%s' for %a" s pp_c c);
+    Identifier.make s
 
 and tuple_name items =
   Identifier.make @@ "tuple_"
@@ -55,6 +60,9 @@ and tuple_name items =
     |> String.concat ~sep:"_")
 
 and array_name t = c_typename t |> Identifier.map ~f:(fun s -> s ^ "_array")
+
+and option_name c = c_typename c |> Identifier.map ~f:(fun s -> s ^ "_option")
+
 
 let tuple_fields =
   List.mapi ~f:(fun i c -> (Identifier.make @@ Fmt.str "t%d" i, c))
@@ -99,7 +107,6 @@ let normalize_poly_variant_members basic rich =
 let inline_record_c_name ~variant_name ~constructor_name =
   Fmt.str "%s__%a" variant_name Identifier.pp constructor_name
 
-let option_name c = c_typename c |> Identifier.map ~f:(fun s -> s ^ "_option")
 
 let reified_option_c c =
   Variant
