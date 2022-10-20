@@ -2,7 +2,7 @@ open Base
 open C_intf
 open C_pp
 
-let exported_module_name = "Schemas"
+let c_module_name = ref "Schemas"
 let indent = 2
 
 let rec tuple_members = function
@@ -73,3 +73,5 @@ let switch ?(default : unit Fmt.t option) (on : string)
   in
   const string ("switch " ^ on ^ " {")
   ++ cut ++ cases ++ cut ++ maybe_default ++ const char '}'
+
+let qualified_c_type ~c_type_name = Fmt.str "%s.%s" !c_module_name c_type_name

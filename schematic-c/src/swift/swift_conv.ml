@@ -189,7 +189,7 @@ let tuple_conv_decl members : unit Fmt.t * unit Fmt.t =
              let v = to_c_stored ~c_type:c ~c_expr in
              (id, const string v))
     in
-    let body = invoke_named tname inits in
+    let body = invoke_named (qualified_c_type ~c_type_name:tname) inits in
     block ~indent signature body
   in
   let of_c =
@@ -286,7 +286,7 @@ let option_conv_decl c =
     let signature =
       Fmt.str "func schematicToC(_ x: %a) -> %s" pp_swift_type (Option c) tname
     in
-    let constructor_name = Fmt.str "%s.%s" exported_module_name tname in
+    let constructor_name = qualified_c_type ~c_type_name:tname in
     let body =
       let if_block =
         let body =

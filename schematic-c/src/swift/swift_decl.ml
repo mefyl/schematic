@@ -49,7 +49,7 @@ let struct_field : (Identifier.t * c) Fmt.t =
 (* Type definitions *)
 let type_decl fmt (c_name, ts) =
   let qualified_c_name =
-    Fmt.str "%s.%a" exported_module_name Identifier.pp c_name
+    qualified_c_type ~c_type_name:(Identifier.to_string c_name)
   in
   let swift_type_name = Swiftify.Type.id c_name in
   let rec pp_swift_decl f ts =

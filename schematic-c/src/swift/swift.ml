@@ -51,4 +51,5 @@ let export_schemas schemas =
     in
     l |> List.rev |> String.concat ~sep:"\n\n"
   in
-  prelude ^ "\n\n\n" ^ user_dependent_code
+  [prelude; Fmt.str "import %s" (!c_module_name); user_dependent_code] |>
+  String.concat ~sep:"\n\n"
