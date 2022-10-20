@@ -62,6 +62,7 @@ and tuple_name items =
 and array_name t = c_typename t |> Identifier.map ~f:(fun s -> s ^ "_array")
 and option_name c = c_typename c |> Identifier.map ~f:(fun s -> s ^ "_option")
 
+
 let tuple_fields =
   List.mapi ~f:(fun i c -> (Identifier.make @@ Fmt.str "t%d" i, c))
 
