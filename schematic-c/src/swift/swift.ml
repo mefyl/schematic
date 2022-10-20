@@ -28,9 +28,8 @@ let export_schemas schemas =
           f (Swift_conv.tuple_conv_decl members) (Tuple members)
         | _ -> (
           match option_element c with
-            | Some c when not (Set.mem specialized (Option c)) -> (
-                f (Swift_conv.option_conv_decl c) (Option c)
-              )
+          | Some c when not (Set.mem specialized (Option c)) ->
+            f (Swift_conv.option_conv_decl c) (Option c)
           | _ -> (specialized, [])))
     in
     (specialized, extra_decls @ [ decl ] @ l)

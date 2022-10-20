@@ -26,7 +26,6 @@ let rec option_element = function
   | _ -> None
 
 let rec is_option = Fn.compose Option.is_some option_element
-
 let is_array = Fn.compose Option.is_some array_element
 
 let rec needs_toplevel_conv c =
@@ -74,6 +73,3 @@ let switch ?(default : unit Fmt.t option) (on : string)
   in
   const string ("switch " ^ on ^ " {")
   ++ cut ++ cases ++ cut ++ maybe_default ++ const char '}'
-
-
-

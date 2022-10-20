@@ -5,7 +5,8 @@ open Swift_utils
 open Swift_typeexpr
 
 let to_c_expr ~c_type ~c_expr =
-  if needs_toplevel_conv c_type then Fmt.str "schematicToC(%s)" c_expr
+  if needs_toplevel_conv c_type then
+    Fmt.str "schematicToC(%s as %a)" c_expr pp_swift_type c_type
   else
     let inner = Fmt.str "%s.toC()" c_expr in
     match array_element c_type with
@@ -289,11 +290,11 @@ let option_conv_decl c =
     let body =
       let if_block =
         let body =
-          let payload =
-            Fmt.str "OpaquePointer(heapAlloc(%s))"
-              (to_c_expr ~c_type:c ~c_expr:"x")
-          in
-          const string "return "
+          let payload = "OpaquePointer(heapAlloc(c))" in
+          const string
+            (Fmt.str "let c: %s = %s" (Swiftify.C_type.c c)
+               (to_c_expr ~c_type:c ~c_expr:"x"))
+          ++ cut ++ const string "return "
           ++ invoke_named constructor_name
                [
                  ("tag", const string (some_tag |> Identifier.to_string));

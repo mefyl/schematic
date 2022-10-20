@@ -66,9 +66,7 @@ module Of = C_walk.Walk (struct
 
   let nullable (c, marks) =
     let name = option_name c in
-    let s () =
-      (Option c, marks)
-    in
+    let s () = (Option c, marks) in
     schema (Some (Identifier.to_string name)) None s
 
   let fields_empty () = ([], Marks.empty)

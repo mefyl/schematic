@@ -13,26 +13,31 @@ let rec pp_swift_type f c =
       ++ const (list ~sep:(const string ", ") pp_swift_type) members
       ++ const char ')'
     | None -> (
-      match c with
-      (* Array<T> specialization. Aliases won't help with protocols so no use
-         keeping them around on the Swift side. *)
-      | Array t | Atom (_, Some (Array t)) -> const array t
-      | Option  c -> const pp_swift_type c ++ const char '?'
-      | String -> const string "String"
-      | Atom (s, _) ->
-        (* XXX this is ugly *)
-        let override =
-          match s |> Identifier.to_string with
-          | "int64_t" -> Some "Int64"
-          | "sch_json" -> Some "String"
-          | "sch_time" -> Some "SchematicTime"
-          | _ -> None
-        in
-        const string (Option.value override ~default:(Swiftify.Type.id s))
-      | Void -> const string "Void"
-      | Mapped { front_facing } -> const pp_swift_type front_facing
-      | Struct _ | Variant _ | Poly_variant _ ->
-        failwith "tried to ref to %a without going through an Atom" pp_c c
-      | Tuple _ -> failwith "unreachable")
+      match array_element c with
+      | Some c -> const array c
+      | None -> (
+        match option_element c with
+        | Some c -> const pp_swift_type c ++ const char '?'
+        | None -> (
+          match c with
+          | String -> const string "String"
+          | Atom (s, _) ->
+            (* XXX this is ugly *)
+            let override =
+              match s |> Identifier.to_string with
+              | "int64_t" -> Some "Int64"
+              | "sch_json" -> Some "String"
+              | "sch_time" -> Some "SchematicTime"
+              | _ -> None
+            in
+            const string (Option.value override ~default:(Swiftify.Type.id s))
+          | Void -> const string "Void"
+          | Mapped { front_facing } -> const pp_swift_type front_facing
+          | Struct _ | Variant _ | Poly_variant _ ->
+            failwith "tried to ref to %a without going through an Atom" pp_c c
+          | Tuple _ | Array _ | Option _ ->
+            failwith
+              "unreachable (if you do trigger this, time to try polyvars for \
+               C_intf.c)")))
   in
   pp f ()

@@ -99,9 +99,7 @@ let normalize_poly_variant_members basic rich =
 let inline_record_c_name ~variant_name ~constructor_name =
   Fmt.str "%s__%a" variant_name Identifier.pp constructor_name
 
-let option_name c =
-  c_typename c |> Identifier.map ~f:(fun s -> s ^ "_option")
-
+let option_name c = c_typename c |> Identifier.map ~f:(fun s -> s ^ "_option")
 
 let reified_option_c c =
   Variant
