@@ -17,6 +17,7 @@ let rec pp_swift_type f c =
       (* Array<T> specialization. Aliases won't help with protocols so no use
          keeping them around on the Swift side. *)
       | Array t | Atom (_, Some (Array t)) -> const array t
+      | Option  c -> const pp_swift_type c ++ const char '?'
       | String -> const string "String"
       | Atom (s, _) ->
         (* XXX this is ugly *)

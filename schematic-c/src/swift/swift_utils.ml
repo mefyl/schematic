@@ -19,7 +19,21 @@ let rec array_element = function
   | Array c -> Some c
   | _ -> None
 
+let rec option_element = function
+  | Atom (_, None) -> None
+  | Atom (_, Some c) -> option_element c
+  | Option c -> Some c
+  | _ -> None
+
+let rec is_option = Fn.compose Option.is_some option_element
+
 let is_array = Fn.compose Option.is_some array_element
+
+let rec needs_toplevel_conv c =
+  match array_element c with
+  | Some c -> needs_toplevel_conv c
+  | None -> is_tuple c || is_option c
+
 let tuple_bindings n = List.init n ~f:(Fmt.str "t%d")
 let typealias f = Fmt.fmt "public typealias C = %s" f
 
@@ -60,3 +74,6 @@ let switch ?(default : unit Fmt.t option) (on : string)
   in
   const string ("switch " ^ on ^ " {")
   ++ cut ++ cases ++ cut ++ maybe_default ++ const char '}'
+
+
+

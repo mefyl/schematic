@@ -5,7 +5,7 @@ open Swift_utils
 open Swift_typeexpr
 
 let to_c_expr ~c_type ~c_expr =
-  if is_tuple c_type then Fmt.str "schematicToC(%s)" c_expr
+  if needs_toplevel_conv c_type then Fmt.str "schematicToC(%s)" c_expr
   else
     let inner = Fmt.str "%s.toC()" c_expr in
     match array_element c_type with
@@ -22,7 +22,7 @@ let to_c_stored ~c_type ~c_expr =
   to_c_expr ~c_type ~c_expr
 
 let of_c_expr ~c_type ~c_expr =
-  if is_tuple c_type then
+  if needs_toplevel_conv c_type then
     (* Unnamed types cannot be extended *)
     Fmt.str "schematicOfC(%s)" c_expr
   else
@@ -170,6 +170,8 @@ let of_c_case ~all_basic ~swift_type_name ~c_variant_name ~c_constructor_name
   in
   (c_case |> Identifier.to_string, pp)
 
+(* TODO maybe generalize this *)
+
 let tuple_conv_decl members : unit Fmt.t * unit Fmt.t =
   let open Fmt in
   let tname = tuple_name members |> Identifier.to_string in
@@ -226,7 +228,6 @@ let array_conv_decl c : unit Fmt.t * unit Fmt.t =
     for (i, x) in x.enumerated() {
       data.advanced(by: i).initialize(to: %s)
     }
-
 |}
             Identifier.pp (c_typename c)
             (to_c_expr ~c_type:c ~c_expr:"x")
@@ -269,6 +270,74 @@ let array_conv_decl c : unit Fmt.t * unit Fmt.t =
         else of_c_expr ~c_type:(Array c) ~c_expr:"c"
       in
       const string s
+    in
+    block ~indent signature body
+  in
+  (of_c, to_c)
+
+let option_conv_decl c =
+  let open Fmt in
+  let tname = option_name c in
+  let some_tag = case_name ~rich:true tname (Identifier.make "some") in
+  let none_tag = case_name ~rich:true tname (Identifier.make "none") in
+  let tname = tname |> Identifier.to_string in
+  let to_c =
+    let signature =
+      Fmt.str "func schematicToC(_ x: %a) -> %s" pp_swift_type (Option c) tname
+    in
+    let constructor_name = Fmt.str "%s.%s" exported_module_name tname in
+    let body =
+      let if_block =
+        let body =
+          let payload =
+            Fmt.str "OpaquePointer(heapAlloc(%s))"
+              (to_c_expr ~c_type:c ~c_expr:"x")
+          in
+          const string "return "
+          ++ invoke_named constructor_name
+               [
+                 ("tag", const string (some_tag |> Identifier.to_string));
+                 ("payload", const string payload);
+               ]
+        in
+        block ~indent "if let x = x" body
+      in
+      let else_block =
+        let body =
+          const string "return "
+          ++ invoke_named constructor_name
+               [
+                 ("tag", const string (none_tag |> Identifier.to_string));
+                 ("payload", const string "nil");
+               ]
+        in
+        block ~indent "else" body
+      in
+      if_block ++ cut ++ else_block
+    in
+    block ~indent signature body
+  in
+  let of_c =
+    let signature =
+      Fmt.str "func schematicOfC(_ c: %s) -> %a" tname pp_swift_type (Option c)
+    in
+    let body =
+      let if_block =
+        let body =
+          let c_expr =
+            Fmt.str "UnsafeMutablePointer<%s>(c.payload).pointee"
+              (Swiftify.C_type.c c)
+          in
+          let expr = of_c_expr ~c_type:c ~c_expr in
+          const string (Fmt.str "return %s" expr)
+        in
+        block ~indent (Fmt.str "if c.tag == %a" Identifier.pp some_tag) body
+      in
+      let else_block =
+        let body = const string "return nil" in
+        block ~indent "else" body
+      in
+      if_block ++ cut ++ else_block
     in
     block ~indent signature body
   in

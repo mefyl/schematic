@@ -8,11 +8,6 @@ let type_decl (name, c) : string option =
 
 let prelude = [%file "Prelude.swift"]
 
-let rec needs_toplevel_conv c =
-  match array_element c with
-  | Some c -> needs_toplevel_conv c
-  | None -> is_tuple c
-
 let export_schemas schemas =
   let process_type (specialized, l) (id, c) =
     let decl = Option.value (type_decl (id, c)) ~default:"" in
@@ -22,7 +17,6 @@ let export_schemas schemas =
       in
       (Set.add specialized flattened_c, [ of_src; to_src ])
     in
-
     let specialized, extra_decls =
       match array_element c with
       | Some c
@@ -32,7 +26,12 @@ let export_schemas schemas =
         match tuple_members c with
         | Some members when not (Set.mem specialized (Tuple members)) ->
           f (Swift_conv.tuple_conv_decl members) (Tuple members)
-        | _ -> (specialized, []))
+        | _ -> (
+          match option_element c with
+            | Some c when not (Set.mem specialized (Option c)) -> (
+                f (Swift_conv.option_conv_decl c) (Option c)
+              )
+          | _ -> (specialized, [])))
     in
     (specialized, extra_decls @ [ decl ] @ l)
   in
