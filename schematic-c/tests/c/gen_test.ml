@@ -529,18 +529,8 @@ value mapped_to_caml(mapped x) {
   if (decode == NULL) {
     decode = caml_named_value("schematic_mapped_decode");
   }
-  v_front = mapped_external_to_caml(x);
+  v_front = string_to_caml(x);
   v = caml_callback(*decode, v_front);
-  CAMLreturn(v);
-}
-|}
-
-let mapped_external_to_caml =
-  {|
-value mapped_external_to_caml(mapped_external x) {
-  CAMLparam0();
-  CAMLlocal1(v);
-  v = string_to_caml(x);
   CAMLreturn(v);
 }
 |}
@@ -555,17 +545,8 @@ mapped mapped_of_caml(value v) {
     encode = caml_named_value("schematic_mapped_encode");
   }
   v_back = caml_callback(*encode, v);
-  mapped res = mapped_external_of_caml(v_back);
+  mapped res = string_of_caml(v_back);
   CAMLreturnT(mapped, res);
-}
-|}
-
-let mapped_external_of_caml =
-  {|
-mapped_external mapped_external_of_caml(value v) {
-  CAMLparam1(v);
-  const char* res = string_of_caml(v);
-  CAMLreturnT(mapped_external, res);
 }
 |}
 
@@ -699,7 +680,7 @@ module Of_caml = struct
   let poly_payload () =
     test poly_payload_schema [ poly_payload_of_caml; tuple_int_string_of_caml ]
 
-  let mapped () = test mapped_schema [ mapped_of_caml; mapped_external_of_caml ]
+  let mapped () = test mapped_schema [ mapped_of_caml ]
 end
 
 module To_caml = struct
@@ -742,7 +723,7 @@ module To_caml = struct
   let poly_payload () =
     test poly_payload_schema [ poly_payload_to_caml; tuple_int_string_to_caml ]
 
-  let mapped () = test mapped_schema [ mapped_to_caml; mapped_external_to_caml ]
+  let mapped () = test mapped_schema [ mapped_to_caml ]
 end
 
 let () =

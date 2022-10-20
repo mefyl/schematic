@@ -61,7 +61,7 @@ module type WALK = sig
   val time : unit -> t
   val time_local : unit -> t
   val tuple : t list -> t
-  val mapped : string option -> t -> t
+  val mapped : t -> t
 end
 
 module Walk (W : WALK) = struct
@@ -81,7 +81,7 @@ module Walk (W : WALK) = struct
     | String -> W.string ()
     | Time -> W.time ()
     | Time_local -> W.time_local ()
-    | Map { descriptor = d; _ } -> W.mapped id (descriptor id d)
+    | Map { descriptor = d; _ } -> W.mapped (descriptor id d)
     | Mapping s -> W.mapping (schema s)
     | Nullable s -> W.nullable (schema s)
     | String_const s -> W.string_const s

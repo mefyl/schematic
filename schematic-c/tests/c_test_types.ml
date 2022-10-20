@@ -227,15 +227,32 @@ let mapped_schema = Mapped.schema
 let pp_mapped = Mapped.pp
 let equal_mapped = Mapped.equal
 
-(* Exports *)
+module Event_test_case = struct
+  module Inner = struct
+    type base = [ `A ] [@@deriving eq, schema, show]
 
-let reified_parametric_record_schema =
-  parametric_record_schema string_wrapper_schema
+    type t =
+      [ base
+      | `B
+      ]
+    [@@deriving show, eq]
 
-type polyvar = [ `Pending ] [@@deriving eq, schema]
+    let schema_versioned _ =
+      let open Schematic.Schemas in
+      let decode = function
+        | 1 -> Result.return `A
+        | 2 -> Result.return `B
+        | _ -> Result.fail "invalid numeric value"
+      and encode = function `A -> 1 | `B -> 2 in
+      Schematic.Schema.(make @@ Map { decode; encode; descriptor = Int })
+  end
 
-type parametric_record_with_polyvar = polyvar parametric_record
-[@@deriving eq, schema]
+  type 'publication wrap = { wrapped : 'publication }
+  [@@deriving schema, eq, show]
+
+  type t = Inner.t wrap
+  [@@deriving eq, schema, show] [@@schematic.name "event-case"]
+end
 
 let exported_schemas =
   [
@@ -269,5 +286,5 @@ let exported_schemas =
     Schema.pack tuple_int_string_alias_schema;
     Schema.pack with_computed_schema;
     Schema.pack mapped_schema;
-    Schema.pack parametric_record_with_polyvar_schema;
+    Schema.pack Event_test_case.schema;
   ]

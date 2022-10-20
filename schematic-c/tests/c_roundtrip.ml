@@ -92,6 +92,9 @@ external with_computed_rt_id : with_computed -> with_computed
 
 external mapped_rt_id : mapped -> mapped = "sch_mapped_rt_id"
 
+external event_case_rt_id : Event_test_case.t -> Event_test_case.t
+  = "sch_event_case_rt_id"
+
 module Tests = struct
   let test t got expected = Alcotest.(check t "" expected) got
 
@@ -336,6 +339,14 @@ module Tests = struct
     |> List.iter (fun x ->
            let new_x = mapped_rt_id x in
            test t new_x x)
+
+  let event_1 () =
+    let open Event_test_case in
+    let t = Alcotest.testable pp equal in
+    ([ { wrapped = `B }; { wrapped = `A } ] : t list)
+    |> List.iter (fun x ->
+           let new_x = event_case_rt_id x in
+           test t new_x x)
 end
 
 let () =
@@ -383,5 +394,6 @@ let () =
             test_case "with computed" `Quick with_computed;
             test_case "tuple_int_string_alias" `Quick tuple_int_string_alias;
             test_case "encode / decode" `Quick encode_decode;
+            test_case "event test case #1" `Quick event_1;
           ] );
     ]
