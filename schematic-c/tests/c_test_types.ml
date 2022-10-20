@@ -232,6 +232,11 @@ let equal_mapped = Mapped.equal
 let reified_parametric_record_schema =
   parametric_record_schema string_wrapper_schema
 
+type polyvar = [ `Pending ] [@@deriving eq, schema]
+
+type parametric_record_with_polyvar = polyvar parametric_record
+[@@deriving eq, schema]
+
 let exported_schemas =
   [
     Schema.pack primitive_record_schema;
@@ -264,4 +269,5 @@ let exported_schemas =
     Schema.pack tuple_int_string_alias_schema;
     Schema.pack with_computed_schema;
     Schema.pack mapped_schema;
+    Schema.pack parametric_record_with_polyvar_schema;
   ]

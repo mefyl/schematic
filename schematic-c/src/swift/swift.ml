@@ -2,6 +2,9 @@ open Base
 open Swift_utils
 open C_intf
 
+(* ref exposed for customizability *)
+let c_module_name = Swift_utils.c_module_name
+
 let type_decl (name, c) : string option =
   Logs.debug (fun m -> m "Swift type_decl: %a@." C_intf.pp_c c);
   Swift_decl.type_decl (name, c)
