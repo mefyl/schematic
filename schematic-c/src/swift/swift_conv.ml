@@ -171,7 +171,6 @@ let of_c_case ~all_basic ~swift_type_name ~c_variant_name ~c_constructor_name
   in
   (c_case |> Identifier.to_string, pp)
 
-
 let top_level_to_c_sig c =
   Fmt.str "func schematicToC(_ x: %a) -> %a" pp_swift_type c Identifier.pp
     (c_typename c)
@@ -179,7 +178,6 @@ let top_level_to_c_sig c =
 let top_level_of_c_sig c =
   Fmt.str "func schematicOfC(_ c: %a) -> %a" Identifier.pp (c_typename c)
     pp_swift_type c
-
 
 let top_level_conv_decl outer_c ~to_c_body ~of_c_body =
   let open Fmt in
@@ -224,37 +222,36 @@ let array_conv_decl c : unit Fmt.t * unit Fmt.t =
   let open Fmt in
   let tname = array_name c |> Identifier.to_string in
   let to_c_body =
-      if is_tuple c || is_array c then
-        const string
-          (Fmt.str
-             "let data = UnsafeMutablePointer<%a>.allocate(capacity: x.count)"
-             Identifier.pp (c_typename c))
-        ++ block ~indent "for (i, x) in x.enumerated()"
-             (const string
-                (Fmt.str "data.advanced(by: i).initialize(to: %s)"
-                   (to_c_expr ~c_type:c ~c_expr:"x")))
-        ++ cut ++ const string "return "
-        ++ invoke_named tname
-             [ ("len", const string "x.count"); ("data", const string "data") ]
-      else const string @@ to_c_expr ~c_type:(Array c) ~c_expr:"x"
+    if is_tuple c || is_array c then
+      const string
+        (Fmt.str
+           "let data = UnsafeMutablePointer<%a>.allocate(capacity: x.count)"
+           Identifier.pp (c_typename c))
+      ++ block ~indent "for (i, x) in x.enumerated()"
+           (const string
+              (Fmt.str "data.advanced(by: i).initialize(to: %s)"
+                 (to_c_expr ~c_type:c ~c_expr:"x")))
+      ++ cut ++ const string "return "
+      ++ invoke_named tname
+           [ ("len", const string "x.count"); ("data", const string "data") ]
+    else const string @@ to_c_expr ~c_type:(Array c) ~c_expr:"x"
   in
   let of_c_body =
-      if is_tuple c || is_array c then
-        const string "typealias Element = "
-        ++ const pp_swift_type c ++ cut
-        ++ swift_statements
-             [ {|assert(c.len >= 0)|}; {|if c.len == 0 { return [] }|} ]
-        ++ cut
-        ++ block ~indent "let res: Array<Element> = (0 ..< (c.len)).map"
-             (swift_statements
-                [
-                  {|let p = c.data.advanced(by: $0)|};
-                  Fmt.str {|return %s|}
-                    (of_c_expr ~c_type:c ~c_expr:"p.pointee");
-                ])
-        ++ cut
-        ++ swift_statements [ {|free(c.data)|}; {|return res|} ]
-      else const string @@ of_c_expr ~c_type:(Array c) ~c_expr:"c"
+    if is_tuple c || is_array c then
+      const string "typealias Element = "
+      ++ const pp_swift_type c ++ cut
+      ++ swift_statements
+           [ {|assert(c.len >= 0)|}; {|if c.len == 0 { return [] }|} ]
+      ++ cut
+      ++ block ~indent "let res: Array<Element> = (0 ..< (c.len)).map"
+           (swift_statements
+              [
+                {|let p = c.data.advanced(by: $0)|};
+                Fmt.str {|return %s|} (of_c_expr ~c_type:c ~c_expr:"p.pointee");
+              ])
+      ++ cut
+      ++ swift_statements [ {|free(c.data)|}; {|return res|} ]
+    else const string @@ of_c_expr ~c_type:(Array c) ~c_expr:"c"
   in
   top_level_conv_decl (Array c) ~to_c_body ~of_c_body
 
@@ -313,6 +310,3 @@ let option_conv_decl c =
     if_block ++ cut ++ else_block
   in
   top_level_conv_decl (Option c) ~to_c_body ~of_c_body
-
-
-
