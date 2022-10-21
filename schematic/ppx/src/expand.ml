@@ -56,6 +56,23 @@ module Jsoo_type_expander = Expander (Jsoo)
 module Schema_expander = Expander (Schema)
 module Sqml_binding_expander = Expander (Sqml)
 
+let type_context (t : type_declaration) =
+  let computed = match t.ptype_kind with Ptype_record _ -> true | _ -> false
+  and union_key =
+    match (t.ptype_kind, t.ptype_manifest) with
+    | Ptype_variant _, _
+    | Ptype_abstract, Some { ptyp_desc = Ptyp_variant _; _ } ->
+      true
+    | _ -> false
+  in
+  {
+    attributes =
+      Attributes.extract ~computed ~name:true ~union_key t.ptype_attributes;
+    loc = t.ptype_loc;
+    name = t.ptype_name.txt;
+    params = t.ptype_params;
+  }
+
 let expand ~context types gadt jsoo sqml =
   let jsoo =
     if context.global.enable_jsoo then
@@ -72,26 +89,8 @@ let expand ~context types gadt jsoo sqml =
   let expand context =
     let types =
       let f t =
-        let type_context =
-          let computed =
-            match t.ptype_kind with Ptype_record _ -> true | _ -> false
-          and union_key =
-            match (t.ptype_kind, t.ptype_manifest) with
-            | Ptype_variant _, _
-            | Ptype_abstract, Some { ptyp_desc = Ptyp_variant _; _ } ->
-              true
-            | _ -> false
-          in
-          {
-            attributes =
-              Attributes.extract ~computed ~name:true ~union_key
-                t.ptype_attributes;
-            loc = t.ptype_loc;
-            name = t.ptype_name.txt;
-            params = t.ptype_params;
-          }
-        in
-        let loc = t.ptype_loc in
+        let type_context = type_context t
+        and loc = t.ptype_loc in
         let type_ =
           match t.ptype_kind with
           | Ptype_record fields ->
@@ -160,29 +159,10 @@ let expand ~context types gadt jsoo sqml =
     List.map ~f variants |> List.concat
   | None -> expand context
 
-let expand_sig ~(context : context) types =
+let expand_sig ~context types =
   (* FIXME: Jsoo declarations *)
-  let loc = context.loc in
-  let module Ast = (val Ast_builder.make loc) in
-  let f { ptype_name = { txt; loc }; _ } =
-    let type_ = Ast.ptyp_constr { txt = Longident.Lident txt; loc } [] in
-    [
-      Ast.(
-        psig_value
-        @@ value_description
-             ~name:{ txt = name "schema_versioned" txt; loc }
-             ~type_:
-               [%type:
-                 Schematic.Schema.version -> [%t type_] Schematic.Schema.t]
-             ~prim:[]);
-      Ast.(
-        psig_value
-        @@ value_description
-             ~name:{ txt = name "schema" txt; loc }
-             ~type_:[%type: [%t type_] Schematic.Schema.t] ~prim:[]);
-    ]
-  in
-  List.map ~f types |> List.concat
+  let types = List.map types ~f:(fun t -> (t, type_context t)) in
+  Schema.expand_sig ~context types
 
 let add ~inside ~jsoo ~version =
   let global =

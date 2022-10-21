@@ -475,6 +475,22 @@ and expand_any_variant ~context ~type_context poly options =
 let expand_abstract_type ~context ~type_context t =
   encode_type ~context ~type_context t
 
+let type_wrap context type_context t =
+  let loc = type_context.loc in
+  let module Ast = (val Ast_builder.make loc) in
+  let wrap param t =
+    match param with
+    | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
+      if context.global.inside then
+        [%type: [%t Ast.ptyp_var name] Schema.t -> [%t t]]
+      else [%type: [%t Ast.ptyp_var name] Schematic.Schema.t -> [%t t]]
+    | { ptyp_desc = Ptyp_any; ptyp_loc = loc; _ }, _ -> [%type: _ -> [%t t]]
+    | t, _ ->
+      Ppxlib.Location.raise_errorf ~loc
+        "schematic-ppx: unsupported type parameter A %a" Pprintast.core_type t
+  in
+  List.fold_right ~f:wrap ~init:t type_context.params
+
 let close ~configuration:_ ~context ~type_context schema =
   let module Ast = (val Ast_builder.make type_context.loc) in
   let loc = type_context.loc in
@@ -496,18 +512,7 @@ let close ~configuration:_ ~context ~type_context schema =
     in
     Option.value ~default type_context.attributes.name
   in
-  let type_wrap t =
-    let wrap param t =
-      match param with
-      | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
-        [%type: [%t Ast.ptyp_var name] Schema.t -> [%t t]]
-      | { ptyp_desc = Ptyp_any; ptyp_loc = loc; _ }, _ -> [%type: _ -> [%t t]]
-      | t, _ ->
-        Ppxlib.Location.raise_errorf ~loc
-          "schematic-ppx: unsupported type parameter A %a" Pprintast.core_type t
-    in
-    List.fold_right ~f:wrap ~init:t type_context.params
-  and params_wrap body =
+  let params_wrap body =
     let wrap i exp arg =
       match arg with
       | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
@@ -712,7 +717,7 @@ let close ~configuration:_ ~context ~type_context schema =
   in
   let pattern, pattern_versioned =
     ( Ast.ppat_constraint (Ast.pvar name)
-        (type_wrap
+        (type_wrap context type_context
            [%type:
              [%t
                Ast.ptyp_constr
@@ -742,3 +747,33 @@ let combine ~loc () expanded =
     { pstr_desc = Pstr_value (Recursive, versioned); pstr_loc = loc };
     { pstr_desc = Pstr_value (Nonrecursive, unversioned); pstr_loc = loc };
   ]
+
+let expand_sig ~(context : context) types =
+  let loc = context.loc in
+  let module Ast = (val Ast_builder.make loc) in
+  let f ({ ptype_name = { txt; loc }; ptype_params; _ }, type_context) =
+    let type_ =
+      Ast.ptyp_constr
+        { txt = Longident.Lident txt; loc }
+        (List.map ~f:fst ptype_params)
+    in
+    [
+      Ast.(
+        psig_value
+        @@ value_description
+             ~name:{ txt = name "schema_versioned" txt; loc }
+             ~type_:
+               [%type:
+                 Schematic.Schema.version ->
+                 [%t
+                   type_wrap context type_context
+                     [%type: [%t type_] Schematic.Schema.t]]]
+             ~prim:[]);
+      Ast.(
+        psig_value
+        @@ value_description
+             ~name:{ txt = name "schema" txt; loc }
+             ~type_:[%type: [%t type_] Schematic.Schema.t] ~prim:[]);
+    ]
+  in
+  List.map ~f types |> List.concat
