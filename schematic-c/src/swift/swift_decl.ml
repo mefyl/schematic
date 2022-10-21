@@ -42,7 +42,7 @@ let case_decls basic rich =
 let struct_field : (Identifier.t * c) Fmt.t =
   let open Fmt in
   let pp f (id, c) =
-    Fmt.fmt "public let %s: %a" f (Swiftify.Binding.id id) pp_swift_type c
+    Fmt.fmt "public var %s: %a" f (Swiftify.Binding.id id) pp_swift_type c
   in
   box pp
 

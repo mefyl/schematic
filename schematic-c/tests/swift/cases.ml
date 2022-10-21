@@ -7,8 +7,8 @@ module Primitive_record : Schema_test = struct
     {|
 public struct PrimitiveRecord: CConvertible {
   public typealias C = primitive_record
-  public let a: Int
-  public let b: Int
+  public var a: Int
+  public var b: Int
   public init(a: Int, b: Int) {
     self.a = a
     self.b = b
@@ -36,8 +36,8 @@ module Wrapper : Schema_test = struct
     {|
 public struct Wrapper: CConvertible {
   public typealias C = wrapper
-  public let somevar: Int
-  public let r: PrimitiveRecord
+  public var somevar: Int
+  public var r: PrimitiveRecord
   public init(somevar: Int, r: PrimitiveRecord) {
     self.somevar = somevar
     self.r = r
