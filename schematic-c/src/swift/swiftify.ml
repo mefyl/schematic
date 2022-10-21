@@ -9,8 +9,8 @@ module C_type = struct
   let c c =
     let override =
       match c with
-      | String -> Some "UnsafePointer<CChar>"
-      | Atom (id, _) -> (
+      | `String -> Some "UnsafePointer<CChar>"
+      | `Atom (id, _) -> (
         match Identifier.to_string id with
         | "int" -> Some "CInt"
         | "long" -> Some "CLong"

@@ -23,16 +23,16 @@ let export_schemas schemas =
     let specialized, extra_decls =
       match array_element c with
       | Some c
-        when (not (Set.mem specialized (Array c))) && needs_toplevel_conv c ->
-        f (Swift_conv.array_conv_decl c) (Array c)
+        when (not (Set.mem specialized (`Array c))) && needs_toplevel_conv c ->
+        f (Swift_conv.array_conv_decl c) (`Array c)
       | _ -> (
         match tuple_members c with
-        | Some members when not (Set.mem specialized (Tuple members)) ->
-          f (Swift_conv.tuple_conv_decl members) (Tuple members)
+        | Some members when not (Set.mem specialized (`Tuple members)) ->
+          f (Swift_conv.tuple_conv_decl members) (`Tuple members)
         | _ -> (
           match option_element c with
-          | Some c when not (Set.mem specialized (Option c)) ->
-            f (Swift_conv.option_conv_decl c) (Option c)
+          | Some c when not (Set.mem specialized (`Option c)) ->
+            f (Swift_conv.option_conv_decl c) (`Option c)
           | _ -> (specialized, [])))
     in
     (specialized, extra_decls @ [ decl ] @ l)

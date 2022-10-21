@@ -2,7 +2,7 @@ open C_intf
 open Base
 
 let pp ?(indent = 2) fmt ts =
-  let rec pp fmt ts =
+  let rec pp fmt (ts : c) =
     let printer =
       let open Fmt in
       let open C_pp in
@@ -50,22 +50,22 @@ let pp ?(indent = 2) fmt ts =
          ++ const string "data;")
       in
       match ts with
-      | Option c -> const pp (reified_option_c c)
-      | Atom (s, _) -> const string (Identifier.to_string s)
-      | Array t -> const array t
+      | `Option c -> const pp (reified_option_c c)
+      | `Atom (s, _) -> const string (Identifier.to_string s)
+      | `Array t -> const array t
       (* TODO: do a pass over const-correctness *)
-      | String -> const string "const char*"
-      | Struct { fields; _ } -> const struct_ fields
-      (* Tuples are structs with types named according to their indices *)
-      | Tuple types ->
+      | `String -> const string "const char*"
+      | `Struct { fields; _ } -> const struct_ fields
+      (* `Tuples are structs with types named according to their indices *)
+      | `Tuple types ->
         let fields = tuple_fields types in
         const struct_ fields
-      | Variant { name; basic; rich; _ } -> const variant (name, basic, rich)
-      | Poly_variant { name; basic; rich; _ } ->
+      | `Variant { name; basic; rich; _ } -> const variant (name, basic, rich)
+      | `Poly_variant { name; basic; rich; _ } ->
         let basic, rich = normalize_poly_variant_members basic rich in
         const variant (name, basic, rich)
-      | Mapped { front_facing } -> const pp front_facing
-      | Void -> nop
+      | `Mapped front_facing -> const pp front_facing
+      | `Void -> nop
     in
     printer fmt ()
   in

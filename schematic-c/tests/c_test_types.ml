@@ -244,7 +244,7 @@ module Event_1 = struct
   end
 
   type 'publication wrap = { wrapped : 'publication }
-  [@@deriving schema, eq, show]
+  [@@deriving schema, eq, show] [@@boxed]
 
   type t = Inner.t wrap [@@deriving eq, schema, show]
 end

@@ -28,7 +28,7 @@ let roundtrip_src (name, c) =
   let open C_pp in
   (* Bit of a hack... *)
   let typ =
-    let c = Atom (name, Some c) in
+    let c = `Atom (name, Some c) in
     Fmt.to_to_string C_typeexpr.pp c
   in
   let decl = Fmt.str "CAMLprim value %s(value v)" (roundtrip_for name) in

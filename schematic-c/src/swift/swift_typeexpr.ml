@@ -5,7 +5,7 @@ open Swift_utils
 let rec pp_swift_type f c =
   Logs.debug (fun m -> m "pp_swift_type: %a" pp_c c);
   let open Fmt in
-  let array : c Fmt.t = fun f -> Fmt.fmt "Array<%a>" f pp_swift_type in
+  let array : c Fmt.t = fun f -> Fmt.fmt "`Array<%a>" f pp_swift_type in
   let pp =
     match tuple_members c with
     | Some members ->
@@ -20,8 +20,8 @@ let rec pp_swift_type f c =
         | Some c -> const pp_swift_type c ++ const char '?'
         | None -> (
           match c with
-          | String -> const string "String"
-          | Atom (s, _) ->
+          | `String -> const string "String"
+          | `Atom (s, _) ->
             (* XXX this is ugly *)
             let override =
               match s |> Identifier.to_string with
@@ -31,11 +31,11 @@ let rec pp_swift_type f c =
               | _ -> None
             in
             const string (Option.value override ~default:(Swiftify.Type.id s))
-          | Void -> const string "Void"
-          | Mapped { front_facing } -> const pp_swift_type front_facing
-          | Struct _ | Variant _ | Poly_variant _ ->
-            failwith "tried to ref to %a without going through an Atom" pp_c c
-          | Tuple _ | Array _ | Option _ ->
+          | `Void -> const string "`Void"
+          | `Mapped front_facing -> const pp_swift_type front_facing
+          | `Struct _ | `Variant _ | `Poly_variant _ ->
+            failwith "tried to ref to %a without going through an `Atom" pp_c c
+          | `Tuple _ | `Array _ | `Option _ ->
             failwith
               "unreachable (if you do trigger this, time to try polyvars for \
                C_intf.c)")))

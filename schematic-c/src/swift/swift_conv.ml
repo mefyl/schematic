@@ -67,9 +67,9 @@ let to_c_case ~all_basic ~c_variant_name ~c_constructor_name
       let bindings, body =
         match c with
         (* Inline tuple *)
-        | Atom (c_tuple_type_name, Some (Tuple members)) ->
+        | `Atom (c_tuple_type_name, Some (`Tuple members)) ->
           let bindings = tuple_bindings (List.length members) in
-          (* Tuple types CANNOT be extended in Swift. *)
+          (* `Tuple types CANNOT be extended in Swift. *)
           let tuple_construction =
             invoke_named
               (c_tuple_type_name |> Identifier.to_string)
@@ -80,7 +80,7 @@ let to_c_case ~all_basic ~c_variant_name ~c_constructor_name
           in
           (bindings |> String.concat ~sep:", ", tuple_construction)
         (* Inline record *)
-        | Struct { fields } ->
+        | `Struct { fields } ->
           let fields =
             fields |> List.map ~f:(fun (id, c) -> (Swiftify.Binding.id id, c))
           in
@@ -130,7 +130,7 @@ let of_c_case ~all_basic ~swift_type_name ~c_variant_name ~c_constructor_name
       let pointee, intermediate_stmts, params =
         match c with
         (* Inline tuple *)
-        | Atom (_, Some (Tuple members)) ->
+        | `Atom (_, Some (`Tuple members)) ->
           let bindings = tuple_bindings (List.length members) in
           let stmts =
             List.zip_exn bindings members
@@ -141,7 +141,7 @@ let of_c_case ~all_basic ~swift_type_name ~c_variant_name ~c_constructor_name
           let args = bindings |> String.concat ~sep:", " in
           (Swiftify.C_type.c c, stmts, args)
         (* Inline record *)
-        | Struct { fields } ->
+        | `Struct { fields } ->
           let fields =
             fields |> List.map ~f:(fun (id, c) -> (Swiftify.Binding.id id, c))
           in
@@ -180,7 +180,6 @@ let top_level_of_c_sig c =
     pp_swift_type c
 
 let top_level_conv_decl outer_c ~to_c_body ~of_c_body =
-  let open Fmt in
   let to_c =
     let signature = top_level_to_c_sig outer_c in
     block ~indent signature to_c_body
@@ -216,7 +215,7 @@ let tuple_conv_decl members : unit Fmt.t * unit Fmt.t =
     ++ const (list ~sep:(const string ", ") string) items
     ++ const char ')'
   in
-  top_level_conv_decl (Tuple members) ~to_c_body ~of_c_body
+  top_level_conv_decl (`Tuple members) ~to_c_body ~of_c_body
 
 let array_conv_decl c : unit Fmt.t * unit Fmt.t =
   let open Fmt in
@@ -234,7 +233,7 @@ let array_conv_decl c : unit Fmt.t * unit Fmt.t =
       ++ cut ++ const string "return "
       ++ invoke_named tname
            [ ("len", const string "x.count"); ("data", const string "data") ]
-    else const string @@ to_c_expr ~c_type:(Array c) ~c_expr:"x"
+    else const string @@ to_c_expr ~c_type:(`Array c) ~c_expr:"x"
   in
   let of_c_body =
     if is_tuple c || is_array c then
@@ -243,7 +242,7 @@ let array_conv_decl c : unit Fmt.t * unit Fmt.t =
       ++ swift_statements
            [ {|assert(c.len >= 0)|}; {|if c.len == 0 { return [] }|} ]
       ++ cut
-      ++ block ~indent "let res: Array<Element> = (0 ..< (c.len)).map"
+      ++ block ~indent "let res: `Array<Element> = (0 ..< (c.len)).map"
            (swift_statements
               [
                 {|let p = c.data.advanced(by: $0)|};
@@ -251,9 +250,9 @@ let array_conv_decl c : unit Fmt.t * unit Fmt.t =
               ])
       ++ cut
       ++ swift_statements [ {|free(c.data)|}; {|return res|} ]
-    else const string @@ of_c_expr ~c_type:(Array c) ~c_expr:"c"
+    else const string @@ of_c_expr ~c_type:(`Array c) ~c_expr:"c"
   in
-  top_level_conv_decl (Array c) ~to_c_body ~of_c_body
+  top_level_conv_decl (`Array c) ~to_c_body ~of_c_body
 
 let option_conv_decl c =
   let open Fmt in
@@ -309,4 +308,4 @@ let option_conv_decl c =
     in
     if_block ++ cut ++ else_block
   in
-  top_level_conv_decl (Option c) ~to_c_body ~of_c_body
+  top_level_conv_decl (`Option c) ~to_c_body ~of_c_body

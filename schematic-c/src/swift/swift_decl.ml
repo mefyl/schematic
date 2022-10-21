@@ -20,9 +20,9 @@ let case_decls basic rich =
         let swift_case = Swiftify.Binding.id id in
         match c with
         (* Inline tuples are special-cased to avoid extra parentheses *)
-        | Atom (_, Some (Tuple _)) ->
+        | `Atom (_, Some (`Tuple _)) ->
           Fmt.fmt "case %s%a" f swift_case pp_swift_type c
-        | Struct { fields } ->
+        | `Struct { fields } ->
           let named_member_decls =
             fields
             |> List.map ~f:(fun (id, c) ->
@@ -166,15 +166,16 @@ let type_decl fmt (c_name, ts) =
           body fmt ()
       in
       match ts with
-      (* Structs and enums are named types *)
-      | Struct { fields } -> const struct_ fields
-      | Variant { name; basic; rich } -> const variant (name, basic, rich)
-      | Poly_variant { name; basic; rich } ->
+      (* `Structs and enums are named types *)
+      | `Struct { fields } -> const struct_ fields
+      | `Variant ({ name; basic; rich } : regular_variant) ->
+        const variant (name, basic, rich)
+      | `Poly_variant { name; basic; rich } ->
         let basic, rich = normalize_poly_variant_members basic rich in
         const variant (name, basic, rich)
-      (* Mapped types delegate to their external representation *)
-      | Mapped { front_facing } -> const pp_swift_decl front_facing
-      | Void -> failwith "Tried to declare Void"
+      (* `Mapped types delegate to their external representation *)
+      | `Mapped front_facing -> const pp_swift_decl front_facing
+      | `Void -> failwith "Tried to declare `Void"
       (* Other types don't get their own declaration, and are just aliases *)
       | aliased ->
         const string
@@ -189,5 +190,5 @@ let type_decl (c_name, c) : string option =
   Logs.debug (fun m -> m "Encountering %a: %a" Identifier.pp c_name pp_c c);
   match c with
   (* Some types do not need to be individually declared *)
-  | Tuple _ | Array _ | Option _ -> None
+  | `Tuple _ | `Array _ | `Option _ -> None
   | c -> Some (Fmt.to_to_string type_decl (c_name, c))

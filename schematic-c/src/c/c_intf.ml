@@ -1,28 +1,34 @@
 open Base
 module Identifier = C_identifier
 
-type c =
-  | Void
-  | String  (** Native string *)
-  | Array of c
-  | Atom of Identifier.t * c option
-      (** The RHS is the referenced type, if known. *)
-  | Struct of { fields : (Identifier.t * c) list }
-  | Variant of {
-      name : Identifier.t;
-      basic : Identifier.t list;
-      rich : (Identifier.t * c) list;
-    }
-  | Poly_variant of {
-      name : Identifier.t;
-      (* int: hash *)
-      basic : (Identifier.t * int) list;
-      rich : (Identifier.t * int * c) list;
-    }
-  | Tuple of c list
-  | Mapped of { (* "serialized" type *)
-                front_facing : c }
-  | Option of c
+type c_struct = { fields : (Identifier.t * c) list }
+
+and regular_variant = {
+  name : Identifier.t;
+  basic : Identifier.t list;
+  rich : (Identifier.t * c) list;
+}
+
+and poly_variant = {
+  name : Identifier.t;
+  (* int: hash *)
+  basic : (Identifier.t * int) list;
+  rich : (Identifier.t * int * c) list;
+}
+
+and c =
+  [ `Void
+  | `String  (** Native string *)
+  | `Array of c
+  | `Atom of Identifier.t * c option
+    (** The RHS is the referenced type, if known. *)
+  | `Struct of c_struct
+  | `Variant of regular_variant
+  | `Poly_variant of poly_variant
+  | `Tuple of c list
+  | `Mapped of c
+  | `Option of c
+  ]
 [@@deriving show, hash, eq, ord]
 
 type c_function = {
@@ -40,14 +46,14 @@ type c_gen = {
 open Base
 
 let rec c_canonical_typename : c -> Identifier.t option = function
-  | String -> Some (Identifier.make "string")
-  | Atom (s, _) -> Some s
-  | Tuple members -> Some (tuple_name members)
-  | Array c -> Some (array_name c)
-  | Variant { name; _ } | Poly_variant { name; _ } -> Some name
-  | Option c -> Some (option_name c)
-  | Mapped { front_facing } -> c_canonical_typename front_facing
-  | Void | Struct _ -> None
+  | `String -> Some (Identifier.make "string")
+  | `Atom (s, _) -> Some s
+  | `Tuple members -> Some (tuple_name members)
+  | `Array c -> Some (array_name c)
+  | `Variant { name; _ } | `Poly_variant { name; _ } -> Some name
+  | `Option c -> Some (option_name c)
+  | `Mapped front_facing -> c_canonical_typename front_facing
+  | `Void | `Struct _ -> None
 
 and c_typename c =
   match c_canonical_typename c with
@@ -98,8 +104,8 @@ let case_name ~rich variant_name constr_name =
   |> Identifier.make
 
 let rec concrete_type = function
-  | Atom (_, Some t) -> concrete_type t
-  | Atom (_, None) -> None
+  | `Atom (_, Some t) -> concrete_type t
+  | `Atom (_, None) -> None
   | t -> Some t
 
 let normalize_poly_variant_members basic rich =
@@ -111,9 +117,10 @@ let inline_record_c_name ~variant_name ~constructor_name =
   Fmt.str "%s__%a" variant_name Identifier.pp constructor_name
 
 let reified_option_c c =
-  Variant
-    {
-      name = option_name c;
-      basic = [ Identifier.make "none" ];
-      rich = [ (Identifier.make "some", c) ];
-    }
+  `Variant
+    ({
+       name = option_name c;
+       basic = [ Identifier.make "none" ];
+       rich = [ (Identifier.make "some", c) ];
+     }
+      : regular_variant)

@@ -29,14 +29,14 @@ let cases ~indent l =
 let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
     ((name : Identifier.t), ast) =
   match ast with
-  | Option c ->
+  | `Option c ->
     pp_of_caml_converter ~safety_checks ~indent (name, reified_option_c c)
   | _ ->
     let open Fmt in
     let caml_locals, (body : unit Fmt.t) =
       let open C_statements in
       match ast with
-      | Struct { fields } ->
+      | `Struct { fields } ->
         let field_stores =
           fields
           |> List.mapi ~f:(fun field_idx (field_name, field_type) ->
@@ -53,7 +53,7 @@ let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         in
         ([], const pp_statements statements)
         (* Plain-only regular variant *)
-      | Variant { basic; rich = []; _ } ->
+      | `Variant { basic; rich = []; _ } ->
         let pp =
           const pp_statements
             [
@@ -63,7 +63,7 @@ let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         in
         ([], pp)
         (* Regular variant with payloads *)
-      | Variant { basic; rich; _ } ->
+      | `Variant { basic; rich; _ } ->
         let plain_case =
           const pp_statements
             [ "res.tag = Int_val(v)"; "assert(res.tag < n_basic)" ]
@@ -73,14 +73,14 @@ let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
           let accessor_stmts =
             match c with
             (* Inline tuple payload *)
-            | Atom (_, Some (Tuple members)) ->
+            | `Atom (_, Some (`Tuple members)) ->
               members
               |> List.mapi ~f:(fun field_idx c ->
                      Fmt.str "res.payload->%a.t%d = %a(Field(v, %d))"
                        Identifier.pp field_name field_idx Identifier.pp
                        (of_caml_name_for_c c) field_idx)
             (* Inline record payload *)
-            | Struct { fields } ->
+            | `Struct { fields } ->
               fields
               |> List.mapi ~f:(fun i (inline_field_name, field_c) ->
                      Fmt.str "res.payload->%a.%a = %a(%s)" Identifier.pp
@@ -139,7 +139,7 @@ let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
             ++ vbox ~indent (const string "} else {" ++ cut ++ rich_case)
             ++ cut ++ const char '}') )
       (* Polymorphic variant *)
-      | Poly_variant { basic; rich; _ } ->
+      | `Poly_variant { basic; rich; _ } ->
         let basic_only = List.is_empty rich in
         let case_name = case_name ~rich:(not basic_only) in
         let elses =
@@ -197,7 +197,7 @@ let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
           ++ cut ++ if_else_chain
         in
         ([], pp)
-      | Tuple members ->
+      | `Tuple members ->
         let tuptype = tuple_name members in
         let pp =
           const pp_statements
@@ -211,7 +211,7 @@ let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
                      (of_caml_name_for_c c) (field "v" field_idx)))
         in
         ([], pp)
-      | Array elem_type ->
+      | `Array elem_type ->
         let length_while =
           block ~indent "while (l != Val_emptylist)"
             (const pp_statements
@@ -242,7 +242,7 @@ let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         in
         ([ "l" ], pp)
       (* The considered type is merely an alias for another *)
-      | (Atom _ | String) as c ->
+      | (`Atom _ | `String) as c ->
         let pp =
           const pp_statements
             [
@@ -251,7 +251,7 @@ let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
             ]
         in
         ([], pp)
-      | Mapped { front_facing } ->
+      | `Mapped front_facing ->
         (* TODO: factor lazy named value retrieval *)
         let if_encode =
           block ~indent "if (encode == NULL)"
@@ -272,9 +272,9 @@ let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
                ]
         in
         ([ "v_back" ], pp)
-      | Void ->
+      | `Void ->
         failwith
-          "Void may not be instantiated, and therefore cannot be converted"
+          "`Void may not be instantiated, and therefore cannot be converted"
     in
     let return_type = Identifier.to_string name in
     let fname = name |> of_caml_name_for in
@@ -332,12 +332,12 @@ let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
 
 let rec pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
   match ast with
-  | Option c -> pp_to_caml_converter ~indent (name, reified_option_c c)
+  | `Option c -> pp_to_caml_converter ~indent (name, reified_option_c c)
   | _ ->
     let open Fmt in
     let argname, (body : unit Fmt.t) =
       match ast with
-      | Struct { fields } ->
+      | `Struct { fields } ->
         let tag = 0 in
         let n_fields = List.length fields in
         let field_stores =
@@ -363,7 +363,7 @@ let rec pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
         in
         ("p", const pp_statements statements)
       (* Plain-only regular variant *)
-      | Variant { basic; rich = []; _ } ->
+      | `Variant { basic; rich = []; _ } ->
         let pp =
           const pp_statements
             [
@@ -372,7 +372,7 @@ let rec pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
         in
         ("x", pp)
       (* Regular variant with payloads *)
-      | Variant { name = variant_name; basic; rich } ->
+      | `Variant { name = variant_name; basic; rich } ->
         let pp =
           let basic_cases : (string * unit Fmt.t) list =
             basic
@@ -392,7 +392,7 @@ let rec pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
                    let n_fields, stmts =
                      match constr_type with
                      (* Inline tuple *)
-                     | Atom (_, Some (Tuple members)) ->
+                     | `Atom (_, Some (`Tuple members)) ->
                        ( members |> List.length,
                          members
                          |> List.mapi ~f:(fun field_idx c ->
@@ -402,7 +402,7 @@ let rec pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
                                 in
                                 store ~dst:"v" ~field_idx ~field_val) )
                      (* Inline record *)
-                     | Struct { fields } ->
+                     | `Struct { fields } ->
                        ( fields |> List.length,
                          fields
                          |> List.mapi ~f:(fun field_idx (field_name, c) ->
@@ -446,7 +446,7 @@ let rec pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
           ++ const pp_statements [ return_val "v" ]
         in
         ("x", pp)
-      | Poly_variant { basic; rich; _ } ->
+      | `Poly_variant { basic; rich; _ } ->
         let basic_only = List.is_empty rich in
         let case_name = case_name ~rich:(not basic_only) in
         let cases =
@@ -494,7 +494,7 @@ let rec pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
           ++ const pp_statements [ return_val "v" ]
         in
         ("x", pp)
-      | Tuple members ->
+      | `Tuple members ->
         let pp =
           const pp_statements
           @@ [
@@ -512,7 +512,7 @@ let rec pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
           @ [ return_val "v" ]
         in
         ("x", pp)
-      | Array elem_type ->
+      | `Array elem_type ->
         let loop =
           block ~indent "for (int64_t i = arr.len - 1; i >= 0; i--)"
             (const pp_statements
@@ -533,7 +533,7 @@ let rec pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
           ++ const pp_statements [ return_val "cli" ]
         in
         ("arr", pp)
-      | (Atom _ | String) as c ->
+      | (`Atom _ | `String) as c ->
         let pp =
           const pp_statements
             [
@@ -544,7 +544,7 @@ let rec pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
             ]
         in
         ("x", pp)
-      | Mapped { front_facing } ->
+      | `Mapped front_facing ->
         let if_decode =
           block ~indent "if (decode == NULL)"
             (const pp_statements
@@ -566,8 +566,8 @@ let rec pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
                ]
         in
         ("x", pp)
-      | Void ->
-        failwith "Void may not be instantiated and is unsupported in to_caml"
+      | `Void ->
+        failwith "`Void may not be instantiated and is unsupported in to_caml"
     in
     let argtype = Identifier.to_string name in
     let decl =

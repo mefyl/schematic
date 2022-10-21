@@ -155,14 +155,14 @@ extension String: CConvertible {
 
 
 // Won't work on tuples.
-extension Array: OfC where Element: OfC {
+extension `Array: OfC where Element: OfC {
   public typealias C = type_erased_array
 
   public static func ofC(_ c: type_erased_array) -> [Element] {
     assert(c.len >= 0)
     if c.len == 0 { return [] }
 
-    let res: Array<Element> = (0 ..< (c.len)).map {
+    let res: `Array<Element> = (0 ..< (c.len)).map {
       let p = c.data.assumingMemoryBound(to: Element.C.self)
         .advanced(by: $0)
       return Element.ofC(p.pointee)
@@ -174,7 +174,7 @@ extension Array: OfC where Element: OfC {
   }
 }
 
-extension Array: ToC where Element: ToC {
+extension `Array: ToC where Element: ToC {
   public typealias C = type_erased_array
 
   public func toC() -> type_erased_array {
