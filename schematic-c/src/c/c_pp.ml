@@ -22,3 +22,7 @@ let banners section_name =
 let bannerify section_name body =
   let start_banner, end_banner = banners section_name in
   start_banner ^ body ^ end_banner
+
+let case_ish ~indent header body =
+  let open Fmt in
+  vbox ~indent @@ (header ++ cut ++ body)

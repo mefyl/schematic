@@ -135,7 +135,7 @@ let payload_variant_of_caml =
   {|
 payload_variant payload_variant_of_caml(value v) {
   CAMLparam1(v);
-  payload_variant res;
+  payload_variant res = {.tag = -1, .payload = NULL};
   const int n_basic = 3;
   const int n_rich = 2;
   if (Is_long(v)) {
@@ -396,7 +396,7 @@ let poly_basic_of_caml =
   {|
 poly_basic poly_basic_of_caml(value v) {
   CAMLparam1(v);
-  poly_basic res;
+  poly_basic res = -1;
   if (0) {}
   else if (v == Val_long(65)) res = poly_basic_a;
   else if (v == Val_long(66)) res = poly_basic_b;
@@ -457,7 +457,7 @@ let poly_payload_of_caml =
   {|
 poly_payload poly_payload_of_caml(value v) {
   CAMLparam1(v);
-  poly_payload res;
+  poly_payload res = {.tag = -1, .payload = NULL};
   if (0) {}
   else if (v == Val_long(65)) res.tag = poly_payload_a_tag;
   else if (v == Val_long(66)) res.tag = poly_payload_b_tag;

@@ -41,14 +41,13 @@ open Base
 
 let rec c_canonical_typename : c -> Identifier.t option = function
   | String -> Some (Identifier.make "string")
-  | Atom (s, _) -> Some (s)
+  | Atom (s, _) -> Some s
   | Tuple members -> Some (tuple_name members)
   | Array c -> Some (array_name c)
-  | Variant { name; _ } | Poly_variant { name; _ } -> Some (name)
+  | Variant { name; _ } | Poly_variant { name; _ } -> Some name
   | Option c -> Some (option_name c)
   | Mapped { front_facing } -> c_canonical_typename front_facing
-  | (Void | Struct _) -> None
-
+  | Void | Struct _ -> None
 
 and c_typename c =
   match c_canonical_typename c with

@@ -55,20 +55,19 @@ let invoke_named callee named_params =
 let switch ?(default : unit Fmt.t option) (on : string)
     (cases : (string * unit Fmt.t) list) : unit Fmt.t =
   let open Fmt in
-  let case_ish header body = vbox ~indent @@ (header ++ cut ++ body) in
   (* We don't use a block because we don't want to increase the indentation
      level inside the switch. *)
   let case : (string * unit Fmt.t) Fmt.t =
    fun f (case_match, case_body) ->
     let pp =
-      case_ish (const string (Fmt.str "case %s:" case_match)) case_body
+      case_ish ~indent (const string (Fmt.str "case %s:" case_match)) case_body
     in
     pp f ()
   in
   let cases : unit Fmt.t = const (list ~sep:cut case) cases in
   let maybe_default =
     match default with
-    | Some body -> case_ish (const string "default:") body ++ cut
+    | Some body -> case_ish ~indent (const string "default:") body ++ cut
     | None -> nop
   in
   const string ("switch " ^ on ^ " {")

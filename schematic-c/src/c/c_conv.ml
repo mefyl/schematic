@@ -127,7 +127,8 @@ let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
           vbox
             (const pp_statements
                [
-                 Fmt.str "%a res" Identifier.pp name;
+                 Fmt.str "%a res = {.tag = -1, .payload = NULL}" Identifier.pp
+                   name;
                  Fmt.str "const int n_basic = %d" (List.length basic);
                  Fmt.str "const int n_rich = %d" (List.length rich);
                ]
@@ -188,8 +189,11 @@ let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
           const string "if (0) {}" ++ cut ++ elses ++ cut
           ++ const string "else assert(0);"
         in
+        let init =
+          if basic_only then "-1" else "{.tag = -1, .payload = NULL}"
+        in
         let pp =
-          const pp_statements [ Fmt.str "%a res" Identifier.pp name ]
+          const pp_statements [ Fmt.str "%a res = %s" Identifier.pp name init ]
           ++ cut ++ if_else_chain
         in
         ([], pp)

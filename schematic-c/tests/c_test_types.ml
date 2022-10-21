@@ -207,9 +207,7 @@ module Mapped = struct
       | "a" -> Result.return A
       | "b" -> Result.return B
       | s -> Result.failf "unknown repr: %s" s
-    and encode (x : t) =
-      match x with A -> "a" | B -> "b"
-    in
+    and encode (x : t) = match x with A -> "a" | B -> "b" in
     let open Schematic.Schema in
     {
       id = Some "mapped";
@@ -248,8 +246,7 @@ module Event_1 = struct
   type 'publication wrap = { wrapped : 'publication }
   [@@deriving schema, eq, show]
 
-  type t = Inner.t wrap
-  [@@deriving eq, schema, show]
+  type t = Inner.t wrap [@@deriving eq, schema, show]
 end
 
 module Event_test_2 = struct
