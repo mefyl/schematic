@@ -81,9 +81,6 @@ let to_c_case ~all_basic ~c_variant_name ~c_constructor_name
           (bindings |> String.concat ~sep:", ", tuple_construction)
         (* Inline record *)
         | `Struct { fields } ->
-          let fields =
-            fields |> List.map ~f:(fun (id, c) -> (Swiftify.Binding.id id, c))
-          in
           let construction =
             invoke_named
               (inline_record_c_name
@@ -91,10 +88,14 @@ let to_c_case ~all_basic ~c_variant_name ~c_constructor_name
                  ~constructor_name:c_constructor_name)
               (fields
               |> List.map ~f:(fun (name, c) ->
-                     (name, const string (to_c_stored ~c_type:c ~c_expr:name)))
-              )
+                     ( name |> Identifier.to_string,
+                       const string
+                         (to_c_stored ~c_type:c
+                            ~c_expr:(Swiftify.Binding.id name)) )))
           in
-          let bindings = List.map fields ~f:(fun (name, _c) -> name) in
+          let bindings =
+            List.map fields ~f:(fun (name, _c) -> Swiftify.Binding.id name)
+          in
           (bindings |> String.concat ~sep:", ", construction)
         | _ -> ("x", const string (to_c_stored ~c_type:c ~c_expr:"x"))
       in
@@ -142,15 +143,12 @@ let of_c_case ~all_basic ~swift_type_name ~c_variant_name ~c_constructor_name
           (Swiftify.C_type.c c, stmts, args)
         (* Inline record *)
         | `Struct { fields } ->
-          let fields =
-            fields |> List.map ~f:(fun (id, c) -> (Swiftify.Binding.id id, c))
-          in
           let args =
             fields
             |> List.map ~f:(fun (label, c) ->
-                   let c_expr = Fmt.str "payload.%s" label in
+                   let c_expr = Fmt.str "payload.%a" Identifier.pp label in
                    let converted = of_c_expr ~c_type:c ~c_expr in
-                   Fmt.str "%s: %s" label converted)
+                   Fmt.str "%s: %s" (Swiftify.Binding.id label) converted)
           in
           ( inline_record_c_name
               ~variant_name:(Identifier.to_string c_variant_name)
