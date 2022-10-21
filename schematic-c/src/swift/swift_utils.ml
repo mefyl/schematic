@@ -4,6 +4,7 @@ open C_pp
 
 let c_module_name = ref "Schemas"
 let indent = 2
+let first_some_l = List.fold ~f:Option.first_some ~init:None
 
 let rec tuple_members = function
   | `Atom (_, None) -> None
