@@ -39,16 +39,22 @@ type c_gen = {
 
 open Base
 
-let rec c_typename : c -> Identifier.t = function
-  | String -> Identifier.make "string"
-  | Atom (s, _) -> s
-  | Tuple members -> tuple_name members
-  | Array c -> array_name c
-  | Variant { name; _ } | Poly_variant { name; _ } -> name
-  | Option c -> option_name c
-  | Mapped { front_facing } -> c_typename front_facing
+let rec c_canonical_typename : c -> Identifier.t option = function
+  | String -> Some (Identifier.make "string")
+  | Atom (s, _) -> Some (s)
+  | Tuple members -> Some (tuple_name members)
+  | Array c -> Some (array_name c)
+  | Variant { name; _ } | Poly_variant { name; _ } -> Some (name)
+  | Option c -> Some (option_name c)
+  | Mapped { front_facing } -> c_canonical_typename front_facing
+  | (Void | Struct _) -> None
+
+
+and c_typename c =
+  match c_canonical_typename c with
+  | Some id -> id
   (* Fallback: hash the physical structure of the type. *)
-  | (Void | Struct _) as c ->
+  | None ->
     let s = Fmt.str "_sch_%d" (hash_c c) in
     Logs.warn (fun m -> m "Using hash-based name '%s' for %a" s pp_c c);
     Identifier.make s
@@ -61,7 +67,6 @@ and tuple_name items =
 
 and array_name t = c_typename t |> Identifier.map ~f:(fun s -> s ^ "_array")
 and option_name c = c_typename c |> Identifier.map ~f:(fun s -> s ^ "_option")
-
 
 let tuple_fields =
   List.mapi ~f:(fun i c -> (Identifier.make @@ Fmt.str "t%d" i, c))

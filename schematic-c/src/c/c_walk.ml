@@ -61,7 +61,7 @@ module type WALK = sig
   val time : unit -> t
   val time_local : unit -> t
   val tuple : t list -> t
-  val mapped : t -> t
+  val mapped :  t -> t
 end
 
 module Walk (W : WALK) = struct

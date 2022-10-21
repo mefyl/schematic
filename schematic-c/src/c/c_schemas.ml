@@ -57,7 +57,6 @@ module Of = C_walk.Walk (struct
       | None ->
         Logs.debug (fun m -> m "no id\n");
         let c, marks = s () in
-        Logs.debug (fun m -> m "c: %a\n" pp_c c);
         (c, marks)
       | Some id ->
         Logs.debug (fun m -> m "has id: %s\n" id);
