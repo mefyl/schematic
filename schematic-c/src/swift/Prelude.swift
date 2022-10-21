@@ -23,11 +23,11 @@ public protocol OfC {
 protocol CConvertible: OfC, ToC {}
 
 // Types
-struct Unit: CConvertible {
-  func toC() -> unit {
+public struct Unit: CConvertible {
+  public func toC() -> unit {
       return 0;
   }
-  static func ofC(_ c: unit) -> Unit {
+  public static func ofC(_ c: unit) -> Unit {
     assert(c == 0);
     return Self()
   }
