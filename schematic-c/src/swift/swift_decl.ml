@@ -66,6 +66,23 @@ let type_decl fmt (c_name, ts) =
       let struct_ : (Identifier.t * c) list Fmt.t =
        fun f fields ->
         let fields_decl = const (list ~sep:cut struct_field) fields in
+        let public_initializer =
+          let named_params =
+            fields
+            |> List.map ~f:(fun (id, c) ->
+                   Fmt.str "%s: %a" (Swiftify.Binding.id id) pp_swift_type c)
+            |> String.concat ~sep:", "
+          in
+          let signature = Fmt.str "public init(%s)" named_params in
+          let body =
+            const (list ~sep:cut string)
+              (fields
+              |> List.map ~f:(fun (id, _) ->
+                     let binding = Swiftify.Binding.id id in
+                     Fmt.str "self.%s = %s" binding binding))
+          in
+          block ~indent signature body
+        in
         let to_c =
           let body =
             invoke_named qualified_c_name
@@ -96,8 +113,8 @@ let type_decl fmt (c_name, ts) =
           of_c body
         in
         let body =
-          associated_typealias ++ cut ++ fields_decl ++ cut ++ to_c ++ cut
-          ++ of_c
+          associated_typealias ++ cut ++ fields_decl ++ cut
+          ++ public_initializer ++ cut ++ to_c ++ cut ++ of_c
         in
         block ~indent
           (Fmt.str "public struct %s: CConvertible" swift_type_name)

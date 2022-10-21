@@ -9,6 +9,10 @@ public struct PrimitiveRecord: CConvertible {
   public typealias C = primitive_record
   let a: Int
   let b: Int
+  public init(a: Int, b: Int) {
+    self.a = a
+    self.b = b
+  }
   public func toC() -> primitive_record {
     Schemas.primitive_record(
       a: a.toC(),
@@ -34,6 +38,10 @@ public struct Wrapper: CConvertible {
   public typealias C = wrapper
   let somevar: Int
   let r: PrimitiveRecord
+  public init(somevar: Int, r: PrimitiveRecord) {
+    self.somevar = somevar
+    self.r = r
+  }
   public func toC() -> wrapper {
     Schemas.wrapper(
       somevar: somevar.toC(),
