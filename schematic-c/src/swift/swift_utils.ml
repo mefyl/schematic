@@ -74,3 +74,4 @@ let switch ?(default : unit Fmt.t option) (on : string)
   ++ cut ++ cases ++ cut ++ maybe_default ++ const char '}'
 
 let qualified_c_type ~c_type_name = Fmt.str "%s.%s" !c_module_name c_type_name
+let swift_statements l = Fmt.(const (list string ~sep:cut) l)
