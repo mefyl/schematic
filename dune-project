@@ -4,6 +4,8 @@
 
 (generate_opam_files true)
 
+(use_standard_c_and_cxx_flags false)
+
 (license LGPL-3.0-or-later)
 
 (maintainers "mefyl <mefyl@gruntech.org>")
@@ -18,6 +20,7 @@
 
 (source
  (uri git+https://gitlab.routine.co/routine/schematic.git))
+
 
 (package
  (name schematic)
