@@ -203,13 +203,11 @@ module Mapped = struct
 
   let schema =
     let decode s =
-      Fmt.epr "decode: %s@." s;
       match s with
       | "a" -> Result.return A
       | "b" -> Result.return B
       | s -> Result.failf "unknown repr: %s" s
     and encode (x : t) =
-      Fmt.epr "encode: %a@." pp x;
       match x with A -> "a" | B -> "b"
     in
     let open Schematic.Schema in

@@ -355,7 +355,8 @@ let () =
   Logs.set_reporter (Logs_fmt.reporter ());
   C.Runtime.register_static_callbacks ();
   C.Runtime.register_schema mapped_schema;
-  run "Schematic.C roundtrip"
+  C.Runtime.register_schema Event_1.schema;
+  run "Schematic.C roundtrip" ~verbose:true
     [
       ( "roundtrip",
         Tests.
