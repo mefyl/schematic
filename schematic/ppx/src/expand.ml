@@ -56,10 +56,9 @@ module Jsoo_type_expander = Expander (Jsoo)
 module Schema_expander = Expander (Schema)
 module Sqml_binding_expander = Expander (Sqml)
 
-let expand ~ctxt ~global (recursive, types) fixpoint gadt jsoo sqml =
-  let loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt in
+let expand ~context types gadt jsoo sqml =
   let jsoo =
-    if global.enable_jsoo then
+    if context.global.enable_jsoo then
       match jsoo with
       | None -> None
       | Some [%expr jsoo] | Some [%expr true] -> Some true
@@ -69,16 +68,7 @@ let expand ~ctxt ~global (recursive, types) fixpoint gadt jsoo sqml =
           "schematic-ppx: invalid ~jsoo argument value: %a" Pprintast.expression
           exp
     else None
-  in
-  let context =
-    let recursive = Poly.(recursive = Recursive)
-    and code_path = Ppxlib.Expansion_context.Deriver.code_path ctxt in
-    let types =
-      let f { ptype_name; _ } = ptype_name.txt in
-      if recursive then List.map ~f types else []
-    in
-    { code_path; fixpoint; gadt_variant = None; global; loc; types; recursive }
-  in
+  and loc = context.loc in
   let expand context =
     let types =
       let f t =
@@ -151,7 +141,7 @@ let expand ~ctxt ~global (recursive, types) fixpoint gadt jsoo sqml =
 
         let _ = fun (_ : int_js) -> ()]
       @ contents
-    else if global.inside then
+    else if context.global.inside then
       [%str
         open Schemas
 
@@ -170,9 +160,9 @@ let expand ~ctxt ~global (recursive, types) fixpoint gadt jsoo sqml =
     List.map ~f variants |> List.concat
   | None -> expand context
 
-let expand_sig ~ctxt ~global:_ (_recursive, types) =
+let expand_sig ~(context : context) types =
   (* FIXME: Jsoo declarations *)
-  let loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt in
+  let loc = context.loc in
   let module Ast = (val Ast_builder.make loc) in
   let f { ptype_name = { txt; loc }; _ } =
     let type_ = Ast.ptyp_constr { txt = Longident.Lident txt; loc } [] in
@@ -207,13 +197,32 @@ let add ~inside ~jsoo ~version =
        in
        { inside; enable_jsoo = !jsoo; version = !version })
   in
+  let context ~ctxt ~fixpoint recursive types =
+    let code_path = Ppxlib.Expansion_context.Deriver.code_path ctxt
+    and loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt
+    and recursive = Poly.(recursive = Recursive) in
+    let types =
+      let f { ptype_name; _ } = ptype_name.txt in
+      if recursive then List.map ~f types else []
+    in
+    {
+      code_path;
+      fixpoint;
+      gadt_variant = None;
+      global = Lazy.force global;
+      loc;
+      types;
+      recursive;
+    }
+  in
   let sig_type_decl =
     let arg =
       let open Deriving.Args in
-      empty
+      let fixpoint = flag "fixpoint" in
+      empty +> fixpoint
     in
-    Deriving.Generator.V2.make arg (fun ~ctxt ast ->
-        expand_sig ~global:(Lazy.force global) ~ctxt ast)
+    Deriving.Generator.V2.make arg (fun ~ctxt (recursive, types) fixpoint ->
+        expand_sig ~context:(context ~ctxt ~fixpoint recursive types) types)
   and str_type_decl =
     let arg =
       let open Deriving.Args in
@@ -223,7 +232,7 @@ let add ~inside ~jsoo ~version =
       and sqml = arg "sqml" (estring __) in
       empty +> fixpoint +> gadt +> jsoo +> sqml
     in
-    Deriving.Generator.V2.make arg (fun ~ctxt ast ->
-        expand ~global:(Lazy.force global) ~ctxt ast)
+    Deriving.Generator.V2.make arg (fun ~ctxt (recursive, types) fixpoint ->
+        expand ~context:(context ~ctxt ~fixpoint recursive types) types)
   in
   Deriving.add ~sig_type_decl ~str_type_decl "schema"
