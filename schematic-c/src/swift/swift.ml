@@ -1,6 +1,5 @@
 open Base
 open Swift_utils
-open C_intf
 
 (* ref exposed for customizability *)
 let c_module_name = Swift_utils.c_module_name

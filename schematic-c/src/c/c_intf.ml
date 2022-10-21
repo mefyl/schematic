@@ -1,9 +1,22 @@
 open Base
 module Identifier = C_identifier
 
-type c_struct = { fields : (Identifier.t * c) list }
+type c_leaf =
+  [ `Void
+  | `Unit
+  | `String
+  | `Bool
+  | `Int
+  | `Int64
+  | `Double
+  | `Time
+  | `Json
+  ]
+[@@deriving show, hash, eq, ord]
 
-and regular_variant = {
+[@@@warning "-30"]
+
+type regular_variant = {
   name : Identifier.t;
   basic : Identifier.t list;
   rich : (Identifier.t * c) list;
@@ -16,9 +29,10 @@ and poly_variant = {
   rich : (Identifier.t * int * c) list;
 }
 
+and c_struct = { fields : (Identifier.t * c) list }
+
 and c =
-  [ `Void
-  | `String  (** Native string *)
+  [ c_leaf
   | `Array of c
   | `Atom of Identifier.t * c option
     (** The RHS is the referenced type, if known. *)
@@ -30,6 +44,8 @@ and c =
   | `Option of c
   ]
 [@@deriving show, hash, eq, ord]
+
+[@@@warning "+30"]
 
 type c_function = {
   signature : string;
@@ -45,6 +61,20 @@ type c_gen = {
 
 open Base
 
+let c_builtin_name = function
+  | `Void -> "void"
+  | `String -> "const char*"
+  | `Int -> "int"
+  | `Int64 -> "int64_t"
+  | `Double -> "double"
+  | `Bool -> "bool"
+  (* XXX dedup *)
+  | `Json -> "sch_json"
+  | `Time -> "sch_time"
+  | `Unit -> "unit"
+
+let c_builtin_id c = c |> c_builtin_name |> Identifier.make
+
 let rec c_canonical_typename : c -> Identifier.t option = function
   | `String -> Some (Identifier.make "string")
   | `Atom (s, _) -> Some s
@@ -53,7 +83,8 @@ let rec c_canonical_typename : c -> Identifier.t option = function
   | `Variant { name; _ } | `Poly_variant { name; _ } -> Some name
   | `Option c -> Some (option_name c)
   | `Mapped front_facing -> c_canonical_typename front_facing
-  | `Void | `Struct _ -> None
+  | #c_leaf as c -> Some (c_builtin_id c)
+  | `Struct _ -> None
 
 and c_typename c =
   match c_canonical_typename c with
@@ -116,7 +147,7 @@ let normalize_poly_variant_members basic rich =
 let inline_record_c_name ~variant_name ~constructor_name =
   Fmt.str "%s__%a" variant_name Identifier.pp constructor_name
 
-let reified_option_c c =
+let reified_option_c (c : c) =
   `Variant
     ({
        name = option_name c;

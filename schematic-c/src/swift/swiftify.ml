@@ -6,24 +6,13 @@ module C_type = struct
 
       It's the same as the C type name, except for built-in C compatiblity types
       defined in the standard Swift distribution. *)
-  let c c =
-    let override =
-      match c with
-      | `String -> Some "UnsafePointer<CChar>"
-      | `Atom (id, _) -> (
-        match Identifier.to_string id with
-        | "int" -> Some "CInt"
-        | "long" -> Some "CLong"
-        | "bool" -> Some "CBool"
-        | "double" -> Some "CDouble"
-        | "int32_t" -> Some "Int32"
-        | "int64_t" -> Some "Int64"
-        | _ -> None)
-      | _ -> None
-    in
-    match override with
-    | Some s -> s
-    | None -> c |> c_typename |> Identifier.to_string
+  let c = function
+    | `String -> "UnsafePointer<CChar>"
+    | `Int -> "CInt"
+    | `Bool -> "CBool"
+    | `Double -> "CDouble"
+    | `Int64 -> "Int64"
+    | c -> c |> c_typename |> Identifier.to_string
 end
 
 module Type = struct

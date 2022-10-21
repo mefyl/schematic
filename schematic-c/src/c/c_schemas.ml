@@ -27,25 +27,39 @@ module Of = C_walk.Walk (struct
   type case = string * c
   type t = res
 
+  (* Utils *)
   let name (c, _marks) = c_typename c |> Identifier.to_string
-  let make name = (`Atom (Identifier.make name, None), Marks.empty)
+  let builtin c = (c, Marks.empty)
 
-  (* Shallow primitive types *)
+  (* Built-ins *)
 
-  let ignore () = make "unit"
+  let ignore () = builtin `Unit
   let null = ignore
 
-  (* Mainly used for individual union constructors *)
-  let string_const _s = (`Void, Marks.empty)
-  let int () = make "int"
-  let bool () = make "bool"
+  let int () = builtin `Int
+  let int64 () = builtin `Int64
+  let bool () = builtin `Bool
 
+  let float () =
   (** "OCaml's floating-point numbers follow the IEEE 754 standard, using double
       precision (64 bits) numbers." *)
-  let float () = make "double"
+    builtin `Double
 
-  let int64 () = make "int64_t"
-  let string () = (`String, Marks.empty)
+  let string () = builtin `String
+
+  let string_const _s =
+    (* Mainly used for individual union constructors *)
+    builtin `Void
+
+  let any () = builtin `Json
+
+  let time () =
+    Lazy.force C_sanity_checks.ptime;
+    builtin `Time
+
+
+
+  (* The rest *)
 
   (* This will recurse forever if given a recursive schema. *)
   let schema (id : string option) parametric s =
@@ -152,16 +166,27 @@ module Of = C_walk.Walk (struct
   (* We could use a struct for "key" / "value" fields instead of a tuple. *)
   let mapping t = tuple [ string (); t ] |> list
 
-  let time () =
-    Lazy.force C_sanity_checks.ptime;
-    make "sch_time"
+
+  let mapped : t -> t =
+   fun (c, marks) ->
+    let front_facing, marks =
+      match c_canonical_typename c with
+      | Some _ -> (c, marks)
+      | None ->
+        let id = Fmt.str "%a_external" Identifier.pp (c_typename c) in
+        let s () = (c, marks) in
+        schema (Some id) None s
+    in
+    (`Mapped front_facing, marks)
+
+
+  (* XXX: make those into built-ins? *)
 
   (* TODO: for clarity, use a struct *)
   let time_local () =
     Lazy.force C_sanity_checks.ptime_local;
     tuple [ time (); int () ]
 
-  let any () = (`Atom (Identifier.make "sch_json", Some `String), Marks.empty)
 
   let date () =
     Lazy.force C_sanity_checks.date;
@@ -181,17 +206,9 @@ module Of = C_walk.Walk (struct
     in
     schema (Some "sch_date") None s
 
-  let mapped : t -> t =
-   fun (c, marks) ->
-    let front_facing, marks =
-      match c_canonical_typename c with
-      | Some _ -> (c, marks)
-      | None ->
-        let id = Fmt.str "%a_external" Identifier.pp (c_typename c) in
-        let s () = (c, marks) in
-        schema (Some id) None s
-    in
-    (`Mapped front_facing, marks)
+
+
+
 end)
 
 include Make_mark_converter (struct

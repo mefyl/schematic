@@ -36,6 +36,10 @@ let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
     let caml_locals, (body : unit Fmt.t) =
       let open C_statements in
       match ast with
+      | `Option _ -> failwith "unreachable"
+      | `Void ->
+        failwith
+          "`Void may not be instantiated, and therefore cannot be converted"
       | `Struct { fields } ->
         let field_stores =
           fields
@@ -242,7 +246,7 @@ let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
         in
         ([ "l" ], pp)
       (* The considered type is merely an alias for another *)
-      | (`Atom _ | `String) as c ->
+      | (`Atom _ | #c_leaf) as c ->
         let pp =
           const pp_statements
             [
@@ -272,9 +276,6 @@ let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
                ]
         in
         ([ "v_back" ], pp)
-      | `Void ->
-        failwith
-          "`Void may not be instantiated, and therefore cannot be converted"
     in
     let return_type = Identifier.to_string name in
     let fname = name |> of_caml_name_for in
@@ -337,6 +338,9 @@ let rec pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
     let open Fmt in
     let argname, (body : unit Fmt.t) =
       match ast with
+      | `Option _ -> failwith "unreachable"
+      | `Void ->
+        failwith "`Void may not be instantiated and is unsupported in to_caml"
       | `Struct { fields } ->
         let tag = 0 in
         let n_fields = List.length fields in
@@ -533,7 +537,7 @@ let rec pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
           ++ const pp_statements [ return_val "cli" ]
         in
         ("arr", pp)
-      | (`Atom _ | `String) as c ->
+      | (`Atom _ | #c_leaf) as c ->
         let pp =
           const pp_statements
             [
@@ -566,8 +570,6 @@ let rec pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
                ]
         in
         ("x", pp)
-      | `Void ->
-        failwith "`Void may not be instantiated and is unsupported in to_caml"
     in
     let argtype = Identifier.to_string name in
     let decl =

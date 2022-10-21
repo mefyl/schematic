@@ -3,7 +3,7 @@ open C_test_types
 open Schematic_c
 
 let () =
-  Logs.set_level (Some Logs.Debug);
+  Logs.set_level (Some Logs.Info);
   Logs.set_reporter (Logs_fmt.reporter ());
   let argv = Sys.get_argv () in
   let h_filename, swift_filename = (argv.(1), argv.(2)) in

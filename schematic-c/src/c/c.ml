@@ -5,7 +5,7 @@ module Runtime = C_runtime
 module Builtins = C_builtins
 module Swift = Swift
 
-let export ?safety_checks (name, c) : c_gen =
+let export ?safety_checks (name, (c : c)) : c_gen =
   let open Fmt in
   let of_caml, to_caml = C_conv.converters ?safety_checks name c in
   { name; type_expr = const C_typeexpr.pp c; to_caml; of_caml }

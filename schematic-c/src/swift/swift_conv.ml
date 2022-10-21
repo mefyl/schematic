@@ -242,7 +242,7 @@ let array_conv_decl c : unit Fmt.t * unit Fmt.t =
       ++ swift_statements
            [ {|assert(c.len >= 0)|}; {|if c.len == 0 { return [] }|} ]
       ++ cut
-      ++ block ~indent "let res: `Array<Element> = (0 ..< (c.len)).map"
+      ++ block ~indent "let res: Array<Element> = (0 ..< (c.len)).map"
            (swift_statements
               [
                 {|let p = c.data.advanced(by: $0)|};

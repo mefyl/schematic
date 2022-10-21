@@ -1,7 +1,7 @@
 open C_intf
 open Base
 
-let pp ?(indent = 2) fmt ts =
+let pp ?(indent = 2) fmt (ts : c) =
   let rec pp fmt (ts : c) =
     let printer =
       let open Fmt in
@@ -53,8 +53,6 @@ let pp ?(indent = 2) fmt ts =
       | `Option c -> const pp (reified_option_c c)
       | `Atom (s, _) -> const string (Identifier.to_string s)
       | `Array t -> const array t
-      (* TODO: do a pass over const-correctness *)
-      | `String -> const string "const char*"
       | `Struct { fields; _ } -> const struct_ fields
       (* `Tuples are structs with types named according to their indices *)
       | `Tuple types ->
@@ -65,7 +63,7 @@ let pp ?(indent = 2) fmt ts =
         let basic, rich = normalize_poly_variant_members basic rich in
         const variant (name, basic, rich)
       | `Mapped front_facing -> const pp front_facing
-      | `Void -> nop
+      | #c_leaf as c -> const string (c_builtin_name c)
     in
     printer fmt ()
   in
