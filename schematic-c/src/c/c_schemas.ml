@@ -181,7 +181,14 @@ module Of = C_walk.Walk (struct
     in
     schema (Some "sch_date") None s
 
-  let mapped : t -> t = fun (c, marks) -> (Mapped { front_facing = c }, marks)
+  let mapped : t -> t =
+   fun (c, marks) ->
+    let front_facing, marks =
+      let id = Fmt.str "%a_external" Identifier.pp (c_typename c) in
+      let s () = (c, marks) in
+      schema (Some id) None s
+    in
+    (Mapped { front_facing }, marks)
 end)
 
 include Make_mark_converter (struct
