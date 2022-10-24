@@ -3,9 +3,13 @@ open C_intf
 open Schematic
 
 let register_map type_name ~encode ~decode =
-  Stdlib.Callback.register (encode_name_for type_name) encode;
-  let decode = Fn.compose Result.ok_or_failwith decode in
-  Stdlib.Callback.register (decode_name_for type_name) decode
+  let encode_name = encode_name_for type_name in
+  let decode_name = decode_name_for type_name in
+  Logs.info (fun m ->
+      m "Registering Map encode/decode for '%s' under names '%s' and '%s'"
+        type_name encode_name decode_name);
+  Stdlib.Callback.register encode_name encode;
+  Stdlib.Callback.register decode_name (Fn.compose Result.ok_or_failwith decode)
 
 let rec traverse_descriptor :
     type t. string option -> t Schema.descriptor -> unit =
@@ -24,7 +28,6 @@ let rec traverse_descriptor :
       Option.map id ~f:(Fn.compose Identifier.to_string Identifier.make)
       |> Option.value ~default
     in
-    Logs.info (fun m -> m "Registering Map encode/decode for '%s'" id);
     register_map id ~encode ~decode;
     traverse_descriptor (Some id) d
   | Mapping s -> traverse_schema s
