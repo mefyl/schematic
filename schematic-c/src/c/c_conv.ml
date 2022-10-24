@@ -270,6 +270,7 @@ let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
           ++ cut ++ if_encode ++ cut
           ++ const pp_statements
                [
+                 "assert(encode != NULL)";
                  "v_back = caml_callback(*encode, v)";
                  Fmt.str "%a res = %a(v_back)" Identifier.pp name Identifier.pp
                    (of_caml_name_for_c front_facing);
@@ -563,6 +564,7 @@ let rec pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
           ++ cut ++ if_decode ++ cut
           ++ const pp_statements
                [
+                 "assert(decode != NULL)";
                  Fmt.str {|v_front = %a(x)|} Identifier.pp
                    (to_caml_name_for_c front_facing);
                  {|v = caml_callback(*decode, v_front)|};

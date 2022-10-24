@@ -529,6 +529,7 @@ value mapped_to_caml(mapped x) {
   if (decode == NULL) {
     decode = caml_named_value("schematic_mapped_decode");
   }
+  assert(decode != NULL);
   v_front = string_to_caml(x);
   v = caml_callback(*decode, v_front);
   CAMLreturn(v);
@@ -544,6 +545,7 @@ mapped mapped_of_caml(value v) {
   if (encode == NULL) {
     encode = caml_named_value("schematic_mapped_encode");
   }
+  assert(encode != NULL);
   v_back = caml_callback(*encode, v);
   mapped res = string_of_caml(v_back);
   CAMLreturnT(mapped, res);
