@@ -82,6 +82,8 @@
    (and
     (>= 1.1.0)
     :with-test))
+  (js_of_ocaml-ppx
+   (>= 4.0.0))
   json-derivers
   (schematic
    (= :version))
