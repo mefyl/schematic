@@ -87,7 +87,7 @@
   json-derivers
   (schematic
    (= :version))
-  sexp))
+  sexplib))
 
 (package
  (name schematic-sqml)

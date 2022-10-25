@@ -14,7 +14,7 @@ depends: [
   "js_of_ocaml-ppx" {>= "4.0.0"}
   "json-derivers"
   "schematic" {= version}
-  "sexp"
+  "sexplib"
   "odoc" {with-doc}
 ]
 build: [
