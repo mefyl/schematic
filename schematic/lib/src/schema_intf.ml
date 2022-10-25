@@ -113,66 +113,68 @@ and 't parametric =
     }
       -> 't parametric
 
-module type WALK_TYPES = sig
-  type t
-  type fields
-end
-
-module type WALK_DEFAULT = sig
-  include WALK_TYPES
-
-  val t : t
-  val fields : fields
-end
+type ('t, 'req) schema_field = ('t, 'req) field
 
 module type WALK = sig
-  include WALK_TYPES
+  type t
+  type field
+
+  module M : Base.Monad.S
 
   (* Schema *)
 
   (** [schema id parametric schema] *)
-  val schema : string option -> (unit -> t) option -> (unit -> t) -> t
+  val schema :
+    string option -> (unit -> t M.t) option -> (unit -> t M.t) -> t M.t
 
   (** [parametric template_name arg_names effective_args t] *)
-  val parametric : string -> string list -> t list -> t -> t
+  val parametric : string -> string list -> t M.t list -> t M.t -> t M.t
 
   (* Object *)
 
-  val fields_empty : unit -> fields
+  (** [field name required t] walks an object field.
 
-  (** [field_inline required fields rest] *)
-  val field_inline : bool -> fields list -> fields -> fields
+      All schema details such as ignored fields and inlining are handled by the
+      walker. *)
+  val field : string -> bool -> t M.t -> field M.t
 
-  (** [field_outline name required t rest]*)
-  val field_outline : string -> bool -> t -> fields -> fields
+  (** [object_ fields] combines the fields alternatives in a single object.
 
-  val object_ : fields -> t
+      There can be multiple [field list] alternative in case a variant is
+      inlined. *)
+  val object_ : field list list M.t -> t M.t
+
+  (** [inline schema field] potentially intercepts inline fields.
+
+      The field is not inlined and replaced with the return value if it is not
+      [None]. The [schema] argument can be used to walk the field schema. *)
+  val inline : (unit -> t M.t) -> ('t, 'req) schema_field -> field M.t option
 
   (* Union *)
 
   (** [case key name t] *)
-  val case : string option -> string -> t -> t
+  val case : string option -> string -> t M.t -> t M.t
 
-  val union : t list -> t
+  val union : t list M.t -> t M.t
 
   (* Descriptors *)
 
-  val any : unit -> t
-  val bool : unit -> t
-  val float : unit -> t
-  val date : unit -> t
-  val mapping : t -> t
-  val int : unit -> t
-  val ignore : unit -> t
-  val int64 : unit -> t
-  val list : t -> t
-  val null : unit -> t
-  val nullable : t -> t
-  val string : unit -> t
-  val string_const : string -> t
-  val time : unit -> t
-  val time_local : unit -> t
-  val tuple : t list -> t
+  val any : t M.t
+  val bool : t M.t
+  val float : t M.t
+  val date : t M.t
+  val mapping : t M.t -> t M.t
+  val int : t M.t
+  val ignore : t M.t
+  val int64 : t M.t
+  val list : t M.t -> t M.t
+  val null : t M.t
+  val nullable : t M.t -> t M.t
+  val string : t M.t
+  val string_const : string -> t M.t
+  val time : t M.t
+  val time_local : t M.t
+  val tuple : t list M.t -> t M.t
 end
 
 type library = ..
@@ -187,14 +189,13 @@ type 't flatten =
     }
       -> 't flatten
 
-(** A ['res inline] maps a field to a ['res]. *)
-type ('fold, 'res) inline = {
-  f : 't 'req. 'fold -> ('t, 'req) field -> 'fold * 'res;
-}
+module Make_inline (M : Base.Monad.S) = struct
+  (** A ['res inline] maps a field to a ['res]. *)
+  type 'res inline = {
+    f : 't 'req. ('t, 'req) field -> 'res M.t;
+    filter : 't 'req. (('t, 'req) field -> 'res M.t option) option;
+  }
 
-(** A ['res inline] maps a field and a value for that field to a ['res]. *)
-type 'res inline_v = { f : 't 'req. ('t, 'req) field -> 'req -> 'res }
-
-type ('fold, 'res) inline_v_fold = {
-  f : 't 'req. ('t, 'req) field -> 'fold -> 'req -> 'fold * 'res;
-}
+  (** A ['res inline] maps a field and a value for that field to a ['res]. *)
+  type 'res inline_v = { f : 't 'req. ('t, 'req) field -> 'req -> 'res M.t }
+end

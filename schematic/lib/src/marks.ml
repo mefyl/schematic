@@ -13,18 +13,17 @@ module type MARK = sig
 end
 
 module type V = sig
-  type u
+  type t
 
-  include Comparable.S with type t = u
+  include Comparable.S with type t := t
 
   val pp : ?with_value:bool -> t Fmt.t
 end
 
 module Make (S : MARK) = struct
-  module rec Mark : (V with type u = string * (S.t * Marks.t) Lazy.t) = struct
+  module rec Mark : (V with type t = string * (S.t * Marks.t) Lazy.t) = struct
     module T = struct
       type t = string * (S.t * Marks.t) Lazy.t
-      type u = t
 
       let sexp_of_t (id, _) = Sexp.Atom id
       let compare (l, _) (r, _) = String.compare l r

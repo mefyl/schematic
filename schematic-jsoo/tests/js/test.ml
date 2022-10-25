@@ -52,14 +52,14 @@ let decode_error coding =
       Fmt.str "%s decode error: %a" coding Schematic.Error.pp_decoding e)
 
 (** Check inlining works in the expanded JSOO type *)
-let f (o : o_js) =
+let _f (o : o_js) =
   let (_ : Js.js_string Js.t) = o##.s
   and (_ : bool Js.t Js.Optdef.t) = o##.opt
   and (_ : bool Js.t Js.Opt.t Js.Optdef.t) = o##.opt_nullable
   and (_ : Js.number Js.t Js.Optdef.t) = o##.def in
   ()
 
-let g (o : keyed_js) =
+let _g (o : keyed_js) =
   let (_ : Js.js_string Js.t) = o##.type_key in
   ()
 

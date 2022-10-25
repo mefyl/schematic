@@ -13,6 +13,10 @@ let composite_object open_ pp close =
 
 let colon fmt x = (const char ':' ++ sp) fmt x
 
+module Inline_fmt = Schema.Make_inline (State_monad.Make (struct
+  type t = bool * Formatter.t
+end))
+
 let rec of_schema : type t. t Schema.t -> t Fmt.t = function
   | { descriptor; _ } -> of_descriptor descriptor
 
@@ -49,7 +53,7 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
           | Required -> pp
           | Optional -> option pp
         in
-        fun (first, fmt) v ->
+        fun v (first, fmt) ->
           let pp =
             (if first then nop else semi)
             ++ (box ~indent:2
@@ -57,14 +61,14 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
                )
           in
           let () = pp fmt v in
-          ((false, fmt), ())
+          ((), (false, fmt))
       in
-      Schema.inline_v_fold { f } fields |> Result.ok_or_failwith
+      Inline_fmt.value { f } fields |> Result.ok_or_failwith
     in
     let printer =
       composite_object '{'
         (fun fmt v ->
-          ignore (pp (true, fmt) v);
+          ignore (pp v (true, fmt));
           char fmt ';')
         '}'
     in

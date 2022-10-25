@@ -23,6 +23,10 @@ let null =
   let validation = make_validation ~type_:[ Null ] () in
   make ~validation ()
 
+module Inline_marks = Schema.Make_inline (State_monad.Make (struct
+  type t = ids
+end))
+
 let of_schema schema =
   let make ?(core = make_core ()) =
     let core =
@@ -31,111 +35,115 @@ let of_schema schema =
     make ~core
   in
   let id_name s = "#" ^ s in
-  let rec of_schema : type u. ids -> u Schema.t -> ids * t =
+  let rec of_schema : type u. ids -> u Schema.t -> t * ids =
    fun marks -> function
     | { id = None; descriptor; _ } -> of_descriptor marks descriptor
     | { id = Some id; _ } when Set.mem marks id ->
-      (marks, make ~core:(make_core ~ref:(id_name id) ()) ())
+      (make ~core:(make_core ~ref:(id_name id) ()) (), marks)
     | { id = Some id; descriptor; _ } ->
       let marks = Set.add marks id in
-      let marks, schema = of_descriptor marks descriptor in
-      (marks, { schema with core = { schema.core with id = Some (id_name id) } })
-  and of_descriptor : type u. ids -> u Schema.descriptor -> ids * t =
+      let schema, marks = of_descriptor marks descriptor in
+      ({ schema with core = { schema.core with id = Some (id_name id) } }, marks)
+  and of_descriptor : type u. ids -> u Schema.descriptor -> t * ids =
    fun marks -> function
-    | Schema.Any -> (marks, make ())
+    | Schema.Any -> (make (), marks)
     | Schema.Bool ->
       let validation = make_validation ~type_:[ Boolean ] () in
-      (marks, make ~validation ())
+      (make ~validation (), marks)
     | Schema.Date -> of_descriptor marks date_tuple_schema.descriptor
     | Fixpoint s -> of_descriptor marks (Lazy.force s)
     | Schema.Float ->
       let validation = make_validation ~type_:[ Number ] () in
-      (marks, make ~validation ())
-    | Schema.Ignore -> (marks, make ())
+      (make ~validation (), marks)
+    | Schema.Ignore -> (make (), marks)
     | Schema.Int | Schema.Int64 ->
       let validation = make_validation ~type_:[ Integer ] () in
-      (marks, make ~validation ())
+      (make ~validation (), marks)
     | Schema.List schema ->
-      let marks, schema = of_schema marks schema in
+      let schema, marks = of_schema marks schema in
       let applicator = make_applicator ~items:(Items_schema schema) ()
       and validation = make_validation ~type_:[ Array ] () in
-      (marks, make ~applicator ~validation ())
+      (make ~applicator ~validation (), marks)
     | Schema.Map { descriptor; _ } -> of_descriptor marks descriptor
     | Schema.Mapping schema ->
-      let marks, schema = of_schema marks schema in
+      let schema, marks = of_schema marks schema in
       let applicator =
         make_applicator ~additionalProperties:(Properties_schema schema) ()
       and validation = make_validation ~type_:[ Object ] () in
-      (marks, make ~applicator ~validation ())
-    | Schema.Null -> (marks, null)
+      (make ~applicator ~validation (), marks)
+    | Schema.Null -> (null, marks)
     | Schema.Nullable s ->
-      let marks, t = of_descriptor marks s.descriptor in
+      let t, marks = of_descriptor marks s.descriptor in
       let type_ =
         Null :: t.validation.type_ |> List.dedup_and_sort ~compare:Poly.compare
       and one_of =
         match t.applicator.one_of with [] -> [] | cases -> null :: cases
       in
-      ( marks,
-        {
+      ( {
           t with
           applicator = { t.applicator with one_of };
           validation = { t.validation with type_ };
-        } )
+        },
+        marks )
     | Schema.String ->
       let validation = make_validation ~type_:[ String ] () in
-      (marks, make ~validation ())
+      (make ~validation (), marks)
     | Schema.String_const v ->
       let validation = string_const_validation v in
-      (marks, make ~validation ())
+      (make ~validation (), marks)
     | Schema.Time ->
       let validation = make_validation ~type_:[ String ] () in
-      (marks, make ~validation ())
+      (make ~validation (), marks)
     | Schema.Time_local ->
       let validation = make_validation ~type_:[ String ] () in
-      (marks, make ~validation ())
+      (make ~validation (), marks)
     | Schema.Object _ as o -> (
-      let marks, properties =
-        Result.ok_or_failwith
-        @@ Schema.inline o marks
-             {
-               f =
-                 (fun (type req t) marks
-                      ({
-                         description;
-                         examples;
-                         maximum;
-                         minimum;
-                         name;
-                         requirement;
-                         schema;
-                         title;
-                         _;
-                       } :
-                        (t, req) Schema.field) ->
-                   let schema = Schema.field_schema schema in
-                   let marks, t = of_schema marks schema
-                   and to_json v = Json.to_ezjsonm @@ Json.encode schema v in
-                   ( marks,
-                     ( name,
-                       {
-                         t with
-                         metadata =
-                           {
-                             t.metadata with
-                             default =
-                               (match requirement with
-                               | Schema.Default v -> Some (to_json v)
-                               | _ -> None);
-                             description;
-                             title =
-                               Option.return
-                                 (Option.value ~default:(String.capitalize name)
-                                    title);
-                             examples = List.map ~f:to_json examples;
-                           };
-                         validation = { t.validation with maximum; minimum };
-                       } ) ));
-             }
+      let properties, marks =
+        let f =
+          Result.ok_or_failwith
+          @@ Inline_marks.schema o
+               {
+                 f =
+                   (fun (type req t)
+                        ({
+                           description;
+                           examples;
+                           maximum;
+                           minimum;
+                           name;
+                           requirement;
+                           schema;
+                           title;
+                           _;
+                         } :
+                          (t, req) Schema.field) marks ->
+                     let schema = Schema.field_schema schema in
+                     let t, marks = of_schema marks schema
+                     and to_json v = Json.to_ezjsonm @@ Json.encode schema v in
+                     ( ( name,
+                         {
+                           t with
+                           metadata =
+                             {
+                               t.metadata with
+                               default =
+                                 (match requirement with
+                                 | Schema.Default v -> Some (to_json v)
+                                 | _ -> None);
+                               description;
+                               title =
+                                 Option.return
+                                   (Option.value
+                                      ~default:(String.capitalize name) title);
+                               examples = List.map ~f:to_json examples;
+                             };
+                           validation = { t.validation with maximum; minimum };
+                         } ),
+                       marks ));
+                 filter = None;
+               }
+        in
+        f marks
       and validation = make_validation ~type_:[ Object ] () in
       match
         List.map
@@ -143,31 +151,31 @@ let of_schema schema =
             make_applicator ~properties ~additionalProperties:(Allowed false) ())
           properties
       with
-      | [ applicator ] -> (marks, make ~applicator ~validation ())
+      | [ applicator ] -> (make ~applicator ~validation (), marks)
       | l ->
         let one_of = List.map ~f:(fun applicator -> make ~applicator ()) l in
-        (marks, make ~applicator:(make_applicator ~one_of ()) ~validation ()))
+        (make ~applicator:(make_applicator ~one_of ()) ~validation (), marks))
     | Schema.Tuple { items; _ } ->
-      let marks, fields =
-        let rec tuple_applicator : type u. ids -> u Schema.tuple -> ids * t list
+      let fields, marks =
+        let rec tuple_applicator : type u. ids -> u Schema.tuple -> t list * ids
             =
          fun marks -> function
-          | Schema.ItemEnd -> (marks, [])
+          | Schema.ItemEnd -> ([], marks)
           | Schema.Item { schema; rest } ->
-            let marks, head = of_schema marks schema in
-            let marks, tail = tuple_applicator marks rest in
-            (marks, head :: tail)
+            let head, marks = of_schema marks schema in
+            let tail, marks = tuple_applicator marks rest in
+            (head :: tail, marks)
         in
         tuple_applicator marks items
       and validation = make_validation ~type_:[ Array ] () in
-      ( marks,
-        make
+      ( make
           ~applicator:(make_applicator ~items:(Tuple_schema fields) ())
-          ~validation () )
+          ~validation (),
+        marks )
     | Schema.Union { cases; key; _ } ->
       let marks, schemas =
         let f marks (Schema.Case { name; schema; _ }) =
-          let marks, schema = of_schema marks schema in
+          let schema, marks = of_schema marks schema in
           let schema =
             match (key, schema) with
             | ( Some key,
@@ -199,6 +207,6 @@ let of_schema schema =
             |> List.dedup_and_sort ~compare:Poly.compare)
           ()
       in
-      (marks, make ~applicator ~validation ())
+      (make ~applicator ~validation (), marks)
   in
-  of_schema (Set.empty (module String)) schema |> snd
+  of_schema (Set.empty (module String)) schema |> fst

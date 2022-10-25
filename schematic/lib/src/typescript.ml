@@ -37,9 +37,19 @@ include Marks.Make (struct
 end)
 
 module Of = Schema.Walk (struct
-  type res = t * Marks.t
-  type fields = (string * t * bool) list list * Marks.t
-  type t = res
+  type field =
+    | Field of (string * t * bool)
+    | Type of string
+
+  type nonrec t = t
+
+  module M = State_monad.Make (struct
+    type t = Marks.t
+  end)
+
+  let ( let* ) = M.Let_syntax.( >>= )
+  let ( and* ) = M.Let_syntax.Let_syntax.both
+  let ( let+ ) = M.Let_syntax.( >>| )
 
   (* Schema *)
 
@@ -51,101 +61,111 @@ module Of = Schema.Walk (struct
       | None -> s ()
       | Some id ->
         if String.is_prefix ~prefix:"#" id then
-          (Atom (name @@ String.subo ~pos:1 id), Marks.empty)
-        else
-          let mark = Marks.make id s in
-          (Atom (name id), mark))
+          M.return (Atom (name @@ String.subo ~pos:1 id))
+        else fun marks ->
+          let mark = (id, lazy (s () marks)) in
+          (Atom (name id), Marks.add marks mark))
 
   let parametric template_name args effective t =
-    let template_name = name template_name in
-    let effective, marks = List.unzip effective in
-    let mark =
-      let id =
-        Fmt.(
-          str "%s<%a>" template_name
-            (list ~sep:(const string ", ") string)
-            (List.map ~f:name args))
+    let* t = t
+    and* effective = M.all effective in
+    fun marks ->
+      let template_name = name template_name in
+      let mark =
+        let id =
+          Fmt.(
+            str "%s<%a>" template_name
+              (list ~sep:(const string ", ") string)
+              (List.map ~f:name args))
+        in
+        (id, lazy (t, marks))
       in
-      (id, lazy t)
-    in
-    ( Template { name = template_name; args = effective },
-      Marks.add (Marks.merge marks) mark )
+      (Template { name = template_name; args = effective }, Marks.add marks mark)
 
-  let make name = (Atom name, Marks.empty)
-  let any () = make "any"
-  let bool () = make "boolean"
-  let fields_empty () = ([ [] ], Marks.empty)
+  let atom name marks = (Atom name, marks)
+  let any = atom "any"
+  let bool = atom "boolean"
 
-  let field_inline inline_required cases (rest, rest_marks) =
-    let fields, marks = List.unzip cases in
-    let fields = Base.Sequence.(of_list fields |> map ~f:of_list |> concat) in
-    let fields =
-      Base.Sequence.(
-        cartesian_product fields (of_list rest)
-        |> map ~f:(fun (l, r) ->
-               List.map
-                 ~f:(fun (name, t, required) ->
-                   (name, t, required && inline_required))
-                 l
-               @ r)
-        |> to_list)
-    in
-    (fields, Marks.merge (rest_marks :: marks))
+  let field name required schema =
+    let+ schema = schema in
+    Field (name, schema, required)
 
-  let field_outline name required (schema, marks) (rest, rest_marks) =
-    ( List.map ~f:(List.cons (name, schema, required)) rest,
-      Marks.merge [ marks; rest_marks ] )
+  let inline s = function
+    | Schema.{ schema = Inline { id = Some id; _ }; _ } ->
+      Some
+        (fun marks ->
+          let mark = (id, lazy (s () marks)) in
+          (Type (name id), Marks.add marks mark))
+    | _ -> None
 
-  let float () = make "number"
-  let date () = make "Date"
+  let float = atom "number"
+  let date = atom "Date"
   let int = float
-  let ignore () = make "null"
+  let ignore = atom "null"
   let int64 = float
-  let list (s, marks) = (Template { name = "Array"; args = [ s ] }, marks)
 
-  let mapping (elt, marks) =
-    (Template { name = "Record"; args = [ Atom "string"; elt ] }, marks)
+  let list elt =
+    let+ elt = elt in
+    Template { name = "Array"; args = [ elt ] }
 
-  let null () = make "null"
-  let nullable (t, marks) = (Union [ t; Atom "null" ], marks)
+  let mapping elt =
+    let+ elt = elt in
+    Template { name = "Record"; args = [ Atom "string"; elt ] }
 
-  let object_ (fields_cases, marks) =
-    let f fields = Object { fields } in
-    match fields_cases with
+  let null = atom "null"
+
+  let nullable schema =
+    let+ schema = schema in
+    Union [ schema; Atom "null" ]
+
+  let object_ fields =
+    let f fields =
+      let fields, types =
+        List.partition_map fields ~f:(function
+          | Field f -> First f
+          | Type t -> Second t)
+      in
+      let object_ = Object { fields } in
+      match types with
+      | [] -> object_
+      | _ -> Intersection (object_ :: List.map ~f:(fun t -> Atom t) types)
+    in
+    let+ fields = fields in
+    match fields with
     | [] -> failwith "typescript: of_objects yielded no result"
-    | [ fields ] -> (f fields, marks)
-    | cases -> (Union (List.map ~f cases), marks)
+    | [ fields ] -> f fields
+    | cases -> Union (List.map ~f cases)
 
-  let string () = make "string"
-  let time () = make "Date"
+  let string = atom "string"
+  let time = atom "Date"
   let time_local = time
 
   let tuple items =
-    let items, marks = List.unzip items in
-    (Tuple items, Marks.merge marks)
+    let+ items = items in
+    Tuple items
 
-  let string_const s = (Atom (Fmt.str "%S" s), Marks.empty)
+  let string_const s marks = (Atom (Fmt.str "%S" s), marks)
 
   (* Union *)
 
-  let case key name (schema, marks) =
+  let case key name schema =
+    let+ schema = schema in
     match key with
-    | None -> (schema, marks)
+    | None -> schema
     | Some key ->
-      ( Intersection [ schema; Object { fields = [ (key, String name, true) ] } ],
-        marks )
+      Intersection [ schema; Object { fields = [ (key, String name, true) ] } ]
 
   let union cases =
-    let t, marks = List.unzip cases in
-    (Union t, Marks.merge marks)
+    let+ cases = cases in
+    Union cases
 end)
 
 include Make_mark_converter (struct
-  let of_descriptor _ = Of.descriptor
-  let of_parametric = Of.parametric
+  let of_descriptor _ descriptor = Of.descriptor descriptor Marks.empty
+  let of_parametric parametric = Of.parametric parametric Marks.empty
 end)
 
-let of_descriptor d = Of.descriptor d |> fst
+let of_descriptor d = Of.descriptor d Marks.empty |> fst
 let break sp id fmt _ = Caml.Format.pp_print_break fmt sp id
 
 let custom_break fits breaks fmt _ =

@@ -1,4 +1,4 @@
-module V0_14_8 = struct
+module V0_15_0 = struct
   module Error = Error
   module Base64 = B64
 
@@ -9,21 +9,9 @@ module V0_14_8 = struct
 
   module Schema = Schema
   module Schemas = Schemas
-
-  type 'a schema = 'a Schema.t
-
   module Coding = Coding
   module Pp = Pp
   module Typescript = Typescript
   module Version = Version
   module Marks = Marks
 end
-
-module V0_14_7 = V0_14_8
-module V0_14_6 = V0_14_7
-module V0_14_5 = V0_14_6
-module V0_14_4 = V0_14_5
-module V0_14_3 = V0_14_4
-module V0_14_2 = V0_14_3
-module V0_14_1 = V0_14_2
-module V0_14_0 = V0_14_1

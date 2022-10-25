@@ -1,4 +1,4 @@
-(lang dune 2.8)
+(lang dune 2.9)
 
 (name schematic)
 
@@ -12,11 +12,13 @@
 
 (authors "mefyl <mefyl@gruntech.org>")
 
-(version 0.14.8)
+(version 0.15.0)
 
 (homepage https://gitlab.routine.co/routine/schematic)
 
 (bug_reports https://gitlab.routine.co/routine/schematic/-/issues)
+
+(executables_implicit_empty_intf true)
 
 (source
  (uri git+https://gitlab.routine.co/routine/schematic.git))
@@ -39,7 +41,7 @@
   (ezjsonm
    (>= 1.1.0))
   (ocaml
-   (>= 4.12.0))
+   (>= 4.14.0))
   fmt
   ppxlib
   ppx_deriving
@@ -96,8 +98,8 @@
     :with-test))
   (sqml
    (and
-    (>= 0.7.0)
-    (< 0.8.0)))
+    (>= 0.8.0)
+    (< 0.9.0)))
   (schematic
    (= :version))))
 
@@ -117,11 +119,12 @@
 (package
  (name schematic-c)
  (synopsis "Generate C types and converters based on schemas")
- (authors "Yohaï-Eliel BERREBY <yberreby@pm.me>")
+ (authors "Yoha\195\175-Eliel BERREBY <yberreby@pm.me>")
  (depends
   bake
   logs
-  (ppx_hash (= v0.14.0))
+  (ppx_hash
+   (= v0.14.0))
   (schematic
    (= :version))))
 
