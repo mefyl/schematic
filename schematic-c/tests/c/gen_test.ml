@@ -527,7 +527,7 @@ value mapped_to_caml(mapped x) {
   CAMLlocal2(v_front, v);
   static const value* decode = NULL;
   if (decode == NULL) {
-    decode = caml_named_value("schematic_mapped_decode");
+    decode = caml_named_value("schematic_mapped_decode_of_string");
   }
   assert(decode != NULL);
   v_front = string_to_caml(x);
@@ -543,7 +543,7 @@ mapped mapped_of_caml(value v) {
   CAMLlocal1(v_back);
   static const value* encode = NULL;
   if (encode == NULL) {
-    encode = caml_named_value("schematic_mapped_encode");
+    encode = caml_named_value("schematic_mapped_encode_to_string");
   }
   assert(encode != NULL);
   v_back = caml_callback(*encode, v);

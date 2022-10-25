@@ -15,3 +15,4 @@ let make s =
 let map ~f = function Id s -> Id (f s)
 let to_string = function Id s -> s
 let pp f id = Fmt.string f (to_string id)
+let normalize_s s = s |> make |> to_string

@@ -262,7 +262,7 @@ let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
             (const pp_statements
                [
                  Fmt.str {|encode = caml_named_value("%s")|}
-                   (name |> Identifier.to_string |> encode_name_for);
+                   (encode_name_for (name |> Identifier.to_string) front_facing);
                ])
         in
         let pp =
@@ -555,7 +555,7 @@ let rec pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), ast) =
             (const pp_statements
                [
                  Fmt.str {|decode = caml_named_value("%s")|}
-                   (name |> Identifier.to_string |> decode_name_for);
+                   (decode_name_for (name |> Identifier.to_string) front_facing);
                ])
         in
         let pp =

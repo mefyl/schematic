@@ -240,7 +240,8 @@ module Event_1 = struct
         | 2 -> Result.return `B
         | _ -> Result.fail "invalid numeric value"
       and encode = function `A -> 1 | `B -> 2 in
-      Schematic.Schema.(make @@ Map { decode; encode; descriptor = Int })
+      Schematic.Schema.(
+        make ~id:"event-1-t" @@ Map { decode; encode; descriptor = Int })
   end
 
   type 'publication wrap = { wrapped : 'publication }

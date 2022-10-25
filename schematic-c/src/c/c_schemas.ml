@@ -168,15 +168,7 @@ module Of = C_walk.Walk (struct
 
 
   let mapped : t -> t =
-   fun (c, marks) ->
-    let front_facing, marks =
-      match c_canonical_typename c with
-      | Some _ -> (c, marks)
-      | None ->
-        let id = Fmt.str "%a_external" Identifier.pp (c_typename c) in
-        let s () = (c, marks) in
-        schema (Some id) None s
-    in
+   fun (front_facing, marks) ->
     (`Mapped front_facing, marks)
 
 

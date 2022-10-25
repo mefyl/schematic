@@ -117,17 +117,17 @@ let checking_checked_for c =
 let roundtrip_for = Fmt.str "sch_%a_rt_id" Identifier.pp
 
 (* FIXME: this approach does not protect against collisions *)
-let of_caml_name_for_c = Fn.compose of_caml_name_for c_typename
-let to_caml_name_for_c = Fn.compose to_caml_name_for c_typename
+let of_caml_name_for_c c = c |> c_typename |> of_caml_name_for
+let to_caml_name_for_c c = c |> c_typename |> to_caml_name_for
 let value_name = Fmt.str "schematic_%s"
-let encode_name_for typ = Fmt.str "%s_encode" typ |> value_name
-let decode_name_for typ = Fmt.str "%s_decode" typ |> value_name
 
-let encode_name_for_c c =
-  c_typename c |> Identifier.to_string |> encode_name_for
+let encode_name_for id serialized =
+  let serialized = serialized |> c_typename |> Identifier.to_string in
+  Fmt.str "%s_encode_to_%s" id serialized |> value_name
 
-let decode_name_for_c c =
-  c_typename c |> Identifier.to_string |> decode_name_for
+let decode_name_for id serialized =
+  let serialized = serialized |> c_typename |> Identifier.to_string in
+  Fmt.str "%s_decode_of_%s" id serialized |> value_name
 
 let case_name ~rich variant_name constr_name =
   let suffix = if rich then "_tag" else "" in
