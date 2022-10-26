@@ -70,7 +70,9 @@ let type_decl fmt (c_name, ts) =
           let named_params =
             fields
             |> List.map ~f:(fun (id, c) ->
-                   Fmt.str "%s: %a" (Swiftify.Binding.id id) pp_swift_type c)
+                   let default = if is_option c then " = nil" else "" in
+                   Fmt.str "%s: %a%s" (Swiftify.Binding.id id) pp_swift_type c
+                     default)
             |> String.concat ~sep:", "
           in
           let signature = Fmt.str "public init(%s)" named_params in
