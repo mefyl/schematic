@@ -35,14 +35,13 @@ module Of = C_walk.Walk (struct
 
   let ignore () = builtin `Unit
   let null = ignore
-
   let int () = builtin `Int
   let int64 () = builtin `Int64
   let bool () = builtin `Bool
 
   let float () =
-  (** "OCaml's floating-point numbers follow the IEEE 754 standard, using double
-      precision (64 bits) numbers." *)
+    (* "OCaml's floating-point numbers follow the IEEE 754 standard, using
+       double precision (64 bits) numbers." *)
     builtin `Double
 
   let string () = builtin `String
@@ -56,8 +55,6 @@ module Of = C_walk.Walk (struct
   let time () =
     Lazy.force C_sanity_checks.ptime;
     builtin `Time
-
-
 
   (* The rest *)
 
@@ -166,7 +163,6 @@ module Of = C_walk.Walk (struct
   (* We could use a struct for "key" / "value" fields instead of a tuple. *)
   let mapping t = tuple [ string (); t ] |> list
 
-
   let mapped : t -> t =
    fun (c, marks) ->
     let front_facing, marks =
@@ -179,14 +175,12 @@ module Of = C_walk.Walk (struct
     in
     (`Mapped front_facing, marks)
 
-
   (* XXX: make those into built-ins? *)
 
   (* TODO: for clarity, use a struct *)
   let time_local () =
     Lazy.force C_sanity_checks.ptime_local;
     tuple [ time (); int () ]
-
 
   let date () =
     Lazy.force C_sanity_checks.date;
@@ -205,13 +199,21 @@ module Of = C_walk.Walk (struct
       (`Struct { fields }, Marks.empty)
     in
     schema (Some "sch_date") None s
-
-
-
-
 end)
 
 include Make_mark_converter (struct
-  let of_descriptor = Of.descriptor
-  let of_parametric = Of.parametric
+  let of_descriptor id d =
+    try Of.descriptor id d
+    with e ->
+      Logs.err (fun m ->
+          m "Exception thrown for descriptor '%a', %a"
+            Fmt.(option string)
+            id Schematic.Schema.pp_descriptor d);
+      raise e
+
+  let of_parametric p =
+    try Of.parametric p
+    with e ->
+      Logs.err (fun m -> m "Exception thrown for parametric");
+      raise e
 end)
