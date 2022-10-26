@@ -169,7 +169,7 @@ module Of = C_walk.Walk (struct
       match c_canonical_typename c with
       | Some _ -> (c, marks)
       | None ->
-        let id = Fmt.str "%a_external" Identifier.pp (c_typename c) in
+        let id = Identifier.to_string (c_typename c) in
         let s () = (c, marks) in
         schema (Some id) None s
     in
