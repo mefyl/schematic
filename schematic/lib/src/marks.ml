@@ -112,11 +112,17 @@ module Make (S : MARK) = struct
     let of_parametric = M.of_parametric
 
     let mark_of_schema Schema.{ id; descriptor; parametric } =
+      let id =
+        match id with
+        | Some id -> id
+        | None ->
+          Fmt.failwith
+            "Schema with descriptor %a has no ID, required for mark emission"
+            Schema.pp_descriptor descriptor
+      in
       match parametric with
-      | None ->
-        (Option.value_exn ~here:[%here] id, lazy (M.of_descriptor id descriptor))
-      | Some parametric ->
-        (Option.value_exn ~here:[%here] id, lazy (M.of_parametric parametric))
+      | None -> (id, lazy (M.of_descriptor (Some id) descriptor))
+      | Some parametric -> (id, lazy (M.of_parametric parametric))
 
     let of_schema_state marks s = of_mark marks @@ mark_of_schema s
 
