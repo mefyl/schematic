@@ -72,7 +72,7 @@ module Of = C_walk.Walk (struct
       | Some id ->
         Logs.debug (fun m -> m "has id: %s\n" id);
         let referenced_type : c = fst @@ s () in
-        (`Atom (Identifier.make id, Some referenced_type), Marks.make id s))
+        (`Atom (Identifier.make id, Some referenced_type), Marks.make ~id s))
 
   let nullable (c, marks) =
     let name = option_name c in
@@ -127,7 +127,7 @@ module Of = C_walk.Walk (struct
                  inline_record_c_name ~variant_name:name ~constructor_name:id
                in
                let s () = (constr_c, marks) in
-               Marks.make id s
+               Marks.make ~id s
              | _ -> Marks.empty)
       |> Marks.merge
     in

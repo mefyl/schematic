@@ -63,7 +63,7 @@ module Of = Schema.Walk (struct
         if String.is_prefix ~prefix:"#" id then
           M.return (Atom (name @@ String.subo ~pos:1 id))
         else fun marks ->
-          let mark = (id, lazy (s () marks)) in
+          let mark = (Some id, lazy (s () marks)) in
           (Atom (name id), Marks.add marks mark))
 
   let parametric template_name args effective t =
@@ -78,7 +78,7 @@ module Of = Schema.Walk (struct
               (list ~sep:(const string ", ") string)
               (List.map ~f:name args))
         in
-        (id, lazy (t, marks))
+        (Some id, lazy (t, marks))
       in
       (Template { name = template_name; args = effective }, Marks.add marks mark)
 
@@ -94,7 +94,7 @@ module Of = Schema.Walk (struct
     | Schema.{ schema = Inline { id = Some id; _ }; _ } ->
       Some
         (fun marks ->
-          let mark = (id, lazy (s () marks)) in
+          let mark = (Some id, lazy (s () marks)) in
           (Type (name id), Marks.add marks mark))
     | _ -> None
 

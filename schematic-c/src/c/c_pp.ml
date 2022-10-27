@@ -29,7 +29,6 @@ let case_ish ~indent header body =
   let open Fmt in
   vbox ~indent @@ (header ++ cut ++ body)
 
-
 let force_newline fmt _ = Caml.Format.pp_force_newline fmt ()
 
 let signature ~return_type ~fname ~argtype ~argname =

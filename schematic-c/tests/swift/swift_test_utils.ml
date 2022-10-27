@@ -7,8 +7,10 @@ module Generate_types = struct
     let expected = Base.Set.of_list (module String) expected in
     let actual =
       C.of_schema schema
-      |> List.filter_map ~f:(fun x ->
-             C.Swift.type_decl x |> Option.map ~f:(fun x -> "\n" ^ x ^ "\n"))
+      |> List.filter_map ~f:(fun (id, c) ->
+             Option.bind id ~f:(fun id ->
+                 C.Swift.type_decl (id, c)
+                 |> Option.map ~f:(fun x -> "\n" ^ x ^ "\n")))
       |> Base.Set.of_list (module String)
     in
 

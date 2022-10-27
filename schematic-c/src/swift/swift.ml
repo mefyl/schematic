@@ -48,6 +48,8 @@ let export_ctypes c =
   let user_dependent_code =
     let _, l =
       c
+      |> List.filter_map ~f:(fun (id, c) ->
+             Option.map id ~f:(fun id -> (id, c)))
       |> List.fold ~init:(Base.Set.empty (module C_for_set), []) ~f:process_type
     in
     l |> List.rev |> String.concat ~sep:"\n\n"
