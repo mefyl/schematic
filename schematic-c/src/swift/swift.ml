@@ -10,7 +10,7 @@ let type_decl (name, c) : string option =
 
 let prelude = [%file "Prelude.swift"]
 
-let export_schemas schemas =
+let export_ctypes c =
   let process_type (specialized, l) (id, c) =
     let decl = Option.value (type_decl (id, c)) ~default:"" in
     let f (pp_of, pp_to) flattened_c =
@@ -47,10 +47,12 @@ let export_schemas schemas =
   end in
   let user_dependent_code =
     let _, l =
-      schemas |> C_schemas.of_schemas
+      c
       |> List.fold ~init:(Base.Set.empty (module C_for_set), []) ~f:process_type
     in
     l |> List.rev |> String.concat ~sep:"\n\n"
   in
   [ Fmt.str "import %s" !c_module_name; prelude; user_dependent_code ]
   |> String.concat ~sep:"\n\n"
+
+let export_schemas schemas = schemas |> C_schemas.of_schemas |> export_ctypes

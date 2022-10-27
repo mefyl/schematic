@@ -3,29 +3,6 @@ open C_intf
 open C_pp
 open C_statements
 
-let force_newline fmt _ = Caml.Format.pp_force_newline fmt ()
-
-let signature ~return_type ~fname ~argtype ~argname =
-  Fmt.str "%s %a(%s %s)" return_type Identifier.pp fname argtype argname
-
-let case ~indent case contents =
-  let open Fmt in
-  let post_case, post_box =
-    match contents with
-    | Some contents -> (cut ++ contents, nop)
-    | None -> (nop, force_newline)
-  in
-  vbox ~indent (const string (Fmt.str "case %s:" case) ++ post_case) ++ post_box
-
-let cases ~indent l =
-  let n = List.length l in
-  let open Fmt in
-  l
-  |> List.map ~f:(fun (condition, contents) -> case ~indent condition contents)
-  |> List.foldi ~init:nop ~f:(fun i acc x ->
-         let post = if i = n - 1 then nop else cut in
-         acc ++ x ++ post)
-
 let rec pp_of_caml_converter ?(safety_checks = false) ?(indent = 2)
     ((name : Identifier.t), ast) =
   match ast with

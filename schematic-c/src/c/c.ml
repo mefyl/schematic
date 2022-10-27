@@ -4,6 +4,10 @@ include C_schemas
 module Runtime = C_runtime
 module Builtins = C_builtins
 module Swift = Swift
+module Typeexpr = C_typeexpr
+module Format = C_pp
+module Statements = C_statements
+module Schemas = C_schemas
 
 let export ?safety_checks (name, (c : c)) : c_gen =
   let open Fmt in
@@ -46,15 +50,8 @@ let roundtrip_src (name, c) =
   let pp = block ~indent:2 decl body in
   Fmt.to_to_string pp ()
 
-(** Returns (header file content) * (implementation file content).
-
-    Please note: the implementation has no `#include "..."` for the header file,
-    since its name and location are not yet determined. It must be added by
-    consumers of this function. *)
-let export_schemas ?(safety_checks = false)
-    (schemas : Schematic.Schema.pack list) =
+let export_ctypes ?(safety_checks = false) ctypes =
   let nl_concat = String.concat ~sep:"\n" in
-  let ctypes = of_schemas schemas in
   let cgens = ctypes |> List.map ~f:(export ~safety_checks) in
   let user_declarations, user_impls =
     let typedefs = cgens |> List.map ~f:typedef_src |> nl_concat in
@@ -90,3 +87,14 @@ let export_schemas ?(safety_checks = false)
     |> String.concat ~sep:"\n\n"
   in
   (header_file_contents, c_file_contents)
+
+let ctypes_of_schemas = of_schemas
+
+(** Returns (header file content) * (implementation file content).
+
+    Please note: the implementation has no `#include "..."` for the header file,
+    since its name and location are not yet determined. It must be added by
+    consumers of this function. *)
+let export_schemas ?(safety_checks = false)
+    (schemas : Schematic.Schema.pack list) =
+  of_schemas schemas |> export_ctypes ~safety_checks

@@ -118,11 +118,11 @@ module Make (S : MARK) = struct
       | Some parametric ->
         (Option.value_exn ~here:[%here] id, lazy (M.of_parametric parametric))
 
-    let of_schema marks s = of_mark marks @@ mark_of_schema s
+    let of_schema_state marks s = of_mark marks @@ mark_of_schema s
 
     let unpacker marks =
       let unpack : type a. a Schema.t -> (S.Id.t * S.t) list * Marks.t =
-       fun s -> of_schema marks s
+       fun s -> of_schema_state marks s
       in
       { Schema.unpack }
 
@@ -145,6 +145,6 @@ module Make (S : MARK) = struct
       let marks = state_exclude exclude in
       of_schemas_state marks schemas |> fst
 
-    let of_schema schema = of_schema Marks.empty schema |> fst
+    let of_schema schema = of_schema_state Marks.empty schema |> fst
   end
 end
