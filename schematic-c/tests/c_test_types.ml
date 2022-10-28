@@ -281,6 +281,8 @@ let exported_schemas =
   [
     Schema.pack (option_schema int_schema);
     Schema.pack (option_schema int_schema);
+    Schema.pack (list_schema int_schema);
+    Schema.pack (list_schema int_schema);
     Schema.pack primitive_record_schema;
     Schema.pack collection_schema;
     Schema.pack wrapper_schema;
