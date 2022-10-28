@@ -6,31 +6,6 @@ let c_module_name = ref "Schemas"
 let indent = 2
 let first_some_l = List.fold ~f:Option.first_some ~init:None
 
-let rec tuple_members = function
-  | `Atom (_, None) -> None
-  | `Atom (_, Some c) -> tuple_members c
-  | `Tuple members -> Some members
-  | `Mapped front_facing -> tuple_members front_facing
-  | _ -> None
-
-let rec array_element = function
-  | `Atom (_, None) -> None
-  | `Atom (_, Some c) -> array_element c
-  | `Array c -> Some c
-  | `Mapped front_facing -> array_element front_facing
-  | _ -> None
-
-let rec option_element = function
-  | `Atom (_, None) -> None
-  | `Atom (_, Some c) -> option_element c
-  | `Option c -> Some c
-  | `Mapped front_facing -> option_element front_facing
-  | _ -> None
-
-let is_tuple : c -> bool = Fn.compose Option.is_some tuple_members
-let is_option : c -> bool = Fn.compose Option.is_some option_element
-let is_array : c -> bool = Fn.compose Option.is_some array_element
-
 let rec needs_toplevel_conv c =
   match array_element c with
   | Some c -> needs_toplevel_conv c

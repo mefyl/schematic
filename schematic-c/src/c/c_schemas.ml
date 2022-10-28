@@ -72,12 +72,14 @@ module Of = C_walk.Walk (struct
       | Some id ->
         Logs.debug (fun m -> m "has id: %s\n" id);
         let referenced_type : c = fst @@ s () in
-        (`Atom (Identifier.make id, Some referenced_type), Marks.make ~id s))
+        (`Atom (Identifier.make id, Some referenced_type), Marks.make id s))
 
   let nullable (c, marks) =
     let name = option_name c in
     let s () = (`Option c, marks) in
     schema (Some (Identifier.to_string name)) None s
+  (* schema (Some (Identifier.to_string name)) None s *)
+  (* s () *)
 
   let fields_empty () = ([], Marks.empty)
 
@@ -127,7 +129,7 @@ module Of = C_walk.Walk (struct
                  inline_record_c_name ~variant_name:name ~constructor_name:id
                in
                let s () = (constr_c, marks) in
-               Marks.make ~id s
+               Marks.make id s
              | _ -> Marks.empty)
       |> Marks.merge
     in
@@ -202,6 +204,11 @@ module Of = C_walk.Walk (struct
 end)
 
 include Make_mark_converter (struct
+  let identified = function
+    (* | `Atom (name, Some ((`Option _ | `Array _) as outer)) when Identifier.(equal name (c_typename outer)) -> *)
+    (*   (Some (c_typename outer |> Identifier.to_string), (outer :> c)) *)
+    | c -> (c_typename c |> Identifier.to_string |> fun s -> s ^ "_" |> Option.some, c)
+
   let of_descriptor id d =
     try Of.descriptor id d
     with e ->
@@ -218,17 +225,9 @@ include Make_mark_converter (struct
       raise e
 end)
 
-
-let ctypes_of_schemas_state state schemas =
-  let l, state = of_schemas_state state schemas  in
-  let ctypes = l |> List.map ~f:(function
-       | Some name, c -> `Atom (name, Some c)
-       | None, c -> c) in
-  ctypes, state
-
+let ctypes_of_schemas_state state schemas = of_schemas_state state schemas
 
 let ctypes_of_schemas schemas =
-  ctypes_of_schemas_state state_empty schemas
-  |> fst
+  ctypes_of_schemas_state state_empty schemas |> fst
 
 let ctypes_of_schema s = ctypes_of_schemas [ Schematic.Schema.pack s ]

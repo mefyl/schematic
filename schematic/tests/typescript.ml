@@ -109,7 +109,6 @@ module Generate_types = struct
     let actual =
       Schematic.Typescript.of_schema t
       |> List.map ~f:(fun (id, schema) ->
-             let id = Option.value_exn id in
              (id, Schematic.Typescript.to_string schema))
       |> Base.Set.of_list (module String_pair)
     in

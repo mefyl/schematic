@@ -1,5 +1,5 @@
 open Base
-open Swift_utils
+open C_intf
 
 (* ref exposed for customizability *)
 let c_module_name = Swift_utils.c_module_name
@@ -10,13 +10,9 @@ let type_decl (name, c) : string option =
 
 let prelude = [%file "Prelude.swift"]
 
-let export_ctypes c =
-  let process_type (specialized, l) c =
-    let c, decl =
-      match c with
-      | `Atom (id, Some c) -> (c, Option.value (type_decl (id, c)) ~default:"")
-      | c -> (c, "")
-    in
+let export_ctypes ctypes =
+  let process_type (specialized, l) (id, c) =
+    let decl = Option.to_list (type_decl (id, c)) in
     let f (pp_of, pp_to) flattened_c =
       let of_src, to_src =
         (Fmt.to_to_string pp_of (), Fmt.to_to_string pp_to ())
@@ -37,7 +33,7 @@ let export_ctypes c =
             f (Swift_conv.option_conv_decl c) (`Option c)
           | _ -> (specialized, [])))
     in
-    (specialized, extra_decls @ [ decl ] @ l)
+    (specialized, extra_decls @ decl @ l)
   in
   let module C_for_set = struct
     module T = struct
@@ -51,7 +47,7 @@ let export_ctypes c =
   end in
   let user_dependent_code =
     let _, l =
-      c
+      ctypes
       |> List.fold ~init:(Base.Set.empty (module C_for_set), []) ~f:process_type
     in
     l |> List.rev |> String.concat ~sep:"\n\n"
@@ -59,4 +55,5 @@ let export_ctypes c =
   [ Fmt.str "import %s" !c_module_name; prelude; user_dependent_code ]
   |> String.concat ~sep:"\n\n"
 
-let export_schemas schemas = schemas |> C_schemas.ctypes_of_schemas |> export_ctypes
+let export_schemas schemas =
+  schemas |> C_schemas.ctypes_of_schemas |> export_ctypes

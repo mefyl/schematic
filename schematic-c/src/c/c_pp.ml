@@ -1,5 +1,7 @@
 open Base
 
+let indent = 2
+
 let block ?(delim = ('{', '}')) ?(open_sp = true) ~indent lhs body =
   let delim_open, delim_close = delim in
   let open Fmt in

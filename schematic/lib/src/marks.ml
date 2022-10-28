@@ -21,13 +21,12 @@ module type V = sig
 end
 
 module Make (S : MARK) = struct
-  module rec Mark : (V with type t = string option * (S.t * Marks.t) Lazy.t) =
-  struct
+  module rec Mark : (V with type t = string * (S.t * Marks.t) Lazy.t) = struct
     module T = struct
-      type t = string option * (S.t * Marks.t) Lazy.t
+      type t = string * (S.t * Marks.t) Lazy.t
 
-      let sexp_of_t (id, _) = Sexp.Atom (Option.value id ~default:"<None>")
-      let compare (l, _) (r, _) = Option.compare String.compare l r
+      let sexp_of_t (id, _) = Sexp.Atom id
+      let compare (l, _) (r, _) = String.compare l r
     end
 
     include T
@@ -39,23 +38,22 @@ module Make (S : MARK) = struct
         let open Fmt in
         let inner : (_ * (_ * _)) Fmt.t =
          fun f (s, (v, _r)) ->
-          (const (option string) s
-          ++ const char ',' ++ sp ++ const char '{' ++ const S.pp v
-          ++ const char ','
-          (* XXX: cannot use Marks.pp here (unsafe module recursiveness) *)
-          ++ const string " ..."
+          (const string s ++ const char ',' ++ sp ++ const char '{'
+         ++ const S.pp v ++ const char ','
+         (* XXX: cannot use Marks.pp here (unsafe module recursiveness) *)
+         ++ const string " ..."
           ++ const char '}')
             f ()
         in
         (const char '(' ++ inner ++ const char ')') f (s, Lazy.force v)
-      else Fmt.(option string) f s
+      else Fmt.(string) f s
   end
 
   and Marks : sig
     type t
 
     val empty : t
-    val make : ?id:string -> (unit -> S.t * Marks.t) -> t
+    val make : string -> (unit -> S.t * Marks.t) -> t
     val add : t -> Mark.t -> t
     val map : t -> f:(Mark.t -> Mark.t) -> t
     val fold : t -> init:'a -> f:('a -> Mark.t -> 'a) -> 'a
@@ -67,7 +65,7 @@ module Make (S : MARK) = struct
     type t = (Mark.t, Mark.comparator_witness) Set.t
 
     let empty = Set.empty (module Mark)
-    let make ?id f = Set.of_list (module Mark) [ (id, lazy (f ())) ]
+    let make id f = Set.of_list (module Mark) [ (id, lazy (f ())) ]
     let add = Set.add
     let map t = Set.map (module Mark) t
     let fold = Set.fold
@@ -89,13 +87,14 @@ module Make (S : MARK) = struct
 
   (** [of_marks marks mark] *)
   let rec of_mark (marks : Marks.t) (mark : Mark.t) :
-      (S.Id.t option * S.t) list * Marks.t =
+      (S.Id.t * S.t) list * Marks.t =
     if Marks.has marks mark then ([], marks)
     else
       let leaf, deps =
         let res, deps = Lazy.force @@ snd mark in
-        ([ (Option.map (fst mark) ~f:S.Id.make, res) ], deps)
+        ([ (S.Id.make (fst mark), res) ], deps)
       in
+      Fmt.epr "mark: %a@." (Mark.pp ~with_value:true) mark;
       let marks = Marks.add marks mark in
       let f (res, marks) mark =
         let deps, marks = of_mark marks mark in
@@ -105,6 +104,8 @@ module Make (S : MARK) = struct
       (l @ leaf, marks)
 
   module Make_mark_converter (M : sig
+    val identified : S.t -> string option * S.t
+
     val of_descriptor :
       string option -> 'a Schema_intf.descriptor -> S.t * Marks.t
 
@@ -115,14 +116,17 @@ module Make (S : MARK) = struct
     let of_parametric = M.of_parametric
 
     let mark_of_schema Schema.{ id; descriptor; parametric } =
+      let res, marks = M.of_descriptor id descriptor in
+      let id_inner, res = (M.identified res) in
+      let id = Option.first_some id  id_inner |> Option.value_exn in
       match parametric with
-      | None -> (id, lazy (M.of_descriptor id descriptor))
+      | None -> (id, lazy (res, marks))
       | Some parametric -> (id, lazy (M.of_parametric parametric))
 
     let of_schema_state marks s = of_mark marks @@ mark_of_schema s
 
     let unpacker marks =
-      let unpack : type a. a Schema.t -> (S.Id.t option * S.t) list * Marks.t =
+      let unpack : type a. a Schema.t -> (S.Id.t * S.t) list * Marks.t =
        fun s -> of_schema_state marks s
       in
       { Schema.unpack }
