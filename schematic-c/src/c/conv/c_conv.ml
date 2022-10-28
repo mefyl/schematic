@@ -34,12 +34,11 @@ let safety_checks_for name ~fname ~argname =
   in
   main_if ++ cut
 
-let rec pp_of_caml_converter ?(safety_checks = false)
+let pp_of_caml_converter ?(safety_checks = false)
     ((name : Identifier.t), ast) =
   let open C_of_caml in
   let open Fmt in
   let caml_locals, (body : unit Fmt.t) =
-    let open C_statements in
     match ast with
     | `Void ->
       failwith
@@ -79,7 +78,7 @@ let rec pp_of_caml_converter ?(safety_checks = false)
   let decl = signature ~return_type ~fname ~argtype:"value" ~argname in
   { signature = decl; impl = body }
 
-let rec pp_to_caml_converter ?(indent = 2) ((name : Identifier.t), (ast : c)) =
+let pp_to_caml_converter ((name : Identifier.t), (ast : c)) =
   let open Fmt in
   let open C_to_caml in
   let argname, (body : unit Fmt.t) =

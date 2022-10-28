@@ -216,7 +216,7 @@ let other_of_caml c =
   let pp =
     const pp_statements
       [
-        Fmt.str "%a res = %a(v)" (C_typeexpr.pp ~indent) c Identifier.pp
+        Fmt.str "%a res = %a(v)" (C_typeexpr.pp) c Identifier.pp
           (of_caml_name_for_c c);
       ]
   in

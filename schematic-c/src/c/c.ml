@@ -39,7 +39,7 @@ let signature_src { signature; _ } = Fmt.str "%s;" signature
 let impl_src { signature; impl } =
   Fmt.to_to_string (C_pp.block ~indent:2 signature impl) ()
 
-let roundtrip_src (name, c) =
+let roundtrip_src name =
   let open Fmt in
   let open C_pp in
   let decl = Fmt.str "CAMLprim value %s(value v)" (roundtrip_for name) in
@@ -87,7 +87,7 @@ let export_ctypes ?(safety_checks = false) ctypes =
         ]
     else ""
   in
-  let rts = ctypes |> List.map ~f:roundtrip_src |> nl_concat in
+  let rts = ctypes |> List.map ~f:fst |> List.map ~f:roundtrip_src |> nl_concat in
   (* TODO include declaration file *)
   let c_file_contents =
     [ Builtins.implementations; statics; rts; user_impls ]

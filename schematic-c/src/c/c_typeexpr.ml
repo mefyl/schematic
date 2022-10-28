@@ -1,7 +1,7 @@
 open C_intf
 open Base
 
-let pp ?(indent = 2) fmt (ts : c) =
+let pp fmt (ts : c) =
   let rec pp fmt (ts : c) =
     let printer =
       let open Fmt in
