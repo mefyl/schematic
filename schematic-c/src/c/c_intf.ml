@@ -92,7 +92,7 @@ and c_typename c =
   (* Fallback: hash the physical structure of the type. *)
   | None ->
     let s = Fmt.str "_sch_%d" (hash_c c) in
-    Logs.warn (fun m -> m "Using hash-based name '%s' for %a" s pp_c c);
+    Logs.debug (fun m -> m "Using hash-based name '%s' for %a" s pp_c c);
     Identifier.make s
 
 and tuple_name items =
