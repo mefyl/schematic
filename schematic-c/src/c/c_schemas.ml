@@ -207,7 +207,7 @@ include Make_mark_converter (struct
   let identified = function
     (* | `Atom (name, Some ((`Option _ | `Array _) as outer)) when Identifier.(equal name (c_typename outer)) -> *)
     (*   (Some (c_typename outer |> Identifier.to_string), (outer :> c)) *)
-    | c -> (c_typename c |> Identifier.to_string |> fun s -> s ^ "_" |> Option.some, c)
+    | c -> (c_typename c |> Identifier.to_string |> fun s -> s ^ "_2" |> Option.some, c)
 
   let of_descriptor id d =
     try Of.descriptor id d

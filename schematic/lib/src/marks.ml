@@ -94,7 +94,6 @@ module Make (S : MARK) = struct
         let res, deps = Lazy.force @@ snd mark in
         ([ (S.Id.make (fst mark), res) ], deps)
       in
-      Fmt.epr "mark: %a@." (Mark.pp ~with_value:true) mark;
       let marks = Marks.add marks mark in
       let f (res, marks) mark =
         let deps, marks = of_mark marks mark in
