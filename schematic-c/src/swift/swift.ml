@@ -11,8 +11,12 @@ let type_decl (name, c) : string option =
 let prelude = [%file "Prelude.swift"]
 
 let export_ctypes c =
-  let process_type (specialized, l) (id, c) =
-    let decl = Option.value (type_decl (id, c)) ~default:"" in
+  let process_type (specialized, l) c =
+    let c, decl =
+      match c with
+      | `Atom (id, Some c) -> (c, Option.value (type_decl (id, c)) ~default:"")
+      | c -> (c, "")
+    in
     let f (pp_of, pp_to) flattened_c =
       let of_src, to_src =
         (Fmt.to_to_string pp_of (), Fmt.to_to_string pp_to ())
@@ -55,7 +59,4 @@ let export_ctypes c =
   [ Fmt.str "import %s" !c_module_name; prelude; user_dependent_code ]
   |> String.concat ~sep:"\n\n"
 
-let export_schemas schemas =
-  schemas |> C_schemas.of_schemas
-  |> List.filter_map ~f:(function Some id, c -> Some (id, c) | _ -> None)
-  |> export_ctypes
+let export_schemas schemas = schemas |> C_schemas.ctypes_of_schemas |> export_ctypes

@@ -217,3 +217,18 @@ include Make_mark_converter (struct
       Logs.err (fun m -> m "Exception thrown for parametric");
       raise e
 end)
+
+
+let ctypes_of_schemas_state state schemas =
+  let l, state = of_schemas_state state schemas  in
+  let ctypes = l |> List.map ~f:(function
+       | Some name, c -> `Atom (name, Some c)
+       | None, c -> c) in
+  ctypes, state
+
+
+let ctypes_of_schemas schemas =
+  ctypes_of_schemas_state state_empty schemas
+  |> fst
+
+let ctypes_of_schema s = ctypes_of_schemas [ Schematic.Schema.pack s ]
