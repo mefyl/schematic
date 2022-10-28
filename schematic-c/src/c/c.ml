@@ -51,11 +51,6 @@ let roundtrip_src (name, c) =
   Fmt.to_to_string pp ()
 
 let export_ctypes ?(safety_checks = false) ctypes =
-  let ctypes =
-    List.filter_map ctypes ~f:(function
-      | Some id, c -> Some (id, c)
-      | _ -> None)
-  in
   let nl_concat = String.concat ~sep:"\n" in
   let cgens = ctypes |> List.map ~f:(export ~safety_checks) in
   let user_declarations, user_impls =
@@ -102,4 +97,6 @@ let ctypes_of_schemas = of_schemas
     consumers of this function. *)
 let export_schemas ?(safety_checks = false)
     (schemas : Schematic.Schema.pack list) =
-  of_schemas schemas |> export_ctypes ~safety_checks
+  of_schemas schemas
+  |> List.filter_map ~f:(function Some id, c -> Some (id, c) | _ -> None)
+  |> export_ctypes ~safety_checks

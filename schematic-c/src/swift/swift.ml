@@ -48,8 +48,6 @@ let export_ctypes c =
   let user_dependent_code =
     let _, l =
       c
-      |> List.filter_map ~f:(fun (id, c) ->
-             Option.map id ~f:(fun id -> (id, c)))
       |> List.fold ~init:(Base.Set.empty (module C_for_set), []) ~f:process_type
     in
     l |> List.rev |> String.concat ~sep:"\n\n"
@@ -57,4 +55,7 @@ let export_ctypes c =
   [ Fmt.str "import %s" !c_module_name; prelude; user_dependent_code ]
   |> String.concat ~sep:"\n\n"
 
-let export_schemas schemas = schemas |> C_schemas.of_schemas |> export_ctypes
+let export_schemas schemas =
+  schemas |> C_schemas.of_schemas
+  |> List.filter_map ~f:(function Some id, c -> Some (id, c) | _ -> None)
+  |> export_ctypes
