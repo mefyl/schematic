@@ -91,11 +91,17 @@ let export_ctypes ?(safety_checks = false) ctypes =
   in
   (header_file_contents, c_file_contents)
 
-let ctypes_of_schemas schemas =
-  schemas |> of_schemas
-  |> List.map ~f:(function
+let ctypes_of_schemas_state state schemas =
+  let l, state = of_schemas_state state schemas  in
+  let ctypes = l |> List.map ~f:(function
        | Some name, c -> `Atom (name, Some c)
-       | None, c -> c)
+       | None, c -> c) in
+  ctypes, state
+
+
+let ctypes_of_schemas schemas =
+  ctypes_of_schemas_state state_empty schemas
+  |> fst
 
 let ctypes_of_schema s = ctypes_of_schemas [ Schematic.Schema.pack s ]
 
