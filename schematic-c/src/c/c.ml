@@ -9,8 +9,13 @@ module Format = C_pp
 module Statements = C_statements
 module Schemas = C_schemas
 
-let export ?safety_checks (name, (c : c)) : c_gen =
+let unpack_named = function
+  | `Atom (name, Some c) -> (name, c)
+  | _ -> failwith "expected Atom"
+
+let export ?safety_checks c : c_gen =
   let open Fmt in
+  let name, c = unpack_named c in
   let of_caml, to_caml = C_conv.converters ?safety_checks name c in
   { name; type_expr = const C_typeexpr.pp c; to_caml; of_caml }
 
@@ -27,14 +32,12 @@ let signature_src { signature; _ } = Fmt.str "%s;" signature
 let impl_src { signature; impl } =
   Fmt.to_to_string (C_pp.block ~indent:2 signature impl) ()
 
-let roundtrip_src (name, c) =
+let roundtrip_src (c : c) =
   let open Fmt in
   let open C_pp in
   (* Bit of a hack... *)
-  let typ =
-    let c = `Atom (name, Some c) in
-    Fmt.to_to_string C_typeexpr.pp c
-  in
+  let name = c_typename c in
+  let typ = Fmt.to_to_string C_typeexpr.pp c in
   let decl = Fmt.str "CAMLprim value %s(value v)" (roundtrip_for name) in
   let body =
     const pp_statements
@@ -88,7 +91,13 @@ let export_ctypes ?(safety_checks = false) ctypes =
   in
   (header_file_contents, c_file_contents)
 
-let ctypes_of_schemas = of_schemas
+let ctypes_of_schemas schemas =
+  schemas |> of_schemas
+  |> List.map ~f:(function
+       | Some name, c -> `Atom (name, Some c)
+       | None, c -> c)
+
+let ctypes_of_schema s = ctypes_of_schemas [ Schematic.Schema.pack s ]
 
 (** Returns (header file content) * (implementation file content).
 
@@ -97,6 +106,4 @@ let ctypes_of_schemas = of_schemas
     consumers of this function. *)
 let export_schemas ?(safety_checks = false)
     (schemas : Schematic.Schema.pack list) =
-  of_schemas schemas
-  |> List.filter_map ~f:(function Some id, c -> Some (id, c) | _ -> None)
-  |> export_ctypes ~safety_checks
+  ctypes_of_schemas schemas |> export_ctypes ~safety_checks
