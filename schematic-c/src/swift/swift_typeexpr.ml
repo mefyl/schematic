@@ -1,6 +1,5 @@
 open Base
 open C_intf
-open Swift_utils
 
 let rec pp_swift_type f c =
   Logs.debug (fun m -> m "pp_swift_type: %a" pp_c c);

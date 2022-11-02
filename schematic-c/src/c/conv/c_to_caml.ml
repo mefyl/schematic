@@ -29,8 +29,9 @@ let struct_to_caml (`Struct { fields }) =
   in
   ("p", const pp_statements statements)
 
-let plain_variant_to_caml (`Variant ({ basic; rich = []; _ } : regular_variant))
+let plain_variant_to_caml (`Variant ({ basic; rich; _ } : regular_variant))
     =
+    assert (List.is_empty rich);
   let pp =
     const pp_statements
       [ Fmt.str "assert(x < %d)" (List.length basic); "return Val_int(x)" ]
