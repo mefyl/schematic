@@ -41,13 +41,19 @@ module Testables = struct
         let pp : set Fmt.t =
          fun f s ->
           let l = s |> Base.Set.to_list in
-          (Fmt.list S.pp) f l
+          (Fmt.list S.pp ~sep:Fmt.semi) f l
         in
         let eq : set -> set -> bool = Base.Set.equal in
         Alcotest.testable pp eq
     end
 
     (* Functor applications *)
+
+    module String = Make (struct
+      include String
+
+      type elem = t
+    end)
 
     module String_pair = Make (String_pair)
   end

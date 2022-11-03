@@ -67,9 +67,27 @@ value sch_json_to_caml(const char* x) {
 
 let typedefs =
   {|
-typedef const char* sch_json;
 typedef int unit;
-typedef struct timespec timespec;
+
+
+typedef struct {
+    int days;
+    // Picoseconds, in the [0; 86_399_999_999_999_999] range.
+    int64_t ps;
+} sch_time;
+
+typedef const char* sch_json;
+
+
+typedef struct {
+  size_t len;
+  void* data;
+} type_erased_array;
+
+typedef struct {
+  int tag;
+  void* payload;
+} type_erased_option;
 |}
 
 (* TODO: DRY builtin sigs / impls. *)
@@ -86,26 +104,30 @@ value bool_to_caml(bool x);
 bool bool_of_caml(value v);
 double double_of_caml(value v);
 value double_to_caml(double x);
-timespec timespec_of_caml(value v);
-value timespec_to_caml(timespec x);
+
+sch_time sch_time_of_caml(value v);
+value sch_time_to_caml(sch_time x);
+
+sch_time timespec_to_sch_time(struct timespec ts);
+struct timespec timespec_of_sch_time(sch_time st);
 |}
 
 let implementations =
   bannerify "Schematic C builtin implementations"
   @@ {|
-  
+
 value unit_to_caml(unit x){
   CAMLparam0();
   // assert(x == 0);
   CAMLreturn(Val_unit);
 }
+
 unit unit_of_caml(value v) {
   CAMLparam1(v);
   // assert(v == Val_unit);
   CAMLreturnT(unit, 0);
 }
 
-  
 value int_to_caml(int x) {
   CAMLparam0();
   CAMLreturn(Val_int(x));
@@ -172,23 +194,60 @@ value double_to_caml(double x) {
 }
 
 
-
-timespec timespec_of_caml(value v) {
+sch_time sch_time_of_caml(value v) {
   CAMLparam1(v);
-  timespec x;
-  x.tv_sec = Long_val(Field(v, 0));
-  x.tv_nsec = Int64_val(Field(v, 1));
-  CAMLreturnT(timespec, x);
+
+  sch_time x = {
+    .days = Long_val(Field(v, 0)),
+    .ps = Int64_val(Field(v, 1))
+  };
+
+  CAMLreturnT(sch_time, x);
 }
 
 
-value timespec_to_caml(timespec x) {
+value sch_time_to_caml(sch_time x) {
   CAMLparam0();
   CAMLlocal1(v);
+
   v = caml_alloc_tuple(2);
-  Store_field(v, 0, Val_long(x.tv_sec));
-  Store_field(v, 1, caml_copy_int64(x.tv_nsec));
+  Store_field(v, 0, Val_long(x.days));
+  Store_field(v, 1, caml_copy_int64(x.ps));
   CAMLreturn(v);
+}
+
+
+
+// Extras
+
+
+static const int64_t PS_IN_S = 1000000000000;
+static const int64_t PS_IN_NS = 1000;
+static const int64_t S_IN_DAY = 86400;
+
+
+struct timespec timespec_of_sch_time(sch_time st) {
+  int64_t days_seconds = S_IN_DAY * st.days;
+  int64_t ps_seconds = st.ps / PS_IN_S;
+  int64_t rem_ps = st.ps % PS_IN_S;
+
+  struct timespec x = {
+      .tv_sec = days_seconds + ps_seconds,
+      .tv_nsec = (rem_ps / PS_IN_NS)
+  };
+
+  return x;
+}
+
+sch_time timespec_to_sch_time(struct timespec ts) {
+  long rem_s = ts.tv_sec % S_IN_DAY;
+
+  sch_time st = {
+    .days = ts.tv_sec / S_IN_DAY,
+    .ps = (rem_s * PS_IN_S) + (ts.tv_nsec * PS_IN_NS)
+  };
+
+  return st;
 }
 
 |}

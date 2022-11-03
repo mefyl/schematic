@@ -84,13 +84,14 @@ external evil_defaults_rt_id : evil_defaults -> evil_defaults
   = "sch_evil_defaults_rt_id"
 
 external reified_ultra_generic_rt_id :
-  reified_ultra_generic -> reified_ultra_generic (* FIXME: this is wrong *)
+  reified_ultra_generic -> reified_ultra_generic (* XXX *)
   = "sch_string_wrapper_parametric_record_ultra_generic_rt_id"
 
 external with_computed_rt_id : with_computed -> with_computed
   = "sch_with_computed_rt_id"
 
 external mapped_rt_id : mapped -> mapped = "sch_mapped_rt_id"
+external event_1_rt_id : Event_1.t -> Event_1.t = "sch_event_1_rt_id"
 
 module Tests = struct
   let test t got expected = Alcotest.(check t "" expected) got
@@ -336,6 +337,14 @@ module Tests = struct
     |> List.iter (fun x ->
            let new_x = mapped_rt_id x in
            test t new_x x)
+
+  let event_1 () =
+    let open Event_1 in
+    let t = Alcotest.testable pp equal in
+    ([ { wrapped = `B }; { wrapped = `A } ] : t list)
+    |> List.iter (fun (x : Event_1.t) ->
+           let new_x = event_1_rt_id x in
+           test t new_x x)
 end
 
 let () =
@@ -344,7 +353,8 @@ let () =
   Logs.set_reporter (Logs_fmt.reporter ());
   C.Runtime.register_static_callbacks ();
   C.Runtime.register_schema mapped_schema;
-  run "Schematic.C roundtrip"
+  C.Runtime.register_schema Event_1.schema;
+  run "Schematic.C roundtrip" ~verbose:true
     [
       ( "roundtrip",
         Tests.
@@ -383,5 +393,6 @@ let () =
             test_case "with computed" `Quick with_computed;
             test_case "tuple_int_string_alias" `Quick tuple_int_string_alias;
             test_case "encode / decode" `Quick encode_decode;
+            test_case "event 1" `Quick event_1;
           ] );
     ]

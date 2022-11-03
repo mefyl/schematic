@@ -2,10 +2,17 @@ open Base
 open C_intf
 open Schematic
 
-let register_map type_name ~encode ~decode =
-  Stdlib.Callback.register (encode_name_for type_name) encode;
-  let decode = Fn.compose Result.ok_or_failwith decode in
-  Stdlib.Callback.register (decode_name_for type_name) decode
+let register_map id ~serialized ~encode ~decode =
+  let encode_name = encode_name_for id serialized in
+  let decode_name = decode_name_for id serialized in
+  Logs.info (fun m ->
+      m
+        {|Registering Map encode/decode for '%s':
+          encoder: '%s'
+          decoder: '%s'|}
+        id encode_name decode_name);
+  Stdlib.Callback.register encode_name encode;
+  Stdlib.Callback.register decode_name (Fn.compose Result.ok_or_failwith decode)
 
 let rec traverse_descriptor :
     type t. string option -> t Schema.descriptor -> unit =
@@ -17,16 +24,19 @@ let rec traverse_descriptor :
     ()
   | Fixpoint d -> traverse_descriptor id (Lazy.force d)
   | List s -> traverse_schema s
-  | Map { descriptor = d; encode; decode } ->
-    let id =
-      let c, _ = C_schemas.of_descriptor None d in
-      let default = c |> c_typename |> Identifier.to_string in
-      Option.map id ~f:(Fn.compose Identifier.to_string Identifier.make)
-      |> Option.value ~default
+  | Map { descriptor = serialized_d; encode; decode } as map_d ->
+    let id : string =
+      match id with
+      | Some id -> id
+      | None ->
+        Fmt.failwith
+          {|Mapped descriptor '%a' may not be used without a name, to prevent unsoundness.|}
+          Schematic.Schema.pp_descriptor map_d
     in
-    Logs.info (fun m -> m "Registering Map encode/decode for '%s'" id);
-    register_map id ~encode ~decode;
-    traverse_descriptor (Some id) d
+    let serialized, _ = C_schemas.of_descriptor None serialized_d in
+    let id = id |> Identifier.normalize_s in
+    register_map id ~serialized ~encode ~decode;
+    traverse_descriptor None serialized_d
   | Mapping s -> traverse_schema s
   | Nullable s -> traverse_schema s
   | Object { fields; _ } -> traverse_fields fields

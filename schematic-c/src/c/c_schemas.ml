@@ -1,39 +1,62 @@
 open Base
 include C_intf
 
+(* Shamelessly copy-pasted, because depending on either ppx_deriving.api or
+   ocaml-compiler-libs.common confuses esy .*)
+let hash_variant s =
+  let accu = ref 0 in
+  for i = 0 to String.length s - 1 do
+    accu := (223 * !accu) + Stdlib.Char.code s.[i]
+  done;
+  (* reduce to 31 bits *)
+  accu := !accu land ((1 lsl 31) - 1);
+  (* make it signed for 64 bits architectures *)
+  if !accu > 0x3FFFFFFF then !accu - (1 lsl 31) else !accu
+
 include Schematic.Marks.Make (struct
   type t = c
 
-  let pp = pp
+  let pp = pp_c
 
   module Id = Identifier
 end)
 
 module Of = C_walk.Walk (struct
-  type res = t * Marks.t
-  type fields = (string * t) list * Marks.t
-  type case = string * t
+  type res = c * Marks.t
+  type fields = (string * c) list * Marks.t
+  type case = string * c
   type t = res
 
+  (* Utils *)
   let name (c, _marks) = c_typename c |> Identifier.to_string
-  let make name = (Atom (Identifier.make name, None), Marks.empty)
+  let builtin c = (c, Marks.empty)
 
-  (* Shallow primitive types *)
+  (* Built-ins *)
 
-  let ignore () = make "unit"
+  let ignore () = builtin `Unit
   let null = ignore
+  let int () = builtin `Int
+  let int64 () = builtin `Int64
+  let bool () = builtin `Bool
 
-  (* Mainly used for individual union constructors *)
-  let string_const _s = (Void, Marks.empty)
-  let int () = make "int"
-  let bool () = make "bool"
+  let float () =
+    (* "OCaml's floating-point numbers follow the IEEE 754 standard, using
+       double precision (64 bits) numbers." *)
+    builtin `Double
 
-  (** "OCaml's floating-point numbers follow the IEEE 754 standard, using double
-      precision (64 bits) numbers." *)
-  let float () = make "double"
+  let string () = builtin `String
 
-  let int64 () = make "int64_t"
-  let string () = (String, Marks.empty)
+  let string_const _s =
+    (* Mainly used for individual union constructors *)
+    builtin `Void
+
+  let any () = builtin `Json
+
+  let time () =
+    Lazy.force C_sanity_checks.ptime;
+    builtin `Time
+
+  (* The rest *)
 
   (* This will recurse forever if given a recursive schema. *)
   let schema (id : string option) parametric s =
@@ -45,29 +68,15 @@ module Of = C_walk.Walk (struct
       | None ->
         Logs.debug (fun m -> m "no id\n");
         let c, marks = s () in
-        Logs.debug (fun m -> m "c: %a\n" pp c);
         (c, marks)
       | Some id ->
         Logs.debug (fun m -> m "has id: %s\n" id);
         let referenced_type : c = fst @@ s () in
-        (Atom (Identifier.make id, Some referenced_type), Marks.make id s))
+        (`Atom (Identifier.make id, Some referenced_type), Marks.make id s))
 
-  (* This could be optimized (null ptr optim), but this approach allows us to
-     simplify things
-
-     TODO: better representation, as we don't need different tags for each
-     option specialization. *)
   let nullable (c, marks) =
-    let name = c_typename c |> Identifier.map ~f:(fun s -> s ^ "_option") in
-    let s () =
-      ( Variant
-          {
-            name;
-            basic = [ Identifier.make "none" ];
-            rich = [ (Identifier.make "some", c) ];
-          },
-        marks )
-    in
+    let name = option_name c in
+    let s () = (`Option c, marks) in
     schema (Some (Identifier.to_string name)) None s
 
   let fields_empty () = ([], Marks.empty)
@@ -80,12 +89,12 @@ module Of = C_walk.Walk (struct
     ((name, ast) :: rest_ast, marks)
 
   let object_ ((fields, marks) : fields) =
-    if List.is_empty fields then (Void, marks)
+    if List.is_empty fields then (`Void, marks)
     else
       let fields =
         fields |> List.map ~f:(fun (s, c) -> (Identifier.make s, c))
       in
-      (Struct { fields }, marks)
+      (`Struct { fields }, marks)
 
   let union ~name ~polymorphic ~(cases : (string * string * (c * Marks.t)) list)
       =
@@ -100,7 +109,7 @@ module Of = C_walk.Walk (struct
     let basic, rich =
       constructors
       |> List.partition_map ~f:(function
-           | s, raw_s, Void -> First (s, raw_s)
+           | s, raw_s, `Void -> First (s, raw_s)
            | x -> Second x)
     in
     (* Give names to inline payload types that would otherwise be impossible to
@@ -113,8 +122,10 @@ module Of = C_walk.Walk (struct
       rich
       |> List.map ~f:(fun (id, _, constr_c) ->
              match constr_c with
-             | Tuple _ | Struct _ ->
-               let id = Fmt.str "%s__%a" name Identifier.pp id in
+             | `Tuple _ | `Struct _ ->
+               let id =
+                 inline_record_c_name ~variant_name:name ~constructor_name:id
+               in
                let s () = (constr_c, marks) in
                Marks.make id s
              | _ -> Marks.empty)
@@ -124,31 +135,27 @@ module Of = C_walk.Walk (struct
     let name = Identifier.make name in
     if polymorphic then
       let basic =
-        List.map
-          ~f:(fun (id, raw_name) ->
-            (id, Ocaml_common.Btype.hash_variant raw_name))
-          basic
+        List.map ~f:(fun (id, raw_name) -> (id, hash_variant raw_name)) basic
       in
       let rich =
         List.map
-          ~f:(fun (id, raw_name, c) ->
-            (id, Ocaml_common.Btype.hash_variant raw_name, c))
+          ~f:(fun (id, raw_name, c) -> (id, hash_variant raw_name, c))
           rich
       in
-      (Poly_variant { name; basic; rich }, marks)
+      (`Poly_variant { name; basic; rich }, marks)
     else
       let basic = List.map ~f:(fun (id, _) -> id) basic in
       let rich = List.map ~f:(fun (id, _, c) -> (id, c)) rich in
-      (Variant { name; basic; rich }, marks)
+      (`Variant ({ name; basic; rich } : regular_variant), marks)
 
   let tuple ts =
     let items, marks = List.unzip ts in
-    let s () = (Tuple items, Marks.merge marks) in
+    let s () = (`Tuple items, Marks.merge marks) in
     let tuple_name = tuple_name items in
     schema (Some (Identifier.to_string tuple_name)) None s
 
   let list (c, marks) =
-    let s () = (Array c, marks) in
+    let s () = (`Array c, marks) in
     let name = array_name c in
     schema (Some (Identifier.to_string name)) None s
 
@@ -156,16 +163,24 @@ module Of = C_walk.Walk (struct
   (* We could use a struct for "key" / "value" fields instead of a tuple. *)
   let mapping t = tuple [ string (); t ] |> list
 
-  let time () =
-    Lazy.force C_sanity_checks.ptime;
-    make "timespec"
+  let mapped : t -> t =
+   fun (c, marks) ->
+    let front_facing, marks =
+      match c_canonical_typename c with
+      | Some _ -> (c, marks)
+      | None ->
+        let id = Identifier.to_string (c_typename c) in
+        let s () = (c, marks) in
+        schema (Some id) None s
+    in
+    (`Mapped front_facing, marks)
+
+  (* XXX: make those into built-ins? *)
 
   (* TODO: for clarity, use a struct *)
   let time_local () =
     Lazy.force C_sanity_checks.ptime_local;
     tuple [ time (); int () ]
-
-  let any () = (Atom (Identifier.make "sch_json", Some String), Marks.empty)
 
   let date () =
     Lazy.force C_sanity_checks.date;
@@ -181,24 +196,24 @@ module Of = C_walk.Walk (struct
           (Identifier.make "day", int);
         ]
       in
-      (Struct { fields }, Marks.empty)
+      (`Struct { fields }, Marks.empty)
     in
     schema (Some "sch_date") None s
-
-  let mapped : string option -> t -> t =
-   fun id (c, marks) ->
-    Logs.debug (fun m -> m "mapped: %a@." (Fmt.option Fmt.string) id);
-    Logs.debug (fun m -> m "c: %a@." C_intf.pp c);
-    let front_facing, marks =
-      let s () = (c, marks) in
-      let default = c_typename c |> Identifier.to_string in
-      let id = Fmt.str "%s_external" (Option.value id ~default) in
-      schema (Some id) None s
-    in
-    (Mapped { front_facing }, marks)
 end)
 
 include Make_mark_converter (struct
-  let of_descriptor = Of.descriptor
-  let of_parametric = Of.parametric
+  let of_descriptor id d =
+    try Of.descriptor id d
+    with e ->
+      Logs.err (fun m ->
+          m "Exception thrown for descriptor '%a', %a"
+            Fmt.(option string)
+            id Schematic.Schema.pp_descriptor d);
+      raise e
+
+  let of_parametric p =
+    try Of.parametric p
+    with e ->
+      Logs.err (fun m -> m "Exception thrown for parametric");
+      raise e
 end)

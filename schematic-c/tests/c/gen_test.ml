@@ -14,26 +14,26 @@ typedef struct {
 
 let primitive_record_of_caml =
   {|
-primitive_record* primitive_record_of_caml(value v) {
+primitive_record primitive_record_of_caml(value v) {
   CAMLparam1(v);
-  primitive_record* res = malloc(sizeof(*res));
+  primitive_record res;
   assert(Is_block(v) && Wosize_val(v) == 2);
-  res->a = int_of_caml(Field(v, 0));
-  res->b = int_of_caml(Field(v, 1));
-  CAMLreturnT(primitive_record*, res);
+  res.a = int_of_caml(Field(v, 0));
+  res.b = int_of_caml(Field(v, 1));
+  CAMLreturnT(primitive_record, res);
 }
 |}
 
 let primitive_record_to_caml =
   {|
-value primitive_record_to_caml(primitive_record* p) {
+value primitive_record_to_caml(primitive_record p) {
   CAMLparam0();
   CAMLlocal1(v);
   int n_fields = 2;
   int tag = 0;
   v = caml_alloc(n_fields, tag);
-  Store_field(v, 0, int_to_caml(p->a));
-  Store_field(v, 1, int_to_caml(p->b));
+  Store_field(v, 0, int_to_caml(p.a));
+  Store_field(v, 1, int_to_caml(p.b));
   CAMLreturn(v);
 }
 |}
@@ -46,32 +46,32 @@ let wrapper_c =
   {|
 typedef struct {
   int somevar;
-  primitive_record* r;
+  primitive_record r;
 } wrapper;
 |}
 
 let wrapper_of_caml =
   {|
-wrapper* wrapper_of_caml(value v) {
+wrapper wrapper_of_caml(value v) {
   CAMLparam1(v);
-  wrapper* res = malloc(sizeof(*res));
+  wrapper res;
   assert(Is_block(v) && Wosize_val(v) == 2);
-  res->somevar = int_of_caml(Field(v, 0));
-  res->r = primitive_record_of_caml(Field(v, 1));
-  CAMLreturnT(wrapper*, res);
+  res.somevar = int_of_caml(Field(v, 0));
+  res.r = primitive_record_of_caml(Field(v, 1));
+  CAMLreturnT(wrapper, res);
 }
 |}
 
 let wrapper_to_caml =
   {|
-value wrapper_to_caml(wrapper* p) {
+value wrapper_to_caml(wrapper p) {
   CAMLparam0();
   CAMLlocal1(v);
   int n_fields = 2;
   int tag = 0;
   v = caml_alloc(n_fields, tag);
-  Store_field(v, 0, int_to_caml(p->somevar));
-  Store_field(v, 1, primitive_record_to_caml(p->r));
+  Store_field(v, 0, int_to_caml(p.somevar));
+  Store_field(v, 1, primitive_record_to_caml(p.r));
   CAMLreturn(v);
 }
 |}
@@ -114,7 +114,6 @@ typedef struct {
 } tuple_int_string;
 |}
 
-(* FIXME: possible collisions with "tag" and "payload" *)
 let payload_variant_c =
   {|
 typedef struct {
@@ -136,12 +135,12 @@ let payload_variant_of_caml =
   {|
 payload_variant payload_variant_of_caml(value v) {
   CAMLparam1(v);
-  payload_variant res;
+  payload_variant res = {.tag = -1, .payload = NULL};
   const int n_basic = 3;
   const int n_rich = 2;
   if (Is_long(v)) {
-    assert(res.tag < n_basic);
     res.tag = Int_val(v);
+    assert(res.tag < n_basic);
   } else {
     assert(Tag_val(v) < n_rich);
     res.tag = n_basic + Tag_val(v);
@@ -203,7 +202,6 @@ typedef struct {
 } tuple_string_int;
 |}
 
-(* XXX tuple naming *)
 let pair_alias_of_caml =
   {|
 pair_alias pair_alias_of_caml(value v) {
@@ -264,26 +262,26 @@ typedef struct {
 
 let record_with_pair_alias_of_caml =
   {|
-record_with_pair_alias* record_with_pair_alias_of_caml(value v) {
+record_with_pair_alias record_with_pair_alias_of_caml(value v) {
   CAMLparam1(v);
-  record_with_pair_alias* res = malloc(sizeof(*res));
+  record_with_pair_alias res;
   assert(Is_block(v) && Wosize_val(v) == 2);
-  res->a = int_of_caml(Field(v, 0));
-  res->pair_alias = pair_alias_of_caml(Field(v, 1));
-  CAMLreturnT(record_with_pair_alias*, res);
+  res.a = int_of_caml(Field(v, 0));
+  res.pair_alias = pair_alias_of_caml(Field(v, 1));
+  CAMLreturnT(record_with_pair_alias, res);
 }
 |}
 
 let record_with_pair_alias_to_caml =
   {|
-value record_with_pair_alias_to_caml(record_with_pair_alias* p) {
+value record_with_pair_alias_to_caml(record_with_pair_alias p) {
   CAMLparam0();
   CAMLlocal1(v);
   int n_fields = 2;
   int tag = 0;
   v = caml_alloc(n_fields, tag);
-  Store_field(v, 0, int_to_caml(p->a));
-  Store_field(v, 1, pair_alias_to_caml(p->pair_alias));
+  Store_field(v, 0, int_to_caml(p.a));
+  Store_field(v, 1, pair_alias_to_caml(p.pair_alias));
   CAMLreturn(v);
 }
 |}
@@ -291,7 +289,7 @@ value record_with_pair_alias_to_caml(record_with_pair_alias* p) {
 let behemoth_c =
   {|
 typedef struct {
-  diverse* d;
+  diverse d;
   basic_variant b;
   payload_variant p;
   tuple_string_wrapper pair;
@@ -303,7 +301,7 @@ let string_wrapper_tuple_c =
   {|
 typedef struct {
   const char* t0;
-  wrapper* t1;
+  wrapper t1;
 } tuple_string_wrapper;
 |}
 
@@ -398,7 +396,7 @@ let poly_basic_of_caml =
   {|
 poly_basic poly_basic_of_caml(value v) {
   CAMLparam1(v);
-  poly_basic res;
+  poly_basic res = -1;
   if (0) {}
   else if (v == Val_long(65)) res = poly_basic_a;
   else if (v == Val_long(66)) res = poly_basic_b;
@@ -459,7 +457,7 @@ let poly_payload_of_caml =
   {|
 poly_payload poly_payload_of_caml(value v) {
   CAMLparam1(v);
-  poly_payload res;
+  poly_payload res = {.tag = -1, .payload = NULL};
   if (0) {}
   else if (v == Val_long(65)) res.tag = poly_payload_a_tag;
   else if (v == Val_long(66)) res.tag = poly_payload_b_tag;
@@ -498,7 +496,7 @@ value tuple_int_string_to_caml(tuple_int_string x) {
 let primitive_record_in_parametric_c =
   {|
 typedef struct {
-  primitive_record* parameterized_field;
+  primitive_record parameterized_field;
 } primitive_record_parametric_record;
 |}
 
@@ -529,20 +527,11 @@ value mapped_to_caml(mapped x) {
   CAMLlocal2(v_front, v);
   static const value* decode = NULL;
   if (decode == NULL) {
-    decode = caml_named_value("schematic_mapped_decode");
+    decode = caml_named_value("schematic_mapped_decode_of_string");
   }
-  v_front = mapped_external_to_caml(x);
+  assert(decode != NULL);
+  v_front = string_to_caml(x);
   v = caml_callback(*decode, v_front);
-  CAMLreturn(v);
-}
-|}
-
-let mapped_external_to_caml =
-  {|
-value mapped_external_to_caml(mapped_external x) {
-  CAMLparam0();
-  CAMLlocal1(v);
-  v = string_to_caml(x);
   CAMLreturn(v);
 }
 |}
@@ -554,20 +543,12 @@ mapped mapped_of_caml(value v) {
   CAMLlocal1(v_back);
   static const value* encode = NULL;
   if (encode == NULL) {
-    encode = caml_named_value("schematic_mapped_encode");
+    encode = caml_named_value("schematic_mapped_encode_to_string");
   }
+  assert(encode != NULL);
   v_back = caml_callback(*encode, v);
-  mapped res = mapped_external_of_caml(v_back);
+  mapped res = string_of_caml(v_back);
   CAMLreturnT(mapped, res);
-}
-|}
-
-let mapped_external_of_caml =
-  {|
-mapped_external mapped_external_of_caml(value v) {
-  CAMLparam1(v);
-  const char* res = string_of_caml(v);
-  CAMLreturnT(mapped_external, res);
 }
 |}
 
@@ -701,7 +682,7 @@ module Of_caml = struct
   let poly_payload () =
     test poly_payload_schema [ poly_payload_of_caml; tuple_int_string_of_caml ]
 
-  let mapped () = test mapped_schema [ mapped_of_caml; mapped_external_of_caml ]
+  let mapped () = test mapped_schema [ mapped_of_caml ]
 end
 
 module To_caml = struct
@@ -744,7 +725,7 @@ module To_caml = struct
   let poly_payload () =
     test poly_payload_schema [ poly_payload_to_caml; tuple_int_string_to_caml ]
 
-  let mapped () = test mapped_schema [ mapped_to_caml; mapped_external_to_caml ]
+  let mapped () = test mapped_schema [ mapped_to_caml ]
 end
 
 let () =

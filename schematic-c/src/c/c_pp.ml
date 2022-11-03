@@ -1,9 +1,11 @@
-let braced ~indent lhs body =
+let block ?(delim = ('{', '}')) ?(open_sp = true) ~indent lhs body =
+  let delim_open, delim_close = delim in
   let open Fmt in
   let opening =
-    hbox @@ (const string lhs ++ const char ' ' ++ const char '{')
+    let sp = if open_sp then const char ' ' else nop in
+    hbox @@ (const string lhs ++ sp ++ const char delim_open)
   in
-  vbox ~indent (opening ++ cut ++ vbox body) ++ cut ++ const char '}'
+  vbox ~indent (opening ++ cut ++ vbox body) ++ cut ++ const char delim_close
 
 let pp_statements = Fmt.((vbox @@ list ~sep:semi string) ++ const char ';')
 let ptr_type = Fmt.str "%s*"
@@ -20,3 +22,7 @@ let banners section_name =
 let bannerify section_name body =
   let start_banner, end_banner = banners section_name in
   start_banner ^ body ^ end_banner
+
+let case_ish ~indent header body =
+  let open Fmt in
+  vbox ~indent @@ (header ++ cut ++ body)

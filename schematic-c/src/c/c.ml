@@ -3,8 +3,9 @@ include C_intf
 include C_schemas
 module Runtime = C_runtime
 module Builtins = C_builtins
+module Swift = Swift
 
-let export ?safety_checks (name, c) : c_gen =
+let export ?safety_checks (name, (c : c)) : c_gen =
   let open Fmt in
   let of_caml, to_caml = C_conv.converters ?safety_checks name c in
   { name; type_expr = const C_typeexpr.pp c; to_caml; of_caml }
@@ -20,16 +21,14 @@ let statics_src { name; _ } =
 let signature_src { signature; _ } = Fmt.str "%s;" signature
 
 let impl_src { signature; impl } =
-  Fmt.to_to_string (C_pp.braced ~indent:2 signature impl) ()
-
-let free_src (_ : c_gen) = failwith "no free() yet"
+  Fmt.to_to_string (C_pp.block ~indent:2 signature impl) ()
 
 let roundtrip_src (name, c) =
   let open Fmt in
   let open C_pp in
   (* Bit of a hack... *)
   let typ =
-    let c = Atom (name, Some c) in
+    let c = `Atom (name, Some c) in
     Fmt.to_to_string C_typeexpr.pp c
   in
   let decl = Fmt.str "CAMLprim value %s(value v)" (roundtrip_for name) in
@@ -44,7 +43,7 @@ let roundtrip_src (name, c) =
           "CAMLreturn(ret)";
         ]
   in
-  let pp = braced ~indent:2 decl body in
+  let pp = block ~indent:2 decl body in
   Fmt.to_to_string pp ()
 
 (** Returns (header file content) * (implementation file content).

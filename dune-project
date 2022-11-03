@@ -4,6 +4,8 @@
 
 (generate_opam_files true)
 
+(use_standard_c_and_cxx_flags false)
+
 (license LGPL-3.0-or-later)
 
 (maintainers "mefyl <mefyl@gruntech.org>")
@@ -20,6 +22,7 @@
 
 (source
  (uri git+https://gitlab.routine.co/routine/schematic.git))
+
 
 (package
  (name schematic)
@@ -79,10 +82,12 @@
    (and
     (>= 1.1.0)
     :with-test))
+  (js_of_ocaml-ppx
+   (>= 4.0.0))
   json-derivers
   (schematic
    (= :version))
-  sexp))
+  sexplib))
 
 (package
  (name schematic-sqml)
@@ -118,6 +123,7 @@
  (synopsis "Generate C types and converters based on schemas")
  (authors "Yoha\195\175-Eliel BERREBY <yberreby@pm.me>")
  (depends
+  bake
   logs
   (ppx_hash
    (= v0.14.0))

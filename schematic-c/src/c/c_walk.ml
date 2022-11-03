@@ -1,5 +1,5 @@
-(* XXX: we should probably merge this back into a generalized walker in
-   schemas *)
+(* TODO: see how much of this could be factored, similarly to new walker from
+   0.15.0 (or into it) *)
 
 open Schematic
 open Base
@@ -61,7 +61,7 @@ module type WALK = sig
   val time : unit -> t
   val time_local : unit -> t
   val tuple : t list -> t
-  val mapped : string option -> t -> t
+  val mapped : t -> t
 end
 
 module Walk (W : WALK) = struct
@@ -81,7 +81,13 @@ module Walk (W : WALK) = struct
     | String -> W.string ()
     | Time -> W.time ()
     | Time_local -> W.time_local ()
-    | Map { descriptor = d; _ } -> W.mapped id (descriptor id d)
+    | Map { descriptor = d; _ } as map_d ->
+      (match id with
+      | Some _ -> ()
+      | None ->
+        Fmt.failwith "Mapped descriptor %a must have an id"
+          Schematic.Schema.pp_descriptor map_d);
+      W.mapped (descriptor id d)
     | Mapping s -> W.mapping (schema s)
     | Nullable s -> W.nullable (schema s)
     | String_const s -> W.string_const s
