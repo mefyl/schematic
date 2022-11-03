@@ -277,6 +277,12 @@ module Event_test_2 = struct
   [@@deriving eq, schema, show] [@@schematic.name "event-2"]
 end
 
+type reserved_kws = {
+  self : int;
+  super : int;
+}
+[@@deriving schema, eq, show]
+
 let exported_schemas =
   [
     Schema.pack (option_schema int_schema);
@@ -314,4 +320,5 @@ let exported_schemas =
     Schema.pack with_computed_schema;
     Schema.pack mapped_schema;
     Schema.pack Event_1.schema;
+    Schema.pack reserved_kws_schema;
   ]

@@ -57,14 +57,15 @@ module Binding = struct
     ]
 
   let s s =
-    if List.mem ~equal:String.equal reserved s then
-      s ^ "_"
-    else
+    (* camelCase *)
+    let s =
       match String.split s ~on:'_' with
       | h :: t ->
         let t = List.map ~f:String.capitalize t in
         String.concat ~sep:"" (h :: t)
       | [] -> ""
+    in
+    if List.mem ~equal:String.equal reserved s then s ^ "_" else s
 
   let id id = Identifier.to_string id |> s
 end
