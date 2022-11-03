@@ -1,5 +1,5 @@
 open Base
-open Schematic_c
+open Schematic_ffi
 open Test_utils
 
 module Generate_types = struct

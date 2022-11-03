@@ -1,8 +1,8 @@
 open Base
 
 let poly_cmp_callback_name = "polymorphic_compare"
-let json_of_value_callback_name = "schematic_c_json_string_of_value"
-let json_to_value_callback_name = "schematic_c_json_string_to_value"
+let json_of_value_callback_name = "schematic_ffi_json_string_of_value"
+let json_to_value_callback_name = "schematic_ffi_json_string_to_value"
 
 external eq : 'a -> 'a -> bool = "caml_equal"
 

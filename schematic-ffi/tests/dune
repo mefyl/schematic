@@ -2,21 +2,21 @@
 
 (library
  (name c_test_types)
- (package schematic-c)
+ (package schematic-ffi)
  (modules c_test_types)
  (preprocess
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show ppx_deriving.make))
- (libraries schematic schematic_c ptime))
+ (libraries schematic schematic_ffi ptime))
 
 (executable
  (name gen_roundtrip_stubs)
  (modules gen_roundtrip_stubs)
- (libraries alcotest schematic schematic_c c_test_types stdio logs logs.fmt))
+ (libraries alcotest schematic schematic_ffi c_test_types stdio logs logs.fmt))
 
 (executable
  (name gen_swift_schemas)
  (modules gen_swift_schemas)
- (libraries alcotest schematic schematic_c c_test_types stdio logs logs.fmt))
+ (libraries alcotest schematic schematic_ffi c_test_types stdio logs logs.fmt))
 
 (rule
  (targets roundtrip_stubs.h roundtrip_stubs.c)
@@ -41,7 +41,7 @@
 
 (test
  (name c_roundtrip)
- (package schematic-c)
+ (package schematic-ffi)
  (modes exe)
  (deps
   (file roundtrip_stubs.h)
@@ -54,4 +54,4 @@
  (modules c_roundtrip)
  (preprocess
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
- (libraries alcotest schematic_c c_test_types ptime logs logs.fmt))
+ (libraries alcotest schematic_ffi c_test_types ptime logs logs.fmt))

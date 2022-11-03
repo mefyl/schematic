@@ -1,6 +1,6 @@
 open Base
 open C_test_types
-open Schematic_c
+open Schematic_ffi
 
 let () =
   Logs.set_level (Some Logs.Info);

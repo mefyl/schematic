@@ -1,5 +1,5 @@
 open C_test_types
-open Schematic_c
+open Schematic_ffi
 
 (* A first step (outside of this file) generates a C file exposing primitives
    that convert values from Caml to C, then back to Caml (a "roundtrip"). This

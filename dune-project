@@ -119,8 +119,8 @@
    (= :version))))
 
 (package
- (name schematic-c)
- (synopsis "Generate C types and converters based on schemas")
+ (name schematic-ffi)
+ (synopsis "Generate FFI types and converters based on schemas")
  (authors "Yoha\195\175-Eliel BERREBY <yberreby@pm.me>")
  (depends
   bake

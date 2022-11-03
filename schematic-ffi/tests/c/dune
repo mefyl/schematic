@@ -2,8 +2,8 @@
 
 (test
  (name gen_test)
- (package schematic-c)
+ (package schematic-ffi)
  (modules gen_test)
  (preprocess
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
- (libraries alcotest schematic schematic_c c_test_types))
+ (libraries alcotest schematic schematic_ffi c_test_types))

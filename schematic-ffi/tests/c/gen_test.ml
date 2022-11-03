@@ -1,6 +1,6 @@
 open Base
 open C_test_types
-open Schematic_c
+open Schematic_ffi
 
 (* TODO: prefixing, for lack of namespacing *)
 

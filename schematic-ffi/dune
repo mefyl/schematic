@@ -1,8 +1,8 @@
 (include_subdirs unqualified)
 
 (library
- (name schematic_c)
- (public_name schematic-c)
+ (name schematic_ffi)
+ (public_name schematic-ffi)
  (libraries bake base base64 ezjsonm fmt logs ptime schematic semver2 uri)
  (preprocessor_deps
   (file src/swift/Prelude.swift))
