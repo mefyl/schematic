@@ -1,10 +1,8 @@
 open Base
 open C_intf
-
 module Utils = Swift_utils
 module Typeexpr = Swift_typeexpr
 module Swiftify = Swiftify
-
 
 (* ref exposed for customizability *)
 let c_module_name = Swift_utils.c_module_name

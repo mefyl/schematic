@@ -20,7 +20,7 @@ let export ?safety_checks (name, c) : c_gen =
   (*   | `Atom (_, None) -> *)
   (*     Fmt.failwith "attempting to create converter for empty type %a" pp_c c *)
   (*   | _ -> *)
-  (*     Fmt.failwith "attempting to create converter for unnamed type %a" pp_c c *)
+  (* Fmt.failwith "attempting to create converter for unnamed type %a" pp_c c *)
   (* in *)
   let of_caml = C_conv.pp_of_caml_converter ?safety_checks (name, c) in
   let to_caml = C_conv.pp_to_caml_converter (name, c) in
@@ -49,7 +49,8 @@ let roundtrip_src name =
         [
           p1 "v";
           "CAMLlocal1(ret)";
-          Fmt.str "%a x = %a(v)" Identifier.pp name Identifier.pp (of_caml_name_for name);
+          Fmt.str "%a x = %a(v)" Identifier.pp name Identifier.pp
+            (of_caml_name_for name);
           Fmt.str "ret = %a(x)" Identifier.pp (to_caml_name_for name);
           "CAMLreturn(ret)";
         ]
@@ -87,7 +88,9 @@ let export_ctypes ?(safety_checks = false) ctypes =
         ]
     else ""
   in
-  let rts = ctypes |> List.map ~f:fst |> List.map ~f:roundtrip_src |> nl_concat in
+  let rts =
+    ctypes |> List.map ~f:fst |> List.map ~f:roundtrip_src |> nl_concat
+  in
   (* TODO include declaration file *)
   let c_file_contents =
     [ Builtins.implementations; statics; rts; user_impls ]

@@ -34,8 +34,7 @@ let safety_checks_for name ~fname ~argname =
   in
   main_if ++ cut
 
-let pp_of_caml_converter ?(safety_checks = false)
-    ((name : Identifier.t), ast) =
+let pp_of_caml_converter ?(safety_checks = false) ((name : Identifier.t), ast) =
   let open C_of_caml in
   let open Fmt in
   let caml_locals, (body : unit Fmt.t) =
