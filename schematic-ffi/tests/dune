@@ -11,12 +11,26 @@
 (executable
  (name gen_roundtrip_stubs)
  (modules gen_roundtrip_stubs)
- (libraries alcotest schematic schematic_ffi c_test_types stdio logs logs.fmt))
+ (libraries
+  alcotest
+  schematic
+  schematic_ffi
+  c_test_types
+  stdio
+  logs
+  logs.fmt))
 
 (executable
  (name gen_swift_schemas)
  (modules gen_swift_schemas)
- (libraries alcotest schematic schematic_ffi c_test_types stdio logs logs.fmt))
+ (libraries
+  alcotest
+  schematic
+  schematic_ffi
+  c_test_types
+  stdio
+  logs
+  logs.fmt))
 
 (rule
  (targets roundtrip_stubs.h roundtrip_stubs.c)
