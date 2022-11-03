@@ -97,8 +97,13 @@ extension Double: CConvertible {
 public struct SchematicTime: CConvertible {
   public typealias C = time_
 
-  let sec: Int
-  let nsec: Int64
+  public var sec: Int
+  public var nsec: Int64
+
+  public init(sec: Int, nsec: Int64) {
+    self.sec = sec
+    self.nsec = nsec
+  }
 
   public func toC() -> C {
     let timespec = timespec(
