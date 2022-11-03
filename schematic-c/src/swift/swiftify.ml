@@ -28,15 +28,43 @@ module Type = struct
 end
 
 module Binding = struct
-  let s = function
-    (* [self] is a reserved keyword in Swift. *)
-    | "self_" -> "self_"
-    | s -> (
+  let reserved =
+    [
+      "as";
+      "case";
+      "class";
+      "default";
+      "defer";
+      "deinit";
+      "do";
+      "else";
+      "enum";
+      "extension";
+      "fallthrough";
+      "false";
+      "func";
+      "guard";
+      "init";
+      "nil";
+      "out";
+      "raise";
+      "self";
+      "struct";
+      "super";
+      "switch";
+      "throw";
+      "true";
+    ]
+
+  let s s =
+    if List.mem ~equal:String.equal reserved s then
+      s ^ "_"
+    else
       match String.split s ~on:'_' with
       | h :: t ->
         let t = List.map ~f:String.capitalize t in
         String.concat ~sep:"" (h :: t)
-      | [] -> "")
+      | [] -> ""
 
   let id id = Identifier.to_string id |> s
 end
