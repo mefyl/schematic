@@ -25,15 +25,14 @@ protocol CConvertible: OfC, ToC {}
 // Types
 public struct Unit: CConvertible {
   public func toC() -> unit {
-      return 0;
+    return 0
   }
+
   public static func ofC(_ c: unit) -> Unit {
-    assert(c == 0);
+    assert(c == 0)
     return Self()
   }
 }
-
-
 
 //
 // Extensions
@@ -51,7 +50,6 @@ extension Bool: CConvertible {
   }
 }
 
-
 extension Int: CConvertible {
   public typealias C = CInt
   public static func ofC(_ c: CInt) -> Int {
@@ -62,7 +60,6 @@ extension Int: CConvertible {
     return CInt(self)
   }
 }
-
 
 extension Int32: CConvertible {
   public typealias C = Int32
@@ -86,11 +83,6 @@ extension Int64: CConvertible {
   }
 }
 
-
-
-
-
-
 extension Double: CConvertible {
   public typealias C = CDouble
   public static func ofC(_ c: CDouble) -> Double {
@@ -101,7 +93,6 @@ extension Double: CConvertible {
     return CDouble(self)
   }
 }
-
 
 public struct SchematicTime: CConvertible {
   public typealias C = time_
@@ -126,7 +117,6 @@ public struct SchematicTime: CConvertible {
   }
 }
 
-
 extension URL: CConvertible {
   public typealias C = UnsafePointer<CChar>
   public func toC() -> C {
@@ -137,8 +127,6 @@ extension URL: CConvertible {
     return URL(string: String.ofC(c))!
   }
 }
-
-
 
 extension String: CConvertible {
   public typealias C = UnsafePointer<CChar>
@@ -153,7 +141,6 @@ extension String: CConvertible {
   }
 }
 
-
 // Won't work on tuples.
 extension Array: OfC where Element: OfC {
   public typealias C = type_erased_array
@@ -162,7 +149,7 @@ extension Array: OfC where Element: OfC {
     assert(c.len >= 0)
     if c.len == 0 { return [] }
 
-    let res: Array<Element> = (0 ..< (c.len)).map {
+    let res: [Element] = (0 ..< (c.len)).map {
       let p = c.data.assumingMemoryBound(to: Element.C.self)
         .advanced(by: $0)
       return Element.ofC(p.pointee)
@@ -190,7 +177,6 @@ extension Array: ToC where Element: ToC {
   }
 }
 
-
 // Freestanding generic functions let us work around some of the limitations of
 // protocols.
 //
@@ -198,9 +184,9 @@ extension Array: ToC where Element: ToC {
 // The present blanket impletations are provided for convenience.
 
 func schematicOfC<T: OfC>(_ c: T.C) -> T {
-    T.ofC(c)
+  T.ofC(c)
 }
 
-func schematicToC<T: ToC>(_ x: T) -> T.C{
-    x.toC()
+func schematicToC<T: ToC>(_ x: T) -> T.C {
+  x.toC()
 }
