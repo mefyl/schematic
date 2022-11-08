@@ -1,6 +1,7 @@
-open C_runtime
-open C_pp
+open Runtime
+open C_format
 
+(** The C symbol that gets assigned to the OCaml value representing polymorphic comparison. *)
 let poly_compare_symbol = "caml_poly_compare"
 
 (* TODO: include guards *)

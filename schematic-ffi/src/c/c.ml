@@ -1,34 +1,23 @@
 open Base
 include C_intf
-include C_schemas
-module Runtime = C_runtime
+include Ffi_schemas
+module Runtime = Runtime
 module Builtins = C_builtins
 module Swift = Swift
 module Typeexpr = C_typeexpr
-module Format = C_pp
+module Format = C_format
 module Statements = C_statements
-module Schemas = C_schemas
+module Schemas = Ffi_schemas
 
 let export ?safety_checks (name, c) : c_gen =
   let open Fmt in
-  (* let name, c = *)
-  (*   match c with *)
-  (*   | `Option c -> (option_name c, (reified_option_c c :> c)) *)
-  (*   | `Atom (name, Some (`Option c)) when Poly.(name = option_name c) -> *)
-  (*     (option_name c, (reified_option_c c :> c)) *)
-  (*   | `Atom (name, Some c) -> (name, c) *)
-  (*   | `Atom (_, None) -> *)
-  (*     Fmt.failwith "attempting to create converter for empty type %a" pp_c c *)
-  (*   | _ -> *)
-  (* Fmt.failwith "attempting to create converter for unnamed type %a" pp_c c *)
-  (* in *)
   let of_caml = C_conv.pp_of_caml_converter ?safety_checks (name, c) in
   let to_caml = C_conv.pp_to_caml_converter (name, c) in
   { name; type_expr = const C_typeexpr.pp c; to_caml; of_caml }
 
 let typedef_src { name; type_expr; _ } =
   let s = Fmt.to_to_string type_expr () in
-  Fmt.str "typedef %s %a;\n" s C_identifier.pp name
+  Fmt.str "typedef %s %a;\n" s Identifier.pp name
 
 let statics_src { name; _ } =
   let checking, checked = checking_checked_for name in
@@ -37,11 +26,11 @@ let statics_src { name; _ } =
 let signature_src { signature; _ } = Fmt.str "%s;" signature
 
 let impl_src { signature; impl } =
-  Fmt.to_to_string (C_pp.block ~indent:2 signature impl) ()
+  Fmt.to_to_string (C_format.block ~indent:2 signature impl) ()
 
 let roundtrip_src name =
   let open Fmt in
-  let open C_pp in
+  let open C_format in
   let decl = Fmt.str "CAMLprim value %s(value v)" (roundtrip_for name) in
   let body =
     const pp_statements
@@ -58,7 +47,7 @@ let roundtrip_src name =
   let pp = block ~indent:2 decl body in
   Fmt.to_to_string pp ()
 
-let export_ctypes ?(safety_checks = false) ctypes =
+let ctypes_to_h_and_c ?(safety_checks = false) (ctypes : (Identifier.t * c) list) : string * string =
   let nl_concat = String.concat ~sep:"\n" in
   let cgens = ctypes |> List.map ~f:(export ~safety_checks) in
   let user_declarations, user_impls =
@@ -98,13 +87,9 @@ let export_ctypes ?(safety_checks = false) ctypes =
   in
   (header_file_contents, c_file_contents)
 
-(** Returns (header file content) * (implementation file content).
 
-    Please note: the implementation has no `#include "..."` for the header file,
-    since its name and location are not yet determined. It must be added by
-    consumers of this function. *)
-let export_schemas ?(safety_checks = false)
+let schemas_to_h_and_c ?(safety_checks = false)
     (schemas : Schematic.Schema.pack list) =
   ctypes_of_schemas schemas
   (* |> List.map ~f:(fun c -> (Fmt.epr ""; c) *)
-  |> export_ctypes ~safety_checks
+  |> ctypes_to_h_and_c ~safety_checks

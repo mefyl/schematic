@@ -1,6 +1,5 @@
 open Base
 open C_intf
-open C_pp
 open Swift_conv
 open Swift_utils
 open Swift_typeexpr

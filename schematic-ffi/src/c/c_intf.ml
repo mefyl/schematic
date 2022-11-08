@@ -1,5 +1,5 @@
 open Base
-module Identifier = C_identifier
+module Identifier = Identifier
 
 type c_leaf =
   [ `Void

@@ -1,14 +1,13 @@
 open Base
-open Schematic_ffi
 open Test_utils
 
 module Generate_types = struct
   let test schema expected =
     let expected = Base.Set.of_list (module String) expected in
     let actual =
-      C.of_schema schema
+      Schematic_ffi.of_schema schema
       |> List.filter_map ~f:(fun (id, c) ->
-             C.Swift.type_decl (id, c)
+             Schematic_ffi.Swift.type_decl (id, c)
              |> Option.map ~f:(fun x -> "\n" ^ x ^ "\n"))
       |> Base.Set.of_list (module String)
     in

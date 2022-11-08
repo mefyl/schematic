@@ -1,5 +1,6 @@
 open Base
 
+(* TODO: use a single Identifier type to convert to all needed styles / encodings... *)
 type t = Id of string [@@deriving eq, ord, hash]
 
 (* Common list for types abd bindings. TODO: distinguish the two *)

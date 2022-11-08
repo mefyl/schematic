@@ -59,4 +59,4 @@ let export_ctypes ctypes =
   |> String.concat ~sep:"\n\n"
 
 let export_schemas schemas =
-  schemas |> C_schemas.ctypes_of_schemas |> export_ctypes
+  schemas |> Ffi_schemas.ctypes_of_schemas |> export_ctypes

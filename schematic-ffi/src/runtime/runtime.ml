@@ -1,5 +1,6 @@
 open Base
 
+(** The name of the "named value" containing the polymorphic comparison operator. *)
 let poly_cmp_callback_name = "polymorphic_compare"
 let json_of_value_callback_name = "schematic_ffi_json_string_of_value"
 let json_to_value_callback_name = "schematic_ffi_json_string_to_value"
@@ -23,4 +24,4 @@ let register_static_callbacks () =
 
 (* Declare a schema against our runtime, in order to recursively make
    user-defined encoders/decoders accessible, where needed. *)
-let register_schema schema : unit = C_schema_registration.traverse_schema schema
+let register_schema schema : unit = Schema_registration.traverse_schema schema

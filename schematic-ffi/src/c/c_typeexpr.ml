@@ -5,7 +5,7 @@ let pp fmt (ts : c) =
   let rec pp fmt (ts : c) =
     let printer =
       let open Fmt in
-      let open C_pp in
+      let open C_format in
       let struct_or_union_field f (name, v) =
         let open Fmt in
         let pp = box (Fmt.pair ~sep:sp (hvbox pp) Fmt.string) in

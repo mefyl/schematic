@@ -585,7 +585,7 @@ let check_unordered_strings name expected actual =
 module Generate_types = struct
   let test schema expected =
     let actual =
-      C.ctypes_of_schema schema |> List.map ~f:C.export
+      ctypes_of_schema schema |> List.map ~f:C.export
       |> List.map ~f:(fun gen -> "\n" ^ C.typedef_src gen)
       |> List.sort ~compare:String.compare
     in

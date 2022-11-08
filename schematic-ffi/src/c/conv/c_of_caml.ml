@@ -2,12 +2,12 @@ open Base
 open Fmt
 open C_intf
 open C_statements
-open C_pp
+open C_format
 
 let struct_of_caml name (`Struct { fields }) =
   let open Fmt in
   let open C_statements in
-  let open C_pp in
+  let open C_format in
   let field_stores =
     fields
     |> List.mapi ~f:(fun field_idx (field_name, field_type) ->
@@ -109,7 +109,7 @@ let plain_variant_of_caml name (`Variant ({ basic; _ } : regular_variant)) =
 let poly_variant_of_caml name
     (`Poly_variant ({ basic; rich; _ } : poly_variant)) =
   let open Fmt in
-  let open C_pp in
+  let open C_format in
   let open C_statements in
   let basic_only = List.is_empty rich in
   let case_name = case_name ~rich:(not basic_only) in

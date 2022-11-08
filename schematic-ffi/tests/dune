@@ -40,13 +40,14 @@
 (rule
  (targets Schemas.swift)
  (action
-  (run %{dep:gen_swift_schemas.exe} roundtrip_stubs.h %{targets})))
+  (run %{dep:gen_swift_schemas.exe} %{targets})))
 
 (rule
- (targets swift.o)
+ (targets Schemas.o)
  (action
   (run
    swiftc
+   -c
    %{dep:Schemas.swift}
    -import-objc-header
    %{dep:roundtrip_stubs.h}

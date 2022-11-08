@@ -2,7 +2,7 @@ open Base
 open Fmt
 open C_intf
 open C_statements
-open C_pp
+open C_format
 
 let struct_to_caml (`Struct { fields }) =
   let tag = 0 in

@@ -1,6 +1,6 @@
 open Base
 open C_intf
-open C_pp
+open C_format
 open C_statements
 
 let safety_checks_for name ~fname ~argname =
@@ -15,7 +15,7 @@ let safety_checks_for name ~fname ~argname =
           (const pp_statements
              [
                Fmt.str {|%s = caml_named_value("%s")|}
-                 C_builtins.poly_compare_symbol C_runtime.poly_cmp_callback_name;
+                 C_builtins.poly_compare_symbol Runtime.poly_cmp_callback_name;
              ])
       in
       const pp_statements [ Fmt.str "%s = true" checking ]
