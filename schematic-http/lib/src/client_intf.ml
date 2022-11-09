@@ -12,11 +12,66 @@ module type BODY = sig
   val of_stream : string Lwt_stream.t -> t
 end
 
+type 'a response = {
+  body : 'a;
+  headers : (string * string) list;
+  status : Cohttp.Code.status_code;
+}
+
 type ('a, 'body, 'response) request =
   ?headers:(string * string) list ->
   ?body:'body Schematic.Schema.t * 'body ->
   'response Schematic.Schema.t ->
   'a
+
+module type REQUESTS = sig
+  type 'a res
+  type error
+
+  val call :
+    ( Cohttp.Code.meth ->
+      Uri.t ->
+      ('response res, [> error Error.reason ] Error.t) Lwt_result.t,
+      'body,
+      'response )
+    request
+
+  val delete :
+    ( Uri.t -> ('response res, [> error Error.reason ] Error.t) Lwt_result.t,
+      'body,
+      'response )
+    request
+
+  val get :
+    ( Uri.t -> ('response res, [> error Error.reason ] Error.t) Lwt_result.t,
+      'body,
+      'response )
+    request
+
+  val head :
+    ( Uri.t -> ('response res, [> error Error.reason ] Error.t) Lwt_result.t,
+      'body,
+      'response )
+    request
+
+  val patch :
+    ( Uri.t -> ('response res, [> error Error.reason ] Error.t) Lwt_result.t,
+      'body,
+      'response )
+    request
+
+  val post :
+    ( Uri.t -> ('response res, [> error Error.reason ] Error.t) Lwt_result.t,
+      'body,
+      'response )
+    request
+
+  val put :
+    ( Uri.t -> ('response res, [> error Error.reason ] Error.t) Lwt_result.t,
+      'body,
+      'response )
+    request
+end
 
 module type S = sig
   type 'a t
@@ -28,49 +83,10 @@ module type S = sig
   val stream : string Lwt_stream.t Schematic.Schema.t
   val string : string Schematic.Schema.t
 
-  val call :
-    ( Cohttp.Code.meth ->
-      Uri.t ->
-      ('response t, [> error Error.reason ] Error.t) Lwt_result.t,
-      'body,
-      'response )
-    request
+  module Response :
+    REQUESTS with type 'a res := 'a response t and type error := error
 
-  val delete :
-    ( Uri.t -> ('response t, [> error Error.reason ] Error.t) Lwt_result.t,
-      'body,
-      'response )
-    request
-
-  val get :
-    ( Uri.t -> ('response t, [> error Error.reason ] Error.t) Lwt_result.t,
-      'body,
-      'response )
-    request
-
-  val head :
-    ( Uri.t -> ('response t, [> error Error.reason ] Error.t) Lwt_result.t,
-      'body,
-      'response )
-    request
-
-  val patch :
-    ( Uri.t -> ('response t, [> error Error.reason ] Error.t) Lwt_result.t,
-      'body,
-      'response )
-    request
-
-  val post :
-    ( Uri.t -> ('response t, [> error Error.reason ] Error.t) Lwt_result.t,
-      'body,
-      'response )
-    request
-
-  val put :
-    ( Uri.t -> ('response t, [> error Error.reason ] Error.t) Lwt_result.t,
-      'body,
-      'response )
-    request
+  include REQUESTS with type 'a res := 'a t and type error := error
 end
 
 module type RATE_LIMIT = sig

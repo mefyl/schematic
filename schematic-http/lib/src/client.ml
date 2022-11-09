@@ -31,7 +31,40 @@ let stream =
 
 let string = Schematic.Schema.make String
 
-module Make (Handler : HANDLER) = struct
+module Make_requests (Call : sig
+  type 'a res
+  type error
+
+  val call :
+    ( Cohttp.Code.meth ->
+      Uri.t ->
+      ('response res, [> error Error.reason ] Error.t) Lwt_result.t,
+      'body,
+      'response )
+    request
+end) =
+struct
+  include (
+    Call :
+      module type of Call
+        with type 'a res := 'a Call.res
+         and type error := Call.error)
+
+  let delete ?headers ?body response uri =
+    call ?headers ?body response `DELETE uri
+
+  let get ?headers ?body response uri = call ?headers ?body response `GET uri
+  let head ?headers ?body response uri = call ?headers ?body response `HEAD uri
+
+  let patch ?headers ?body response uri =
+    call ?headers ?body response `PATCH uri
+
+  let post ?headers ?body response uri = call ?headers ?body response `POST uri
+  let put ?headers ?body response uri = call ?headers ?body response `PUT uri
+end
+
+module Make (Handler : HANDLER) :
+  S with type 'a t = 'a Handler.response and type error = Handler.error = struct
   include Handler
 
   type 'a t = 'a response
@@ -42,7 +75,7 @@ module Make (Handler : HANDLER) = struct
   let stream = stream
   let string = string
 
-  let call (type body response) ?(headers = [])
+  let _call (type body response) ?(headers = [])
       ?(body : (body Schematic.Schema.t * body) option)
       (response : response Schematic.Schema.t) method_ uri =
     let body, headers =
@@ -67,38 +100,52 @@ module Make (Handler : HANDLER) = struct
       | _ -> headers
     in
     Handler.Monad.bind (raw ~headers ?body method_ uri) ~f:(fun (resp, body) ->
-        match response with
-        | { descriptor = Ignore; _ } when response == empty ->
-          let* () = Body.drain body in
-          Handler.Monad.return (() : response)
-        | schema when Obj.magic schema == stream ->
-          Handler.Monad.return (Obj.magic (Body.to_stream body))
-        | { descriptor = String; _ } as schema when schema == string ->
-          let* body = Body.to_string body in
-          let* () = Logs.debug (fun m -> m "response body:\n%s" body) in
-          Handler.Monad.return body
-        | response -> (
-          let* body = Body.to_string body in
-          let* () = Logs.debug (fun m -> m "response body:\n%s" body) in
-          match Coding.decode response body with
-          | Result.Ok r -> Handler.Monad.return r
-          | Result.Error e ->
-            Lwt_result.fail
-              (Error.make ~method_
-                 ~status:(Cohttp.Response.status resp)
-                 ~reason:(`Decoding e) uri)))
+        let body =
+          match response with
+          | { descriptor = Ignore; _ } when response == empty ->
+            let* () = Body.drain body in
+            Handler.Monad.return (() : response)
+          | schema when Obj.magic schema == stream ->
+            Handler.Monad.return (Obj.magic (Body.to_stream body))
+          | { descriptor = String; _ } as schema when schema == string ->
+            let* body = Body.to_string body in
+            let* () = Logs.debug (fun m -> m "response body:\n%s" body) in
+            Handler.Monad.return body
+          | response -> (
+            let* body = Body.to_string body in
+            let* () = Logs.debug (fun m -> m "response body:\n%s" body) in
+            match Coding.decode response body with
+            | Result.Ok body -> Handler.Monad.return body
+            | Result.Error e ->
+              Lwt_result.fail
+                (Error.make ~method_
+                   ~status:(Cohttp.Response.status resp)
+                   ~reason:(`Decoding e) uri))
+        in
+        Handler.Monad.map body ~f:(fun body -> (body, resp)))
 
-  let delete ?headers ?body response uri =
-    call ?headers ?body response `DELETE uri
+  module Response = Make_requests (struct
+    type nonrec 'a res = 'a Client_intf.response t
+    and error = error
 
-  let get ?headers ?body response uri = call ?headers ?body response `GET uri
-  let head ?headers ?body response uri = call ?headers ?body response `HEAD uri
+    let call ?(headers = []) ?body response method_ uri =
+      _call ~headers ?body response method_ uri
+      |> Handler.Monad.map ~f:(fun (body, resp) ->
+             {
+               body;
+               headers = Cohttp.Header.to_list resp.Cohttp.Response.headers;
+               status = resp.status;
+             })
+  end)
 
-  let patch ?headers ?body response uri =
-    call ?headers ?body response `PATCH uri
+  include Make_requests (struct
+    type nonrec 'a res = 'a t
+    and error = error
 
-  let post ?headers ?body response uri = call ?headers ?body response `POST uri
-  let put ?headers ?body response uri = call ?headers ?body response `PUT uri
+    let call ?(headers = []) ?body response method_ uri =
+      _call ~headers ?body response method_ uri
+      |> Handler.Monad.map ~f:(fun (body, _) -> body)
+  end)
 end
 
 module Cohttp_ = Cohttp
