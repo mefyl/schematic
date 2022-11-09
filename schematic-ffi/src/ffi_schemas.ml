@@ -204,11 +204,8 @@ module Of = C_walk.Walk (struct
 end)
 
 include Make_mark_converter (struct
-  let identified = function
-    (* | `Atom (name, Some ((`Option _ | `Array _) as outer)) when
-       Identifier.(equal name (c_typename outer)) -> *)
-    (* (Some (c_typename outer |> Identifier.to_string), (outer :> c)) *)
-    | c ->
+  (* FIXME: this is an ugly workaround. *)
+  let identified c =
       c_typename c |> Identifier.to_string |> fun s ->
       (s ^ "_2" |> Option.some, c)
 
