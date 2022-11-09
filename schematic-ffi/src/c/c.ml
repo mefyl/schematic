@@ -47,7 +47,8 @@ let roundtrip_src name =
   let pp = block ~indent:2 decl body in
   Fmt.to_to_string pp ()
 
-let ctypes_to_h_and_c ?(safety_checks = false) (ctypes : (Identifier.t * c) list) : string * string =
+let ctypes_to_h_and_c ?(safety_checks = false)
+    (ctypes : (Identifier.t * c) list) : string * string =
   let nl_concat = String.concat ~sep:"\n" in
   let cgens = ctypes |> List.map ~f:(export ~safety_checks) in
   let user_declarations, user_impls =
@@ -86,7 +87,6 @@ let ctypes_to_h_and_c ?(safety_checks = false) (ctypes : (Identifier.t * c) list
     |> String.concat ~sep:"\n\n"
   in
   (header_file_contents, c_file_contents)
-
 
 let schemas_to_h_and_c ?(safety_checks = false)
     (schemas : Schematic.Schema.pack list) =

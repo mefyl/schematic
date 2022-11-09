@@ -206,8 +206,7 @@ end)
 include Make_mark_converter (struct
   (* FIXME: this is an ugly workaround. *)
   let identified c =
-      c_typename c |> Identifier.to_string |> fun s ->
-      (s ^ "_2" |> Option.some, c)
+    c_typename c |> Identifier.to_string |> fun s -> (s ^ "_2" |> Option.some, c)
 
   let of_descriptor id d =
     try Of.descriptor id d
@@ -231,4 +230,3 @@ let ctypes_of_schemas schemas =
   ctypes_of_schemas_state state_empty schemas |> fst
 
 let ctypes_of_schema s = ctypes_of_schemas [ Schematic.Schema.pack s ]
-

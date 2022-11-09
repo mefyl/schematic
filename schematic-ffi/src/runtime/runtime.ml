@@ -1,7 +1,9 @@
 open Base
 
-(** The name of the "named value" containing the polymorphic comparison operator. *)
+(** The name of the "named value" containing the polymorphic comparison
+    operator. *)
 let poly_cmp_callback_name = "polymorphic_compare"
+
 let json_of_value_callback_name = "schematic_ffi_json_string_of_value"
 let json_to_value_callback_name = "schematic_ffi_json_string_to_value"
 
