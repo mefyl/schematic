@@ -5,6 +5,8 @@ module type MARK = sig
   type t
 
   val pp : t Fmt.t
+  val compare : t -> t -> int
+  val prevent_conflicts : bool
 
   module Id : sig
     type t
@@ -50,33 +52,48 @@ module Make (S : MARK) = struct
       else Fmt.(string) f s
   end
 
+  (** [Marks.t] is a set of named values. There may never be two values sharing
+      a name but with different internal structures. *)
   and Marks : sig
     type t
 
     val empty : t
     val make : string -> (unit -> S.t * Marks.t) -> t
     val add : t -> Mark.t -> t
-    val map : t -> f:(Mark.t -> Mark.t) -> t
     val fold : t -> init:'a -> f:('a -> Mark.t -> 'a) -> 'a
     val has : t -> Mark.t -> bool
     val merge : t list -> t
     val of_list : Mark.t list -> t
     val pp : t Fmt.t
   end = struct
-    type t = (Mark.t, Mark.comparator_witness) Set.t
+    type t = (string, (S.t * Marks.t) Lazy.t, String.comparator_witness) Map.t
 
-    let empty = Set.empty (module Mark)
-    let make id f = Set.of_list (module Mark) [ (id, lazy (f ())) ]
-    let add = Set.add
-    let map t = Set.map (module Mark) t
-    let fold = Set.fold
-    let has = Set.mem
-    let merge = Set.union_list (module Mark)
-    let of_list = Set.of_list (module Mark)
+    let empty = Map.empty (module String)
+    let make id f = Map.add_exn empty ~key:id ~data:(Lazy.from_fun f)
+
+    let add (t : t) ((id, x) : Mark.t) =
+      match Map.add t ~key:id ~data:x with `Ok t -> t | `Duplicate -> t
+
+    let fold (t : t) ~init ~f =
+      Map.fold ~init
+        ~f:(fun ~key ~data acc ->
+          let x : Mark.t = (key, data) in
+          f acc x)
+        t
+
+    let has (t : t) ((id, x) : Mark.t) = Map.mem t id
+
+    let merge l =
+      List.fold l ~init:(empty) ~f:(fun acc x ->
+          Map.merge_skewed acc x ~combine:(fun ~key l r -> l (* XXX *))
+        )
+
+    let of_list (l : Mark.t list) =
+      Map.of_alist_reduce (module String) l  ~f:(fun l r -> l (* XXX *))
 
     let pp : t Fmt.t =
      fun f t ->
-      let l = Set.to_list t in
+      let l = Map.to_alist t in
       let open Fmt in
       let sep = const char ',' ++ sp in
       let pp =

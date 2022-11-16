@@ -13,9 +13,11 @@ let hash_variant s =
   (* make it signed for 64 bits architectures *)
   if !accu > 0x3FFFFFFF then !accu - (1 lsl 31) else !accu
 
-include Schematic.Marks.Make (struct
+include Marks.Make (struct
   type t = c
 
+  let prevent_conflicts = true (* XXX *)
+  let compare = compare_c
   let pp = pp_c
 
   module Id = Identifier
@@ -65,12 +67,8 @@ module Of = C_walk.Walk (struct
     | Some parametric -> parametric ()
     | None -> (
       match id with
-      | None ->
-        Logs.debug (fun m -> m "no id\n");
-        let c, marks = s () in
-        (c, marks)
+      | None -> s ()
       | Some id ->
-        Logs.debug (fun m -> m "has id: %s\n" id);
         let referenced_type : c = fst @@ s () in
         (`Atom (Identifier.make id, Some referenced_type), Marks.make id s))
 
@@ -78,8 +76,6 @@ module Of = C_walk.Walk (struct
     let name = option_name c in
     let s () = (`Option c, marks) in
     schema (Some (Identifier.to_string name)) None s
-  (* schema (Some (Identifier.to_string name)) None s *)
-  (* s () *)
 
   let fields_empty () = ([], Marks.empty)
 
