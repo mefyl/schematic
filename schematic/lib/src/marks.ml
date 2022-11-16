@@ -21,6 +21,7 @@ module type V = sig
 end
 
 module Make (S : MARK) = struct
+  (** A [Mark.t] is a named value, which may depend on other named values. *)
   module rec Mark : (V with type t = string * (S.t * Marks.t) Lazy.t) = struct
     module T = struct
       type t = string * (S.t * Marks.t) Lazy.t
@@ -49,6 +50,7 @@ module Make (S : MARK) = struct
       else Fmt.(string) f s
   end
 
+  (** [Marks.t] is a set of named values. *)
   and Marks : sig
     type t
 
@@ -62,6 +64,7 @@ module Make (S : MARK) = struct
     val of_list : Mark.t list -> t
     val pp : t Fmt.t
   end = struct
+    (* State *)
     type t = (Mark.t, Mark.comparator_witness) Set.t
 
     let empty = Set.empty (module Mark)
@@ -85,7 +88,10 @@ module Make (S : MARK) = struct
       pp f l
   end
 
-  (** [of_marks marks mark] *)
+  (** [of_marks marks mark] returns a tuple:
+
+      - The list of newly-emitted values derived from Mark.t
+      - The merged state corresponding to the addition of [mark] to [marks] *)
   let rec of_mark (marks : Marks.t) (mark : Mark.t) :
       (S.Id.t * S.t) list * Marks.t =
     if Marks.has marks mark then ([], marks)
