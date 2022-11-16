@@ -16,8 +16,7 @@ let hash_variant s =
 include Marks.Make (struct
   type t = c
 
-  let prevent_conflicts = true (* XXX *)
-  let compare = compare_c
+  let equal = equal_c
   let pp = pp_c
 
   module Id = Identifier

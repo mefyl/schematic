@@ -5,8 +5,7 @@ module type MARK = sig
   type t
 
   val pp : t Fmt.t
-  val compare : t -> t -> int
-  val prevent_conflicts : bool
+  val equal : t -> t -> bool
 
   module Id : sig
     type t
@@ -24,6 +23,11 @@ module type V = sig
 end
 
 module Make (S : MARK) = struct
+    let ensure_consistent id l r =
+      if not (S.equal (fst l) (fst r)) then
+        Fmt.failwith "'%s' had duplicate definitions" id
+      else (l)
+
   module rec Mark : (V with type t = string * (S.t * Marks.t)) = struct
     module T = struct
       type t = string * (S.t * Marks.t)
@@ -61,7 +65,7 @@ module Make (S : MARK) = struct
     val make : string -> (unit -> S.t * Marks.t) -> t
     val add : t -> Mark.t -> t
     val fold : t -> init:'a -> f:('a -> Mark.t -> 'a) -> 'a
-    val has : t -> Mark.t -> bool
+    val find : t -> string -> (S.t * Marks.t) option
     val merge : t list -> t
     val of_list : Mark.t list -> t
     val pp : t Fmt.t
@@ -76,8 +80,11 @@ module Make (S : MARK) = struct
       let data = f () in
       Map.add_exn empty ~key:id ~data
 
+
     let add (t : t) ((id, x) : Mark.t) =
-      match Map.add t ~key:id ~data:x with `Ok t -> t | `Duplicate -> t
+      Map.change t id ~f:(function
+        | None -> Some x
+        | Some existing -> Some (ensure_consistent id existing x))
 
     let fold (t : t) ~init ~f =
       Map.fold ~init
@@ -86,14 +93,18 @@ module Make (S : MARK) = struct
           f acc x)
         t
 
-    let has (t : t) ((id, x) : Mark.t) = Map.mem t id
+    let find (t : t) id = Map.find t id
 
-    let merge l =
+    let merge (l : t list) =
       List.fold l ~init:empty ~f:(fun acc x ->
-          Map.merge_skewed acc x ~combine:(fun ~key l r -> l (* XXX *)))
+          Map.merge_skewed acc x ~combine:(fun ~key l r ->
+              ensure_consistent key l r))
+
+    let of_mark ((id, x) : Mark.t) = make id (fun () -> x)
 
     let of_list (l : Mark.t list) =
-      Map.of_alist_reduce (module String) l ~f:(fun l r -> l (* XXX *))
+      (* Very inefficient *)
+      l |> List.map ~f:of_mark |> merge
 
     let pp : t Fmt.t =
      fun f t ->
@@ -110,8 +121,12 @@ module Make (S : MARK) = struct
   (** [of_marks marks mark] *)
   let rec of_mark (marks : Marks.t) (mark : Mark.t) :
       (S.Id.t * S.t) list * Marks.t =
-    if Marks.has marks mark then ([], marks)
-    else
+let id = (fst mark) in
+    match Marks.find marks id with
+  | Some existing ->
+    let _ = ensure_consistent id existing (snd mark) in
+    ([], marks)
+  | None ->
       let leaf, deps =
         let res, deps = snd mark in
         ([ (S.Id.make (fst mark), res) ], deps)
