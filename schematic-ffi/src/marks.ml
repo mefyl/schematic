@@ -24,9 +24,9 @@ module type V = sig
 end
 
 module Make (S : MARK) = struct
-  module rec Mark : (V with type t = string * (S.t * Marks.t) Lazy.t) = struct
+  module rec Mark : (V with type t = string * (S.t * Marks.t)) = struct
     module T = struct
-      type t = string * (S.t * Marks.t) Lazy.t
+      type t = string * (S.t * Marks.t)
 
       let sexp_of_t (id, _) = Sexp.Atom id
       let compare (l, _) (r, _) = String.compare l r
@@ -48,7 +48,7 @@ module Make (S : MARK) = struct
           ++ const char '}')
             f ()
         in
-        (const char '(' ++ inner ++ const char ')') f (s, Lazy.force v)
+        (const char '(' ++ inner ++ const char ')') f (s, v)
       else Fmt.(string) f s
   end
 
@@ -66,10 +66,15 @@ module Make (S : MARK) = struct
     val of_list : Mark.t list -> t
     val pp : t Fmt.t
   end = struct
-    type t = (string, (S.t * Marks.t) Lazy.t, String.comparator_witness) Map.t
+    type t = (string, S.t * Marks.t, String.comparator_witness) Map.t
 
     let empty = Map.empty (module String)
-    let make id f = Map.add_exn empty ~key:id ~data:(Lazy.from_fun f)
+
+    let make id f =
+      (* We don't actually use laziness at this point; we don't support
+         recursive data types, and we want safety checks. *)
+      let data = f () in
+      Map.add_exn empty ~key:id ~data
 
     let add (t : t) ((id, x) : Mark.t) =
       match Map.add t ~key:id ~data:x with `Ok t -> t | `Duplicate -> t
@@ -84,12 +89,11 @@ module Make (S : MARK) = struct
     let has (t : t) ((id, x) : Mark.t) = Map.mem t id
 
     let merge l =
-      List.fold l ~init:(empty) ~f:(fun acc x ->
-          Map.merge_skewed acc x ~combine:(fun ~key l r -> l (* XXX *))
-        )
+      List.fold l ~init:empty ~f:(fun acc x ->
+          Map.merge_skewed acc x ~combine:(fun ~key l r -> l (* XXX *)))
 
     let of_list (l : Mark.t list) =
-      Map.of_alist_reduce (module String) l  ~f:(fun l r -> l (* XXX *))
+      Map.of_alist_reduce (module String) l ~f:(fun l r -> l (* XXX *))
 
     let pp : t Fmt.t =
      fun f t ->
@@ -109,7 +113,7 @@ module Make (S : MARK) = struct
     if Marks.has marks mark then ([], marks)
     else
       let leaf, deps =
-        let res, deps = Lazy.force @@ snd mark in
+        let res, deps = snd mark in
         ([ (S.Id.make (fst mark), res) ], deps)
       in
       let marks = Marks.add marks mark in
@@ -134,8 +138,8 @@ module Make (S : MARK) = struct
       let id_inner, res = M.identified res in
       let id = Option.first_some id id_inner |> Option.value_exn in
       match parametric with
-      | None -> (id, lazy (res, marks))
-      | Some parametric -> (id, lazy (M.of_parametric parametric))
+      | None -> (id, (res, marks))
+      | Some parametric -> (id, M.of_parametric parametric)
 
     let of_schema_state marks s = of_mark marks @@ mark_of_schema s
 
