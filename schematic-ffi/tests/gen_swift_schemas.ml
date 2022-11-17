@@ -1,5 +1,5 @@
 open Base
-open C_test_types
+open Ffi_test_types
 open Schematic_ffi
 
 let () =

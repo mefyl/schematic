@@ -1,4 +1,4 @@
-open C_test_types
+open Ffi_test_types
 open Schematic_ffi
 
 (* A first step (outside of this file) generates a C file exposing primitives

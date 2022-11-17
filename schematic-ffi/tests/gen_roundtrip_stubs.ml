@@ -1,5 +1,5 @@
 open Base
-open C_test_types
+open Ffi_test_types
 
 let () =
   Logs.set_level (Some Logs.Info);
