@@ -109,7 +109,6 @@ module Make (S : MARK) = struct
       (l @ leaf, marks)
 
   module Make_mark_converter (M : sig
-
     val of_descriptor :
       string option -> 'a Schema_intf.descriptor -> S.t * Marks.t
 

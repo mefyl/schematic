@@ -23,10 +23,10 @@ module type V = sig
 end
 
 module Make (S : MARK) = struct
-    let ensure_consistent id l r =
-      if not (S.equal (fst l) (fst r)) then
-        Fmt.failwith "'%s' had duplicate definitions" id
-      else (l)
+  let ensure_consistent id l r =
+    if not (S.equal (fst l) (fst r)) then
+      Fmt.failwith "'%s' had duplicate definitions" id
+    else l
 
   module rec Mark : (V with type t = string * (S.t * Marks.t)) = struct
     module T = struct
@@ -80,7 +80,6 @@ module Make (S : MARK) = struct
       let data = f () in
       Map.add_exn empty ~key:id ~data
 
-
     let add (t : t) ((id, x) : Mark.t) =
       Map.change t id ~f:(function
         | None -> Some x
@@ -121,12 +120,12 @@ module Make (S : MARK) = struct
   (** [of_marks marks mark] *)
   let rec of_mark (marks : Marks.t) (mark : Mark.t) :
       (S.Id.t * S.t) list * Marks.t =
-let id = (fst mark) in
+    let id = fst mark in
     match Marks.find marks id with
-  | Some existing ->
-    let _ = ensure_consistent id existing (snd mark) in
-    ([], marks)
-  | None ->
+    | Some existing ->
+      let _ = ensure_consistent id existing (snd mark) in
+      ([], marks)
+    | None ->
       let leaf, deps =
         let res, deps = snd mark in
         ([ (S.Id.make (fst mark), res) ], deps)
