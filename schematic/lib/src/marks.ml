@@ -21,6 +21,7 @@ module type V = sig
 end
 
 module Make (S : MARK) = struct
+  (** A [Mark.t] is a named value, which may depend on other named values. *)
   module rec Mark : (V with type t = string * (S.t * Marks.t) Lazy.t) = struct
     module T = struct
       type t = string * (S.t * Marks.t) Lazy.t
@@ -46,9 +47,10 @@ module Make (S : MARK) = struct
             f ()
         in
         (const char '(' ++ inner ++ const char ')') f (s, Lazy.force v)
-      else Fmt.string f s
+      else Fmt.(string) f s
   end
 
+  (** [Marks.t] is a set of named values. *)
   and Marks : sig
     type t
 
@@ -62,6 +64,7 @@ module Make (S : MARK) = struct
     val of_list : Mark.t list -> t
     val pp : t Fmt.t
   end = struct
+    (* State *)
     type t = (Mark.t, Mark.comparator_witness) Set.t
 
     let empty = Set.empty (module Mark)
@@ -85,13 +88,17 @@ module Make (S : MARK) = struct
       pp f l
   end
 
-  (** [of_marks marks mark] *)
-  let rec of_mark marks mark : (S.Id.t * S.t) list * Marks.t =
+  (** [of_marks marks mark] returns a tuple:
+
+      - The list of newly-emitted values derived from Mark.t
+      - The merged state corresponding to the addition of [mark] to [marks] *)
+  let rec of_mark (marks : Marks.t) (mark : Mark.t) :
+      (S.Id.t * S.t) list * Marks.t =
     if Marks.has marks mark then ([], marks)
     else
       let leaf, deps =
         let res, deps = Lazy.force @@ snd mark in
-        ([ (S.Id.make @@ fst mark, res) ], deps)
+        ([ (S.Id.make (fst mark), res) ], deps)
       in
       let marks = Marks.add marks mark in
       let f (res, marks) mark =
@@ -112,17 +119,16 @@ module Make (S : MARK) = struct
     let of_parametric = M.of_parametric
 
     let mark_of_schema Schema.{ id; descriptor; parametric } =
+      let id = id |> Option.value_exn in
       match parametric with
-      | None ->
-        (Option.value_exn ~here:[%here] id, lazy (M.of_descriptor id descriptor))
-      | Some parametric ->
-        (Option.value_exn ~here:[%here] id, lazy (M.of_parametric parametric))
+      | None -> (id, lazy (M.of_descriptor (Some id) descriptor))
+      | Some parametric -> (id, lazy (M.of_parametric parametric))
 
-    let of_schema marks s = of_mark marks @@ mark_of_schema s
+    let of_schema_state marks s = of_mark marks @@ mark_of_schema s
 
     let unpacker marks =
       let unpack : type a. a Schema.t -> (S.Id.t * S.t) list * Marks.t =
-       fun s -> of_schema marks s
+       fun s -> of_schema_state marks s
       in
       { Schema.unpack }
 
@@ -145,6 +151,6 @@ module Make (S : MARK) = struct
       let marks = state_exclude exclude in
       of_schemas_state marks schemas |> fst
 
-    let of_schema schema = of_schema Marks.empty schema |> fst
+    let of_schema schema = of_schema_state Marks.empty schema |> fst
   end
 end
