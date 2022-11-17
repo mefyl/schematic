@@ -161,7 +161,6 @@ module Of = Schema.Walk (struct
 end)
 
 include Make_mark_converter (struct
-  let identified x = (None, x)
   let of_descriptor _ descriptor = Of.descriptor descriptor Marks.empty
   let of_parametric parametric = Of.parametric parametric Marks.empty
 end)
