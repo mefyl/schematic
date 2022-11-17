@@ -2,96 +2,95 @@ open Ffi_test_types
 open Schematic_ffi
 
 (* A first step (outside of this file) generates a C file exposing primitives
-   that convert values from Caml to C, then back to Caml (a "roundtrip"). This
-   module is linked with those primitives. It calls them for a variety of types
-   and ensures that values are preserved and not trigger assertions. *)
+   that convert values from Caml to C, then back to Caml (a "roundtrip").
 
-external wrapper_rt_id : wrapper -> wrapper = "sch_wrapper_rt_id"
-external diverse_rt_id : diverse -> diverse = "sch_diverse_rt_id"
+   This module is linked with those primitives. It calls them for a variety of
+   types and ensures that values are preserved and not trigger assertions.
 
-external basic_variant_rt_id : basic_variant -> basic_variant
-  = "sch_basic_variant_rt_id"
+   Sadly enough, OCaml will not warn us if we exposed a primitive involving a
+   type that itself contains a type whose boxed/unboxed status is ambiguous.
+   This is dangerous.
 
-external payload_variant_rt_id : payload_variant -> payload_variant
-  = "sch_payload_variant_rt_id"
+   For now (4.14.0) it will work by default, but this may break in the future.
+   [@@boxed] will help. *)
 
-external behemoth_rt_id : behemoth -> behemoth = "sch_behemoth_rt_id"
-external collection_rt_id : collection -> collection = "sch_collection_rt_id"
+[%%metadef
+let to_rt_external c_name ct =
+  let int_rt_name = c_name ^ "_rt_id" in
+  let ext_rt_name = "sch_" ^ c_name ^ "_rt_id" in
+  let open Ppxlib in
+  let fn_typ : core_type =
+    {
+      ptyp_desc = Ptyp_arrow (Nolabel, ct, ct);
+      ptyp_loc = Location.none;
+      ptyp_loc_stack = [];
+      ptyp_attributes = [];
+    }
+  in
+  let structure_item : Ppxlib.structure_item =
+    {
+      pstr_loc = Location.none;
+      pstr_desc =
+        Pstr_primitive
+          {
+            pval_name = Metapp_preutils.mkloc int_rt_name;
+            pval_loc = Location.none;
+            pval_type = fn_typ;
+            pval_prim = [ ext_rt_name ];
+            pval_attributes = [];
+          };
+    }
+  in
+  structure_item]
 
-external int64_alias_rt_id : int64_alias -> int64_alias
-  = "sch_int64_alias_rt_id"
+[%%meta to_rt_external "wrapper" [%t: wrapper]]
+[%%meta to_rt_external "diverse" [%t: diverse]]
+[%%meta to_rt_external "behemoth" [%t: behemoth]]
+[%%meta to_rt_external "collection" [%t: collection]]
+[%%meta to_rt_external "basic_variant" [%t: basic_variant]]
+[%%meta to_rt_external "payload_variant" [%t: payload_variant]]
+[%%meta to_rt_external "int64_alias" [%t: int64_alias]]
+[%%meta to_rt_external "bool_alias" [%t: bool_alias]]
+[%%meta to_rt_external "float_alias" [%t: float_alias]]
+[%%meta to_rt_external "int_option_alias" [%t: int_option_alias]]
+[%%meta to_rt_external "float_map_alias" [%t: float_map_alias]]
+[%%meta to_rt_external "record_with_indir_field" [%t: record_with_indir_field]]
 
-external bool_alias_rt_id : bool_alias -> bool_alias = "sch_bool_alias_rt_id"
+[%%meta
+to_rt_external "record_containing_ambiguous_record"
+  [%t: record_containing_ambiguous_record]]
 
-external float_alias_rt_id : float_alias -> float_alias
-  = "sch_float_alias_rt_id"
+[%%meta to_rt_external "any_alias" [%t: any_alias]]
+[%%meta to_rt_external "time_alias" [%t: time_alias]]
+[%%meta to_rt_external "time_local_alias" [%t: time_local_alias]]
+[%%meta to_rt_external "date_alias" [%t: date_alias]]
+[%%meta to_rt_external "record_with_unit" [%t: record_with_unit]]
 
-external int_option_alias_rt_id : int_option_alias -> int_option_alias
-  = "sch_int_option_alias_rt_id"
+[%%meta
+to_rt_external "variant_with_inline_record_payload"
+  [%t: variant_with_inline_record_payload]]
 
-external float_map_alias_rt_id : float_map_alias -> float_map_alias
-  = "sch_float_map_alias_rt_id"
+[%%meta
+to_rt_external "payload_variant_with_union_key"
+  [%t: payload_variant_with_union_key]]
 
-external record_with_indir_field_rt_id :
-  record_with_indir_field -> record_with_indir_field
-  = "sch_record_with_indir_field_rt_id"
+[%%meta to_rt_external "string_option_record" [%t: string_option_record]]
+[%%meta to_rt_external "tuple_int_string_alias" [%t: tuple_int_string_alias]]
+[%%meta to_rt_external "poly_basic" [%t: poly_basic]]
+[%%meta to_rt_external "poly_payload" [%t: poly_payload]]
+[%%meta to_rt_external "evil_defaults" [%t: evil_defaults]]
 
-(* XXX: Sadly enough, OCaml will not warn us if we exposed a primitive involving
-   a type that itself contains a type whose boxed/unboxed status is ambiguous.
-   This is dangerous. For now (4.12.1) it will work by default, but this may
-   break in the future. @@boxed will help. *)
-external _record_containing_ambiguous_record_rt_id :
-  record_containing_ambiguous_record -> record_containing_ambiguous_record
-  = "sch_record_containing_ambiguous_record_rt_id"
+[%%meta
+to_rt_external "string_wrapper_parametric_record"
+  [%t: string_wrapper parametric_record]]
 
-external any_alias_rt_id : any_alias -> any_alias = "sch_any_alias_rt_id"
-external time_alias_rt_id : time_alias -> time_alias = "sch_time_alias_rt_id"
+[%%meta
+to_rt_external "string_wrapper_parametric_record_ultra_generic"
+  [%t: reified_ultra_generic]]
 
-external time_local_alias_rt_id : time_local_alias -> time_local_alias
-  = "sch_time_local_alias_rt_id"
-
-external date_alias_rt_id : date_alias -> date_alias = "sch_date_alias_rt_id"
-
-external record_with_unit_rt_id : record_with_unit -> record_with_unit
-  = "sch_record_with_unit_rt_id"
-
-external variant_with_inline_record_payload_rt_id :
-  variant_with_inline_record_payload -> variant_with_inline_record_payload
-  = "sch_variant_with_inline_record_payload_rt_id"
-
-external string_wrapper_parametric_record_rt_id :
-  string_wrapper parametric_record -> string_wrapper parametric_record
-  = "sch_string_wrapper_parametric_record_rt_id"
-
-external payload_variant_with_union_key_rt_id :
-  payload_variant_with_union_key -> payload_variant_with_union_key
-  = "sch_payload_variant_with_union_key_rt_id"
-
-external string_option_record_rt_id :
-  string_option_record -> string_option_record
-  = "sch_string_option_record_rt_id"
-
-external tuple_int_string_alias_rt_id :
-  tuple_int_string_alias -> tuple_int_string_alias
-  = "sch_tuple_int_string_alias_rt_id"
-
-external poly_basic_rt_id : poly_basic -> poly_basic = "sch_poly_basic_rt_id"
-
-external poly_payload_rt_id : poly_payload -> poly_payload
-  = "sch_poly_payload_rt_id"
-
-external evil_defaults_rt_id : evil_defaults -> evil_defaults
-  = "sch_evil_defaults_rt_id"
-
-external reified_ultra_generic_rt_id :
-  reified_ultra_generic -> reified_ultra_generic (* XXX *)
-  = "sch_string_wrapper_parametric_record_ultra_generic_rt_id"
-
-external with_computed_rt_id : with_computed -> with_computed
-  = "sch_with_computed_rt_id"
-
-external mapped_rt_id : mapped -> mapped = "sch_mapped_rt_id"
-external event_1_rt_id : Event_1.t -> Event_1.t = "sch_event_1_rt_id"
+[%%meta to_rt_external "with_computed" [%t: with_computed]]
+[%%meta to_rt_external "mapped" [%t: mapped]]
+[%%meta to_rt_external "event_1" [%t: Event_1.t]]
 
 module Tests = struct
   let test t got expected = Alcotest.(check t "" expected) got
@@ -313,7 +312,7 @@ module Tests = struct
         nested_generic = { parameterized_field = "Coin" };
       }
     in
-    let new_x = reified_ultra_generic_rt_id x in
+    let new_x = string_wrapper_parametric_record_ultra_generic_rt_id x in
     let pp_reified_param = pp_parametric_record pp_string_wrapper in
     let equal_reified_param = equal_parametric_record equal_string_wrapper in
     let open Base in
