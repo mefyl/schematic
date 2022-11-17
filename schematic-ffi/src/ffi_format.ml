@@ -2,7 +2,7 @@ let indent = 2 (* FIXME *)
 
 let force_newline fmt _ = Caml.Format.pp_force_newline fmt ()
 
-let block ?(delim = ('{', '}')) ?(open_sp = true) ~indent lhs body =
+let block ?(indent = indent) ?(delim = ('{', '}')) ?(open_sp = true) lhs body =
   let delim_open, delim_close = delim in
   let open Fmt in
   let opening =
@@ -16,7 +16,7 @@ let case_ish ~indent header body =
   vbox ~indent @@ (header ++ cut ++ body)
 
 let applied opening body =
-  block ~indent ~open_sp:false ~delim:('(', ')') opening body
+  block ~open_sp:false ~delim:('(', ')') opening body
 
 let vertical_comma_sep pp l =
   let open Fmt in
