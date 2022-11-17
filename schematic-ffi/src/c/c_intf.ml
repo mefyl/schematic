@@ -114,8 +114,6 @@ let checking_checked_for c =
   ( Fmt.str "sch_%a_checking" Identifier.pp c,
     Fmt.str "sch_%a_checked" Identifier.pp c )
 
-let roundtrip_for = Fmt.str "sch_%a_rt_id" Identifier.pp
-
 (* FIXME: this approach does not protect against collisions *)
 let of_caml_name_for_c c = c |> c_typename |> of_caml_name_for
 let to_caml_name_for_c c = c |> c_typename |> to_caml_name_for
