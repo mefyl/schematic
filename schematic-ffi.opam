@@ -13,6 +13,7 @@ depends: [
   "logs"
   "ppx_hash" {= "v0.14.0"}
   "schematic" {= version}
+  "metapp" {with-test}
   "odoc" {with-doc}
 ]
 build: [

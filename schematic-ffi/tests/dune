@@ -68,5 +68,5 @@
   (flags -Wall))
  (modules c_roundtrip)
  (preprocess
-  (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
+  (pps schematic_ppx ppx_deriving.eq ppx_deriving.show metapp.ppx))
  (libraries alcotest schematic_ffi ffi_test_types ptime logs logs.fmt))
