@@ -1,0 +1,4 @@
+module CSchemas {
+    header "CSchemas.h"
+    export *
+}

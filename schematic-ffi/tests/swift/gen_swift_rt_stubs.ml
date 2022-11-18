@@ -6,11 +6,12 @@ let roundtrip_fn_for (id, c) =
   let c = `Atom (id, Some c) in
   let ct = Swift.Swiftify.C_type.c c in
   let st = Fmt.to_to_string Swift.Typeexpr.pp_swift_type c in
-  let fn = Fmt.str "%s_rt_id_sw" ct in
+  let fn = Fmt.str "%s_swift_rt_id" ct in
   Fmt.str
     {|
 @_cdecl("sch_%s")
-func %s(_ x: %s) -> %s {
+public func %s(_ x: %s) -> %s {
+    //print("C obj: ", x as Any)
     let sw: %s = schematicOfC(x)
     return schematicToC(sw)
 }
@@ -29,7 +30,8 @@ let () =
   let rts_src =
     ctypes |> List.map ~f:roundtrip_fn_for |> String.concat ~sep:"\n"
   in
-  let swift_contents = schemas_src ^ rts_src in
+  let swift_contents = {|import CSchemas
+|} ^ schemas_src ^ rts_src in
 
   let open Stdio.Out_channel in
   write_all swift_filename ~data:swift_contents

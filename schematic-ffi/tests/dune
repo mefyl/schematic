@@ -1,65 +1,60 @@
 (include_subdirs no)
 
-(executable
- (name gen_c_rt_stubs)
- (modules gen_c_rt_stubs)
- (libraries
-  alcotest
-  schematic
-  schematic_ffi
-  ffi_test_utils
-  stdio
-  logs
-  logs.fmt))
-
-(executable
- (name gen_swift_rt_stubs)
- (modules gen_swift_rt_stubs)
- (libraries
-  alcotest
-  schematic
-  schematic_ffi
-  ffi_test_utils
-  stdio
-  logs
-  logs.fmt))
 
 (rule
- (targets c_rt_stubs.h c_rt_stubs.c)
+ (targets CSchemas.h CSchemas.c)
  (action
-  (run %{dep:gen_c_rt_stubs.exe} %{targets})))
+  (run %{dep:c/gen_c_rt_stubs.exe} %{targets})))
 
 (rule
- (targets Swift_rt_stubs.swift)
+ (targets Schemas.o CSchemas.o)
+ (deps
+  (file swift/Schemas/Schemas.o)
+  (file swift/Schemas/CSchemas.o))
  (action
-  (run %{dep:gen_swift_rt_stubs.exe} %{targets})))
+  (progn
+   (run cp %{deps} .))))
 
 (rule
- (targets Swift_rt_stubs.o)
+ (targets
+  libswiftCore.a
+  libswiftDispatch.a
+  libFoundation.a
+  libdispatch.a
+  libBlocksRuntime.a
+  libCoreFoundation.a
+  libicui18nswift.a
+  libicuucswift.a
+  libswiftGlibc.a
+  libDispatchStubs.a
+  libicudataswift.a
+  libswiftSwiftOnoneSupport.a
+  libswift_StringProcessing.a)
  (action
-  (run
-   swiftc
-   -c
-   %{dep:Swift_rt_stubs.swift}
-   -import-objc-header
-   %{dep:c_rt_stubs.h}
-   -I
-   %{ocaml_where})))
+  (progn
+   ; XXX: hardcoded path
+   (system "cp /usr/lib/swift/lib/swift_static/linux/*.a ."))))
 
 (test
  (name c_roundtrip)
  (package schematic-ffi)
+ (extra_objects Schemas CSchemas)
  (modes exe)
- (deps
-  (file c_rt_stubs.h)
-  (file c_rt_stubs.h)
-  (file Swift_rt_stubs.swift)
-  (file Swift_rt_stubs.o))
- (foreign_stubs
-  (language c)
-  (names c_rt_stubs)
-  ; When debugging, use -O0
-  (flags -Wall))
+ (flags :standard -cclib -lstdc++ -cclib -lm -cclib -ldl -cclib -lpthread)
+ (foreign_archives
+  swiftCore
+  Foundation
+  dispatch
+  swiftDispatch
+  BlocksRuntime
+  CoreFoundation
+  icui18nswift
+  icuucswift
+  swiftGlibc
+  DispatchStubs
+  icudataswift
+  swiftSwiftOnoneSupport
+  swift_StringProcessing)
  (modules c_roundtrip)
  (preprocess
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show metapp.ppx))

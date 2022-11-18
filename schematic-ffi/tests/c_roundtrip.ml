@@ -2,9 +2,9 @@ open Schematic_ffi
 open Ffi_test_utils.Types
 
 [%%metadef
-let to_rt_external c_name ct =
-  let int_rt_name = c_name ^ "_rt_id" in
-  let ext_rt_name = "sch_" ^ c_name ^ "_rt_id" in
+let to_rt_external c_name suff ct =
+  let int_rt_name = c_name ^ suff ^ "_rt_id" in
+  let ext_rt_name = "sch_" ^ c_name ^ suff ^ "_rt_id" in
   let open Ppxlib in
   let fn_typ : core_type =
     {
@@ -28,7 +28,10 @@ let to_rt_external c_name ct =
           };
     }
   in
-  structure_item]
+  structure_item
+
+let to_rt_external_c c_name typ = to_rt_external c_name "" typ
+let to_rt_external_swift c_name typ = to_rt_external c_name "_swift" typ]
 
 (* A first step (outside of this file) generates a C file exposing primitives
    that convert values from Caml to C, then back to Caml (a "roundtrip").
@@ -43,54 +46,56 @@ let to_rt_external c_name ct =
    For now (4.14.0) it will work by default, but this may break in the future.
    [@@boxed] will help. *)
 
-[%%meta to_rt_external "wrapper" [%t: wrapper]]
-[%%meta to_rt_external "diverse" [%t: diverse]]
-[%%meta to_rt_external "behemoth" [%t: behemoth]]
-[%%meta to_rt_external "collection" [%t: collection]]
-[%%meta to_rt_external "basic_variant" [%t: basic_variant]]
-[%%meta to_rt_external "payload_variant" [%t: payload_variant]]
-[%%meta to_rt_external "int64_alias" [%t: int64_alias]]
-[%%meta to_rt_external "bool_alias" [%t: bool_alias]]
-[%%meta to_rt_external "float_alias" [%t: float_alias]]
-[%%meta to_rt_external "int_option_alias" [%t: int_option_alias]]
-[%%meta to_rt_external "float_map_alias" [%t: float_map_alias]]
-[%%meta to_rt_external "record_with_indir_field" [%t: record_with_indir_field]]
+[%%meta to_rt_external_c "wrapper" [%t: wrapper]]
+[%%meta to_rt_external_c "diverse" [%t: diverse]]
+[%%meta to_rt_external_c "behemoth" [%t: behemoth]]
+[%%meta to_rt_external_c "collection" [%t: collection]]
+[%%meta to_rt_external_c "basic_variant" [%t: basic_variant]]
+[%%meta to_rt_external_c "payload_variant" [%t: payload_variant]]
+[%%meta to_rt_external_c "int64_alias" [%t: int64_alias]]
+[%%meta to_rt_external_c "bool_alias" [%t: bool_alias]]
+[%%meta to_rt_external_c "float_alias" [%t: float_alias]]
+[%%meta to_rt_external_c "int_option_alias" [%t: int_option_alias]]
+[%%meta to_rt_external_c "float_map_alias" [%t: float_map_alias]]
 
 [%%meta
-to_rt_external "record_containing_ambiguous_record"
+to_rt_external_c "record_with_indir_field" [%t: record_with_indir_field]]
+
+[%%meta
+to_rt_external_c "record_containing_ambiguous_record"
   [%t: record_containing_ambiguous_record]]
 
-[%%meta to_rt_external "any_alias" [%t: any_alias]]
-[%%meta to_rt_external "time_alias" [%t: time_alias]]
-[%%meta to_rt_external "time_local_alias" [%t: time_local_alias]]
-[%%meta to_rt_external "date_alias" [%t: date_alias]]
-[%%meta to_rt_external "record_with_unit" [%t: record_with_unit]]
+[%%meta to_rt_external_c "any_alias" [%t: any_alias]]
+[%%meta to_rt_external_c "time_alias" [%t: time_alias]]
+[%%meta to_rt_external_c "time_local_alias" [%t: time_local_alias]]
+[%%meta to_rt_external_c "date_alias" [%t: date_alias]]
+[%%meta to_rt_external_c "record_with_unit" [%t: record_with_unit]]
 
 [%%meta
-to_rt_external "variant_with_inline_record_payload"
+to_rt_external_c "variant_with_inline_record_payload"
   [%t: variant_with_inline_record_payload]]
 
 [%%meta
-to_rt_external "payload_variant_with_union_key"
+to_rt_external_c "payload_variant_with_union_key"
   [%t: payload_variant_with_union_key]]
 
-[%%meta to_rt_external "string_option_record" [%t: string_option_record]]
-[%%meta to_rt_external "tuple_int_string_alias" [%t: tuple_int_string_alias]]
-[%%meta to_rt_external "poly_basic" [%t: poly_basic]]
-[%%meta to_rt_external "poly_payload" [%t: poly_payload]]
-[%%meta to_rt_external "evil_defaults" [%t: evil_defaults]]
+[%%meta to_rt_external_c "string_option_record" [%t: string_option_record]]
+[%%meta to_rt_external_c "tuple_int_string_alias" [%t: tuple_int_string_alias]]
+[%%meta to_rt_external_c "poly_basic" [%t: poly_basic]]
+[%%meta to_rt_external_c "poly_payload" [%t: poly_payload]]
+[%%meta to_rt_external_c "evil_defaults" [%t: evil_defaults]]
 
 [%%meta
-to_rt_external "string_wrapper_parametric_record"
+to_rt_external_c "string_wrapper_parametric_record"
   [%t: string_wrapper parametric_record]]
 
 [%%meta
-to_rt_external "string_wrapper_parametric_record_ultra_generic"
+to_rt_external_c "string_wrapper_parametric_record_ultra_generic"
   [%t: reified_ultra_generic]]
 
-[%%meta to_rt_external "with_computed" [%t: with_computed]]
-[%%meta to_rt_external "mapped" [%t: mapped]]
-[%%meta to_rt_external "event_1" [%t: Event_1.t]]
+[%%meta to_rt_external_c "with_computed" [%t: with_computed]]
+[%%meta to_rt_external_c "mapped" [%t: mapped]]
+[%%meta to_rt_external_c "event_1" [%t: Event_1.t]]
 
 module Tests_ocaml_c = struct
   let test t got expected = Alcotest.(check t "" expected) got
@@ -346,7 +351,32 @@ module Tests_ocaml_c = struct
            test t new_x x)
 end
 
-module Tests_ocaml_c_swift = struct end
+module Tests_ocaml_c_swift = struct
+  [%%meta to_rt_external_swift "wrapper" [%t: wrapper]]
+
+  let test t got expected = Alcotest.(check t "" expected) got
+
+  (* TODO: factor test definitions *)
+  let wrapper () =
+    let x = { somevar = 42; r = { a = 1; b = 77 } } in
+    let new_x = wrapper_swift_rt_id x in
+    let t = Alcotest.testable pp_wrapper equal_wrapper in
+    test t new_x x
+
+  let behemoth () =
+    let x : behemoth =
+      {
+        d = { s = "Coucou" };
+        b = B;
+        p = SomeInt 101;
+        pair = ("hello", { somevar = 1; r = { a = 0; b = 56000 } });
+        pair_alias = ("coin", 8);
+      }
+    in
+    let new_x = behemoth_rt_id x in
+    let t = Alcotest.testable pp_behemoth equal_behemoth in
+    test t new_x x
+end
 
 let () =
   let open Alcotest in
@@ -370,12 +400,10 @@ let () =
             test_case "payload_variant_with_union_key" `Quick
               payload_variant_with_union_key;
             test_case "behemoth" `Quick behemoth;
-            test_case "collection" `Quick collection;
             test_case "int64" `Quick int64;
             test_case "bool" `Quick bool;
             test_case "float" `Quick float;
             test_case "int option" `Quick int_option;
-            test_case "mapping" `Quick mapping;
             test_case "type alias indirection" `Quick indirection;
             test_case "any (JSON)" `Quick any;
             test_case "time" `Quick time;
@@ -390,11 +418,18 @@ let () =
             test_case "basic polymorphic variant" `Quick poly_basic;
             test_case "payload polymorphic variant" `Quick poly_payload;
             test_case "evil defaults" `Quick evil_defaults;
-            test_case "ultra generic" `Quick ultra_generic;
             test_case "with computed" `Quick with_computed;
             test_case "tuple_int_string_alias" `Quick tuple_int_string_alias;
             test_case "encode / decode" `Quick encode_decode;
             test_case "event 1" `Quick event_1;
+            test_case "collection" `Quick collection;
+            test_case "mapping" `Quick mapping;
+            test_case "ultra generic" `Quick ultra_generic;
           ] );
-      ("OCaml -> C -> Swift and back", Tests_ocaml_c_swift.[]);
+      ( "OCaml -> C -> Swift and back",
+        Tests_ocaml_c_swift.
+          [
+            (* test_case "wrapper" `Quick wrapper; *)
+            (* test_case "behemoth" `Quick behemoth; *)
+          ] );
     ]

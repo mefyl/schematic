@@ -8,13 +8,12 @@ module Typeexpr = C_typeexpr
 module Format = C_format
 module Statements = C_statements
 module Schemas = Ffi_schemas
-module Safety = C_safety
 
-type gen_params = {
-  gen_roundtrips : bool;
-  runtime_safety_checks : bool;
-}
-[@@deriving make, show]
+(* type gen_params = { *)
+(*   gen_roundtrips : bool; *)
+(*   runtime_safety_checks : bool; *)
+(* } *)
+(* [@@deriving make, show] *)
 
 let nl_concat = String.concat ~sep:"\n"
 
@@ -37,7 +36,7 @@ let signature_src { signature; _ } = Fmt.str "%s;" signature
 let impl_src { signature; impl } =
   Fmt.to_to_string (C_format.block ~indent:2 signature impl) ()
 
-let ctypes_to_h_and_c ?(safety_checks = false) ~h_include
+let h_and_c_of_ctypes ?(safety_checks = false) ~h_include
     (ctypes : (Identifier.t * c) list) : string * string =
   let cgens = ctypes |> List.map ~f:(export ~safety_checks) in
   let user_declarations, user_impls =
@@ -56,28 +55,19 @@ let ctypes_to_h_and_c ?(safety_checks = false) ~h_include
   let header_file_contents =
     Builtins.declarations :: user_declarations |> nl_concat
   in
-  (* Would be nice to generate signature for the roundtrip functions too, though
-     that isn't strictly needed. *)
   let statics =
     [ Fmt.str "static const value* %s = NULL;" C_builtins.poly_compare_symbol ]
     @ (cgens |> List.map ~f:statics_src)
     |> Option.some_if safety_checks
     |> Option.to_list |> List.concat
   in
-  let roundtrip_impls =
-    ctypes |> List.map ~f:fst
-    |> List.map ~f:Safety.roundtrip_src
-    |> Option.some_if safety_checks
-    |> Option.to_list |> List.concat
-  in
   let c_file_contents =
     Fmt.str "#include \"%s\"" h_include
-    :: Builtins.implementations
-    :: (statics @ roundtrip_impls @ user_impls)
+    :: Builtins.implementations :: (statics @ user_impls)
     |> nl_concat
   in
   (header_file_contents, c_file_contents)
 
-let schemas_to_h_and_c ?(safety_checks = false)
+let h_and_c_of_schemas ?(safety_checks = false)
     (schemas : Schematic.Schema.pack list) =
-  ctypes_of_schemas schemas |> ctypes_to_h_and_c ~safety_checks
+  ctypes_of_schemas schemas |> h_and_c_of_ctypes ~safety_checks

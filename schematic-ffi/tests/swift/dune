@@ -1,5 +1,23 @@
 (include_subdirs no)
 
+(executable
+ (name gen_swift_rt_stubs)
+ (modules gen_swift_rt_stubs)
+ (libraries
+  alcotest
+  schematic
+  schematic_ffi
+  ffi_test_utils
+  stdio
+  logs
+  logs.fmt))
+
+(rule
+ (targets Schemas.swift)
+ (action
+  (progn
+   (run %{dep:gen_swift_rt_stubs.exe} %{targets}))))
+
 (test
  (name types)
  (modules types cases swift_test_utils)

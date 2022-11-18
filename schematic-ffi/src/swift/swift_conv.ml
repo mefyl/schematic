@@ -214,15 +214,16 @@ let tuple_conv_decl members : unit Fmt.t * unit Fmt.t =
   in
   top_level_conv_decl (`Tuple members) ~to_c_body ~of_c_body
 
-let array_conv_decl c : unit Fmt.t * unit Fmt.t =
+let array_conv_decl ?(always_specialize = false) c : unit Fmt.t * unit Fmt.t =
   let open Fmt in
   let tname = array_name c |> Identifier.to_string in
   let to_c_body =
-    if is_tuple c || is_array c then
+    if (not always_specialize) && (is_tuple c || is_array c) then
       const string
         (Fmt.str
-           "let data = UnsafeMutablePointer<%a>.allocate(capacity: x.count)"
-           Identifier.pp (c_typename c))
+           "let data = UnsafeMutablePointer<%s>.allocate(capacity: x.count)"
+           (Swiftify.C_type.c c))
+      ++ cut
       ++ block ~indent "for (i, x) in x.enumerated()"
            (const string
               (Fmt.str "data.advanced(by: i).initialize(to: %s)"
@@ -233,7 +234,7 @@ let array_conv_decl c : unit Fmt.t * unit Fmt.t =
     else const string @@ to_c_expr ~c_type:(`Array c) ~c_expr:"x"
   in
   let of_c_body =
-    if is_tuple c || is_array c then
+    if (not always_specialize) && (is_tuple c || is_array c) then
       const string "typealias Element = "
       ++ const pp_swift_type c ++ cut
       ++ swift_statements

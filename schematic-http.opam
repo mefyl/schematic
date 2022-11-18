@@ -8,7 +8,7 @@ license: "LGPL-3.0-or-later"
 homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
-  "dune" {>= "2.9"}
+  "dune" {>= "3.5"}
   "cohttp-lwt" {>= "5.0.0" & < "5.1.0"}
   "lwt" {>= "5.6.0"}
   "schematic" {= version}
@@ -23,11 +23,9 @@ build: [
     name
     "-j"
     jobs
-    "--promote-install-files=false"
     "@install"
     "@runtest" {with-test}
     "@doc" {with-doc}
   ]
-  ["dune" "install" "-p" name "--create-install-files" name]
 ]
 dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"
