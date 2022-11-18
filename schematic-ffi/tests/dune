@@ -1,8 +1,8 @@
 (include_subdirs no)
 
 (executable
- (name gen_roundtrip_stubs)
- (modules gen_roundtrip_stubs)
+ (name gen_c_roundtrip_stubs)
+ (modules gen_c_roundtrip_stubs)
  (libraries
   alcotest
   schematic
@@ -25,9 +25,9 @@
   logs.fmt))
 
 (rule
- (targets roundtrip_stubs.h roundtrip_stubs.c)
+ (targets c_roundtrip_stubs.h c_roundtrip_stubs.c)
  (action
-  (run %{dep:gen_roundtrip_stubs.exe} %{targets})))
+  (run %{dep:gen_c_roundtrip_stubs.exe} %{targets})))
 
 (rule
  (targets Schemas.swift)
@@ -42,7 +42,7 @@
    -c
    %{dep:Schemas.swift}
    -import-objc-header
-   %{dep:roundtrip_stubs.h}
+   %{dep:c_roundtrip_stubs.h}
    -I
    %{ocaml_where})))
 
@@ -51,11 +51,11 @@
  (package schematic-ffi)
  (modes exe)
  (deps
-  (file roundtrip_stubs.h)
-  (file roundtrip_stubs.h))
+  (file c_roundtrip_stubs.h)
+  (file c_roundtrip_stubs.h))
  (foreign_stubs
   (language c)
-  (names roundtrip_stubs)
+  (names c_roundtrip_stubs)
   ; When debugging, use -O0
   (flags -Wall))
  (modules c_roundtrip)
