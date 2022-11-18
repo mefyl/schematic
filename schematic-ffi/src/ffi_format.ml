@@ -15,8 +15,7 @@ let case_ish ~indent header body =
   let open Fmt in
   vbox ~indent @@ (header ++ cut ++ body)
 
-let applied opening body =
-  block ~open_sp:false ~delim:('(', ')') opening body
+let applied opening body = block ~open_sp:false ~delim:('(', ')') opening body
 
 let vertical_comma_sep pp l =
   let open Fmt in
