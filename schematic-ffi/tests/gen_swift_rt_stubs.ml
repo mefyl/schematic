@@ -6,7 +6,7 @@ let roundtrip_fn_for (id, c) =
   let c = `Atom (id, Some c) in
   let ct = Swift.Swiftify.C_type.c c in
   let st = Fmt.to_to_string Swift.Typeexpr.pp_swift_type c in
-  let fn = Fmt.str "%s_rt_id" ct in
+  let fn = Fmt.str "%s_rt_id_sw" ct in
   Fmt.str
     {|
 @_cdecl("sch_%s")
