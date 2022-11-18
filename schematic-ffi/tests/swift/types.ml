@@ -23,6 +23,7 @@ let test ?name ?(deps = []) t =
 
 let () =
   let open Alcotest in
+  Schematic_ffi.Swift.c_module_name := Some "Schemas";
   run "Schematic.C.Swift"
     Cases.
       [
