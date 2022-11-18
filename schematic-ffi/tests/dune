@@ -1,13 +1,5 @@
 (include_subdirs no)
 
-(library
- (name ffi_test_types)
- (package schematic-ffi)
- (modules ffi_test_types)
- (preprocess
-  (pps schematic_ppx ppx_deriving.eq ppx_deriving.show ppx_deriving.make))
- (libraries schematic schematic_ffi ptime))
-
 (executable
  (name gen_roundtrip_stubs)
  (modules gen_roundtrip_stubs)
@@ -15,7 +7,7 @@
   alcotest
   schematic
   schematic_ffi
-  ffi_test_types
+  ffi_test_utils
   stdio
   logs
   logs.fmt))
@@ -27,7 +19,7 @@
   alcotest
   schematic
   schematic_ffi
-  ffi_test_types
+  ffi_test_utils
   stdio
   logs
   logs.fmt))
@@ -72,7 +64,7 @@
  (libraries
   alcotest
   schematic_ffi
-  ffi_test_types
+  ffi_test_utils
   ptime
   logs
   logs.fmt

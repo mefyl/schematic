@@ -1,5 +1,5 @@
 open Base
-open Ffi_test_types
+open Ffi_test_utils.Types
 open Schematic_ffi
 
 (* TODO: prefixing, for lack of namespacing *)

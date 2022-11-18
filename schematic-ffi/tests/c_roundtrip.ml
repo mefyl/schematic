@@ -1,18 +1,5 @@
-open Ffi_test_types
 open Schematic_ffi
-
-(* A first step (outside of this file) generates a C file exposing primitives
-   that convert values from Caml to C, then back to Caml (a "roundtrip").
-
-   This module is linked with those primitives. It calls them for a variety of
-   types and ensures that values are preserved and not trigger assertions.
-
-   Sadly enough, OCaml will not warn us if we exposed a primitive involving a
-   type that itself contains a type whose boxed/unboxed status is ambiguous.
-   This is dangerous.
-
-   For now (4.14.0) it will work by default, but this may break in the future.
-   [@@boxed] will help. *)
+open Ffi_test_utils.Types
 
 [%%metadef
 let to_rt_external c_name ct =
@@ -42,6 +29,21 @@ let to_rt_external c_name ct =
     }
   in
   structure_item]
+
+
+(* A first step (outside of this file) generates a C file exposing primitives
+   that convert values from Caml to C, then back to Caml (a "roundtrip").
+
+   This module is linked with those primitives. It calls them for a variety of
+   types and ensures that values are preserved and not trigger assertions.
+
+   Sadly enough, OCaml will not warn us if we exposed a primitive involving a
+   type that itself contains a type whose boxed/unboxed status is ambiguous.
+   This is dangerous.
+
+   For now (4.14.0) it will work by default, but this may break in the future.
+   [@@boxed] will help. *)
+
 
 [%%meta to_rt_external "wrapper" [%t: wrapper]]
 [%%meta to_rt_external "diverse" [%t: diverse]]
@@ -92,7 +94,7 @@ to_rt_external "string_wrapper_parametric_record_ultra_generic"
 [%%meta to_rt_external "mapped" [%t: mapped]]
 [%%meta to_rt_external "event_1" [%t: Event_1.t]]
 
-module Tests = struct
+module Tests_ocaml_c = struct
   let test t got expected = Alcotest.(check t "" expected) got
 
   let wrapper () =
@@ -346,6 +348,11 @@ module Tests = struct
            test t new_x x)
 end
 
+
+module Tests_ocaml_c_swift = struct
+
+end
+
 let () =
   let open Alcotest in
   Logs.set_level (Some Logs.Info);
@@ -353,10 +360,10 @@ let () =
   C.Runtime.register_static_callbacks ();
   C.Runtime.register_schema mapped_schema;
   C.Runtime.register_schema Event_1.schema;
-  run "Schematic.C roundtrip" ~verbose:true
+  run "Schematic_ffi roundtrips" ~verbose:true
     [
-      ( "roundtrip",
-        Tests.
+      ( "OCaml <-> C",
+        Tests_ocaml_c.
           [
             test_case "wrapper" `Quick wrapper;
             test_case "diverse" `Quick diverse;
@@ -394,4 +401,10 @@ let () =
             test_case "encode / decode" `Quick encode_decode;
             test_case "event 1" `Quick event_1;
           ] );
+
+( "OCaml -> C -> Swift and back",
+        Tests_ocaml_c_swift.
+          [
+          ] )
+
     ]

@@ -1,5 +1,5 @@
 open Base
-open Ffi_test_types
+open Ffi_test_utils.Types
 open Schematic_ffi
 
 let () =
@@ -11,3 +11,9 @@ let () =
   let swift_contents = Swift.export_schemas exported_schemas in
   let open Stdio.Out_channel in
   write_all swift_filename ~data:swift_contents
+
+(* for each type, from a Swift file:
+
+   - take as input a void pointer to a caml value? - call
+
+   schematicOfC() / schematicToC() *)

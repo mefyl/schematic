@@ -3,4 +3,4 @@
 (test
  (name types)
  (modules types cases swift_test_utils)
- (libraries alcotest schematic ffi_test_types stdio logs logs.fmt test_utils))
+ (libraries alcotest schematic ffi_test_utils stdio logs logs.fmt test_utils))
