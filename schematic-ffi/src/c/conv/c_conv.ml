@@ -63,7 +63,6 @@ let pp_of_caml_converter ?(safety_checks = false) ((name : Identifier.t), ast) =
     let safety_checks =
       if safety_checks then safety_checks_for name ~fname ~argname else Fmt.nop
     in
-    (* TODO: factor this across of/to_caml *)
     let caml_params = const pp_statements [ p1 "v" ] ++ cut in
     let caml_locals =
       match caml_locals with

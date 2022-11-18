@@ -30,7 +30,6 @@ let to_rt_external c_name ct =
   in
   structure_item]
 
-
 (* A first step (outside of this file) generates a C file exposing primitives
    that convert values from Caml to C, then back to Caml (a "roundtrip").
 
@@ -43,7 +42,6 @@ let to_rt_external c_name ct =
 
    For now (4.14.0) it will work by default, but this may break in the future.
    [@@boxed] will help. *)
-
 
 [%%meta to_rt_external "wrapper" [%t: wrapper]]
 [%%meta to_rt_external "diverse" [%t: diverse]]
@@ -348,10 +346,7 @@ module Tests_ocaml_c = struct
            test t new_x x)
 end
 
-
-module Tests_ocaml_c_swift = struct
-
-end
+module Tests_ocaml_c_swift = struct end
 
 let () =
   let open Alcotest in
@@ -401,10 +396,5 @@ let () =
             test_case "encode / decode" `Quick encode_decode;
             test_case "event 1" `Quick event_1;
           ] );
-
-( "OCaml -> C -> Swift and back",
-        Tests_ocaml_c_swift.
-          [
-          ] )
-
+      ("OCaml -> C -> Swift and back", Tests_ocaml_c_swift.[]);
     ]
