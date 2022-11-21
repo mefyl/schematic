@@ -78,8 +78,11 @@ let () =
   Logs.set_level (Some Logs.Info);
   Logs.set_reporter (Logs_fmt.reporter ());
   C.Runtime.register_static_callbacks ();
+
+  (* Schemas using dynamic components must be registered *)
   C.Runtime.register_schema mapped_schema;
   C.Runtime.register_schema Event_1.schema;
+
   run "Schematic_ffi roundtrips" ~verbose:true
     [
       ( "",
