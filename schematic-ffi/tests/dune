@@ -34,13 +34,22 @@
    ; XXX: hardcoded path
    (system "cp /usr/lib/swift/lib/swift_static/linux/*.a ."))))
 
+
+; Simpler to use (extra_objects ...), but only available in dune 3.5+
+(rule
+(target libroundtrip.a)
+ (action
+ (run ar rc %{target} %{dep:Schemas.o} %{dep:CSchemas.o}
+ ))
+)
+
 (test
  (name roundtrip)
  (package schematic-ffi)
- (extra_objects Schemas CSchemas)
  (modes exe)
  (flags :standard -cclib -lstdc++ -cclib -lm -cclib -ldl -cclib -lpthread)
  (foreign_archives
+   roundtrip
   swiftCore
   Foundation
   dispatch
