@@ -9,7 +9,7 @@
    (chdir
     Sources
     (run mkdir -p Schemas CSchemas/include))
-    (run cp -rf %{ocaml_where}/caml Sources/CSchemas/include/caml)
+   (run cp -rf %{ocaml_where}/caml Sources/CSchemas/include/caml)
    (run cp ../../CSchemas.c Sources/CSchemas)
    (run cp ../../CSchemas.h Sources/CSchemas/include)
    (run mv %{dep:../Schemas.swift} Sources/Schemas/)

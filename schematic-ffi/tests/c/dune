@@ -1,6 +1,5 @@
 (include_subdirs no)
 
-
 (executable
  (name gen_c_rt_stubs)
  (modules gen_c_rt_stubs)
