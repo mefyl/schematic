@@ -9,12 +9,6 @@ module Format = C_format
 module Statements = C_statements
 module Schemas = Ffi_schemas
 
-(* type gen_params = { *)
-(*   gen_roundtrips : bool; *)
-(*   runtime_safety_checks : bool; *)
-(* } *)
-(* [@@deriving make, show] *)
-
 let nl_concat = String.concat ~sep:"\n"
 
 let export ?safety_checks (name, c) : c_gen =
@@ -52,6 +46,7 @@ let h_and_c_of_ctypes ?(safety_checks = false) ~h_include
     let impls = List.concat impls in
     (typedefs @ signatures, impls)
   in
+  (* TODO include guards *)
   let header_file_contents =
     Builtins.declarations :: user_declarations |> nl_concat
   in
