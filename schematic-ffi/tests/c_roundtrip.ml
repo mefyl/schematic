@@ -83,6 +83,10 @@ let () =
   C.Runtime.register_schema mapped_schema;
   C.Runtime.register_schema Event_1.schema;
 
+  let ptime_sample =
+    let dt = ((2022, 11, 04), ((13, 12, 3), 0)) in
+    Ptime.of_date_time dt |> Base.Option.value_exn
+  in
   run "Schematic_ffi roundtrips" ~verbose:true
     [
       ( "",
@@ -224,13 +228,13 @@ let () =
                 [%e time_alias_rt_id],
                 [%e pp_time_alias],
                 [%e equal_time_alias],
-                [%e [ Ptime.min; Ptime.max ]] );
+                [%e [ ptime_sample ]] );
               ( "time_local_alias",
                 [%t: time_local_alias],
                 [%e time_local_alias_rt_id],
                 [%e pp_time_local_alias],
                 [%e equal_time_local_alias],
-                [%e [ (Ptime.min, 0); (Ptime.max, 5443) ]] );
+                [%e [ (ptime_sample, 0); (ptime_sample, 5443) ]] );
               ( "date_alias",
                 [%t: date_alias],
                 [%e date_alias_rt_id],
