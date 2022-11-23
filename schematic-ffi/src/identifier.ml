@@ -4,7 +4,7 @@ open Base
    encodings... *)
 type t = Id of string [@@deriving eq, ord, hash]
 
-(* Common list for types abd bindings. TODO: distinguish the two *)
+(* Common list for types and bindings. TODO: distinguish the two *)
 let reserved_names = [ "time"; "id"; "self" ]
 
 (* This is assumed to be idempotent. *)
