@@ -45,6 +45,7 @@
  (name roundtrip)
  (package schematic-ffi)
  (modes exe)
+ (enabled_if %{bin-available:swiftc})
  (flags :standard -cclib -lstdc++ -cclib -lm -cclib -ldl -cclib -lpthread)
  (foreign_archives
   roundtrip
