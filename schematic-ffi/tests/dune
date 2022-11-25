@@ -84,7 +84,8 @@
 
 (rule
  (alias runtest)
- (enabled_if %{bin-available:swiftc})
+ ; Dune 3.0+
+ ; (enabled_if %{bin-available:swiftc})
  (action
   (progn
    (setenv
