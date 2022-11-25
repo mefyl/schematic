@@ -1,16 +1,33 @@
-FROM alpine:3.16.2 AS opam-base
+# Ubuntu 22.04 base
+# There's no well-supported Swift on Alpine Linux.
+FROM swift:5.7 AS opam-base
 
-# No `apk --no-cache` because it makes `conf-pkg-config` fail.
-# See https://github.com/ocaml/opam-repository/issues/22094
-RUN apk add bash coreutils docker-cli gcc git linux-headers m4 make musl-dev opam openssh
-ARG OCAML_VERSION
+# Dirty fix to maintain compatibility with alpine CI images.
+RUN apt-get update && apt-get install --yes busybox
+RUN ln -f /usr/bin/busybox /bin/sh && \
+    ln -f /usr/bin/busybox /sbin/sh && \
+    ln -f /usr/bin/busybox /usr/bin/sh
+
+# Docker CLI sources
+RUN apt-get update && apt-get install --yes linux-headers-generic ca-certificates curl gnupg lsb-release  && mkdir -p /etc/apt/keyrings &&  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# System dependencies
+RUN apt-get update && apt-get install --yes \
+        bash coreutils git opam build-essential \
+        docker-ce docker-ce-cli containerd.io \
+        docker-compose-plugin zsh
+
+# OCaml setup
+ARG OCAML_VERSION="4.14.0"
+RUN opam --version
 RUN opam init  --compiler="$OCAML_VERSION" --disable-sandboxing --dot-profile=/etc/profile.d/opam.sh --shell-setup --verbose --yes && opam clean -a -c -s --logs -r && rm -rf /root/.opam/$OCAML_VERSION/bin/*.byte
 RUN opam config set jobs $(nproc)
 RUN chmod a+x /root
 
-
 FROM opam-base
-
+ARG OCAML_VERSION
 ENV OPAMROOTISOK=1
 ENV ENV="/etc/profile"
 ENV PATH="/root/.opam/$OCAML_VERSION/bin:$PATH"
@@ -19,7 +36,7 @@ RUN chmod 600 /root/.ssh/id_rsa
 RUN ssh-keyscan gitlab.routine.co > /root/.ssh/known_hosts
 # No recursive lookup available
 ARG PACKAGES
-RUN if test -n "$PACKAGES"; then apk add --no-cache $PACKAGES; fi
+RUN if test -n "$PACKAGES"; then apt-get install --yes $PACKAGES; fi
 ADD .exists *.opam.extdeps /root/
 RUN opam update && \
     opam switch set-invariant ocamlformat.0.20.1 && \
@@ -44,4 +61,5 @@ RUN if test -e /root/package.json; then \
     rm -rf /usr/local/share/.cache /root/.cache /tmp/*; \
     fi
 ENV NODE_PATH=/root/node_modules
-ENTRYPOINT ["/bin/ash", "-l", "-c"]
+
+RUN sh -c "opam init --compiler=\"$OCAML_VERSION\" --disable-sandboxing --dot-profile=/etc/profile --shell-setup --verbose --yes && opam clean -a -c -s --logs -r && rm -rf /root/.opam/$OCAML_VERSION/bin/*.byte"

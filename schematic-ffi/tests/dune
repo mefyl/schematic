@@ -14,54 +14,60 @@
   (progn
    (run cp %{deps} .))))
 
-(rule
- (targets
-  libswiftCore.a
-  libswiftDispatch.a
-  libFoundation.a
-  libdispatch.a
-  libBlocksRuntime.a
-  libCoreFoundation.a
-  libicui18nswift.a
-  libicuucswift.a
-  libswiftGlibc.a
-  libDispatchStubs.a
-  libicudataswift.a
-  libswiftSwiftOnoneSupport.a
-  libswift_StringProcessing.a)
- (action
-  (progn
-   ; XXX: hardcoded path
-   (system "cp /usr/lib/swift/lib/swift_static/linux/*.a ."))))
-
-; Simpler to use (extra_objects ...), but only available in dune 3.5+
+; It would be simpler to use (extra_objects ...), but that's only available in dune 3.5+
 
 (rule
  (target libroundtrip.a)
  (action
-  (run ar rc %{target} %{dep:Schemas.o} %{dep:CSchemas.o})))
+  (progn
+   (run ar rc %{target} %{dep:Schemas.o} %{dep:CSchemas.o}))))
 
-(test
+(executable
  (name roundtrip)
- (package schematic-ffi)
  (modes exe)
- (enabled_if %{bin-available:swiftc})
- (flags :standard -cclib -lstdc++ -cclib -lm -cclib -ldl -cclib -lpthread)
- (foreign_archives
-  roundtrip
-  swiftCore
-  Foundation
-  dispatch
-  swiftDispatch
-  BlocksRuntime
-  CoreFoundation
-  icui18nswift
-  icuucswift
-  swiftGlibc
-  DispatchStubs
-  icudataswift
-  swiftSwiftOnoneSupport
-  swift_StringProcessing)
+ ; Linking shenanigans required to get Swift object files to work nicely with our test suite.
+ (flags
+  :standard
+  -cclib
+  schematic-ffi/tests/%{dep:libroundtrip.a}
+  -cclib
+  -lstdc++
+  -cclib
+  -lm
+  -cclib
+  -ldl
+  -cclib
+  -lpthread
+  -cclib
+  -L/usr/lib/swift/linux
+  -cclib
+  -L/usr/lib/swift/lib/swift/linux
+  -cclib
+  -lswiftCore
+  -cclib
+  -lFoundation
+  -cclib
+  -ldispatch
+  -cclib
+  -lswiftDispatch
+  -cclib
+  -lBlocksRuntime
+  -cclib
+  -licui18nswift
+  -cclib
+  -licuucswift
+  -cclib
+  -lswiftGlibc
+  -cclib
+  -licudataswift
+  -cclib
+  -lswiftSwiftOnoneSupport
+  -cclib
+  -lswift_StringProcessing
+  ; These were available in swift_static, but not as .so
+  ; -cclib -lCoreFoundation
+  ; -cclib -lDispatchStubs
+  )
  (modules roundtrip)
  (preprocess
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show metapp.ppx))
@@ -75,3 +81,13 @@
   ppxlib
   ppxlib.ast
   metapp))
+
+(rule
+ (alias runtest)
+ (enabled_if %{bin-available:swiftc})
+ (action
+  (progn
+   (setenv
+    LD_LIBRARY_PATH
+    /usr/lib/swift/linux:/usr/lib/swift/lib/swift/linux:%{env:LD_LIBRARY_PATH=}
+    (run %{exe:roundtrip.exe})))))

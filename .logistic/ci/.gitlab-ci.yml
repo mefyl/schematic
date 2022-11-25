@@ -3,6 +3,8 @@ include:
 
 toolchain:
   extends: .ocaml-toolchain
+  variables:
+    OCAML_VERSION: "4.14.0"
 
 build:
   extends: .ocaml-build
@@ -10,6 +12,8 @@ build:
     - toolchain
   needs:
     - toolchain
+  variables:
+    OCAML_VERSION: "4.14.0"
 
 check:
   extends: .ocaml-check
@@ -17,6 +21,8 @@ check:
     - build
   needs:
     - build
+  variables:
+    OCAML_VERSION: "4.14.0"
 
 package:
   extends: .ocaml-package
@@ -24,6 +30,8 @@ package:
     - check
   needs:
     - check
+  variables:
+    OCAML_VERSION: "4.14.0"
 
 opam:
   extends: .ocaml-opam
@@ -31,3 +39,5 @@ opam:
     - check
   needs:
     - check
+  variables:
+    OCAML_VERSION: "4.14.0"
