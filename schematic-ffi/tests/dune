@@ -24,6 +24,7 @@
 
 (executable
  (name roundtrip)
+ (optional)
  (modes exe)
  ; Linking shenanigans required to get Swift object files to work nicely with our test suite.
  (flags

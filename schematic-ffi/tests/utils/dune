@@ -1,5 +1,6 @@
 (library
  (name ffi_test_utils)
+ (optional)
  (package schematic-ffi)
  (modules ffi_test_utils ffi_test_types)
  (preprocess
