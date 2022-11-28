@@ -17,6 +17,7 @@ include Marks.Make (struct
   type t = c
 
   let equal = equal_c
+  let compare = compare_c
   let pp = pp_c
 
   module Id = Identifier
@@ -30,7 +31,7 @@ module Of = C_walk.Walk (struct
 
   (* Utils *)
   let name (c, _marks) = c_typename c |> Identifier.to_string
-  let builtin c = (c, Marks.empty)
+  let builtin c = (c, Lazy.force Marks.empty)
 
   (* Built-ins *)
 
@@ -76,7 +77,7 @@ module Of = C_walk.Walk (struct
     let s () = (`Option c, marks) in
     schema (Some (Identifier.to_string name)) None s
 
-  let fields_empty () = ([], Marks.empty)
+  let fields_empty () = ([], Lazy.force Marks.empty)
 
   let field : string -> required:bool -> t -> fields -> fields =
    fun name ~required (ast, marks) (rest_ast, rest_marks) ->
@@ -125,7 +126,7 @@ module Of = C_walk.Walk (struct
                in
                let s () = (constr_c, marks) in
                Marks.make id s
-             | _ -> Marks.empty)
+             | _ -> Lazy.force Marks.empty)
       |> Marks.merge
     in
     let marks = Marks.merge [ marks; inline_payload_marks ] in
@@ -193,7 +194,7 @@ module Of = C_walk.Walk (struct
           (Identifier.make "day", int);
         ]
       in
-      (`Struct { fields }, Marks.empty)
+      (`Struct { fields }, Lazy.force Marks.empty)
     in
     schema (Some "sch_date") None s
 end)
