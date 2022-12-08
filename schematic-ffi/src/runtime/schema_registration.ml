@@ -20,7 +20,7 @@ let rec traverse_descriptor :
   match d with
   (* Shallow types *)
   | Null | String | Time | Bool | Float | Int | Ignore | Int64 | Time_local
-  | String_const _ | Date | Any ->
+  | String_const _ | Date | Any _ | Json ->
     ()
   | Fixpoint d -> traverse_descriptor id (Lazy.force d)
   | List s -> traverse_schema s

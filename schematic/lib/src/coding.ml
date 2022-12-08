@@ -1,5 +1,6 @@
 module E = Error
 open Base
+include Coding_intf
 
 let map_results ~f l =
   let rec rev_results res = function
@@ -8,48 +9,6 @@ let map_results ~f l =
     | Result.Ok hd :: tl -> rev_results (hd :: res) tl
   in
   List.rev_map ~f l |> rev_results []
-
-type 'a customizable =
-  [ `Generic
-  | `Custom of 'a
-  ]
-
-type 't key_get = ('t -> string -> ('t option, string) Result.t) customizable
-type 't key_set = ('t -> string -> 't -> ('t, string) Result.t) customizable
-
-module type IMPL = sig
-  type t
-
-  val pp : t Fmt.t
-  val key_get : t key_get
-  val key_set : t key_set
-  val null : unit -> t
-  val of_bool : bool -> t
-  val of_date : (Ptime.date -> t) customizable
-  val of_fields : (string * t) list -> t
-  val of_float : float -> t
-  val of_int : int -> t
-  val of_int64 : int64 -> t
-  val of_json : Ezjsonm.value -> t
-  val of_list : t list -> t
-  val of_option : t option -> t
-  val of_string : string -> t
-  val of_time : Ptime.t -> t
-  val of_time_local : Ptime.t * int -> t
-  val to_bool : t -> bool option
-  val to_date : (t -> Ptime.date option) customizable
-  val to_fields : t -> (string * t) list option
-  val to_float : t -> float option
-  val to_int : t -> int option
-  val to_int64 : t -> int64 option
-  val to_json : t -> Ezjsonm.value option
-  val to_list : t -> t list option
-  val to_option : t -> t option option
-  val to_string : t -> string option
-  val to_time : t -> (Ptime.t, string option) Result.t
-  val to_time_local : t -> (Ptime.t * int, string option) Result.t
-  val type_name : t -> string
-end
 
 let fail id ids fmt =
   let f reason = E.{ path = ids; schema = id; reason } in
@@ -189,7 +148,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         Fmt.kstr f reason
       and ( >>= ) = Result.( >>= ) in
       match schema with
-      | Any -> Coding.to_json v |> type_error "JSON"
+      | Any (module Any) -> Any.of_any (Coding.to_any v) |> type_error Any.name
       | Bool -> Coding.to_bool v |> type_error "boolean"
       | Date -> (
         match Coding.to_date with
@@ -200,6 +159,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       | Ignore -> Result.return ()
       | Int -> Coding.to_int v |> type_error "integer"
       | Int64 -> Coding.to_int64 v |> type_error "integer"
+      | Json -> Coding.to_json v |> type_error "JSON"
       | List items_schema ->
         let* v = Coding.to_list v |> type_error "array" in
         map_results ~f:(decode None ids items_schema.descriptor) v
@@ -350,8 +310,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
     let rec encode_field :
         type req t. (t, req) Schema.field -> req -> (string * Coding.t) option =
      fun { name; requirement; schema; _ } ->
-      let compare = Schema.(compare (field_schema schema))
-      and encode = encode_schema (Schema.field_schema schema) in
+      let encode = encode_schema (Schema.field_schema schema) in
       let optional v =
         match v with None -> None | Some v -> Some (name, encode v)
       in
@@ -360,6 +319,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       | Computed_optional -> (
         fun v -> match v with None -> None | Some v -> optional v)
       | Default default ->
+        let compare = Schema.(compare (field_schema schema)) in
         fun v -> if compare v default = 0 then None else Some (name, encode v)
       | Optional -> optional
       | Required -> fun v -> Some (name, encode v)
@@ -367,7 +327,12 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         type t. string option -> t Schema.descriptor -> t -> Coding.t =
      fun id schema ->
       match schema with
-      | Any -> Coding.of_json
+      | Any (module Any) -> (
+        fun v ->
+          match Coding.of_any (Any.to_any v) with
+          | Some v -> v
+          | None ->
+            Fmt.failwith "%s encoder cannot encode %s" Coding.name Any.name)
       | Bool -> Coding.of_bool
       | Date -> (
         match Coding.of_date with
@@ -381,6 +346,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       | Ignore -> Coding.null
       | Int -> Coding.of_int
       | Int64 -> Coding.of_int64
+      | Json -> Coding.of_json
       | List items_schema ->
         let f = encode_schema items_schema in
         fun v -> Coding.of_list (List.map ~f v)
@@ -479,4 +445,11 @@ module Make_string (C : STR) : STR with type t = string = struct
   let content_type = C.content_type
   let to_string s = s
   let of_string s = Result.return s
+end
+
+module Any (Coding : IMPL) = struct
+  let schema =
+    Schema.{ descriptor = Any (module Coding); id = None; parametric = None }
+
+  let schema_versioned _ = schema
 end

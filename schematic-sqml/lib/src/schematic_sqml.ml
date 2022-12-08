@@ -3,7 +3,7 @@ open Acid
 let rec type_of_descriptor :
     type t. t Schematic.Schema.descriptor -> t Sqml.Expression.Column.Type.t =
   function
-  | Any -> Json
+  | Any _ -> failwith "Any schema unsupported in SQML"
   | Bool -> Bool
   | Float -> Float
   | Date ->
@@ -14,6 +14,7 @@ let rec type_of_descriptor :
   | Int -> Int
   | Ignore -> failwith "schematic-sqml: cannot bind Ignore schema"
   | Int64 -> Bigint
+  | Json -> Json
   | List _ -> failwith "schematic-sqml: cannot bind List schema"
   | Null -> failwith "schematic-sqml: cannot bind Null schema"
   | String -> Text

@@ -1,13 +1,10 @@
 module Schema : module type of Schema
 
-type any = Ezjsonm.value
+type json = Ezjsonm.value
 type ignore = unit
 
 val pp_ignore : Base.Formatter.t -> ignore -> unit
 val equal_ignore : ignore -> ignore -> bool
-val any_schema : any Schema.t
-val any_schema_versioned : Schema.version -> any Schema.t
-val equal_any : any -> any -> bool
 val bool_schema : bool Schema.t
 val bool_schema_versioned : Schema.version -> bool Schema.t
 val float_schema : float Schema.t
@@ -18,6 +15,9 @@ val int64_schema : int64 Schema.t
 val int64_schema_versioned : Schema.version -> int64 Schema.t
 val int_schema : int Schema.t
 val int_schema_versioned : Schema.version -> int Schema.t
+val json_schema : json Schema.t
+val json_schema_versioned : Schema.version -> json Schema.t
+val equal_json : json -> json -> bool
 val list_schema : 'a Schema.t -> 'a list Schema.t
 val list_schema_versioned : Schema.version -> 'a Schema.t -> 'a list Schema.t
 val mapping_schema : 'a Schema.t -> (string * 'a) list Schema.t

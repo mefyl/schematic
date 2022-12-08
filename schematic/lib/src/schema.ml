@@ -26,7 +26,7 @@ let rec pp_descriptor : type u. u descriptor Fmt.t =
     let open Fmt in
     let indent = 2 in
     match d with
-    | Any -> const string "Any"
+    | Any _ -> const string "Any"
     | Bool -> const string "Bool"
     | Date -> const string "Date"
     | Fixpoint s -> const pp_descriptor (Lazy.force s)
@@ -34,6 +34,7 @@ let rec pp_descriptor : type u. u descriptor Fmt.t =
     | Ignore -> const string "Ignore"
     | Int -> const string "Int"
     | Int64 -> const string "Int64"
+    | Json -> const string "Json"
     | List schema ->
       box ~indent
       @@ const string "[" ++ sp
@@ -455,7 +456,7 @@ module Walk (W : WALK) = struct
   module Inline = Make_inline (W.M)
 
   let rec descriptor : type t. t descriptor -> W.t W.M.t = function
-    | Any -> W.any
+    | Any _ -> W.any
     | Bool -> W.bool
     | Float -> W.float
     | Date -> W.date
@@ -463,6 +464,7 @@ module Walk (W : WALK) = struct
     | Int -> W.int
     | Ignore -> W.ignore
     | Int64 -> W.int64
+    | Json -> W.json
     | List l -> W.list (schema l)
     | Null -> W.null
     | String -> W.string
@@ -570,13 +572,14 @@ let compare schema =
     | `O l, `O r -> assoc_compare compare_json l r
   in
   let rec compare : type u. u descriptor -> u -> u -> int = function
-    | Any -> compare_json
+    | Any (module Coding) -> Coding.compare
     | Bool -> Base.Bool.compare
     | Date -> Base.Poly.compare
     | Fixpoint s -> compare (Lazy.force s)
     | Float -> Base.Poly.compare
     | Ignore -> Base.Poly.compare
     | Int | Int64 -> Base.Poly.compare
+    | Json -> compare_json
     | List schema -> Base.List.compare (compare schema.descriptor)
     | Map { encode; descriptor; _ } ->
       fun l r -> compare descriptor (encode l) (encode r)

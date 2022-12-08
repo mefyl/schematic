@@ -70,8 +70,8 @@ and validation = {
   required : string list;
       [@schematic.properties { unique = true }] [@default []]
   dependentRequired : (string * string list) list; [@default []]
-  const : Schemas.any option;
-  enum : Schemas.any list; [@default []]
+  const : Schemas.json option;
+  enum : Schemas.json list; [@default []]
   type_ : type_ list;
       [@default []] [@schematic.schema one_or_many_versioned type_schema]
 }
@@ -79,11 +79,11 @@ and validation = {
 and metadata = {
   title : string option;
   description : string option;
-  default : Schemas.any option;
+  default : Schemas.json option;
   deprecated : bool; [@default false]
   readOnly : bool; [@default false]
   writeOnly : bool; [@default false]
-  examples : Schemas.any list; [@default []]
+  examples : Schemas.json list; [@default []]
 }
 
 and t = {

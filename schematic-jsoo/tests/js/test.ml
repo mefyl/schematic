@@ -63,6 +63,8 @@ let _g (o : keyed_js) =
   let (_ : Js.js_string Js.t) = o##.type_key in
   ()
 
+type any = { any : Schematic_jsoo.Jsoo.t } [@@deriving schema ~jsoo]
+
 let () =
   Js.export_all
     (object%js
@@ -92,4 +94,13 @@ let () =
          let open Result in
          Schematic_jsoo.Jsoo.decode variant_schema js
          |> decode_error "js" >>| variant_to_js
+
+       method any js =
+         match
+           Schematic_jsoo.Jsoo.decode any_schema js |> decode_error "any"
+         with
+         | Result.Ok { any } -> (Js.Unsafe.coerce any)##.content
+         | Result.Error msg ->
+           Js_error.(
+             raise_ @@ of_error (new%js Js.error_constr (Js.string msg)))
     end)

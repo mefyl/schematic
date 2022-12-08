@@ -19,8 +19,9 @@ module Coding = struct
         (Schematic.Schema.equal schema)
     in
     let encoded = Schematic_sexp.encode schema v in
-    let () = Alcotest.(check sexp "encoded" exp encoded) in
-    Alcotest.(check (result value decoding_error)) "decoded" (Result.Ok v)
+    let () = Alcotest.(check ~here:[%here] sexp "encoded" exp encoded) in
+    Alcotest.(check ~here:[%here] (result value decoding_error))
+      "decoded" (Result.Ok v)
     @@ Schematic_sexp.decode schema encoded
 
   let int () = roundtrip int_schema 20 (Atom "20")
@@ -54,6 +55,28 @@ module Coding = struct
   let string () = roundtrip string_schema "20" (Atom "20")
 end
 
+module Any = struct
+  type any = { value : Schematic_sexp.t } [@@deriving eq, schema, show]
+
+  let any = Alcotest.testable pp_any equal_any
+
+  let decode_fail () =
+    Alcotest.(check ~here:[%here] (result any decoding_error))
+      "json error"
+      (Result.Error
+         {
+           path = [ "value" ];
+           reason = "expected s-expression, got null";
+           schema = None;
+         })
+      (Schematic.Json.decode any_schema (`O [ ("value", `Null) ]))
+
+  let encode_fail () =
+    Alcotest.(check_raises ~here:[%here] "json error")
+      (Failure "JSON encoder cannot encode s-expression") (fun () ->
+        Schematic.Json.encode any_schema { value = Atom "value" } |> ignore)
+end
+
 let () =
   let open Alcotest in
   run "schematic-sexp"
@@ -64,4 +87,9 @@ let () =
       ("option", [ test_case "option" `Quick Coding.option ]);
       ("record", [ test_case "record" `Quick Coding.record ]);
       ("string", [ test_case "string" `Quick Coding.string ]);
+      ( "any",
+        [
+          test_case "decode_fail" `Quick Any.decode_fail;
+          test_case "encode_fail" `Quick Any.encode_fail;
+        ] );
     ]

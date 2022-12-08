@@ -44,7 +44,7 @@ external _record_containing_ambiguous_record_rt_id :
   record_containing_ambiguous_record -> record_containing_ambiguous_record
   = "sch_record_containing_ambiguous_record_rt_id"
 
-external any_alias_rt_id : any_alias -> any_alias = "sch_any_alias_rt_id"
+external json_alias_rt_id : json_alias -> json_alias = "sch_json_alias_rt_id"
 external time_alias_rt_id : time_alias -> time_alias = "sch_time_alias_rt_id"
 
 external time_local_alias_rt_id : time_local_alias -> time_local_alias
@@ -232,15 +232,15 @@ module Tests = struct
     in
     test t new_x x
 
-  let any () =
+  let json () =
     (* [ `Null | `Bool of bool | `Float of float | `String of string | `A of
        value list | `O of (string * value) list ] *)
-    let x : any_alias =
+    let x : json_alias =
       `A
         [ `A []; `Float 65.; `O [ ("mykey", `Bool true); ("otherKey", `Null) ] ]
     in
-    let new_x = any_alias_rt_id x in
-    let t = Alcotest.testable pp_any_alias equal_any_alias in
+    let new_x = json_alias_rt_id x in
+    let t = Alcotest.testable pp_json_alias equal_json_alias in
     test t new_x x
 
   let time () =
@@ -376,7 +376,7 @@ let () =
             test_case "int option" `Quick int_option;
             test_case "mapping" `Quick mapping;
             test_case "type alias indirection" `Quick indirection;
-            test_case "any (JSON)" `Quick any;
+            test_case "JSON" `Quick json;
             test_case "time" `Quick time;
             test_case "time_local" `Quick time_local;
             test_case "date" `Quick date;

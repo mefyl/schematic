@@ -13,3 +13,8 @@ val helpers_typed :
   ('t -> 'js Js_of_ocaml.Js.t)
   * ('js Js_of_ocaml.Js.t -> ('t, Schematic.Error.decoding) result)
   * ('js Js_of_ocaml.Js.t -> 't)
+
+val schema_versioned : Schematic.Schema.version -> t Schematic.Schema.t
+val schema : t Schematic.Schema.t
+
+type js = t

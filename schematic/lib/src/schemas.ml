@@ -6,25 +6,23 @@ type ignore = unit
 let pp_ignore _ () = ()
 let equal_ignore () () = true
 
-type any = Ezjsonm.value
+type json = Ezjsonm.value
 
-let rec equal_any l r =
+let rec equal_json l r =
   match (l, r) with
   | `Null, `Null -> true
   | `Bool l, `Bool r -> Bool.equal l r
   | `Float l, `Float r -> Float.equal l r
   | `String l, `String r -> String.equal l r
-  | `A l, `A r -> List.equal equal_any l r
+  | `A l, `A r -> List.equal equal_json l r
   | `O l, `O r -> (
     try
       let l = Map.of_alist_exn (module String) l
       and r = Map.of_alist_exn (module String) r in
-      Map.equal equal_any l r
+      Map.equal equal_json l r
     with _ -> false)
   | _ -> false
 
-let any_schema = Schema.make Any
-let any_schema_versioned (_ : Schema.version) = any_schema
 let bool_schema = Schema.make Bool
 let bool_schema_versioned (_ : Schema.version) = bool_schema
 let float_schema = Schema.make Float
@@ -35,6 +33,8 @@ let int64_schema = Schema.make Int64
 let int64_schema_versioned (_ : Schema.version) = int64_schema
 let int_schema = Schema.make Int
 let int_schema_versioned (_ : Schema.version) = int_schema
+let json_schema = Schema.make Json
+let json_schema_versioned (_ : Schema.version) = json_schema
 let list_schema schema = Schema.make (List schema)
 let list_schema_versioned _ = list_schema
 let mapping_schema schema = Schema.make (Mapping schema)

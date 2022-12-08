@@ -1,14 +1,16 @@
 open Base
 open Schematic
 module Sexp = Sexplib.Sexp
+include Sexp
 include Schematic_sexp_intf
 
-let schema = Schema.make Any
-let schema_versioned (_ : Schema.version) = schema
+type Coding.any += Sexp of t
 
 module Sexp_coding : Coding.IMPL with type t = t = struct
   type nonrec t = t
 
+  let name = "s-expression"
+  let compare = Sexplib.Sexp.compare
   let pp = Sexplib.Sexp.pp
 
   include Coding.Defaults
@@ -27,6 +29,7 @@ module Sexp_coding : Coding.IMPL with type t = t = struct
 
   (* Interface *)
   let null () = Sexp.unit
+  let of_any = function Sexp v -> Some v | _ -> None
   let of_bool b = Sexp.Atom (Bool.to_string b)
 
   let of_fields fields =
@@ -45,6 +48,7 @@ module Sexp_coding : Coding.IMPL with type t = t = struct
   let of_time_local (t, tz_offset_s) =
     Sexp.Atom (Ptime.to_rfc3339 ~tz_offset_s t)
 
+  let to_any = function v -> Sexp v
   let to_bool = of_atom Bool.of_string
 
   let to_fields = function
@@ -91,3 +95,4 @@ module Sexp_coding : Coding.IMPL with type t = t = struct
 end
 
 include Coding.Make (Sexp_coding)
+include Coding.Any (Sexp_coding)

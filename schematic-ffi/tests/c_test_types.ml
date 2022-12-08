@@ -79,15 +79,15 @@ type record_containing_ambiguous_record = {
 }
 [@@deriving schema, show, eq]
 
-type any_alias = Schematic.Schemas.any [@@deriving schema, eq]
+type json_alias = Schematic.Schemas.json [@@deriving schema, eq]
 
-let pp_any_alias : any_alias Fmt.t = Fmt.of_to_string Ezjsonm.get_string
+let pp_json_alias : json_alias Fmt.t = Fmt.of_to_string Ezjsonm.get_string
 
-type any_manual_annotation =
-  (Ezjsonm.value[@schematic.schema fun _ -> Schematic.Schemas.any_schema])
+type json_manual_annotation =
+  (Ezjsonm.value[@schematic.schema fun _ -> Schematic.Schemas.json_schema])
 [@@deriving schema]
 
-let pp_any_manual_annotation : any_manual_annotation Fmt.t =
+let pp_json_manual_annotation : json_manual_annotation Fmt.t =
   Fmt.of_to_string Ezjsonm.get_string
 
 type time_alias = Ptime.t [@@deriving schema, show, eq]
@@ -300,7 +300,7 @@ let exported_schemas =
     Schema.pack int64_alias_schema;
     Schema.pack record_with_indir_field_schema;
     Schema.pack record_containing_ambiguous_record_schema;
-    Schema.pack any_alias_schema;
+    Schema.pack json_alias_schema;
     Schema.pack time_alias_schema;
     Schema.pack time_local_alias_schema;
     Schema.pack date_alias_schema;
