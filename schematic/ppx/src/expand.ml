@@ -73,43 +73,41 @@ let type_context (t : type_declaration) =
     params = t.ptype_params;
   }
 
+let jsoo_flag ~context jsoo =
+  if context.global.enable_jsoo then
+    match jsoo with
+    | None -> None
+    | Some [%expr jsoo] | Some [%expr true] -> Some true
+    | Some [%expr false] -> Some false
+    | Some exp ->
+      Ppxlib.Location.raise_errorf ~loc:exp.pexp_loc
+        "schematic-ppx: invalid ~jsoo argument value: %a" Pprintast.expression
+        exp
+  else None
+
+let type_ ~context ~type_context t =
+  let loc = type_context.loc in
+  match t.ptype_kind with
+  | Ptype_record fields ->
+    let fields = List.map ~f:(expand_field context) fields
+    and computed =
+      Attributes.fields_of_computed ~loc type_context.attributes.computed
+    in
+    Record (fields @ computed)
+  | Ptype_abstract -> (
+    match t.ptype_manifest with Some type_ -> Core type_ | None -> Abstract)
+  | Ptype_open ->
+    Ppxlib.Location.raise_errorf ~loc "schematic-ppx: unsupported Ptype_open"
+  | Ptype_variant options -> Variant options
+
 let expand ~context types gadt jsoo sqml =
-  let jsoo =
-    if context.global.enable_jsoo then
-      match jsoo with
-      | None -> None
-      | Some [%expr jsoo] | Some [%expr true] -> Some true
-      | Some [%expr false] -> Some false
-      | Some exp ->
-        Ppxlib.Location.raise_errorf ~loc:exp.pexp_loc
-          "schematic-ppx: invalid ~jsoo argument value: %a" Pprintast.expression
-          exp
-    else None
+  let jsoo = jsoo_flag ~context jsoo
   and loc = context.loc in
   let expand context =
     let types =
       let f t =
-        let type_context = type_context t
-        and loc = t.ptype_loc in
-        let type_ =
-          match t.ptype_kind with
-          | Ptype_record fields ->
-            let fields = List.map ~f:(expand_field context) fields
-            and computed =
-              Attributes.fields_of_computed ~loc
-                type_context.attributes.computed
-            in
-            Record (fields @ computed)
-          | Ptype_abstract -> (
-            match t.ptype_manifest with
-            | Some type_ -> Core type_
-            | None -> Abstract)
-          | Ptype_open ->
-            Ppxlib.Location.raise_errorf ~loc
-              "schematic-ppx: unsupported Ptype_open"
-          | Ptype_variant options -> Variant options
-        in
-        (type_, type_context)
+        let type_context = type_context t in
+        (type_ ~context ~type_context t, type_context)
       in
       List.map ~f types
     in
@@ -159,10 +157,25 @@ let expand ~context types gadt jsoo sqml =
     List.map ~f variants |> List.concat
   | None -> expand context
 
-let expand_sig ~context types =
-  (* FIXME: Jsoo declarations *)
-  let types = List.map types ~f:(fun t -> (t, type_context t)) in
-  Schema.expand_sig ~context types
+let expand_sig ~(context : context) types jsoo =
+  let loc = context.loc
+  and jsoo = jsoo_flag ~context jsoo
+  and types = List.map types ~f:(fun t -> (t, type_context t)) in
+  let contents =
+    match jsoo with
+    | None -> []
+    | Some _ ->
+      let f (t, type_context) =
+        Jsoo.expand_sig ~context ~configuration:{ functions = true }
+          ~type_context
+          (type_ ~context ~type_context t)
+      in
+      List.map ~f types |> List.concat
+  in
+  let contents = Schema.expand_sig ~context types @ contents in
+  if Option.is_some jsoo then [%sig: open Schematic_jsoo.Schemas] @ contents
+  else if context.global.inside then [%sig: open Schemas] @ contents
+  else [%sig: open Schematic.Schemas] @ contents
 
 let add ~inside ~jsoo ~version =
   let global =
@@ -198,8 +211,9 @@ let add ~inside ~jsoo ~version =
   let sig_type_decl =
     let arg =
       let open Deriving.Args in
-      let fixpoint = flag "fixpoint" in
-      empty +> fixpoint
+      let fixpoint = flag "fixpoint"
+      and jsoo = arg "jsoo" __ in
+      empty +> fixpoint +> jsoo
     in
     Deriving.Generator.V2.make arg (fun ~ctxt (recursive, types) fixpoint ->
         expand_sig ~context:(context ~ctxt ~fixpoint recursive types) types)

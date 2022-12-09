@@ -773,7 +773,10 @@ let expand_sig ~(context : context) types =
         psig_value
         @@ value_description
              ~name:{ txt = name "schema" txt; loc }
-             ~type_:[%type: [%t type_] Schematic.Schema.t] ~prim:[]);
+             ~type_:
+               (type_wrap context type_context
+                  [%type: [%t type_] Schematic.Schema.t])
+             ~prim:[]);
     ]
   in
   List.map ~f types |> List.concat

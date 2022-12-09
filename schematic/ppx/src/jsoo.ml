@@ -278,3 +278,79 @@ let combine ~loc { functions } items =
             (to_js, of_js, of_js_exn)]
   and type_ = { pstr_desc = Pstr_type (Recursive, items); pstr_loc = loc } in
   if functions then type_ :: List.filter_map ~f:converters items else [ type_ ]
+
+let expand_sig ~(context : context) ~(configuration : configuration)
+    ~type_context type_ =
+  let loc = context.loc in
+  let open (val Ast_builder.make loc) in
+  let type_ =
+    let unused t =
+      {
+        t with
+        ptype_attributes =
+          {
+            attr_name = Located.mk "warning";
+            attr_payload =
+              PStr [ pstr_eval (estring "-unused-type-declaration") [] ];
+            attr_loc = loc;
+          }
+          :: t.ptype_attributes;
+      }
+    in
+    let abstract manifest =
+      psig_type Recursive
+        [
+          type_declaration ~cstrs:[] ~kind:Ptype_abstract ~manifest
+            ~name:(name "js" type_context.name |> Located.mk)
+            ~params:type_context.params ~private_:Public
+          |> unused;
+        ]
+    in
+    match type_ with
+    | Abstract -> abstract None
+    | Core core ->
+      expand_type ~loc ~context ~type_context core |> Option.return |> abstract
+    | Record fields ->
+      expand_record ~context ~type_context fields
+      |> close ~configuration ~context ~type_context
+      |> List.map ~f:unused |> psig_type Recursive
+    | Variant fields ->
+      expand_variant ~context ~type_context fields
+      |> close ~configuration ~context ~type_context
+      |> List.map ~f:unused |> psig_type Recursive
+  in
+  if not configuration.functions then [ type_ ]
+  else
+    let params = List.map ~f:fst type_context.params in
+    let params_wrap init =
+      let f param type_ = [%type: [%t param] Schema.t -> [%t type_]] in
+      List.fold_right ~init ~f params
+    in
+    let caml_type = ptyp_constr (Located.lident type_context.name) params
+    and js_type =
+      ptyp_constr
+        (Located.lident (name "js" type_context.name))
+        (List.map ~f:(fun _ -> [%type: Js_of_ocaml.Js.Unsafe.any]) params)
+    in
+    type_
+    :: [
+         psig_value
+         @@ value_description
+              ~name:(Located.mk @@ name "to_js" type_context.name)
+              ~type_:(params_wrap @@ ptyp_arrow Nolabel caml_type js_type)
+              ~prim:[];
+         psig_value
+         @@ value_description
+              ~name:(Located.mk @@ name "of_js" type_context.name)
+              ~type_:
+                (params_wrap
+                @@ ptyp_arrow Nolabel js_type
+                     [%type:
+                       ([%t caml_type], Schematic.Error.decoding) Result.t])
+              ~prim:[];
+         psig_value
+         @@ value_description
+              ~name:(Located.mk @@ name "of_js_exn" type_context.name)
+              ~type_:(params_wrap @@ ptyp_arrow Nolabel js_type caml_type)
+              ~prim:[];
+       ]
