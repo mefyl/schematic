@@ -173,13 +173,31 @@ let custom_break fits breaks fmt _ =
   Caml.Format.pp_print_custom_break fmt ~fits:(fits, 0, "")
     ~breaks:(breaks, 0, "")
 
+module Precedence = struct
+  module T = struct
+    type t =
+      | Delimited
+      | Intersection
+      | Union
+    [@@deriving show { with_path = false }]
+
+    let to_string = Fmt.to_to_string pp
+    let to_int = function Delimited -> 0 | Intersection -> 2 | Union -> 1
+    let compare l r = Int.compare (to_int l) (to_int r)
+    let sexp_of_t t = Sexp.Atom (to_string t)
+  end
+
+  include T
+  include Comparable.Make (T)
+end
+
 let pp ?(indent = 2) fmt ts =
-  let rec pp fmt ts =
+  let rec pp (prec : Precedence.t) fmt ts =
     let printer =
       let open Fmt in
       let tuple =
         const char '[' ++ break 1 indent
-        ++ (hvbox @@ list ~sep:comma (hvbox pp))
+        ++ (hvbox @@ list ~sep:comma (hvbox (pp Delimited)))
         ++ sp ++ const char ']'
       and object_ =
         let field f (name, v, required) =
@@ -187,33 +205,39 @@ let pp ?(indent = 2) fmt ts =
             box ~indent
             @@ Fmt.pair
                  ~sep:(const string (if required then ":" else "?:") ++ sp)
-                 Dump.string (hvbox pp)
+                 Dump.string
+                 (hvbox (pp Delimited))
           in
           pp f (name, v)
         in
         const char '{' ++ break 1 indent
         ++ (hvbox @@ list ~sep:semi field)
         ++ sp ++ const char '}'
-      and union = hvbox @@ list ~sep:(custom_break " | " " |") (hvbox pp) in
+      and union =
+        let pp =
+          hvbox @@ list ~sep:(custom_break " | " " |") (hvbox (pp Union))
+        in
+        if Precedence.(Union < prec) then const char '(' ++ pp ++ const char ')'
+        else pp
+      in
+
       match ts with
       | Atom s -> const string s
       | Intersection types ->
-        const (list ~sep:(sp ++ const char '&' ++ sp) pp) types
+        const (list ~sep:(sp ++ const char '&' ++ sp) (pp Intersection)) types
       | Object { fields; _ } -> const object_ fields
       | String s -> const Dump.string s
       | Template { name; args } ->
         hbox
         @@ const string name ++ const char '<'
-           ++ const (list ~sep:comma pp) args
+           ++ const (list ~sep:comma (pp Delimited)) args
            ++ const char '>'
       | Tuple l -> const tuple l
-      | Union l ->
-        (* FIXME: parenthesizing ? *)
-        const union l
+      | Union l -> const union l
     in
     printer fmt ()
   in
-  pp fmt ts
+  pp Union fmt ts
 
 let to_string t = Fmt.(str "%a" (box pp) t)
 
