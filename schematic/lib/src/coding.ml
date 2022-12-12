@@ -10,8 +10,8 @@ let map_results ~f l =
   in
   List.rev_map ~f l |> rev_results []
 
-let fail id ids fmt =
-  let f reason = E.{ path = ids; schema = id; reason } in
+let fail (context : E.decoding) fmt =
+  let f reason = { context with reason } in
   Fmt.kstr f fmt
 
 let type_error expected effective =
@@ -37,27 +37,26 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
 
   let ( let* ) = Result.( >>= )
 
-  let type_error id ids expected v = function
+  let type_error (context : E.decoding) expected v = function
     | Some v -> Result.return v
     | None ->
-      Result.fail @@ fail id ids "%s"
+      Result.fail @@ fail context "%s"
       @@ type_error expected (Coding.type_name v)
 
-  let key_get schema path o f =
+  let key_get (context : E.decoding) o f =
     match Coding.key_get with
     | `Custom impl ->
-      impl o f |> Result.map_error ~f:(fun reason -> E.{ path; schema; reason })
+      impl o f |> Result.map_error ~f:(fun reason -> { context with reason })
     | `Generic ->
-      let* fields = Coding.to_fields o |> type_error schema path "object" o in
+      let* fields = Coding.to_fields o |> type_error context "object" o in
       List.Assoc.find ~equal:String.equal fields f |> Result.return
 
-  let key_set schema path o f v =
+  let key_set (context : E.decoding) o f v =
     match Coding.key_set with
     | `Custom impl ->
-      impl o f v
-      |> Result.map_error ~f:(fun reason -> E.{ path; schema; reason })
+      impl o f v |> Result.map_error ~f:(fun reason -> { context with reason })
     | `Generic ->
-      let* fields = Coding.to_fields o |> type_error schema path "object" v in
+      let* fields = Coding.to_fields o |> type_error context "object" v in
       Result.return (Coding.of_fields @@ ((f, v) :: fields))
 
   let requirement_return (type a req) (req : (a, req) Schema.requirement)
@@ -91,15 +90,14 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
     let rec decode_field :
         type t r.
         bool ->
-        string option ->
-        string list ->
+        E.decoding ->
         string ->
         t Schema.t ->
         (t, r) Schema.requirement ->
         Coding.t option ->
         (r, 'error) Result.t =
-     fun omit id ids field schema ->
-      let ids_next = field :: ids in
+     fun omit context field schema ->
+      let context_next = { context with path = field :: context.path } in
       function
       | Default default -> (
         function
@@ -108,12 +106,25 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           else
             match (Coding.to_option v, schema.descriptor) with
             | Some None, Nullable nullable -> (
-              match decode schema.id ids_next nullable.descriptor v with
+              match
+                decode
+                  { context_next with schema = schema.id }
+                  nullable.descriptor v
+              with
               | Result.Ok v -> Result.return (Some v)
-              | Result.Error _ -> decode schema.id ids_next schema.descriptor v)
-            | Some None, _ -> decode schema.id ids_next schema.descriptor v
-            | Some (Some v), _ -> decode schema.id ids_next schema.descriptor v
-            | None, _ -> type_error id ids "option" v None)
+              | Result.Error _ ->
+                decode
+                  { context_next with schema = schema.id }
+                  schema.descriptor v)
+            | Some None, _ ->
+              decode
+                { context_next with schema = schema.id }
+                schema.descriptor v
+            | Some (Some v), _ ->
+              decode
+                { context_next with schema = schema.id }
+                schema.descriptor v
+            | None, _ -> type_error context "option" v None)
         | None -> Result.return default)
       | Computed -> fun _ -> Result.Ok None
       | Computed_optional -> fun _ -> Result.Ok None
@@ -122,29 +133,35 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | Some v -> (
           match Coding.to_option v with
           | Some None -> (
-            match decode schema.id ids_next schema.descriptor v with
+            match
+              decode
+                { context_next with schema = schema.id }
+                schema.descriptor v
+            with
             | Result.Ok v -> Result.return (Some v)
             | Result.Error _ -> Result.return None)
           | Some (Some v) ->
             Result.map ~f:Option.return
-            @@ decode schema.id ids_next schema.descriptor v
-          | None -> type_error id ids "option" v None)
+            @@ decode
+                 { context_next with schema = schema.id }
+                 schema.descriptor v
+          | None -> type_error context "option" v None)
         | None -> Result.return None)
       | Required -> (
         function
-        | Some v -> decode schema.id ids_next schema.descriptor v
-        | None -> Result.fail (fail id ids "missing required field %S" field))
+        | Some v ->
+          decode { context_next with schema = schema.id } schema.descriptor v
+        | None -> Result.fail (fail context "missing required field %S" field))
     and decode :
         type t.
-        string option ->
-        string list ->
+        E.decoding ->
         t Schema.descriptor ->
         Coding.t ->
         (t, E.decoding) Result.t =
-     fun id ids schema v ->
-      let type_error expected res = type_error id ids expected v res
+     fun context schema v ->
+      let type_error expected res = type_error context expected v res
       and error reason =
-        let f reason = E.{ path = ids; schema = id; reason } in
+        let f reason = { context with reason } in
         Fmt.kstr f reason
       and ( >>= ) = Result.( >>= ) in
       match schema with
@@ -152,9 +169,10 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       | Bool -> Coding.to_bool v |> type_error "boolean"
       | Date -> (
         match Coding.to_date with
-        | `Generic -> decode None ids date_tuple_schema.descriptor v
+        | `Generic ->
+          decode { context with schema = None } date_tuple_schema.descriptor v
         | `Custom f -> f v |> type_error "date")
-      | Fixpoint s -> decode id ids (Lazy.force s) v
+      | Fixpoint s -> decode context (Lazy.force s) v
       | Float -> Coding.to_float v |> type_error "float"
       | Ignore -> Result.return ()
       | Int -> Coding.to_int v |> type_error "integer"
@@ -162,14 +180,18 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       | Json -> Coding.to_json v |> type_error "JSON"
       | List items_schema ->
         let* v = Coding.to_list v |> type_error "array" in
-        map_results ~f:(decode None ids items_schema.descriptor) v
+        map_results
+          ~f:(decode { context with schema = None } items_schema.descriptor)
+          v
       | Map { decode = cons; descriptor; _ } ->
-        decode id ids descriptor v >>= fun value ->
+        decode context descriptor v >>= fun value ->
         cons value |> Result.map_error ~f:(fun reason -> error "%s" reason)
       | Mapping fields_schema ->
         let* fields = Coding.to_fields v |> type_error "mapping" in
         let f (name, value) =
-          decode fields_schema.id ids fields_schema.descriptor value
+          decode
+            { context with schema = fields_schema.id }
+            fields_schema.descriptor value
           >>= fun value -> Result.return (name, value)
         in
         map_results ~f fields
@@ -182,7 +204,8 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         match Coding.to_option v with
         | Some None -> Result.return None
         | Some (Some v) ->
-          decode s.id ids s.descriptor v |> Result.map ~f:Option.return
+          decode { context with schema = s.id } s.descriptor v
+          |> Result.map ~f:Option.return
         | None -> type_error "option" None)
       | Object { fields = fields_schema; decode = o_decode; _ } ->
         let* fields = Coding.to_fields v |> type_error "object" in
@@ -230,7 +253,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
                     else outline ()
                   | Outline _ -> outline ()
                 in
-                decode_field omit id ids field_name schema requirement value
+                decode_field omit context field_name schema requirement value
               in
               Result.Let_syntax.Let_syntax.both field (decode_object rest))
         in
@@ -259,7 +282,8 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
          fun t v ->
           match (t, v) with
           | Item { schema; rest }, hd :: tl ->
-            decode schema.id ids schema.descriptor hd >>= fun hd ->
+            decode { context with schema = schema.id } schema.descriptor hd
+            >>= fun hd ->
             decode_tuple rest tl >>= fun tl -> Result.return (hd, tl)
           | ItemEnd, [] -> Result.return ()
           | Item _, [] -> Result.fail (error "not enough tuple elements")
@@ -270,8 +294,14 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         match key with
         | None -> (
           let conv (Schema.Case { decoder; schema; _ }) =
-            let id = Option.first_some schema.id id in
-            match decode id ids schema.descriptor v with
+            match
+              decode
+                {
+                  context with
+                  schema = Option.first_some schema.id context.schema;
+                }
+                schema.descriptor v
+            with
             | Result.Ok v -> Some (decoder v)
             | Result.Error _ -> None
           in
@@ -283,7 +313,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | Some key -> (
           let* key_value =
             let* v =
-              match key_get id ids v key with
+              match key_get context v key with
               | Result.Ok (Some v) -> Result.return v
               | Result.Ok None ->
                 Result.Error (error "missing key field %S" key)
@@ -292,10 +322,16 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
             Coding.to_string v |> type_error "string"
           in
           let conv (Schema.Case { decoder; name; schema; _ }) =
-            let id = Option.first_some schema.id id in
             if String.(name = key_value) then
               Option.return
-              @@ let* v = decode id ids schema.descriptor v in
+              @@ let* v =
+                   decode
+                     {
+                       context with
+                       schema = Option.first_some schema.id context.schema;
+                     }
+                     schema.descriptor v
+                 in
                  Result.return (decoder v)
             else None
           in
@@ -304,7 +340,9 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           | None ->
             Result.fail (error "invalid key field %S = %S" key key_value)))
     in
-    decode schema.Schema.id [] schema.descriptor
+    decode
+      { schema = schema.Schema.id; path = []; reason = "" }
+      schema.descriptor
 
   let encode schema =
     let rec encode_field :
@@ -400,7 +438,12 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
                 match key with
                 | Some key -> (
                   match
-                    key_set None [ (* FIXME: context *) ]
+                    key_set
+                      {
+                        schema = None;
+                        path = [ (* FIXME: context *) ];
+                        reason = "";
+                      }
                       v key (Coding.of_string name)
                   with
                   | Result.Ok v -> Some v
