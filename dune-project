@@ -12,7 +12,7 @@
 
 (authors "mefyl <mefyl@gruntech.org>")
 
-(version 0.15.0)
+(version 0.16.0)
 
 (homepage https://gitlab.routine.co/routine/schematic)
 
@@ -22,7 +22,6 @@
 
 (source
  (uri git+https://gitlab.routine.co/routine/schematic.git))
-
 
 (package
  (name schematic)
