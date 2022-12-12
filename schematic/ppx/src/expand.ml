@@ -133,23 +133,10 @@ let expand ~context types gadt jsoo sqml =
       Schema_expander.expand ~configuration:() ~context types @ contents
     in
     if Option.is_some jsoo then
-      [%str
-        open Schematic_jsoo.Schemas
-
-        let _ = fun (_ : int_js) -> ()]
-      @ contents
+      [%str open Schematic_jsoo.Schemas [@@warning "-unused-open"]] @ contents
     else if context.global.inside then
-      [%str
-        open Schemas
-
-        let _ = unit_schema]
-      @ contents
-    else
-      [%str
-        open Schematic.Schemas
-
-        let _ = unit_schema]
-      @ contents
+      [%str open Schemas [@@warning "-unused-open"]] @ contents
+    else [%str open Schematic.Schemas [@@warning "-unused-open"]] @ contents
   in
   match gadt with
   | Some variants ->
@@ -173,9 +160,11 @@ let expand_sig ~(context : context) types jsoo =
       List.map ~f types |> List.concat
   in
   let contents = Schema.expand_sig ~context types @ contents in
-  if Option.is_some jsoo then [%sig: open Schematic_jsoo.Schemas] @ contents
-  else if context.global.inside then [%sig: open Schemas] @ contents
-  else [%sig: open Schematic.Schemas] @ contents
+  if Option.is_some jsoo then
+    [%sig: open Schematic_jsoo.Schemas [@@warning "-unused-open"]] @ contents
+  else if context.global.inside then
+    [%sig: open Schemas [@@warning "-unused-open"]] @ contents
+  else [%sig: open Schematic.Schemas [@@warning "-unused-open"]] @ contents
 
 let add ~inside ~jsoo ~version =
   let global =
