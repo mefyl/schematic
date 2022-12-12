@@ -97,7 +97,9 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         Coding.t option ->
         (r, 'error) Result.t =
      fun omit context field schema ->
-      let context_next = { context with path = field :: context.path } in
+      let decode schema v =
+        decode_schema { context with path = field :: context.path } schema v
+      in
       function
       | Default default -> (
         function
@@ -106,24 +108,11 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           else
             match (Coding.to_option v, schema.descriptor) with
             | Some None, Nullable nullable -> (
-              match
-                decode
-                  { context_next with schema = schema.id }
-                  nullable.descriptor v
-              with
+              match decode nullable v with
               | Result.Ok v -> Result.return (Some v)
-              | Result.Error _ ->
-                decode
-                  { context_next with schema = schema.id }
-                  schema.descriptor v)
-            | Some None, _ ->
-              decode
-                { context_next with schema = schema.id }
-                schema.descriptor v
-            | Some (Some v), _ ->
-              decode
-                { context_next with schema = schema.id }
-                schema.descriptor v
+              | Result.Error _ -> decode schema v)
+            | Some None, _ -> decode schema v
+            | Some (Some v), _ -> decode schema v
             | None, _ -> type_error context "option" v None)
         | None -> Result.return default)
       | Computed -> fun _ -> Result.Ok None
@@ -133,26 +122,17 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | Some v -> (
           match Coding.to_option v with
           | Some None -> (
-            match
-              decode
-                { context_next with schema = schema.id }
-                schema.descriptor v
-            with
+            match decode schema v with
             | Result.Ok v -> Result.return (Some v)
             | Result.Error _ -> Result.return None)
-          | Some (Some v) ->
-            Result.map ~f:Option.return
-            @@ decode
-                 { context_next with schema = schema.id }
-                 schema.descriptor v
+          | Some (Some v) -> Result.map ~f:Option.return @@ decode schema v
           | None -> type_error context "option" v None)
         | None -> Result.return None)
       | Required -> (
         function
-        | Some v ->
-          decode { context_next with schema = schema.id } schema.descriptor v
+        | Some v -> decode schema v
         | None -> Result.fail (fail context "missing required field %S" field))
-    and decode :
+    and decode_descriptor :
         type t.
         E.decoding ->
         t Schema.descriptor ->
@@ -169,10 +149,9 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       | Bool -> Coding.to_bool v |> type_error "boolean"
       | Date -> (
         match Coding.to_date with
-        | `Generic ->
-          decode { context with schema = None } date_tuple_schema.descriptor v
+        | `Generic -> decode_schema context date_tuple_schema v
         | `Custom f -> f v |> type_error "date")
-      | Fixpoint s -> decode context (Lazy.force s) v
+      | Fixpoint s -> decode_descriptor context (Lazy.force s) v
       | Float -> Coding.to_float v |> type_error "float"
       | Ignore -> Result.return ()
       | Int -> Coding.to_int v |> type_error "integer"
@@ -180,19 +159,15 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       | Json -> Coding.to_json v |> type_error "JSON"
       | List items_schema ->
         let* v = Coding.to_list v |> type_error "array" in
-        map_results
-          ~f:(decode { context with schema = None } items_schema.descriptor)
-          v
+        map_results ~f:(decode_schema context items_schema) v
       | Map { decode = cons; descriptor; _ } ->
-        decode context descriptor v >>= fun value ->
+        decode_descriptor context descriptor v >>= fun value ->
         cons value |> Result.map_error ~f:(fun reason -> error "%s" reason)
       | Mapping fields_schema ->
         let* fields = Coding.to_fields v |> type_error "mapping" in
         let f (name, value) =
-          decode
-            { context with schema = fields_schema.id }
-            fields_schema.descriptor value
-          >>= fun value -> Result.return (name, value)
+          decode_schema context fields_schema value >>= fun value ->
+          Result.return (name, value)
         in
         map_results ~f fields
       | Null ->
@@ -204,8 +179,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         match Coding.to_option v with
         | Some None -> Result.return None
         | Some (Some v) ->
-          decode { context with schema = s.id } s.descriptor v
-          |> Result.map ~f:Option.return
+          decode_schema context s v |> Result.map ~f:Option.return
         | None -> type_error "option" None)
       | Object { fields = fields_schema; decode = o_decode; _ } ->
         let* fields = Coding.to_fields v |> type_error "object" in
@@ -282,8 +256,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
          fun t v ->
           match (t, v) with
           | Item { schema; rest }, hd :: tl ->
-            decode { context with schema = schema.id } schema.descriptor hd
-            >>= fun hd ->
+            decode_schema context schema hd >>= fun hd ->
             decode_tuple rest tl >>= fun tl -> Result.return (hd, tl)
           | ItemEnd, [] -> Result.return ()
           | Item _, [] -> Result.fail (error "not enough tuple elements")
@@ -295,7 +268,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | None -> (
           let conv (Schema.Case { decoder; schema; _ }) =
             match
-              decode
+              decode_descriptor
                 {
                   context with
                   schema = Option.first_some schema.id context.schema;
@@ -325,7 +298,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
             if String.(name = key_value) then
               Option.return
               @@ let* v =
-                   decode
+                   decode_descriptor
                      {
                        context with
                        schema = Option.first_some schema.id context.schema;
@@ -339,10 +312,13 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           | Some res -> res
           | None ->
             Result.fail (error "invalid key field %S = %S" key key_value)))
+    and decode_schema :
+        type t. E.decoding -> t Schema.t -> Coding.t -> (t, E.decoding) Result.t
+        =
+     fun context schema v ->
+      decode_descriptor { context with schema = schema.id } schema.descriptor v
     in
-    decode
-      { schema = schema.Schema.id; path = []; reason = "" }
-      schema.descriptor
+    decode_schema { schema = None; path = []; reason = "" } schema
 
   let encode schema =
     let rec encode_field :
