@@ -1,6 +1,5 @@
 (dirs
  schematic
- schematic-cli
  schematic-ffi
  schematic-http
  schematic-jsoo
@@ -24,7 +23,6 @@
   schematic-sqml.opam
   schematic.opam
   (alias_rec schematic/default)
-  (alias_rec schematic-cli/default)
   (alias_rec schematic-http/default)
   (alias_rec schematic-jsoo/default)
   (alias_rec schematic-sexp/default)
@@ -34,6 +32,7 @@
 (rule
  (target dune.extdeps.inc)
  (alias extdeps)
+ (deps dune-project)
  (mode (promote))
  (action
   (with-stdout-to
@@ -41,8 +40,6 @@
    (run
     %{dep:.logistic/dune/extdeps/extdeps.exe}
     generate
-    --packages
-    schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml
     --exclude
     acid,bake))))
 

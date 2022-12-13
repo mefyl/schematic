@@ -20,7 +20,7 @@
   (with-stdout-to %{target}
    (progn (cat %{opam})
     (echo
-     "url { src: \"git://git@gitlab.routine.co:routine/schematic-cli#%{version:schematic-cli}\" }")))))
+     "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-cli}\" }")))))
 (rule (deps (universe)) (target schematic-cli.opam.locked)
  (action (run %{bin:opam} lock schematic-cli)))
 (rule (alias extdeps) (mode (promote (until-clean)))
@@ -36,7 +36,7 @@
   (with-stdout-to %{target}
    (progn (cat %{opam})
     (echo
-     "url { src: \"git://git@gitlab.routine.co:routine/schematic-ffi#%{version:schematic-ffi}\" }")))))
+     "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-ffi}\" }")))))
 (rule (deps (universe)) (target schematic-ffi.opam.locked)
  (action (run %{bin:opam} lock schematic-ffi)))
 (rule (alias extdeps) (mode (promote (until-clean)))
@@ -52,7 +52,7 @@
   (with-stdout-to %{target}
    (progn (cat %{opam})
     (echo
-     "url { src: \"git://git@gitlab.routine.co:routine/schematic-http#%{version:schematic-http}\" }")))))
+     "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-http}\" }")))))
 (rule (deps (universe)) (target schematic-http.opam.locked)
  (action (run %{bin:opam} lock schematic-http)))
 (rule (alias extdeps) (mode (promote (until-clean)))
@@ -68,7 +68,7 @@
   (with-stdout-to %{target}
    (progn (cat %{opam})
     (echo
-     "url { src: \"git://git@gitlab.routine.co:routine/schematic-jsoo#%{version:schematic-jsoo}\" }")))))
+     "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-jsoo}\" }")))))
 (rule (deps (universe)) (target schematic-jsoo.opam.locked)
  (action (run %{bin:opam} lock schematic-jsoo)))
 (rule (alias extdeps) (mode (promote (until-clean)))
@@ -84,7 +84,7 @@
   (with-stdout-to %{target}
    (progn (cat %{opam})
     (echo
-     "url { src: \"git://git@gitlab.routine.co:routine/schematic-sexp#%{version:schematic-sexp}\" }")))))
+     "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-sexp}\" }")))))
 (rule (deps (universe)) (target schematic-sexp.opam.locked)
  (action (run %{bin:opam} lock schematic-sexp)))
 (rule (alias extdeps) (mode (promote (until-clean)))
@@ -100,7 +100,7 @@
   (with-stdout-to %{target}
    (progn (cat %{opam})
     (echo
-     "url { src: \"git://git@gitlab.routine.co:routine/schematic-sqml#%{version:schematic-sqml}\" }")))))
+     "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-sqml}\" }")))))
 (rule (deps (universe)) (target schematic-sqml.opam.locked)
  (action (run %{bin:opam} lock schematic-sqml)))
 (rule (alias extdeps) (mode (promote (until-clean)))
