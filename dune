@@ -1,3 +1,13 @@
+(dirs
+ schematic
+ schematic-cli
+ schematic-ffi
+ schematic-http
+ schematic-jsoo
+ schematic-sexp
+ schematic-sqml
+ .logistic)
+
 (env
  (dev
   (flags
@@ -7,13 +17,14 @@
  (name default)
  (deps
   schematic-cli.opam
+  schematic-ffi.opam
   schematic-http.opam
   schematic-jsoo.opam
   schematic-sexp.opam
   schematic-sqml.opam
-  schematic-ffi.opam
   schematic.opam
   (alias_rec schematic/default)
+  (alias_rec schematic-cli/default)
   (alias_rec schematic-http/default)
   (alias_rec schematic-jsoo/default)
   (alias_rec schematic-sexp/default)
@@ -21,218 +32,18 @@
   (alias_rec schematic-ffi/default)))
 
 (rule
- (target schematic.%{version:schematic}.opam)
- (deps
-  (:opam schematic.opam))
- (action
-  (with-stdout-to
-   %{target}
-   (progn
-    (cat %{opam})
-    (echo
-     "url {\n  src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic}\"\n}\n")))))
-
-(rule
- (target schematic-jsoo.%{version:schematic-jsoo}.opam)
- (deps
-  (:opam schematic-jsoo.opam))
- (action
-  (with-stdout-to
-   %{target}
-   (progn
-    (cat %{opam})
-    (echo
-     "url {\n  src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-jsoo}\"\n}\n")))))
-
-(rule
- (target schematic-sqml.%{version:schematic-sqml}.opam)
- (deps
-  (:opam schematic-sqml.opam))
- (action
-  (with-stdout-to
-   %{target}
-   (progn
-    (cat %{opam})
-    (echo
-     "url {\n  src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-sqml}\"\n}\n")))))
-
-(rule
- (target schematic-cli.%{version:schematic-cli}.opam)
- (deps
-  (:opam schematic-cli.opam))
- (action
-  (with-stdout-to
-   %{target}
-   (progn
-    (cat %{opam})
-    (echo
-     "url {\n  src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-cli}\"\n}\n")))))
-
-(rule
- (target schematic-http.%{version:schematic}.opam)
- (deps
-  (:opam schematic-http.opam))
- (action
-  (with-stdout-to
-   %{target}
-   (progn
-    (cat %{opam})
-    (echo
-     "url {\n  src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic}\"\n}\n")))))
-
-(rule
- (target schematic-sexp.%{version:schematic}.opam)
- (deps
-  (:opam schematic-sexp.opam))
- (action
-  (with-stdout-to
-   %{target}
-   (progn
-    (cat %{opam})
-    (echo
-     "url {\n  src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic}\"\n}\n")))))
-
-(rule
- (target schematic-ffi.%{version:schematic}.opam)
- (deps
-  (:opam schematic-ffi.opam))
- (action
-  (with-stdout-to
-   %{target}
-   (progn
-    (cat %{opam})
-    (echo
-     "url {\n  src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic}\"\n}\n")))))
-
-(rule
- (deps (universe))
- (target schematic.opam.locked)
- (action
-  (run %{bin:opam} lock schematic)))
-
-(rule
- (mode
-  (promote (until-clean)))
- (target schematic.opam.extdeps)
+ (target dune.extdeps.inc)
  (alias extdeps)
+ (mode (promote))
  (action
   (with-stdout-to
    %{target}
    (run
-    %{bin:awk}
-    "/^build: / { exit 0 }; !/^  \"(ocaml)/ { print($0) }"
-    %{dep:schematic.opam.locked}))))
+    %{dep:.logistic/dune/extdeps/extdeps.exe}
+    generate
+    --packages
+    schematic,schematic-cli,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml
+    --exclude
+    schematic,schematic-jsoo))))
 
-(rule
- (deps (universe))
- (target schematic-jsoo.opam.locked)
- (action
-  (run %{bin:opam} lock schematic-jsoo)))
-
-(rule
- (mode
-  (promote (until-clean)))
- (target schematic-jsoo.opam.extdeps)
- (alias extdeps)
- (action
-  (with-stdout-to
-   %{target}
-   (run
-    %{bin:awk}
-    "/^build: / { exit 0 }; !/^  \"(ocaml|schematic)/ { print($0) }"
-    %{dep:schematic-jsoo.opam.locked}))))
-
-(rule
- (deps (universe))
- (target schematic-sqml.opam.locked)
- (action
-  (run %{bin:opam} lock schematic-sqml)))
-
-(rule
- (mode
-  (promote (until-clean)))
- (target schematic-sqml.opam.extdeps)
- (alias extdeps)
- (action
-  (with-stdout-to
-   %{target}
-   (run
-    %{bin:awk}
-    "/^build: / { exit 0 }; !/^  \"(acid|ocaml|schematic|sqml|timmy)/ { print($0) }"
-    %{dep:schematic-sqml.opam.locked}))))
-
-(rule
- (deps (universe))
- (target schematic-cli.opam.locked)
- (action
-  (run %{bin:opam} lock schematic-cli)))
-
-(rule
- (mode
-  (promote (until-clean)))
- (target schematic-cli.opam.extdeps)
- (alias extdeps)
- (action
-  (with-stdout-to
-   %{target}
-   (run
-    %{bin:awk}
-    "/^build: / { exit 0 }; !/^  \"(ocaml|schematic)/ { print($0) }"
-    %{dep:schematic-cli.opam.locked}))))
-
-(rule
- (deps (universe))
- (target schematic-http.opam.locked)
- (action
-  (run %{bin:opam} lock schematic-http)))
-
-(rule
- (mode
-  (promote (until-clean)))
- (target schematic-http.opam.extdeps)
- (alias extdeps)
- (action
-  (with-stdout-to
-   %{target}
-   (run
-    %{bin:awk}
-    "/^build: / { exit 0 }; !/^  \"(ocaml|schematic)/ { print($0) }"
-    %{dep:schematic-http.opam.locked}))))
-
-(rule
- (deps (universe))
- (target schematic-sexp.opam.locked)
- (action
-  (run %{bin:opam} lock schematic-sexp)))
-
-(rule
- (mode
-  (promote (until-clean)))
- (target schematic-sexp.opam.extdeps)
- (alias extdeps)
- (action
-  (with-stdout-to
-   %{target}
-   (run
-    %{bin:awk}
-    "/^build: / { exit 0 }; !/^  \"(ocaml|schematic)/ { print($0) }"
-    %{dep:schematic-sexp.opam.locked}))))
-
-(rule
- (deps (universe))
- (target schematic-ffi.opam.locked)
- (action
-  (run %{bin:opam} lock schematic-ffi)))
-
-(rule
- (mode
-  (promote (until-clean)))
- (target schematic-ffi.opam.extdeps)
- (alias extdeps)
- (action
-  (with-stdout-to
-   %{target}
-   (run
-    %{bin:awk}
-    "/^build: / { exit 0 }; !/^  \"(ocaml|schematic)/ { print($0) }"
-    %{dep:schematic-ffi.opam.locked}))))
+(include dune.extdeps.inc)
