@@ -8,8 +8,8 @@ license: "LGPL-3.0-or-later"
 homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
+  "ocamlformat" {= "0.20.1"}
   "angstrom" {= "0.15.0"}
-  "bake" {= "0.1.1"}
   "base" {= "v0.14.3"}
   "base-bigarray" {= "base"}
   "base-bytes" {= "base"}
@@ -35,6 +35,14 @@ depends: [
   "menhir" {= "20220210"}
   "menhirLib" {= "20220210"}
   "menhirSdk" {= "20220210"}
+  "ocaml" {= "4.14.0"}
+  "ocaml-base-compiler" {= "4.14.0"}
+  "ocaml-compiler-libs" {= "v0.12.4"}
+  "ocaml-config" {= "2"}
+  "ocaml-options-vanilla" {= "1"}
+  "ocaml-syntax-shims" {= "1.0.0"}
+  "ocamlbuild" {= "0.14.2"}
+  "ocamlfind" {= "1.9.5"}
   "ocplib-endian" {= "1.2"}
   "ppx_compare" {= "v0.14.0"}
   "ppx_derivers" {= "1.2.1"}
@@ -56,3 +64,4 @@ depends: [
   "uutf" {= "1.0.3"}
   "yojson" {= "2.0.2"}
 ]
+dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"
