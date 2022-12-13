@@ -13,7 +13,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite --input
     %{dep:schematic.opam.locked} --exclude
-    schematic,schematic-cli,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,schematic,schematic-jsoo))))
+    schematic,schematic-cli,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,bake))))
 (rule (target schematic-cli.%{version:schematic-cli}.opam)
  (deps (:opam schematic-cli.opam))
  (action
@@ -29,7 +29,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite --input
     %{dep:schematic-cli.opam.locked} --exclude
-    schematic,schematic-cli,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,schematic,schematic-jsoo))))
+    schematic,schematic-cli,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,bake))))
 (rule (target schematic-http.%{version:schematic-http}.opam)
  (deps (:opam schematic-http.opam))
  (action
@@ -45,7 +45,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite --input
     %{dep:schematic-http.opam.locked} --exclude
-    schematic,schematic-cli,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,schematic,schematic-jsoo))))
+    schematic,schematic-cli,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,bake))))
 (rule (target schematic-jsoo.%{version:schematic-jsoo}.opam)
  (deps (:opam schematic-jsoo.opam))
  (action
@@ -61,7 +61,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite --input
     %{dep:schematic-jsoo.opam.locked} --exclude
-    schematic,schematic-cli,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,schematic,schematic-jsoo))))
+    schematic,schematic-cli,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,bake))))
 (rule (target schematic-sexp.%{version:schematic-sexp}.opam)
  (deps (:opam schematic-sexp.opam))
  (action
@@ -77,7 +77,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite --input
     %{dep:schematic-sexp.opam.locked} --exclude
-    schematic,schematic-cli,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,schematic,schematic-jsoo))))
+    schematic,schematic-cli,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,bake))))
 (rule (target schematic-sqml.%{version:schematic-sqml}.opam)
  (deps (:opam schematic-sqml.opam))
  (action
@@ -93,4 +93,4 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite --input
     %{dep:schematic-sqml.opam.locked} --exclude
-    schematic,schematic-cli,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,schematic,schematic-jsoo))))
+    schematic,schematic-cli,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,bake))))
