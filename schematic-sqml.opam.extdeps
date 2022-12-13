@@ -10,7 +10,6 @@ homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "ocamlformat" {= "0.20.1"}
-  "acid" {= "0.10.0"}
   "alcotest" {= "1.6.0" & with-test}
   "angstrom" {= "0.15.0"}
   "astring" {= "0.8.5" & with-test}

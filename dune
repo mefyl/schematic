@@ -44,6 +44,6 @@
     --packages
     schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml
     --exclude
-    bake))))
+    acid,bake))))
 
 (include dune.extdeps.inc)
