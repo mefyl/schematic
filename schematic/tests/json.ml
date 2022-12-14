@@ -4,34 +4,33 @@ module Parse_error = struct
   let empty () = Schematic.Json.of_string ""
 
   (* let trailing_garbage () = Schematic.Json.of_string "{ \"a\" : 42 }{" *)
-
   let missing_quotes () = Schematic.Json.of_string "{ a : 42 }"
 end
 
 module Pretty_print = struct
-  let check name json repr =
+  let check ~here name json repr =
     let buffer = Buffer.create 1024 in
     let fmt = Caml.Format.formatter_of_buffer buffer in
     let () = Caml.Format.pp_set_margin fmt 20 in
     let () = Fmt.pf fmt "%a" Schematic.Json.pp json in
     let () = Caml.Format.pp_print_flush fmt () in
-    Alcotest.(check string name repr (Buffer.contents buffer))
+    Alcotest.(check ~here string name repr (Buffer.contents buffer))
 
-  let null () = check "null" `Null "null"
+  let null () = check ~here:[%here] "null" `Null "null"
 
   let bool () =
-    check "true" (`Bool true) "true";
-    check "false" (`Bool false) "false"
+    check ~here:[%here] "true" (`Bool true) "true";
+    check ~here:[%here] "false" (`Bool false) "false"
 
-  let float () = check "float" (`Float 123.45) "123.45"
-  let string () = check "string" (`String "foobar") {|"foobar"|}
+  let float () = check ~here:[%here] "float" (`Float 123.45) "123.45"
+  let string () = check ~here:[%here] "string" (`String "foobar") {|"foobar"|}
 
   let array () =
-    check "empty" (`A []) "[]";
-    check "fits"
+    check ~here:[%here] "empty" (`A []) "[]";
+    check ~here:[%here] "fits"
       (`A [ `Float 0.; `String "1"; `Bool false ])
       {|[0, "1", false]|};
-    check "overflow"
+    check ~here:[%here] "overflow"
       (`A [ `Float 0.123; `String "1.456"; `Bool false ])
       {|[
    0.123,
@@ -40,18 +39,18 @@ module Pretty_print = struct
 ]|}
 
   let object_ () =
-    check "empty" (`O []) "{}";
-    check "fits"
+    check ~here:[%here] "empty" (`O []) "{}";
+    check ~here:[%here] "fits"
       (`O [ ("a", `Float 0.); ("b", `String "1") ])
       {|{"a": 0, "b": "1"}|};
-    check "overflow"
+    check ~here:[%here] "overflow"
       (`O [ ("a", `Float 0.123); ("b", `String "1.456"); ("c", `Bool false) ])
       {|{
    "a": 0.123,
    "b": "1.456",
    "c": false
 }|};
-    check "overflow-item"
+    check ~here:[%here] "overflow-item"
       (`O
         [
           ("a", `Float 0.123); ("b", `String "1.123456789"); ("c", `Bool false);
@@ -66,18 +65,18 @@ end
 
 let () =
   let open Alcotest in
-  let error_case name f =
+  let error_case ~here name f =
     test_case name `Quick (fun () ->
-        check bool "error" true (Result.is_error @@ f ()))
+        check ~here bool "error" true (Result.is_error @@ f ()))
   and test_case name f = test_case name `Quick f in
   run "Schematic.Json"
     [
       ( "parse_error",
         [
-          error_case "empty" Parse_error.empty
-          (* FIXME *)
-          (* ; error_case "trailing garbage" Parse_error.trailing_garbage *);
-          error_case "missing quotes" Parse_error.missing_quotes;
+          error_case ~here:[%here] "empty" Parse_error.empty;
+          (* error_case ~here:[%here] "trailing garbage"
+           *   Parse_error.trailing_garbage; *)
+          error_case ~here:[%here] "missing quotes" Parse_error.missing_quotes;
         ] );
       ( "pretty-print",
         [

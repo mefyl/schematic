@@ -46,7 +46,7 @@ let of_schema schema =
       ({ schema with core = { schema.core with id = Some (id_name id) } }, marks)
   and of_descriptor : type u. ids -> u Schema.descriptor -> t * ids =
    fun marks -> function
-    | Schema.Any -> (make (), marks)
+    | Schema.Any _ -> (make (), marks)
     | Schema.Bool ->
       let validation = make_validation ~type_:[ Boolean ] () in
       (make ~validation (), marks)
@@ -59,6 +59,7 @@ let of_schema schema =
     | Schema.Int | Schema.Int64 ->
       let validation = make_validation ~type_:[ Integer ] () in
       (make ~validation (), marks)
+    | Schema.Json -> (make (), marks)
     | Schema.List schema ->
       let schema, marks = of_schema marks schema in
       let applicator = make_applicator ~items:(Items_schema schema) ()

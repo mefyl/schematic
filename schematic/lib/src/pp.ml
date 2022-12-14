@@ -23,7 +23,7 @@ let rec of_schema : type t. t Schema.t -> t Fmt.t = function
 and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
   let open Fmt in
   function
-  | Any -> fun f json -> Json.pp f json
+  | Any (module Coding) -> Coding.pp
   | Bool -> bool
   | Date -> fun f (year, month, day) -> pf f "%04d-%02d-%02d" year month day
   | Fixpoint d ->
@@ -33,6 +33,7 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
   | Ignore -> nop
   | Int -> int
   | Int64 -> int64
+  | Json -> fun f json -> Json.pp f json
   | List schema -> composite_object '[' (list ~sep:semi @@ of_schema schema) ']'
   | Map { descriptor; encode; _ } -> using encode @@ of_descriptor descriptor
   | Mapping schema ->

@@ -1,4 +1,4 @@
-module V0_15_0 = struct
+module V0_16_0 = struct
   module Error = Error
   module Base64 = B64
 

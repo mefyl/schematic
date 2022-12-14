@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic-sexp"
-version: "0.15.0"
+version: "0.16.0"
 synopsis: "Derive sexps from Ocaml objects"
 description: "Encode to and from s-expressions via a schema."
 maintainer: "mefyl <mefyl@gruntech.org>"
@@ -9,103 +9,63 @@ license: "LGPL-3.0-or-later"
 homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
+  "ocamlformat" {= "0.20.1"}
   "alcotest" {= "1.6.0" & with-test}
   "angstrom" {= "0.15.0"}
   "astring" {= "0.8.5" & with-test}
-  "async" {= "v0.14.0"}
-  "async_kernel" {= "v0.14.0"}
-  "async_rpc_kernel" {= "v0.14.0"}
-  "async_unix" {= "v0.14.0"}
   "base" {= "v0.14.3"}
   "base-bigarray" {= "base"}
   "base-bytes" {= "base"}
   "base-threads" {= "base"}
   "base-unix" {= "base"}
   "base64" {= "3.5.0"}
-  "base_bigstring" {= "v0.14.0"}
-  "base_quickcheck" {= "v0.14.1"}
   "bigstringaf" {= "0.9.0"}
-  "bin_prot" {= "v0.14.1"}
   "cmdliner" {= "1.1.1"}
-  "conf-g++" {= "1.0"}
   "conf-pkg-config" {= "2"}
-  "core" {= "v0.14.1"}
-  "core_kernel" {= "v0.14.2"}
   "cppo" {= "1.6.9"}
   "csexp" {= "1.5.1"}
   "cstruct" {= "6.1.1"}
-  "csvfields" {= "v0.14.0"}
-  "dune" {= "3.4.1"}
-  "dune-configurator" {= "3.4.1"}
+  "dune" {= "3.6.1"}
+  "dune-configurator" {= "3.6.1"}
   "ezjsonm" {= "1.3.0"}
-  "fieldslib" {= "v0.14.0"}
   "fmt" {= "0.9.0"}
   "hex" {= "1.5.0"}
-  "jane-street-headers" {= "v0.14.0"}
   "jbuilder" {= "1.0+beta20.2"}
+  "js_of_ocaml" {= "4.1.0"}
+  "js_of_ocaml-compiler" {= "4.1.0"}
+  "js_of_ocaml-ppx" {= "4.1.0"}
   "json-derivers" {= "1.0.0"}
   "jsonm" {= "1.0.1"}
-  "jst-config" {= "v0.14.1"}
+  "menhir" {= "20220210"}
+  "menhirLib" {= "20220210"}
+  "menhirSdk" {= "20220210"}
   "num" {= "1.4"}
-  "octavius" {= "1.2.2"}
+  "ocaml" {= "4.14.0"}
+  "ocaml-base-compiler" {= "4.14.0"}
+  "ocaml-compiler-libs" {= "v0.12.4"}
+  "ocaml-config" {= "2"}
+  "ocaml-options-vanilla" {= "1"}
+  "ocaml-syntax-shims" {= "1.0.0"}
+  "ocamlbuild" {= "0.14.2"}
+  "ocamlfind" {= "1.9.5"}
   "parsexp" {= "v0.14.2"}
-  "ppx_assert" {= "v0.14.0"}
-  "ppx_base" {= "v0.14.0"}
-  "ppx_bench" {= "v0.14.1"}
-  "ppx_bin_prot" {= "v0.14.0"}
-  "ppx_cold" {= "v0.14.0"}
-  "ppx_compare" {= "v0.14.0"}
-  "ppx_custom_printf" {= "v0.14.1"}
   "ppx_derivers" {= "1.2.1"}
   "ppx_deriving" {= "5.2.1"}
-  "ppx_enumerate" {= "v0.14.0"}
-  "ppx_expect" {= "v0.14.2"}
-  "ppx_fields_conv" {= "v0.14.2"}
-  "ppx_fixed_literal" {= "v0.14.0"}
-  "ppx_hash" {= "v0.14.0"}
   "ppx_here" {= "v0.14.0"}
-  "ppx_inline_test" {= "v0.14.1"}
-  "ppx_jane" {= "v0.14.0"}
-  "ppx_js_style" {= "v0.14.1"}
-  "ppx_let" {= "v0.14.0"}
-  "ppx_module_timer" {= "v0.14.0"}
-  "ppx_optcomp" {= "v0.14.3"}
-  "ppx_optional" {= "v0.14.0"}
-  "ppx_pipebang" {= "v0.14.0"}
-  "ppx_sexp_conv" {= "v0.14.3"}
-  "ppx_sexp_message" {= "v0.14.1"}
-  "ppx_sexp_value" {= "v0.14.0"}
-  "ppx_stable" {= "v0.14.1"}
-  "ppx_string" {= "v0.14.1"}
-  "ppx_typerep_conv" {= "v0.14.2"}
-  "ppx_variants_conv" {= "v0.14.2"}
   "ppxlib" {= "0.25.1"}
-  "protocol_version_header" {= "v0.14.0"}
-  "ptime" {= "1.0.0"}
-  "re" {= "1.10.4"}
-  "re2" {= "v0.14.0"}
+  "ptime" {= "1.1.0"}
+  "re" {= "1.10.4" & with-test}
   "result" {= "1.5"}
   "semver2" {= "1.2.0"}
   "seq" {= "base"}
-  "sexp" {= "v0.14.0"}
-  "sexp_diff_kernel" {= "v0.14.0"}
-  "sexp_macro" {= "v0.14.0"}
-  "sexp_pretty" {= "v0.14.0"}
-  "sexp_select" {= "v0.14.0"}
   "sexplib" {= "v0.14.0"}
   "sexplib0" {= "v0.14.0"}
-  "spawn" {= "v0.15.1"}
-  "splittable_random" {= "v0.14.0"}
-  "stdio" {= "v0.14.0"}
   "stdlib-shims" {= "0.3.0"}
   "stringext" {= "1.6.0"}
-  "textutils" {= "v0.14.0"}
-  "time_now" {= "v0.14.0"}
-  "timezone" {= "v0.14.0"}
-  "topkg" {= "1.0.5"}
-  "typerep" {= "v0.14.0"}
+  "topkg" {= "1.0.6"}
   "uchar" {= "0.0.2"}
   "uri" {= "4.2.0"}
   "uutf" {= "1.0.3"}
-  "variantslib" {= "v0.14.0"}
+  "yojson" {= "2.0.2"}
 ]
+dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"

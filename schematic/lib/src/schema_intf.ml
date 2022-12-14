@@ -51,7 +51,7 @@ and _ tuple =
 
 (** A descriptor describes the structure of a type. *)
 and _ descriptor =
-  | Any : Ezjsonm.value descriptor
+  | Any : (module Coding_intf.IMPL with type t = 't) -> 't descriptor
   | Bool : bool descriptor
   | Date : Ptime.date descriptor
   | Fixpoint : 'a descriptor Lazy.t -> 'a descriptor
@@ -59,6 +59,7 @@ and _ descriptor =
   | Ignore : unit descriptor
   | Int : int descriptor
   | Int64 : int64 descriptor
+  | Json : Ezjsonm.value descriptor
   | List : 'a t -> 'a list descriptor
   (* 'a: facing, 'b: underlying *)
   | Map : {
@@ -167,6 +168,7 @@ module type WALK = sig
   val int : t M.t
   val ignore : t M.t
   val int64 : t M.t
+  val json : t M.t
   val list : t M.t -> t M.t
   val null : t M.t
   val nullable : t M.t -> t M.t

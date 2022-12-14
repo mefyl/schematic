@@ -68,7 +68,7 @@ module Walk (W : WALK) = struct
   let rec descriptor : type t. string option -> t Schema.descriptor -> W.t =
    fun id d ->
     match d with
-    | Any -> W.any ()
+    | Any _ -> failwith "unsupported"
     | Bool -> W.bool ()
     | Float -> W.float ()
     | Date -> W.date ()
@@ -76,6 +76,7 @@ module Walk (W : WALK) = struct
     | Int -> W.int ()
     | Ignore -> W.ignore ()
     | Int64 -> W.int64 ()
+    | Json -> W.any ()
     | List l -> W.list (schema l)
     | Null -> W.null ()
     | String -> W.string ()

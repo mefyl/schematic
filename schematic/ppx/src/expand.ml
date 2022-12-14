@@ -56,71 +56,58 @@ module Jsoo_type_expander = Expander (Jsoo)
 module Schema_expander = Expander (Schema)
 module Sqml_binding_expander = Expander (Sqml)
 
-let expand ~ctxt ~global (recursive, types) fixpoint gadt jsoo sqml =
-  let loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt in
-  let jsoo =
-    if global.enable_jsoo then
-      match jsoo with
-      | None -> None
-      | Some [%expr jsoo] | Some [%expr true] -> Some true
-      | Some [%expr false] -> Some false
-      | Some exp ->
-        Ppxlib.Location.raise_errorf ~loc:exp.pexp_loc
-          "schematic-ppx: invalid ~jsoo argument value: %a" Pprintast.expression
-          exp
-    else None
+let type_context (t : type_declaration) =
+  let computed = match t.ptype_kind with Ptype_record _ -> true | _ -> false
+  and union_key =
+    match (t.ptype_kind, t.ptype_manifest) with
+    | Ptype_variant _, _
+    | Ptype_abstract, Some { ptyp_desc = Ptyp_variant _; _ } ->
+      true
+    | _ -> false
   in
-  let context =
-    let recursive = Poly.(recursive = Recursive)
-    and code_path = Ppxlib.Expansion_context.Deriver.code_path ctxt in
-    let types =
-      let f { ptype_name; _ } = ptype_name.txt in
-      if recursive then List.map ~f types else []
+  {
+    attributes =
+      Attributes.extract ~computed ~name:true ~union_key t.ptype_attributes;
+    loc = t.ptype_loc;
+    name = t.ptype_name.txt;
+    params = t.ptype_params;
+  }
+
+let jsoo_flag ~context jsoo =
+  if context.global.enable_jsoo then
+    match jsoo with
+    | None -> None
+    | Some [%expr jsoo] | Some [%expr true] -> Some true
+    | Some [%expr false] -> Some false
+    | Some exp ->
+      Ppxlib.Location.raise_errorf ~loc:exp.pexp_loc
+        "schematic-ppx: invalid ~jsoo argument value: %a" Pprintast.expression
+        exp
+  else None
+
+let type_ ~context ~type_context t =
+  let loc = type_context.loc in
+  match t.ptype_kind with
+  | Ptype_record fields ->
+    let fields = List.map ~f:(expand_field context) fields
+    and computed =
+      Attributes.fields_of_computed ~loc type_context.attributes.computed
     in
-    { code_path; fixpoint; gadt_variant = None; global; loc; types; recursive }
-  in
+    Record (fields @ computed)
+  | Ptype_abstract -> (
+    match t.ptype_manifest with Some type_ -> Core type_ | None -> Abstract)
+  | Ptype_open ->
+    Ppxlib.Location.raise_errorf ~loc "schematic-ppx: unsupported Ptype_open"
+  | Ptype_variant options -> Variant options
+
+let expand ~context types gadt jsoo sqml =
+  let jsoo = jsoo_flag ~context jsoo
+  and loc = context.loc in
   let expand context =
     let types =
       let f t =
-        let type_context =
-          let computed =
-            match t.ptype_kind with Ptype_record _ -> true | _ -> false
-          and union_key =
-            match (t.ptype_kind, t.ptype_manifest) with
-            | Ptype_variant _, _
-            | Ptype_abstract, Some { ptyp_desc = Ptyp_variant _; _ } ->
-              true
-            | _ -> false
-          in
-          {
-            attributes =
-              Attributes.extract ~computed ~name:true ~union_key
-                t.ptype_attributes;
-            loc = t.ptype_loc;
-            name = t.ptype_name.txt;
-            params = t.ptype_params;
-          }
-        in
-        let loc = t.ptype_loc in
-        let type_ =
-          match t.ptype_kind with
-          | Ptype_record fields ->
-            let fields = List.map ~f:(expand_field context) fields
-            and computed =
-              Attributes.fields_of_computed ~loc
-                type_context.attributes.computed
-            in
-            Record (fields @ computed)
-          | Ptype_abstract -> (
-            match t.ptype_manifest with
-            | Some type_ -> Core type_
-            | None -> Abstract)
-          | Ptype_open ->
-            Ppxlib.Location.raise_errorf ~loc
-              "schematic-ppx: unsupported Ptype_open"
-          | Ptype_variant options -> Variant options
-        in
-        (type_, type_context)
+        let type_context = type_context t in
+        (type_ ~context ~type_context t, type_context)
       in
       List.map ~f types
     in
@@ -146,23 +133,10 @@ let expand ~ctxt ~global (recursive, types) fixpoint gadt jsoo sqml =
       Schema_expander.expand ~configuration:() ~context types @ contents
     in
     if Option.is_some jsoo then
-      [%str
-        open Schematic_jsoo.Schemas
-
-        let _ = fun (_ : int_js) -> ()]
-      @ contents
-    else if global.inside then
-      [%str
-        open Schemas
-
-        let _ = unit_schema]
-      @ contents
-    else
-      [%str
-        open Schematic.Schemas
-
-        let _ = unit_schema]
-      @ contents
+      [%str open Schematic_jsoo.Schemas [@@warning "-unused-open"]] @ contents
+    else if context.global.inside then
+      [%str open Schemas [@@warning "-unused-open"]] @ contents
+    else [%str open Schematic.Schemas [@@warning "-unused-open"]] @ contents
   in
   match gadt with
   | Some variants ->
@@ -170,29 +144,27 @@ let expand ~ctxt ~global (recursive, types) fixpoint gadt jsoo sqml =
     List.map ~f variants |> List.concat
   | None -> expand context
 
-let expand_sig ~ctxt ~global:_ (_recursive, types) =
-  (* FIXME: Jsoo declarations *)
-  let loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt in
-  let module Ast = (val Ast_builder.make loc) in
-  let f { ptype_name = { txt; loc }; _ } =
-    let type_ = Ast.ptyp_constr { txt = Longident.Lident txt; loc } [] in
-    [
-      Ast.(
-        psig_value
-        @@ value_description
-             ~name:{ txt = name "schema_versioned" txt; loc }
-             ~type_:
-               [%type:
-                 Schematic.Schema.version -> [%t type_] Schematic.Schema.t]
-             ~prim:[]);
-      Ast.(
-        psig_value
-        @@ value_description
-             ~name:{ txt = name "schema" txt; loc }
-             ~type_:[%type: [%t type_] Schematic.Schema.t] ~prim:[]);
-    ]
+let expand_sig ~(context : context) types jsoo =
+  let loc = context.loc
+  and jsoo = jsoo_flag ~context jsoo
+  and types = List.map types ~f:(fun t -> (t, type_context t)) in
+  let contents =
+    match jsoo with
+    | None -> []
+    | Some _ ->
+      let f (t, type_context) =
+        Jsoo.expand_sig ~context ~configuration:{ functions = true }
+          ~type_context
+          (type_ ~context ~type_context t)
+      in
+      List.map ~f types |> List.concat
   in
-  List.map ~f types |> List.concat
+  let contents = Schema.expand_sig ~context types @ contents in
+  if Option.is_some jsoo then
+    [%sig: open Schematic_jsoo.Schemas [@@warning "-unused-open"]] @ contents
+  else if context.global.inside then
+    [%sig: open Schemas [@@warning "-unused-open"]] @ contents
+  else [%sig: open Schematic.Schemas [@@warning "-unused-open"]] @ contents
 
 let add ~inside ~jsoo ~version =
   let global =
@@ -207,13 +179,33 @@ let add ~inside ~jsoo ~version =
        in
        { inside; enable_jsoo = !jsoo; version = !version })
   in
+  let context ~ctxt ~fixpoint recursive types =
+    let code_path = Ppxlib.Expansion_context.Deriver.code_path ctxt
+    and loc = Ppxlib.Expansion_context.Deriver.derived_item_loc ctxt
+    and recursive = Poly.(recursive = Recursive) in
+    let types =
+      let f { ptype_name; _ } = ptype_name.txt in
+      if recursive then List.map ~f types else []
+    in
+    {
+      code_path;
+      fixpoint;
+      gadt_variant = None;
+      global = Lazy.force global;
+      loc;
+      types;
+      recursive;
+    }
+  in
   let sig_type_decl =
     let arg =
       let open Deriving.Args in
-      empty
+      let fixpoint = flag "fixpoint"
+      and jsoo = arg "jsoo" __ in
+      empty +> fixpoint +> jsoo
     in
-    Deriving.Generator.V2.make arg (fun ~ctxt ast ->
-        expand_sig ~global:(Lazy.force global) ~ctxt ast)
+    Deriving.Generator.V2.make arg (fun ~ctxt (recursive, types) fixpoint ->
+        expand_sig ~context:(context ~ctxt ~fixpoint recursive types) types)
   and str_type_decl =
     let arg =
       let open Deriving.Args in
@@ -223,7 +215,7 @@ let add ~inside ~jsoo ~version =
       and sqml = arg "sqml" (estring __) in
       empty +> fixpoint +> gadt +> jsoo +> sqml
     in
-    Deriving.Generator.V2.make arg (fun ~ctxt ast ->
-        expand ~global:(Lazy.force global) ~ctxt ast)
+    Deriving.Generator.V2.make arg (fun ~ctxt (recursive, types) fixpoint ->
+        expand ~context:(context ~ctxt ~fixpoint recursive types) types)
   in
   Deriving.add ~sig_type_decl ~str_type_decl "schema"

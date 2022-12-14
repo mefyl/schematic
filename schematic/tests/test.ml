@@ -502,11 +502,11 @@ module Recursive = struct
       (equal_parametric (Alcotest.equal t))
 
   let parametric () =
-    let () = Alcotest.(check int "first count" 0 !count) in
+    let () = Alcotest.(check ~here:[%here] int "first count" 0 !count) in
     let schema = parametric_schema int_schema in
-    let () = Alcotest.(check int "second count" 1 !count) in
+    let () = Alcotest.(check ~here:[%here] int "second count" 1 !count) in
     let _schema = parametric_schema int_schema in
-    let () = Alcotest.(check int "third count" 1 !count) in
+    let () = Alcotest.(check ~here:[%here] int "third count" 1 !count) in
     let () =
       test ~here:[%here] "recursive" (parametric Alcotest.int) schema
         {
@@ -516,7 +516,7 @@ module Recursive = struct
         }
         [%ezjsonm { value = 0; next = { value = 1 } }]
     in
-    Alcotest.(check int "fourth count" 1 !count)
+    Alcotest.(check ~here:[%here] int "fourth count" 1 !count)
 end
 
 type mutually_a = { next_b : mutually_b option }
@@ -610,7 +610,7 @@ module Inline = struct
   let record () =
     let () =
       Alcotest.(
-        check
+        check ~here:[%here]
           (list @@ list string)
           "the list of mandatory fields"
           [ [ "a"; "b"; "c"; "d" ] ]
@@ -623,7 +623,7 @@ module Inline = struct
   let variant_payload () =
     let () =
       Alcotest.(
-        check
+        check ~here:[%here]
           (list @@ list string)
           "the list of mandatory fields"
           [ [ "a"; "b"; "c"; "d" ]; [ "dummy" ] ]
@@ -636,7 +636,7 @@ module Inline = struct
   let inline_variant () =
     let () =
       Alcotest.(
-        check
+        check ~here:[%here]
           (list @@ list string)
           "the list of mandatory fields"
           [ [ "x"; "b"; "c" ]; [ "x"; "d"; "e" ] ]
@@ -654,7 +654,7 @@ module Inline = struct
   let inline_try () =
     let () =
       Alcotest.(
-        check
+        check ~here:[%here]
           (list @@ list string)
           "mandatory fields when inlinable"
           [ [ "maybe"; "b"; "c" ] ]
@@ -668,7 +668,7 @@ module Inline = struct
       let schema = inline_maybe_schema int_schema in
       let () =
         Alcotest.(
-          check
+          check ~here:[%here]
             (list @@ list string)
             "mandatory fields when not inlinable"
             [ [ "maybe"; "inline" ] ]
@@ -860,7 +860,7 @@ let keyed () =
   and () =
     let json = [%ezjsonm { content = "text"; level = 411 }] in
     Alcotest.(
-      check
+      check ~here:[%here]
         (result tester decoding_error)
         "values are rejected if the key is missing"
         (make_error ~schema:"keyed" {|missing key field "typ"|})
@@ -868,7 +868,7 @@ let keyed () =
   and () =
     let json = [%ezjsonm { content = "text"; level = 411; typ = "fumble" }] in
     Alcotest.(
-      check
+      check ~here:[%here]
         (result tester decoding_error)
         "values are rejected if the key not recognized"
         (make_error ~schema:"keyed" {|invalid key field "typ" = "fumble"|})
@@ -876,7 +876,7 @@ let keyed () =
   and () =
     let json = [%ezjsonm { typ = "header"; content = "text" }] in
     Alcotest.(
-      check
+      check ~here:[%here]
         (result tester decoding_error)
         "errors are specific to the matched case schema"
         (make_error ~schema:"keyed" {|missing required field "level"|})
@@ -895,7 +895,7 @@ let map_error () =
          })
   in
   Alcotest.(
-    check
+    check ~here:[%here]
       (result string decoding_error)
       "errors from Map descriptor decoding are forwarded properly"
       (make_error "whatever")
@@ -910,7 +910,7 @@ module Metadata = struct
       | Result.Ok json -> json
       | Result.Error _ -> Alcotest.fail "invalid literal JSON"
     and effective = json_schema schema in
-    Alcotest.check json "json-schema" expected effective
+    Alcotest.check ~here:[%here] json "json-schema" expected effective
 
   type description = {
     field_a : int; [@schematic.properties { description = "Describe A" }]
@@ -991,31 +991,31 @@ end
 module Comparison = struct
   open Alcotest
 
-  let check name schema e l r =
-    check int name e (Schematic.Schema.compare schema l r)
+  let check ~here name schema e l r =
+    check ~here int name e (Schematic.Schema.compare schema l r)
 
   let bool () =
     let check = check "bool" bool_schema in
-    let () = check 0 true true in
-    let () = check 0 false false in
-    let () = check 1 true false in
-    let () = check (-1) false true in
+    let () = check ~here:[%here] 0 true true in
+    let () = check ~here:[%here] 0 false false in
+    let () = check ~here:[%here] 1 true false in
+    let () = check ~here:[%here] (-1) false true in
     ()
 
   let int () =
     let check = check "int" int_schema in
-    let () = check 0 0 0 in
-    let () = check (-1) 0 1 in
-    let () = check 1 1 0 in
+    let () = check ~here:[%here] 0 0 0 in
+    let () = check ~here:[%here] (-1) 0 1 in
+    let () = check ~here:[%here] 1 1 0 in
     ()
 
   let string () =
     let check = check "string" string_schema in
-    let () = check 0 "a" "a" in
-    let () = check (-1) "a" "b" in
-    let () = check 1 "b" "a" in
-    let () = check 1 "aa" "a" in
-    let () = check (-1) "a" "aa" in
+    let () = check ~here:[%here] 0 "a" "a" in
+    let () = check ~here:[%here] (-1) "a" "b" in
+    let () = check ~here:[%here] 1 "b" "a" in
+    let () = check ~here:[%here] 1 "aa" "a" in
+    let () = check ~here:[%here] (-1) "a" "aa" in
     ()
 
   let versions check f =
@@ -1035,18 +1035,18 @@ module Comparison = struct
 
   let record () =
     let check = check "version" version_schema in
-    versions check version
+    versions (check ~here:[%here]) version
 
   let tuple () =
     let check = check "version" version_tuple_schema in
-    versions check Fn.id
+    versions (check ~here:[%here]) Fn.id
 
   let variant () =
     let check = check "variant" expectation_schema
     and v = { major = 1; minor = 2; subminor = 3 } in
-    let () = check 0 (Exact v) (Exact v)
-    and () = check (-1) (Exact v) Nothing
-    and () = check 1 Nothing (Exact v) in
+    let () = check ~here:[%here] 0 (Exact v) (Exact v)
+    and () = check ~here:[%here] (-1) (Exact v) Nothing
+    and () = check ~here:[%here] 1 Nothing (Exact v) in
     ()
 end
 
@@ -1104,14 +1104,14 @@ module Names = struct
 
   let deduced () =
     Alcotest.(
-      check (option string) "schema name is deduced from type name" (Some "foo")
-        foo_schema.id);
+      check ~here:[%here] (option string)
+        "schema name is deduced from type name" (Some "foo") foo_schema.id);
     Alcotest.(
-      check (option string)
+      check ~here:[%here] (option string)
         "schema name is deduced from type module name when type is \"t\""
         (Some "names") schema.id);
     Alcotest.(
-      check (option string)
+      check ~here:[%here] (option string)
         "schema name is deduced from file name when type is \"t\"" (Some "test")
         root_schema.id)
 
@@ -1122,10 +1122,11 @@ module Names = struct
 
   let parametric () =
     Alcotest.(
-      check (option string) "schema name is deduced from type name"
-        (Some "foo-result") (result_schema foo_schema).id);
+      check ~here:[%here] (option string)
+        "schema name is deduced from type name" (Some "foo-result")
+        (result_schema foo_schema).id);
     Alcotest.(
-      check (option string)
+      check ~here:[%here] (option string)
         "schema name is deduced from type module name when type is \"t\""
         (Some "names-result") (result_schema schema).id)
 end
@@ -1182,7 +1183,7 @@ module Computed = struct
     test ~here:[%here] "computed optional" t schema { x = 0; y = 0 }
       [%ezjsonm { x = 0; sum = 0 }];
     (* This used to fail because the computed field was expected *)
-    Alcotest.(check (result t decoding_error))
+    Alcotest.(check ~here:[%here] (result t decoding_error))
       "variant containing records with missing computed field"
       (Result.Ok { x = 1198; y = 33 })
     @@ Schematic.Json.decode schema [%ezjsonm { x = 1198; y = 33 }]
@@ -1304,10 +1305,11 @@ module Pp = struct
   let pp () =
     let version = { major = 1242; minor = 1243; subminor = 1244 } in
     Alcotest.(
-      check string "version" {|{major: 1242; minor: 1243; subminor: 1244;}|}
+      check ~here:[%here] string "version"
+        {|{major: 1242; minor: 1243; subminor: 1244;}|}
         (Fmt.str "@[%a@]" pp_version version));
     Alcotest.(
-      check string "range"
+      check ~here:[%here] string "range"
         {|(
   {major: 1242; minor: 1243; subminor: 1244;},
   {major: 1242; minor: 1243; subminor: 1244;},
@@ -1320,7 +1322,7 @@ module Pp = struct
     let () = Fmt.pf fmt "@[%a@]" pp_version version in
     let () = Caml.Format.pp_print_flush fmt () in
     Alcotest.(
-      check string "version-narrow"
+      check ~here:[%here] string "version-narrow"
         {|{
   major: 1242;
   minor: 1243;

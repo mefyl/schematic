@@ -244,6 +244,34 @@ module Generate_types = struct
         ("C", {|"c"|});
         ("Duplicate", {|{ "a": A; "b": B; "b'": B; "c": C }|});
       ]
+
+  type union_inner_variant =
+    | A of { a : int }
+    | B of { b : int }
+  [@@schematic.name_opt None]
+
+  and union_inner = Ctor of union_inner_variant
+  [@@schematic.union_key "kind"] [@@deriving schema]
+
+  type union_outer_variant = Ctor of { b : int }
+  [@@schematic.union_key "kind"] [@@schematic.name_opt None]
+
+  and union_outer =
+    | A of { a : int }
+    | B of union_outer_variant
+  [@@deriving schema]
+
+  let priorities () =
+    test ~here:[%here] union_inner_schema
+      [
+        ( "UnionInner",
+          {|({ "a": number } | { "b": number }) & { "kind": "ctor" }|} );
+      ];
+    test ~here:[%here] union_outer_schema
+      [
+        ( "UnionOuter",
+          {|{ "a": number } | { "b": number } & { "kind": "ctor" }|} );
+      ]
 end
 
 let () =
@@ -251,21 +279,22 @@ let () =
   run "Schematic.Typescript"
     [
       ( "generate types",
-        [
-          test_case "nullable" `Quick Generate_types.nullable;
-          test_case "parametric" `Quick Generate_types.parametric;
-          test_case "record" `Quick Generate_types.record;
-          test_case "recursive" `Quick Generate_types.recursive;
-          test_case "tuple" `Quick Generate_types.tuple;
-          test_case "variant" `Quick Generate_types.variant;
-          test_case "inline-variant" `Quick Generate_types.inline_variant;
-          test_case "inline-try" `Quick Generate_types.inline_try;
-          test_case "inline-option" `Quick Generate_types.hidden_inline_optional;
-          test_case "inline-keyed-variant" `Quick
-            Generate_types.inline_keyed_variant;
-          test_case "computed" `Quick Generate_types.computed;
-          test_case "option option" `Quick Generate_types.option_option;
-          test_case "option option" `Quick Generate_types.option_default;
-          test_case "duplicate type" `Quick Generate_types.duplicate;
-        ] );
+        Generate_types.
+          [
+            test_case "nullable" `Quick nullable;
+            test_case "parametric" `Quick parametric;
+            test_case "record" `Quick record;
+            test_case "recursive" `Quick recursive;
+            test_case "tuple" `Quick tuple;
+            test_case "variant" `Quick variant;
+            test_case "inline-variant" `Quick inline_variant;
+            test_case "inline-try" `Quick inline_try;
+            test_case "inline-option" `Quick hidden_inline_optional;
+            test_case "inline-keyed-variant" `Quick inline_keyed_variant;
+            test_case "computed" `Quick computed;
+            test_case "option option" `Quick option_option;
+            test_case "option option" `Quick option_default;
+            test_case "duplicate type" `Quick duplicate;
+            test_case "priorities" `Quick priorities;
+          ] );
     ]

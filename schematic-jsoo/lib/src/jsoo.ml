@@ -16,9 +16,13 @@ let js_of_ptime t = new%js Js.date_fromTimeValue (Ptime.to_float_s t *. 1000.)
 let ( == ) = Base.phys_equal
 let ( let+ ) = Option.( >>| )
 
+type Schematic.Coding.any += Jsoo of Js.Unsafe.any
+
 module Jsoo_coding : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
   type t = Js.Unsafe.any
 
+  let name = "javascript"
+  let compare _ _ = failwith "FIXME"
   let pp fmt t = Fmt.string fmt @@ Js.to_string @@ Js._JSON##stringify t
   let type_name o = Js_of_ocaml.Js.typeof o |> Js.to_string
 
@@ -46,6 +50,7 @@ module Jsoo_coding : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
     `Custom f
 
   let null () = Js.Unsafe.pure_js_expr "null"
+  let of_any = function Jsoo v -> Some v | _ -> None
   let of_bool v = Js.Unsafe.coerce @@ Js.bool v
   let of_date = `Custom js_of_date
 
@@ -66,6 +71,7 @@ module Jsoo_coding : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
   let of_string v = Js.Unsafe.coerce @@ Js.string v
   let of_time v = Js.Unsafe.coerce @@ js_of_ptime v
   let of_time_local v = Js.Unsafe.coerce @@ js_of_ptime (fst v)
+  let to_any = function v -> Jsoo v
 
   let to_bool v =
     if Js.typeof v == Js.string "boolean" then
@@ -138,3 +144,7 @@ let helpers_typed (module _ : JS with type t = 't and type js = 'js) name schema
   ( (to_js : 't -> 'js),
     (of_js : 'js -> ('t, Schematic.Error.decoding) Result.t),
     (of_js_exn : 'js -> 't) )
+
+include Schematic.Coding.Any (Jsoo_coding)
+
+type js = t

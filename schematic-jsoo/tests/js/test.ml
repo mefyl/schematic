@@ -7,35 +7,72 @@ module Schemas_library = struct
   let v = V
 end
 
-module Namespace = struct
+(* Wrap types in modules with explicit signatures to test ppx signature
+   expansion *)
+
+module Namespace : sig
+  type int_alias = int [@@deriving schema ~jsoo]
+end = struct
   type int_alias = int [@@deriving schema ~jsoo]
 end
 
-type 'param inline = {
-  s : 'param;
-  b : bool;
-}
-[@@deriving schema ~jsoo]
+module Inline : sig
+  type 'param t = {
+    s : 'param;
+    b : bool;
+  }
+  [@@deriving schema ~jsoo]
+end = struct
+  type 'param t = {
+    s : 'param;
+    b : bool;
+  }
+  [@@deriving schema ~jsoo]
+end
 
-type o = {
-  i : int;
-  inline : string inline; [@schematic.inline]
-  opt : bool option;
-  opt_nullable : bool option option;
-  a : Namespace.int_alias list;
-  pair : bool * bool;
-  def : int; [@default 0]
-}
+module O : sig
+  type o = {
+    i : int;
+    inline : string Inline.t; [@schematic.inline]
+    opt : bool option;
+    opt_nullable : bool option option;
+    a : Namespace.int_alias list;
+    pair : bool * bool;
+    def : int; [@default 0]
+  }
 
-and variant =
-  | This
-  | That of int
+  and variant =
+    | This
+    | That of int
 
-and poly =
-  [ `This
-  | `That
-  ]
-[@@deriving schema ~jsoo]
+  and poly =
+    [ `This
+    | `That
+    ]
+  [@@deriving schema ~jsoo]
+end = struct
+  type o = {
+    i : int;
+    inline : string Inline.t; [@schematic.inline]
+    opt : bool option;
+    opt_nullable : bool option option;
+    a : Namespace.int_alias list;
+    pair : bool * bool;
+    def : int; [@default 0]
+  }
+
+  and variant =
+    | This
+    | That of int
+
+  and poly =
+    [ `This
+    | `That
+    ]
+  [@@deriving schema ~jsoo]
+end
+
+include O
 
 type keyed =
   | Key_a of { i : int }
@@ -62,6 +99,8 @@ let _f (o : o_js) =
 let _g (o : keyed_js) =
   let (_ : Js.js_string Js.t) = o##.type_key in
   ()
+
+type any = { any : Schematic_jsoo.Jsoo.t } [@@deriving schema ~jsoo]
 
 let () =
   Js.export_all
@@ -92,4 +131,13 @@ let () =
          let open Result in
          Schematic_jsoo.Jsoo.decode variant_schema js
          |> decode_error "js" >>| variant_to_js
+
+       method any js =
+         match
+           Schematic_jsoo.Jsoo.decode any_schema js |> decode_error "any"
+         with
+         | Result.Ok { any } -> (Js.Unsafe.coerce any)##.content
+         | Result.Error msg ->
+           Js_error.(
+             raise_ @@ of_error (new%js Js.error_constr (Js.string msg)))
     end)
