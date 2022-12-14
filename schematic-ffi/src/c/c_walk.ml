@@ -38,7 +38,7 @@ module type WALK = sig
   (* Union *)
 
   val union :
-    name:string option ->
+    name:string ->
     polymorphic:bool ->
     cases:(string * string * t) list ->
     t
@@ -95,6 +95,7 @@ module Walk (W : WALK) = struct
     | Object { fields = f; _ } -> W.object_ (fields f)
     | Tuple { items; _ } -> W.tuple @@ tuple items
     | Union { cases; polymorphic; key = _ } ->
+      let id = Option.value_exn id in
       let cases =
         cases
         |> List.map ~f:(fun (Schema.Case { name; raw_name; schema = s; _ }) ->

@@ -159,13 +159,12 @@ module Make (S : MARK) = struct
     let of_descriptor = M.of_descriptor
     let of_parametric = M.of_parametric
 
-    let mark_of_schema Schema.{ id; descriptor; parametric } =
+    let mark_of_schema Schema.{ id; descriptor; parametric = _ } =
       let res, marks = M.of_descriptor id descriptor in
       let id_inner, res = M.identified res in
       let id = Option.first_some id id_inner |> Option.value_exn in
-      match parametric with
-      | None -> (id, (res, marks))
-      | Some parametric -> (id, M.of_parametric parametric)
+      (* We only consider reifications, hence why `parametric` is ignored. *)
+      (id, (res, marks))
 
     let of_schema_state marks s = of_mark marks @@ mark_of_schema s
 

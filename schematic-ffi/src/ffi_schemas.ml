@@ -60,7 +60,7 @@ module Of = C_walk.Walk (struct
 
   (* The rest *)
 
-  (* This will recurse forever if given a recursive schema. *)
+  (* This will recurse forever if given a cyclic schema. *)
   let schema (id : string option) parametric s =
     Logs.debug (fun m -> m "id: %a\n@." Fmt.(option string) id);
     match parametric with
@@ -96,7 +96,6 @@ module Of = C_walk.Walk (struct
 
   let union ~name ~polymorphic ~(cases : (string * string * (c * Marks.t)) list)
       =
-    let name = Option.value_exn name in
     let constructors, marks =
       cases
       |> List.map ~f:(fun (s, raw_s, (c, m)) ->
