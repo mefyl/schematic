@@ -209,11 +209,11 @@ let () =
                 [%e pp_with_computed],
                 [%e equal_with_computed],
                 [%e [ { non_computed = 4243 } ]] );
-              ( "any_alias",
-                [%t: any_alias],
-                [%e any_alias_rt_id],
-                [%e pp_any_alias],
-                [%e equal_any_alias],
+              ( "json_alias",
+                [%t: json_alias],
+                [%e json_alias_rt_id],
+                [%e pp_json_alias],
+                [%e equal_json_alias],
                 [%e
                   [
                     `A
