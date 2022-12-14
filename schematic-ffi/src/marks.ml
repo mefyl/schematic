@@ -153,11 +153,9 @@ module Make (S : MARK) = struct
   module Make_mark_converter (M : sig
     val identified : S.t -> string option * S.t
     val of_descriptor : string option -> 'a Schema.descriptor -> S.t * Marks.t
-    val of_parametric : 'a Schema.parametric -> S.t * Marks.t
   end) =
   struct
     let of_descriptor = M.of_descriptor
-    let of_parametric = M.of_parametric
 
     let mark_of_schema Schema.{ id; descriptor; parametric = _ } =
       let res, marks = M.of_descriptor id descriptor in

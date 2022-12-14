@@ -327,6 +327,8 @@ let exported_schemas =
     Schema.pack Event_1.schema;
     Schema.pack reserved_kws_schema;
     (* Look for conflicts in tag names *)
-    Schema.pack { (option_like_schema int_schema) with id = Some ("int-option-like")};
-    Schema.pack { (option_like_schema string_schema) with id = Some ("string-option-like")};
+    Schema.pack
+      { (option_like_schema int_schema) with id = Some "int-option-like" };
+    Schema.pack
+      { (option_like_schema string_schema) with id = Some "string-option-like" };
   ]

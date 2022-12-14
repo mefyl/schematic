@@ -211,12 +211,6 @@ include Make_mark_converter (struct
             Fmt.(option string)
             id Schematic.Schema.pp_descriptor d);
       raise e
-
-  let of_parametric p =
-    try Of.parametric p
-    with e ->
-      Logs.err (fun m -> m "Exception thrown for parametric");
-      raise e
 end)
 
 let ctypes_of_schemas_state state schemas = of_schemas_state state schemas
