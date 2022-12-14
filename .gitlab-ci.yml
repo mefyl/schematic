@@ -1,6 +1,9 @@
 include:
   - local: '/.logistic/ci/.gitlab-ci.yml'
 
+variables:
+    DOCKERFILE_BASE: "ubuntu"
+
 toolchain:
   extends: .ocaml-toolchain
   variables:
