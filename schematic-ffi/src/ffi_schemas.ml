@@ -17,12 +17,13 @@ include Marks.Make (struct
   type t = c
 
   let equal = equal_c
+  let compare = compare_c
   let pp = pp_c
 
   module Id = Identifier
 end)
 
-module Of = C_walk.Walk (struct
+module Of = Ffi_walk.Walk (struct
   type res = c * Marks.t
   type fields = (string * c) list * Marks.t
   type case = string * c
@@ -30,7 +31,7 @@ module Of = C_walk.Walk (struct
 
   (* Utils *)
   let name (c, _marks) = c_typename c |> Identifier.to_string
-  let builtin c = (c, Marks.empty)
+  let builtin c = (c, Lazy.force Marks.empty)
 
   (* Built-ins *)
 
@@ -54,12 +55,12 @@ module Of = C_walk.Walk (struct
   let any () = builtin `Json
 
   let time () =
-    Lazy.force C_sanity_checks.ptime;
+    Lazy.force Ffi_sanity_checks.ptime;
     builtin `Time
 
   (* The rest *)
 
-  (* This will recurse forever if given a recursive schema. *)
+  (* This will recurse forever if given a cyclic schema. *)
   let schema (id : string option) parametric s =
     Logs.debug (fun m -> m "id: %a\n@." Fmt.(option string) id);
     match parametric with
@@ -76,7 +77,7 @@ module Of = C_walk.Walk (struct
     let s () = (`Option c, marks) in
     schema (Some (Identifier.to_string name)) None s
 
-  let fields_empty () = ([], Marks.empty)
+  let fields_empty () = ([], Lazy.force Marks.empty)
 
   let field : string -> required:bool -> t -> fields -> fields =
    fun name ~required (ast, marks) (rest_ast, rest_marks) ->
@@ -95,7 +96,6 @@ module Of = C_walk.Walk (struct
 
   let union ~name ~polymorphic ~(cases : (string * string * (c * Marks.t)) list)
       =
-    let name = Option.value_exn name in
     let constructors, marks =
       cases
       |> List.map ~f:(fun (s, raw_s, (c, m)) ->
@@ -125,7 +125,7 @@ module Of = C_walk.Walk (struct
                in
                let s () = (constr_c, marks) in
                Marks.make id s
-             | _ -> Marks.empty)
+             | _ -> Lazy.force Marks.empty)
       |> Marks.merge
     in
     let marks = Marks.merge [ marks; inline_payload_marks ] in
@@ -176,11 +176,11 @@ module Of = C_walk.Walk (struct
 
   (* TODO: for clarity, use a struct *)
   let time_local () =
-    Lazy.force C_sanity_checks.ptime_local;
+    Lazy.force Ffi_sanity_checks.ptime_local;
     tuple [ time (); int () ]
 
   let date () =
-    Lazy.force C_sanity_checks.date;
+    Lazy.force Ffi_sanity_checks.date;
 
     let s () =
       let int = fst (int ()) in
@@ -193,7 +193,7 @@ module Of = C_walk.Walk (struct
           (Identifier.make "day", int);
         ]
       in
-      (`Struct { fields }, Marks.empty)
+      (`Struct { fields }, Lazy.force Marks.empty)
     in
     schema (Some "sch_date") None s
 end)
@@ -210,12 +210,6 @@ include Make_mark_converter (struct
           m "Exception thrown for descriptor '%a', %a"
             Fmt.(option string)
             id Schematic.Schema.pp_descriptor d);
-      raise e
-
-  let of_parametric p =
-    try Of.parametric p
-    with e ->
-      Logs.err (fun m -> m "Exception thrown for parametric");
       raise e
 end)
 

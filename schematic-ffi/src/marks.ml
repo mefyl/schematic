@@ -6,6 +6,7 @@ module type MARK = sig
 
   val pp : t Fmt.t
   val equal : t -> t -> bool
+  val compare : t -> t -> int
 
   module Id : sig
     type t
@@ -30,10 +31,9 @@ module Make (S : MARK) = struct
 
   module rec Mark : (V with type t = string * (S.t * Marks.t)) = struct
     module T = struct
-      type t = string * (S.t * Marks.t)
+      type t = string * (S.t * Marks.t) [@@deriving ord]
 
       let sexp_of_t (id, _) = Sexp.Atom id
-      let compare (l, _) (r, _) = String.compare l r
     end
 
     include T
@@ -61,7 +61,7 @@ module Make (S : MARK) = struct
   and Marks : sig
     type t
 
-    val empty : t
+    val empty : t Lazy.t
     val make : string -> (unit -> S.t * Marks.t) -> t
     val add : t -> Mark.t -> t
     val fold : t -> init:'a -> f:('a -> Mark.t -> 'a) -> 'a
@@ -69,16 +69,27 @@ module Make (S : MARK) = struct
     val merge : t list -> t
     val of_list : Mark.t list -> t
     val pp : t Fmt.t
+    val compare : t -> t -> int
   end = struct
     type t = (string, S.t * Marks.t, String.comparator_witness) Map.t
 
-    let empty = Map.empty (module String)
+    let compare (m1 : t) (m2 : t) : int =
+      let val_cmp (a_s, a_m) (b_s, b_m) =
+        let c1 = S.compare a_s b_s in
+        (* Using Marks.compare instead of just "compare" with a recursive
+           definition is necessary for this to typecheck. *)
+        let c2 = Marks.compare a_m b_m in
+        if c1 = 0 then c2 else c1
+      in
+      Map.compare_direct val_cmp m1 m2
+
+    let empty = lazy (Map.empty (module String))
 
     let make id f =
       (* We don't actually use laziness at this point; we don't support
          recursive data types, and we want safety checks. *)
       let data = f () in
-      Map.add_exn empty ~key:id ~data
+      Map.add_exn (Lazy.force empty) ~key:id ~data
 
     let add (t : t) ((id, x) : Mark.t) =
       Map.change t id ~f:(function
@@ -95,15 +106,16 @@ module Make (S : MARK) = struct
     let find (t : t) id = Map.find t id
 
     let merge (l : t list) =
-      List.fold l ~init:empty ~f:(fun acc x ->
-          Map.merge_skewed acc x ~combine:(fun ~key l r ->
-              ensure_consistent key l r))
+      l |> List.sort ~compare
+      |> List.fold ~init:(Lazy.force empty) ~f:(fun acc x ->
+             Map.merge_skewed acc x ~combine:(fun ~key l r ->
+                 ensure_consistent key l r))
 
     let of_mark ((id, x) : Mark.t) = make id (fun () -> x)
 
     let of_list (l : Mark.t list) =
       (* Very inefficient *)
-      l |> List.map ~f:of_mark |> merge
+      l |> List.sort ~compare:Mark.compare |> List.map ~f:of_mark |> merge
 
     let pp : t Fmt.t =
      fun f t ->
@@ -141,19 +153,16 @@ module Make (S : MARK) = struct
   module Make_mark_converter (M : sig
     val identified : S.t -> string option * S.t
     val of_descriptor : string option -> 'a Schema.descriptor -> S.t * Marks.t
-    val of_parametric : 'a Schema.parametric -> S.t * Marks.t
   end) =
   struct
     let of_descriptor = M.of_descriptor
-    let of_parametric = M.of_parametric
 
-    let mark_of_schema Schema.{ id; descriptor; parametric } =
+    let mark_of_schema Schema.{ id; descriptor; parametric = _ } =
       let res, marks = M.of_descriptor id descriptor in
       let id_inner, res = M.identified res in
       let id = Option.first_some id id_inner |> Option.value_exn in
-      match parametric with
-      | None -> (id, (res, marks))
-      | Some parametric -> (id, M.of_parametric parametric)
+      (* We only consider reifications, hence why `parametric` is ignored. *)
+      (id, (res, marks))
 
     let of_schema_state marks s = of_mark marks @@ mark_of_schema s
 
@@ -172,7 +181,7 @@ module Make (S : MARK) = struct
 
     type state = Marks.t
 
-    let state_empty = Marks.empty
+    let state_empty = Lazy.force Marks.empty
 
     let state_exclude schemas =
       Marks.of_list
@@ -182,6 +191,7 @@ module Make (S : MARK) = struct
       let marks = state_exclude exclude in
       of_schemas_state marks schemas |> fst
 
-    let of_schema schema = of_schema_state Marks.empty schema |> fst
+    let of_schema schema =
+      of_schema_state (Lazy.force Marks.empty) schema |> fst
   end
 end

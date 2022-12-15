@@ -127,7 +127,8 @@
   (ppx_hash
    (= v0.14.0))
   (schematic
-   (= :version))))
+   (= :version))
+  (metapp :with-test)))
 
 (package
  (name schematic-cli)

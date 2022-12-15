@@ -38,10 +38,7 @@ module type WALK = sig
   (* Union *)
 
   val union :
-    name:string option ->
-    polymorphic:bool ->
-    cases:(string * string * t) list ->
-    t
+    name:string -> polymorphic:bool -> cases:(string * string * t) list -> t
 
   (* Descriptors *)
 
@@ -95,6 +92,7 @@ module Walk (W : WALK) = struct
     | Object { fields = f; _ } -> W.object_ (fields f)
     | Tuple { items; _ } -> W.tuple @@ tuple items
     | Union { cases; polymorphic; key = _ } ->
+      let id = Option.value_exn id in
       let cases =
         cases
         |> List.map ~f:(fun (Schema.Case { name; raw_name; schema = s; _ }) ->
@@ -111,21 +109,16 @@ module Walk (W : WALK) = struct
       | Some p ->
         Some
           (fun () ->
-            let _name, _args, _eff_args, t = parametric p in
+            let t = parametric p in
             let name = W.name t in
             W.schema (Some name) None (fun () -> t))
     in
     W.schema id parametric schema
 
-  and parametric :
-      type t. t Schema.parametric -> string * string list * W.t list * W.t =
-    function
-    | Plain { name; descriptor = d } -> (name, [], [], descriptor (Some name) d)
-    | Parametric { name; parameter; next } ->
-      let template_name, args, eff_args, t =
-        parametric (next { parameter with parametric = None })
-      in
-      (template_name, name :: args, schema parameter :: eff_args, t)
+  and parametric : type t. t Schema.parametric -> W.t = function
+    | Plain { name; descriptor = d } -> descriptor (Some name) d
+    | Parametric { name = _; parameter; next } ->
+      parametric (next { parameter with parametric = None })
 
   and fields : type t. t Schema.fields -> W.fields = function
     | FieldEnd -> W.fields_empty ()
@@ -164,8 +157,4 @@ module Walk (W : WALK) = struct
   and tuple : type t. t Schema.tuple -> W.t list = function
     | ItemEnd -> []
     | Item { schema = s; rest } -> schema s :: tuple rest
-
-  let parametric p =
-    let _name, _args, _eff_args, t = parametric p in
-    t
 end

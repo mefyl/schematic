@@ -283,6 +283,11 @@ type reserved_kws = {
 }
 [@@deriving schema, eq, show]
 
+type 'a option_like =
+  | Someish of 'a
+  | Noneish
+[@@deriving schema, eq, show]
+
 let exported_schemas =
   [
     Schema.pack (option_schema int_schema);
@@ -321,4 +326,9 @@ let exported_schemas =
     Schema.pack mapped_schema;
     Schema.pack Event_1.schema;
     Schema.pack reserved_kws_schema;
+    (* Look for conflicts in tag names *)
+    Schema.pack
+      { (option_like_schema int_schema) with id = Some "int-option-like" };
+    Schema.pack
+      { (option_like_schema string_schema) with id = Some "string-option-like" };
   ]

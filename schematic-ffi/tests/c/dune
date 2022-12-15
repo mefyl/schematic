@@ -1,9 +1,21 @@
 (include_subdirs no)
 
+(executable
+ (name gen_c_rt_stubs)
+ (modules gen_c_rt_stubs)
+ (libraries
+  alcotest
+  schematic
+  schematic_ffi
+  ffi_test_utils
+  stdio
+  logs
+  logs.fmt))
+
 (test
  (name gen_test)
  (package schematic-ffi)
  (modules gen_test)
  (preprocess
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
- (libraries alcotest schematic schematic_ffi c_test_types))
+ (libraries alcotest schematic schematic_ffi ffi_test_utils))

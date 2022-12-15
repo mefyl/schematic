@@ -1,4 +1,4 @@
-open C_test_types
+open Ffi_test_utils.Types
 open Schematic
 open Swift_test_utils
 
