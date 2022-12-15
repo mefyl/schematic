@@ -23,7 +23,7 @@ include Marks.Make (struct
   module Id = Identifier
 end)
 
-module Of = C_walk.Walk (struct
+module Of = Ffi_walk.Walk (struct
   type res = c * Marks.t
   type fields = (string * c) list * Marks.t
   type case = string * c
