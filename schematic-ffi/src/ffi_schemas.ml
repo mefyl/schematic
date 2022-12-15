@@ -55,7 +55,7 @@ module Of = Ffi_walk.Walk (struct
   let any () = builtin `Json
 
   let time () =
-    Lazy.force C_sanity_checks.ptime;
+    Lazy.force Ffi_sanity_checks.ptime;
     builtin `Time
 
   (* The rest *)
@@ -176,11 +176,11 @@ module Of = Ffi_walk.Walk (struct
 
   (* TODO: for clarity, use a struct *)
   let time_local () =
-    Lazy.force C_sanity_checks.ptime_local;
+    Lazy.force Ffi_sanity_checks.ptime_local;
     tuple [ time (); int () ]
 
   let date () =
-    Lazy.force C_sanity_checks.date;
+    Lazy.force Ffi_sanity_checks.date;
 
     let s () =
       let int = fst (int ()) in
