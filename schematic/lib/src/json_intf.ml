@@ -5,6 +5,7 @@ module type S = sig
 
   val from_channel : Caml.in_channel -> (t, Error.parsing) Base.Result.t
   val to_channel : Caml.out_channel -> t -> unit
+  val compare : t -> t -> int
   val equal : t -> t -> bool
   val pp : Base.Formatter.t -> t -> unit
   val to_ezjsonm : t -> Ezjsonm.value

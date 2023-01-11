@@ -108,6 +108,32 @@ module Make (Impl : Impl) = struct
   let pp = pp
   let to_ezjsonm v = v
 
+  let rec compare l r =
+    match (l, r) with
+    | `Null, `Null -> 0
+    | `Null, _ -> -1
+    | _, `Null -> 1
+    | `Bool l, `Bool r -> Bool.compare l r
+    | `Bool _, _ -> -1
+    | _, `Bool _ -> 1
+    | `Float l, `Float r -> Float.compare l r
+    | `Float _, _ -> -1
+    | _, `Float _ -> 1
+    | `String l, `String r -> String.compare l r
+    | `String _, _ -> -1
+    | _, `String _ -> 1
+    | `A l, `A r -> List.compare compare l r
+    | `A _, _ -> -1
+    | _, `A _ -> 1
+    | `O l, `O r ->
+      let compare (l, _) (r, _) = String.compare l r
+      and compare_field (lk, lv) (rk, rv) =
+        match String.compare lk rk with 0 -> compare lv rv | n -> n
+      in
+      let l = List.sort ~compare l
+      and r = List.sort ~compare r in
+      List.compare compare_field l r
+
   let rec equal l r =
     match (l, r) with
     | `Null, `Null -> true
