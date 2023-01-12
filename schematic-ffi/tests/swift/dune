@@ -20,5 +20,6 @@
 
 (test
  (name types)
+ (package schematic-ffi)
  (modules types cases swift_test_utils)
  (libraries alcotest schematic ffi_test_utils stdio logs logs.fmt test_utils))
