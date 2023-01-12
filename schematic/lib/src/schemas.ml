@@ -5,6 +5,7 @@ type ignore = unit
 
 let pp_ignore _ () = ()
 let equal_ignore () () = true
+let compare_ignore () () = 0
 
 type json = Ezjsonm.value
 
