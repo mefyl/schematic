@@ -21,9 +21,7 @@ let () =
         let (status, stdout), stderr =
           Shexp_process.(
             run_exit_status "dune" [ "describe"; "opam-files" ]
-            |> capture [ Stdout ]
-            |> capture [ Stderr ]
-            |> eval)
+            |> capture [ Stdout ] |> capture [ Stderr ] |> eval)
         in
         match status with
         | Exited 0 -> (
@@ -197,7 +195,7 @@ let () =
                                      pelem =
                                        Prefix_relop
                                          ( { pelem = `Eq; pos },
-                                           { pelem = String "0.20.1"; pos } );
+                                           { pelem = String "0.24.1"; pos } );
                                      pos;
                                    };
                                  ];

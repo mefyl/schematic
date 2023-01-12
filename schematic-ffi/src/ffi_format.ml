@@ -1,5 +1,4 @@
 let indent = 2 (* FIXME *)
-
 let force_newline fmt _ = Caml.Format.pp_force_newline fmt ()
 
 let block ?(indent = indent) ?(delim = ('{', '}')) ?(open_sp = true) lhs body =
