@@ -197,7 +197,7 @@ let () =
                                      pelem =
                                        Prefix_relop
                                          ( { pelem = `Eq; pos },
-                                           { pelem = String "0.20.1"; pos } );
+                                           { pelem = String "0.24.1"; pos } );
                                      pos;
                                    };
                                  ];
