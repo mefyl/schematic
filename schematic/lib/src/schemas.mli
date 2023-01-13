@@ -5,6 +5,7 @@ type ignore = unit
 
 val pp_ignore : Base.Formatter.t -> ignore -> unit
 val equal_ignore : ignore -> ignore -> bool
+val compare_ignore : ignore -> ignore -> int
 val bool_schema : bool Schema.t
 val bool_schema_versioned : Schema.version -> bool Schema.t
 val float_schema : float Schema.t

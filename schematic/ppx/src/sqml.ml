@@ -31,7 +31,7 @@ let expand_record ~context ~type_context (fields : Attributes.field list) =
     let loc = field.loc in
     let column_type =
       match field.sqml_type with
-      | Some t -> t
+      | Some t -> [%expr Atomic [%e t]]
       | None ->
         [%expr
           Schematic_sqml.type_of_schema
@@ -46,7 +46,7 @@ let expand_record ~context ~type_context (fields : Attributes.field list) =
     and primary = Ast.ebool (Option.value ~default:false field.sqml_primary) in
     [%stri
       let [%p Ast.pvar (column_name field.name)] =
-        Sqml.Column.make ~primary:[%e primary] ?foreign_keys:[%e fk]
+        Sqml.Column.make_composite ~primary:[%e primary] ?foreign_keys:[%e fk]
           [%e Ast.estring field.name] [%e column_type]]
   and column_type_of_field (field : Attributes.field) tail =
     [%type: [%t field.type_] * [%t tail]]

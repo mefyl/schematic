@@ -1,10 +1,10 @@
 open Acid
 
-let rec type_of_descriptor :
+let rec atomic_type_of_descriptor :
     type t.
     ?id:string ->
     t Schematic.Schema.descriptor ->
-    t Sqml.Expression.Column.Type.t =
+    t Sqml.Expression.Column.Type.atomic =
  fun ?id descriptor ->
   let fail name =
     Fmt.failwith "sqml: %acannot bind %s descriptor@ @[%a@]"
@@ -19,7 +19,7 @@ let rec type_of_descriptor :
     let decode = Fn.compose Result.return Timmy.Date.to_tuple
     and encode = Timmy.Date.of_tuple_exn ~here:[%here] in
     Custom { decode; encode; repr = Date }
-  | Fixpoint s -> type_of_descriptor ?id (Lazy.force s)
+  | Fixpoint s -> atomic_type_of_descriptor ?id (Lazy.force s)
   | Int -> Int
   | Ignore -> fail "Ignore"
   | Int64 -> Bigint
@@ -28,7 +28,7 @@ let rec type_of_descriptor :
   | Null -> fail "Null"
   | String -> Text
   | Time ->
-    Sqml.Column.Type.Custom
+    Custom
       {
         repr = Time;
         encode = Timmy.Time.of_ptime;
@@ -36,13 +36,66 @@ let rec type_of_descriptor :
       }
   | Time_local -> fail "Time_local (FIXME)"
   | Map { decode; encode; descriptor } ->
-    Custom { decode; encode; repr = type_of_descriptor descriptor }
+    Custom { decode; encode; repr = atomic_type_of_descriptor descriptor }
   | Mapping _ -> fail "Mapping"
-  | Nullable schema -> Nullable (type_of_descriptor schema.descriptor)
+  | Nullable schema -> Nullable (atomic_type_of_descriptor schema.descriptor)
   | String_const _ -> fail "String_const"
   | Object _ -> fail "Object"
   | Tuple _ -> fail "Tuple"
   | Union _ -> fail "Union"
+
+and atomic_type_of_schema Schematic.Schema.{ descriptor; id; _ } =
+  atomic_type_of_descriptor ?id descriptor
+
+let rec types_of_fields :
+    type l. l Schematic.Schema.fields -> l Sqml.Expression.Column.Type.List.t =
+  function
+  | Field { field = { name; requirement; schema; _ }; rest } -> (
+    let rest = types_of_fields rest in
+    match requirement with
+    | Default _ ->
+      (name, atomic_type_of_schema (Schematic.Schema.field_schema schema))
+      :: rest
+    | Optional ->
+      ( name,
+        Nullable (atomic_type_of_schema (Schematic.Schema.field_schema schema))
+      )
+      :: rest
+    | Required ->
+      (name, atomic_type_of_schema (Schematic.Schema.field_schema schema))
+      :: rest
+    | Computed | Computed_optional ->
+      Fmt.failwith "sqml: cannot bind computed field %S" name)
+  | FieldEnd -> []
+
+let rec hlist_of_fields : type l. l Schematic.Schema.fields -> l -> l Hlist.t =
+  function
+  | Field { field = _; rest } ->
+    let rest = hlist_of_fields rest in
+    fun (hd, tl) -> hd :: rest tl
+  | FieldEnd -> fun () -> []
+
+let rec type_of_descriptor :
+    type t.
+    ?id:string ->
+    t Schematic.Schema.descriptor ->
+    t Sqml.Expression.Column.Type.t =
+ fun ?id descriptor ->
+  match descriptor with
+  | Any _ | Bool | Float | Date | Int | Ignore | Int64 | Json | List _ | Map _
+  | Mapping _ | Null | Nullable _ | String | Time | Time_local | String_const _
+  | Tuple _ | Union _ ->
+    Atomic (atomic_type_of_descriptor descriptor)
+  | Fixpoint s -> type_of_descriptor ?id (Lazy.force s)
+  | Object { decode; encode; fields } ->
+    let columns = types_of_fields fields
+    and hlist_of_fields = hlist_of_fields fields in
+    Composite
+      {
+        columns;
+        decode = (fun columns -> Hlist.to_pairs columns |> decode);
+        encode = (fun o -> encode o |> hlist_of_fields);
+      }
 
 and type_of_schema Schematic.Schema.{ descriptor; id; _ } =
   type_of_descriptor ?id descriptor
