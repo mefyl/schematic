@@ -15,7 +15,7 @@ val object_fields : 'a descriptor -> (string list list, string) Result.t
 (** Map a descriptor to the simplest atomic descriptor possible. *)
 val flatten : 't descriptor -> 't flatten
 
-type 'res walk_fields = { f : 't. 't fields -> 'res }
+type 'res walk_fields = { f : 't. 't Hlist.t fields -> 'res }
 
 val walk_fields :
   't descriptor -> 'res walk_fields -> ('res list, string) result
@@ -30,7 +30,10 @@ module Make_inline (M : Base.Monad.S) : sig
   val schema :
     't descriptor -> 'res inline -> ('res list list M.t, string) Result.t
 
-  val value : 'res inline_v -> 't fields -> ('t -> 'res list M.t, string) result
+  val value :
+    'res inline_v ->
+    't Hlist.t fields ->
+    ('t Hlist.t -> 'res list M.t, string) result
 end
 
 module Inline : module type of Make_inline (Base.Monad.Ident)

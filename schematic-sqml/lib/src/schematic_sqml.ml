@@ -48,8 +48,9 @@ and atomic_type_of_schema Schematic.Schema.{ descriptor; id; _ } =
   atomic_type_of_descriptor ?id descriptor
 
 let rec types_of_fields :
-    type l. l Schematic.Schema.fields -> l Sqml.Expression.Column.Type.List.t =
-  function
+    type l.
+    l Schematic.Hlist.t Schematic.Schema.fields ->
+    l Sqml.Expression.Column.Type.List.t = function
   | Field { field = { name; requirement; schema; _ }; rest } -> (
     let rest = types_of_fields rest in
     match requirement with
@@ -68,12 +69,14 @@ let rec types_of_fields :
       Fmt.failwith "sqml: cannot bind computed field %S" name)
   | FieldEnd -> []
 
-let rec hlist_of_fields : type l. l Schematic.Schema.fields -> l -> l Hlist.t =
+let rec hlist_of_fields :
+    type l.
+    l Schematic.Hlist.t Schematic.Schema.fields -> l Hlist.t -> l Hlist.t =
   function
   | Field { field = _; rest } ->
     let rest = hlist_of_fields rest in
-    fun (hd, tl) -> hd :: rest tl
-  | FieldEnd -> fun () -> []
+    fun (hd :: tl) -> hd :: rest tl
+  | FieldEnd -> fun [] -> []
 
 let rec type_of_descriptor :
     type t.
@@ -93,7 +96,7 @@ let rec type_of_descriptor :
     Composite
       {
         columns;
-        decode = (fun columns -> Hlist.to_pairs columns |> decode);
+        decode = (fun columns -> decode columns);
         encode = (fun o -> encode o |> hlist_of_fields);
       }
 

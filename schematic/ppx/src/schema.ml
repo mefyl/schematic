@@ -155,21 +155,21 @@ and combinator :
       in
       let f i tl field =
         let pattern = pattern i field in
-        [%pat? [%p pattern], [%p tl]]
+        [%pat? [%p pattern] :: [%p tl]]
       in
-      List.fold_righti ~f ~init:[%pat? ()] fields
+      List.fold_righti ~f ~init:[%pat? []] fields
     in
-    Ast.pexp_fun Nolabel None pattern [%expr [%e constructed]]
+    Ast.pexp_fun Nolabel None [%pat? Hlist.([%p pattern])] constructed
   and deconstruct =
     let value =
       let expr i f = field_value i f in
       let f i tl field =
         let expr = expr i field in
-        [%expr [%e expr], [%e tl]]
+        [%expr [%e expr] :: [%e tl]]
       in
-      List.fold_righti ~f ~init:[%expr ()] fields
+      List.fold_righti ~f ~init:[%expr []] fields
     in
-    Ast.pexp_fun Nolabel None deconstructed value
+    Ast.pexp_fun Nolabel None deconstructed [%expr Hlist.([%e value])]
   in
   mapper ~construct ~deconstruct
 
@@ -298,7 +298,6 @@ and _expand_record as_tuple ~context ~type_context
           fields = [%e fields_schema];
         }]
   in
-
   expanded_of_descriptor ~loc
   @@ combinator ~loc fields field_name field_value constructed deconstructed
        mapped
@@ -404,8 +403,8 @@ and expand_any_variant ~context ~type_context poly options =
                 Object
                   {
                     fields = FieldEnd;
-                    encode = (fun x -> x);
-                    decode = (fun x -> x);
+                    encode = (fun () -> Hlist.[]);
+                    decode = (fun Hlist.[] -> ());
                   }]
         in
         (schema, None, None, None, None)

@@ -83,10 +83,17 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
     fun fmt v -> printer fmt (t_encode v)
   | Union { cases; _ } -> of_cases cases
 
-and of_tuple : type t. t Schema.tuple -> t Fmt.t = function
+and of_tuple : type t. t Hlist.t Schema.tuple -> t Hlist.t Fmt.t = function
   | ItemEnd -> nop
-  | Item { schema; rest = ItemEnd } -> pair ~sep:nop (of_schema schema) nop
-  | Item { schema; rest } -> pair ~sep:comma (of_schema schema) (of_tuple rest)
+  | Item { schema; rest = ItemEnd } ->
+    fun f Hlist.[ v ] ->
+      of_schema schema f v;
+      comma f ()
+  | Item { schema; rest } ->
+    fun f Hlist.(hd :: tl) ->
+      of_schema schema f hd;
+      comma f ();
+      of_tuple rest f tl
 
 and of_cases : type t. t Schema.case list -> t Fmt.t =
  fun cases ->

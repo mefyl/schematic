@@ -184,8 +184,9 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       | Object { fields = fields_schema; decode = o_decode; _ } ->
         let* fields = Coding.to_fields v |> type_error "object" in
         let rec decode_object :
-            type t. t Schema.fields -> (t, E.decoding) Result.t = function
-          | FieldEnd -> Result.return ()
+            type t. t Hlist.t Schema.fields -> (t Hlist.t, E.decoding) Result.t
+            = function
+          | FieldEnd -> Result.return Hlist.[]
           | Field
               {
                 field =
@@ -201,7 +202,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
             match Schema.field_schema field_schema with
             | { descriptor = Ignore; _ } ->
               let* rest = decode_object rest in
-              Result.Ok (requirement_return requirement (), rest)
+              Result.Ok Hlist.(requirement_return requirement () :: rest)
             | schema ->
               let field =
                 let value =
@@ -229,7 +230,9 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
                 in
                 decode_field omit context field_name schema requirement value
               in
-              Result.Let_syntax.Let_syntax.both field (decode_object rest))
+              let* field = field in
+              let* tail = decode_object rest in
+              Result.Ok Hlist.(field :: tail))
         in
         decode_object fields_schema |> Result.map ~f:o_decode
       | String -> Coding.to_string v |> type_error "string"
@@ -257,8 +260,8 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           match (t, v) with
           | Item { schema; rest }, hd :: tl ->
             decode_schema context schema hd >>= fun hd ->
-            decode_tuple rest tl >>= fun tl -> Result.return (hd, tl)
-          | ItemEnd, [] -> Result.return ()
+            decode_tuple rest tl >>= fun tl -> Result.return Hlist.(hd :: tl)
+          | ItemEnd, [] -> Result.return Hlist.[]
           | Item _, [] -> Result.fail (error "not enough tuple elements")
           | ItemEnd, _ -> Result.fail (error "too many tuple elements")
         in
@@ -397,7 +400,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
               let encode = encode_schema context schema
               and encode_rest = encode_tuple rest in
               fun v ->
-                let hd, tl = v in
+                let Hlist.(hd :: tl) = v in
                 let hd = encode hd in
                 hd :: encode_rest tl
           in

@@ -97,7 +97,7 @@ and pp : type u. u t Fmt.t =
 
 (* Inline helpers *)
 
-type 'res walk_fields = { f : 't. 't fields -> 'res }
+type 'res walk_fields = { f : 't. 't Hlist.t fields -> 'res }
 
 let rec walk_fields :
     type t res. t descriptor -> res walk_fields -> (res list, string) Result.t =
@@ -202,8 +202,8 @@ module Make_inline (M : Base.Monad.S) = struct
       | Object { fields; encode; _ } -> (
         let rec inline_fields :
             type req f.
-            (f, req) requirement ->
-            f fields ->
+            (f Hlist.t, req) requirement ->
+            f Hlist.t fields ->
             (res list list M.t, string) Result.t =
          fun req -> function
           | FieldEnd -> M.return [ [] ] |> Result.return
@@ -211,7 +211,7 @@ module Make_inline (M : Base.Monad.S) = struct
             match req with
             | Computed -> inline_fields Computed rest
             | Computed_optional -> inline_fields Computed_optional rest
-            | Default (_, tail) -> inline_fields (Default tail) rest
+            | Default Hlist.(_ :: tail) -> inline_fields (Default tail) rest
             | Optional -> inline_fields Optional rest
             | Required -> inline_fields Required rest)
           | Field { field; rest } ->
@@ -249,7 +249,7 @@ module Make_inline (M : Base.Monad.S) = struct
                            schema = field.schema;
                            title = field.title;
                          }
-                     | Required, Default (head, _) ->
+                     | Required, Default Hlist.(head :: _) ->
                        f.f
                          {
                            description = field.description;
@@ -270,7 +270,7 @@ module Make_inline (M : Base.Monad.S) = struct
                   | (Computed | Computed_optional | Default _ | Optional), _
                   | Required, Required ->
                     inline schema.descriptor field.requirement f
-                  | Required, Default (head, _) ->
+                  | Required, Default Hlist.(head :: _) ->
                     inline schema.descriptor (Default head) f
                   | Required, ((Computed | Optional) as requirement) ->
                     inline schema.descriptor requirement f
@@ -292,7 +292,7 @@ module Make_inline (M : Base.Monad.S) = struct
               match req with
               | Computed -> inline_fields Computed rest
               | Computed_optional -> inline_fields Computed_optional rest
-              | Default (_, tail) -> inline_fields (Default tail) rest
+              | Default Hlist.(_ :: tail) -> inline_fields (Default tail) rest
               | Optional -> inline_fields Optional rest
               | Required -> inline_fields Required rest
             in
@@ -370,14 +370,17 @@ module Make_inline (M : Base.Monad.S) = struct
       in
       inline_try ~inline ~outline field.schema
     and inline_fields :
-        type t. t fields -> (t -> 'res list M.t, string) Result.t = function
-      | FieldEnd -> Result.return (fun () -> M.return [])
+        type t.
+        t Hlist.t fields -> (t Hlist.t -> 'res list M.t, string) Result.t =
+      function
+      | FieldEnd -> Result.return (fun Hlist.[] -> M.return [])
       | Field { field; rest } ->
         let* tail = inline_fields rest in
-        if field_ignored field then Result.return (fun (_, tl) -> tail tl)
+        if field_ignored field then
+          Result.return (fun Hlist.(_ :: tl) -> tail tl)
         else
           let+ head = inline_field field in
-          fun (hd, tl) ->
+          fun Hlist.(hd :: tl) ->
             let++ head = head hd
             and++ tail = tail tl in
             head @ tail
@@ -593,12 +596,13 @@ let compare schema =
       fun (l, lz) (r, rz) ->
         match Int.compare lz rz with 0 -> Ptime.compare l r | v -> v)
     | Object { fields; encode; decode = _ } ->
-      let rec compare_fields : type u. u fields -> u -> u -> int = function
+      let rec compare_fields :
+          type u. u Hlist.t fields -> u Hlist.t -> u Hlist.t -> int = function
         | Field { field = { schema; requirement; _ }; rest } ->
           let schema = field_schema schema in
           let f (type field req) (schema : field t)
-              (requirement : (field, req) requirement) ((l : req), lr)
-              ((r : req), rr) =
+              (requirement : (field, req) requirement) Hlist.((l : req) :: lr)
+              Hlist.((r : req) :: rr) =
             let c =
               match requirement with
               | Computed -> Option.compare (compare schema.descriptor) l r
@@ -611,15 +615,15 @@ let compare schema =
             match c with 0 -> compare_fields rest lr rr | v -> v
           in
           f schema requirement
-        | FieldEnd -> fun () () -> 0
+        | FieldEnd -> fun Hlist.[] Hlist.[] -> 0
       in
       let compare_items = compare_fields fields in
       fun l r -> compare_items (encode l) (encode r)
     | Tuple { items; encode; decode = _ } ->
       let rec compare_items : type t. t tuple -> t -> t -> int = function
-        | ItemEnd -> fun () () -> 0
+        | ItemEnd -> fun Hlist.[] Hlist.[] -> 0
         | Item { schema; rest } -> (
-          fun (l, lr) (r, rr) ->
+          fun Hlist.(l :: lr) Hlist.(r :: rr) ->
             match compare schema.descriptor l r with
             | 0 -> compare_items rest lr rr
             | v -> v)

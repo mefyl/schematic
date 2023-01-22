@@ -21,13 +21,13 @@ and 'a field_schema =
   | Inline_try of 'a t
 
 (** A [_ field] can describe any number of object fields. *)
-and _ fields =
-  | FieldEnd : unit fields
+and 't fields =
+  | FieldEnd : unit Hlist.t fields
   | Field : {
       field : ('t, 'req) field;
-      rest : 'rest fields;
+      rest : 'tail Hlist.t fields;
     }
-      -> ('req * 'rest) fields
+      -> ('req -> 'tail) Hlist.t fields
 
 and ('t, 'req) field = {
   description : string option;
@@ -42,12 +42,12 @@ and ('t, 'req) field = {
 }
 
 and _ tuple =
-  | ItemEnd : unit tuple
+  | ItemEnd : unit Hlist.t tuple
   | Item : {
       schema : 'a t;
-      rest : 'b tuple;
+      rest : 'b Hlist.t tuple;
     }
-      -> ('a * 'b) tuple
+      -> ('a -> 'b) Hlist.t tuple
 
 (** A descriptor describes the structure of a type. *)
 and _ descriptor =
@@ -76,15 +76,15 @@ and _ descriptor =
   | Time : Ptime.t descriptor
   | Time_local : (Ptime.t * Ptime.tz_offset_s) descriptor
   | Object : {
-      decode : 'fields -> 't;
-      encode : 't -> 'fields;
-      fields : 'fields fields;
+      decode : 'fields Hlist.t -> 't;
+      encode : 't -> 'fields Hlist.t;
+      fields : 'fields Hlist.t fields;
     }
       -> 't descriptor
   | Tuple : {
-      decode : 'tuple -> 't;
-      encode : 't -> 'tuple;
-      items : 'tuple tuple;
+      decode : 'tuple Hlist.t -> 't;
+      encode : 't -> 'tuple Hlist.t;
+      items : 'tuple Hlist.t tuple;
     }
       -> 't descriptor
   | Union : {

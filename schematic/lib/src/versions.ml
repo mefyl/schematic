@@ -1,6 +1,7 @@
 module V0_16_1 = struct
   module Error = Error
   module Base64 = B64
+  module Hlist = Hlist
 
   module Json = struct
     include Json

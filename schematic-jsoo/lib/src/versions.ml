@@ -1,4 +1,5 @@
 module V0_16_1 = struct
+  module Hlist = Schematic.Hlist
   module Json = Json
   module Jsoo = Jsoo
   module Schemas = Schemas
