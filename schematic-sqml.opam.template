@@ -1,0 +1,5 @@
+pin-depends: [
+  [ "acid.0.11.0" "git+ssh://git@gitlab.routine.co/routine/acid#b160c5a2c388c1cf0ef13d20bbb4d59049f4d67a" ]
+  [ "sqml.0.10.0" "git+ssh://git@gitlab.routine.co/routine/sqml#303faa92d3bf2076539182c577b022643b4a40d6" ]
+  [ "timmy.0.16.0" "git+ssh://git@gitlab.routine.co/routine/timmy#4f499f43b512be8ffaad5cd5aa9da7466f4473e6" ]
+]
