@@ -85,10 +85,7 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
 
 and of_tuple : type t. t Hlist.t Schema.tuple -> t Hlist.t Fmt.t = function
   | ItemEnd -> nop
-  | Item { schema; rest = ItemEnd } ->
-    fun f Hlist.[ v ] ->
-      of_schema schema f v;
-      comma f ()
+  | Item { schema; rest = ItemEnd } -> fun f Hlist.[ v ] -> of_schema schema f v
   | Item { schema; rest } ->
     fun f Hlist.(hd :: tl) ->
       of_schema schema f hd;

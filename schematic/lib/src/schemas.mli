@@ -83,7 +83,3 @@ end
 
 val one_or_many_versioned : 't Schema.t -> Schema.version -> 't list Schema.t
 val one_or_many : 't Schema.t -> 't list Schema.t
-
-module Hlist : sig
-  include module type of Hlist
-end

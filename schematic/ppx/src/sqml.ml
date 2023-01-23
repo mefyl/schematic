@@ -49,7 +49,7 @@ let expand_record ~context ~type_context (fields : Attributes.field list) =
         Sqml.Column.make_composite ~primary:[%e primary] ?foreign_keys:[%e fk]
           [%e Ast.estring field.name] [%e column_type]]
   and column_type_of_field (field : Attributes.field) tail =
-    [%type: [%t field.type_] * [%t tail]]
+    [%type: [%t field.type_] -> [%t tail]]
   and expr_explosion_of_field (field : Attributes.field) =
     [%stri
       let Sqml.Expression.List.(

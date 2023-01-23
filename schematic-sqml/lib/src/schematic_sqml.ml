@@ -49,8 +49,8 @@ and atomic_type_of_schema Schematic.Schema.{ descriptor; id; _ } =
 
 let rec types_of_fields :
     type l.
-    l Schematic.Hlist.t Schematic.Schema.fields ->
-    l Sqml.Expression.Column.Type.List.t = function
+    l Hlist.t Schematic.Schema.fields -> l Sqml.Expression.Column.Type.List.t =
+  function
   | Field { field = { name; requirement; schema; _ }; rest } -> (
     let rest = types_of_fields rest in
     match requirement with
@@ -70,8 +70,7 @@ let rec types_of_fields :
   | FieldEnd -> []
 
 let rec hlist_of_fields :
-    type l.
-    l Schematic.Hlist.t Schematic.Schema.fields -> l Hlist.t -> l Hlist.t =
+    type l. l Hlist.t Schematic.Schema.fields -> l Hlist.t -> l Hlist.t =
   function
   | Field { field = _; rest } ->
     let rest = hlist_of_fields rest in

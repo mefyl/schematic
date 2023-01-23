@@ -209,7 +209,3 @@ let one_or_many_versioned schema _ =
   Schema.map ~decode ~encode either
 
 let one_or_many schema = one_or_many_versioned schema None
-
-module Hlist = struct
-  include Hlist
-end
