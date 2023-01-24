@@ -1,6 +1,4 @@
-module V0_16_1 = struct
+module V0_17_0 = struct
   include Client
   module Error = Error
 end
-
-module V0_16_0 = V0_16_1
