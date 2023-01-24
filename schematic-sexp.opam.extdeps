@@ -39,6 +39,7 @@ depends: [
   "menhir" {= "20220210"}
   "menhirLib" {= "20220210"}
   "menhirSdk" {= "20220210"}
+  "metapp" {= "0.4.4"}
   "num" {= "1.4"}
   "ocaml" {= "4.14.1"}
   "ocaml-base-compiler" {= "4.14.1"}
@@ -60,6 +61,7 @@ depends: [
   "seq" {= "base"}
   "sexplib" {= "v0.14.0"}
   "sexplib0" {= "v0.14.0"}
+  "stdcompat" {= "19"}
   "stdlib-shims" {= "0.3.0"}
   "stringext" {= "1.6.0"}
   "topkg" {= "1.0.6"}

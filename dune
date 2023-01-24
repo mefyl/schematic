@@ -41,6 +41,6 @@
     %{dep:.logistic/dune/extdeps/extdeps.exe}
     generate
     --exclude
-    acid,bake,sqml,timmy))))
+    acid,bake,hlist,sqml,timmy))))
 
 (include dune.extdeps.inc)
