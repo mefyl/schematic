@@ -284,26 +284,13 @@ let expand_sig ~(context : context) ~(configuration : configuration)
   let loc = context.loc in
   let open (val Ast_builder.make loc) in
   let type_ =
-    let unused t =
-      {
-        t with
-        ptype_attributes =
-          {
-            attr_name = Located.mk "warning";
-            attr_payload =
-              PStr [ pstr_eval (estring "-unused-type-declaration") [] ];
-            attr_loc = loc;
-          }
-          :: t.ptype_attributes;
-      }
-    in
     let abstract manifest =
       psig_type Recursive
         [
           type_declaration ~cstrs:[] ~kind:Ptype_abstract ~manifest
             ~name:(name "js" type_context.name |> Located.mk)
             ~params:type_context.params ~private_:Public
-          |> unused;
+          |> unused ~loc;
         ]
     in
     match type_ with
@@ -313,11 +300,13 @@ let expand_sig ~(context : context) ~(configuration : configuration)
     | Record fields ->
       expand_record ~context ~type_context fields
       |> close ~configuration ~context ~type_context
-      |> List.map ~f:unused |> psig_type Recursive
+      |> List.map ~f:(unused ~loc)
+      |> psig_type Recursive
     | Variant fields ->
       expand_variant ~context ~type_context fields
       |> close ~configuration ~context ~type_context
-      |> List.map ~f:unused |> psig_type Recursive
+      |> List.map ~f:(unused ~loc)
+      |> psig_type Recursive
   in
   if not configuration.functions then [ type_ ]
   else

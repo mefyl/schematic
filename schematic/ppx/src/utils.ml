@@ -371,3 +371,17 @@ module Warning = struct
   let unused_var_strict ~loc = make ~loc "-unused-var-strict"
   let unused_rec ~loc = make ~loc "-unused-rec-flag"
 end
+
+let unused ~loc t =
+  let open (val Ast_builder.make loc) in
+  {
+    t with
+    ptype_attributes =
+      {
+        attr_name = Located.mk "warning";
+        attr_payload =
+          PStr [ pstr_eval (estring "-unused-type-declaration") [] ];
+        attr_loc = loc;
+      }
+      :: t.ptype_attributes;
+  }
