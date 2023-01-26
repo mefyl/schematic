@@ -10,7 +10,6 @@ type expanded = {
   columns : structure_item list;
   column_explosions : structure_item list;
   columns_list : expression;
-  columns_pattern : pattern;
   columns_type : core_type;
   fields : Attributes.field list;
   expr_explosions : structure_item list;
@@ -21,11 +20,11 @@ type expanded = {
 }
 
 let explode_columns ~loc (fields : Attributes.field list) init =
-  List.fold fields ~init ~f:(fun e field ->
+  List.fold_right fields ~init ~f:(fun field e ->
       [%expr
-        let Sqml.Expression.Column.List.(
-              [%p Ast_builder.Default.pvar ~loc:field.loc field.name] :: columns)
-            =
+        let ([%p
+               Ast_builder.Default.pvar ~loc:field.loc ("column_" ^ field.name)]
+            :: columns) =
           columns
         in
         [%e e]])
@@ -70,8 +69,6 @@ let expand_record ~context ~type_context (fields : Attributes.field list) =
         rest]
   and id_of_field (field : Attributes.field) =
     Ast_builder.Default.evar ~loc:field.loc (column_name field.name)
-  and pattern_of_field (field : Attributes.field) =
-    Ast_builder.Default.pvar ~loc:field.loc (column_name field.name)
   and record_field_of_field (field : Attributes.field) =
     ( { txt = Lident field.name; loc = field.loc },
       Ast_builder.Default.evar ~loc:field.loc (column_name field.name) )
@@ -88,8 +85,6 @@ let expand_record ~context ~type_context (fields : Attributes.field list) =
     columns = List.map ~f:column_of_field fields;
     column_explosions = List.map ~f:column_explosion_of_field fields;
     columns_list = Ast.elist (List.map ~f:id_of_field fields);
-    columns_pattern =
-      [%pat? [%p Ast.plist (List.map ~f:pattern_of_field fields)]];
     columns_type =
       List.fold_right ~init:[%type: unit] ~f:column_type_of_field fields;
     fields;
@@ -115,7 +110,6 @@ let close ~configuration:{ name } ~context:_ ~type_context
       column_explosions;
       columns;
       columns_list;
-      columns_pattern;
       columns_type;
       expr_explosions;
       fields;
@@ -148,15 +142,19 @@ let close ~configuration:{ name } ~context:_ ~type_context
         type primary = [%t primary_type] [@@warning "-unused-type-declaration"]
 
         let primary columns =
-          [%e
-            explode_columns ~loc fields
-              [%expr Sqml.Expression.Column.List.([%e primary])]]
+          let open Sqml.Expression.Column.List in
+          [%e explode_columns ~loc fields [%expr [%e primary]]]
+          [@@warning "-unused-var-strict"]
       end)
 
       type mapped =
         [%t Ast.ptyp_constr (Ast.Located.lident type_context.name) []]
 
-      let map Acid.Hlist.([%p columns_pattern]) = [%e record]
+      let map columns =
+        let open Hlist in
+        [%e explode_columns ~loc fields record]
+        [@@warning "-unused-var-strict"]
+
       let unmap [%p record_pattern] = Acid.Hlist.([%e columns_list])
 
       module Import (Table : Sqml.Table.S with type Meta.columns = columns) =
