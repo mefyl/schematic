@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic-sexp"
-version: "0.16.1"
+version: "0.17.1"
 synopsis: "Derive sexps from Ocaml objects"
 description: "Encode to and from s-expressions via a schema."
 maintainer: "mefyl <mefyl@gruntech.org>"
