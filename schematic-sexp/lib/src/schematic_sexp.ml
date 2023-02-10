@@ -39,7 +39,32 @@ module Sexp_coding : Coding.IMPL with type t = t = struct
   let of_float = to_atom Float.to_string
   let of_int = to_atom Int.to_string
   let of_int64 = to_atom Int64.to_string
-  let of_json = Json_derivers.Jsonm.sexp_of_value
+
+  (* Shamelessly stolen from json-derivers, without the dependency on an
+     obsolete version of Base *)
+  let rec of_json = function
+    | `Null -> Sexplib.Sexp.Atom "Null"
+    | `Bool v0 ->
+      Sexplib.Sexp.List [ Sexplib.Sexp.Atom "Bool"; sexp_of_bool v0 ]
+    | `Float v0 ->
+      Sexplib.Sexp.List [ Sexplib.Sexp.Atom "Float"; sexp_of_float v0 ]
+    | `String v0 ->
+      Sexplib.Sexp.List [ Sexplib.Sexp.Atom "String"; sexp_of_string v0 ]
+    | `A v0 ->
+      Sexplib.Sexp.List [ Sexplib.Sexp.Atom "A"; sexp_of_list of_json v0 ]
+    | `O v0 ->
+      Sexplib.Sexp.List
+        [
+          Sexplib.Sexp.Atom "O";
+          sexp_of_list
+            (function
+              | v0, v1 ->
+                let v0 = sexp_of_string v0
+                and v1 = of_json v1 in
+                Sexplib.Sexp.List [ v0; v1 ])
+            v0;
+        ]
+
   let of_list l = Sexp.List l
   let of_option = function Some v -> Sexp.List [ v ] | None -> Sexp.List []
   let of_string s = Sexp.Atom s
@@ -63,8 +88,61 @@ module Sexp_coding : Coding.IMPL with type t = t = struct
   let to_int = of_atom Int.of_string
   let to_int64 = of_atom Int64.of_string
 
-  let to_json v =
-    try Some (Json_derivers.Jsonm.value_of_sexp v) with _ -> None
+  (* Shamelessly stolen from json-derivers, without the dependency on an
+     obsolete version of Base *)
+  let rec to_json : t -> Ezjsonm.value option = function
+    | Sexplib.Sexp.Atom atom as _sexp -> (
+      match atom with
+      | "Null" -> Some `Null
+      | "Bool" | "Float" | "String" | "A" | "O" | _ -> None)
+    | Sexplib.Sexp.List (Sexplib.Sexp.Atom atom :: sexp_args) as _sexp -> (
+      try
+        match atom with
+        | "Bool" as _tag -> (
+          match sexp_args with
+          | v0 :: [] ->
+            let v0 = bool_of_sexp v0 in
+            Some (`Bool v0)
+          | _ -> None)
+        | "Float" as _tag -> (
+          match sexp_args with
+          | v0 :: [] ->
+            let v0 = float_of_sexp v0 in
+            Some (`Float v0)
+          | _ -> None)
+        | "String" as _tag -> (
+          match sexp_args with
+          | v0 :: [] ->
+            let v0 = string_of_sexp v0 in
+            Some (`String v0)
+          | _ -> None)
+        | "A" as _tag -> (
+          match sexp_args with
+          | v0 :: [] ->
+            let v0 = list_of_sexp to_json v0 |> Option.all in
+            Option.map ~f:(fun v -> `A v) v0
+          | _ -> None)
+        | "O" as _tag -> (
+          match sexp_args with
+          | v0 :: [] ->
+            let v0 =
+              list_of_sexp
+                (function
+                  | Sexplib.Sexp.List [ v0; v1 ] ->
+                    let v0 = string_of_sexp v0
+                    and v1 = to_json v1 in
+                    Option.map ~f:(fun v1 -> (v0, v1)) v1
+                  | _ -> None)
+                v0
+              |> Option.all
+            in
+            Option.map ~f:(fun f -> `O f) v0
+          | _ -> None)
+        | "Null" -> None
+        | _ -> None
+      with _ -> None)
+    | Sexplib.Sexp.List (Sexplib.Sexp.List _ :: _) -> None
+    | Sexplib.Sexp.List [] -> None
 
   let to_list = function Sexp.List l -> Some l | _ -> None
 

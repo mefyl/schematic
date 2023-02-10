@@ -87,7 +87,6 @@
     :with-test))
   (js_of_ocaml-ppx
    (>= 4.0.0))
-  json-derivers
   (schematic
    (= :version))
   sexplib))
