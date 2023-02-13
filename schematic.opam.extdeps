@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic"
-version: "0.17.1"
+version: "0.17.2"
 synopsis: "Derive schemas from Ocaml types"
 description: """\
 Schematic lets you derive type meta informations using a ppx_deriving
@@ -22,18 +22,17 @@ depends: [
   "astring" {= "0.8.5" & with-test}
   "base" {= "v0.14.3"}
   "base-bigarray" {= "base"}
-  "base-bytes" {= "base"}
   "base-threads" {= "base"}
   "base-unix" {= "base"}
-  "base64" {= "3.5.0"}
+  "base64" {= "3.5.1"}
   "bigstringaf" {= "0.9.0"}
   "cmdliner" {= "1.1.1"}
   "conf-pkg-config" {= "2"}
   "cppo" {= "1.6.9"}
   "csexp" {= "1.5.1"}
   "cstruct" {= "6.1.1"}
-  "dune" {= "3.6.1"}
-  "dune-configurator" {= "3.6.1"}
+  "dune" {= "3.6.2"}
+  "dune-configurator" {= "3.6.2"}
   "ezjsonm" {= "1.3.0"}
   "fmt" {= "0.9.0"}
   "hex" {= "1.5.0"}
@@ -61,7 +60,7 @@ depends: [
   "stdcompat" {= "19"}
   "stdlib-shims" {= "0.3.0"}
   "stringext" {= "1.6.0"}
-  "topkg" {= "1.0.6"}
+  "topkg" {= "1.0.7"}
   "uchar" {= "0.0.2"}
   "uri" {= "4.2.0"}
   "uutf" {= "1.0.3"}
