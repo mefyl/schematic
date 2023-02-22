@@ -63,16 +63,32 @@ struct
   let put ?headers ?body response uri = call ?headers ?body response `PUT uri
 end
 
-module Make'
+module Map_error
     (Handler : HANDLER) (E : sig
       type t
 
       val map : Handler.error -> t
-    end) : S with type 'a t = 'a Handler.response and type error = E.t = struct
+    end) :
+  HANDLER with type 'a response = 'a Handler.response and type error = E.t =
+struct
+  include Handler
+
+  type error = E.t
+
+  let raw ?headers ?body meth uri =
+    Handler.raw ?headers ?body meth uri
+    |> Lwt_result.map_error (function
+         | { Error.reason = `Http reason; _ } as error ->
+           { error with reason = `Http (E.map reason) }
+         | { Error.reason = `Decoding _ | `Networking; _ } as error -> error)
+end
+
+module Make (Handler : HANDLER) :
+  S with type 'a t = 'a Handler.response and type error = Handler.error = struct
   include Handler
 
   type 'a t = 'a response
-  type error = E.t
+  type error = Handler.error
 
   let encode (schema, value) = Coding.encode schema value |> Body.of_string
   let empty = empty
@@ -127,14 +143,10 @@ module Make'
                    ~reason:(`Decoding e) uri))
         in
         Handler.Monad.map body ~f:(fun body -> (body, resp)))
-    |> Lwt_result.map_error (function
-         | { Error.reason = `Http reason; _ } as error ->
-           { error with reason = `Http (E.map reason) }
-         | { Error.reason = `Decoding _ | `Networking; _ } as error -> error)
 
   module Response = Make_requests (struct
     type nonrec 'a res = 'a Client_intf.response t
-    and error = E.t
+    and error = Handler.error
 
     let call ?(headers = []) ?body response method_ uri =
       _call ~headers ?body response method_ uri
@@ -148,22 +160,13 @@ module Make'
 
   include Make_requests (struct
     type nonrec 'a res = 'a t
-    and error = E.t
+    and error = Handler.error
 
     let call ?(headers = []) ?body response method_ uri =
       _call ~headers ?body response method_ uri
       |> Handler.Monad.map ~f:(fun (body, _) -> body)
   end)
 end
-
-module Make (Handler : HANDLER) =
-  Make'
-    (Handler)
-    (struct
-      type t = Handler.error
-
-      let map e = e
-    end)
 
 module Cohttp_ = Cohttp
 

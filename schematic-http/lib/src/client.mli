@@ -3,13 +3,6 @@ include module type of Client_intf
 module Make (Handler : HANDLER) :
   S with type 'a t = 'a Handler.response and type error = Handler.error
 
-module Make'
-    (Handler : HANDLER) (Error : sig
-      type t
-
-      val map : Handler.error -> t
-    end) : S with type 'a t = 'a Handler.response and type error = Error.t
-
 module Rate_limit (Rate : RATE_LIMIT) (Handler : HANDLER) :
   HANDLER
     with type 'a response = 'a Handler.response
@@ -43,6 +36,14 @@ end)
   HANDLER
     with type 'a response = 'a Handler.response
      and type error = Handler.error
+
+module Map_error
+    (Handler : HANDLER) (E : sig
+      type t
+
+      val map : Handler.error -> t
+    end) :
+  HANDLER with type 'a response = 'a Handler.response and type error = E.t
 
 module Cohttp
     (Client : Cohttp_lwt.S.Client)
