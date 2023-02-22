@@ -63,12 +63,16 @@ struct
   let put ?headers ?body response uri = call ?headers ?body response `PUT uri
 end
 
-module Make (Handler : HANDLER) :
-  S with type 'a t = 'a Handler.response and type error = Handler.error = struct
+module Make'
+    (Handler : HANDLER) (E : sig
+      type t
+
+      val map : Handler.error -> t
+    end) : S with type 'a t = 'a Handler.response and type error = E.t = struct
   include Handler
 
   type 'a t = 'a response
-  type error = Handler.error
+  type error = E.t
 
   let encode (schema, value) = Coding.encode schema value |> Body.of_string
   let empty = empty
@@ -123,10 +127,14 @@ module Make (Handler : HANDLER) :
                    ~reason:(`Decoding e) uri))
         in
         Handler.Monad.map body ~f:(fun body -> (body, resp)))
+    |> Lwt_result.map_error (function
+         | { Error.reason = `Http reason; _ } as error ->
+           { error with reason = `Http (E.map reason) }
+         | { Error.reason = `Decoding _ | `Networking; _ } as error -> error)
 
   module Response = Make_requests (struct
     type nonrec 'a res = 'a Client_intf.response t
-    and error = error
+    and error = E.t
 
     let call ?(headers = []) ?body response method_ uri =
       _call ~headers ?body response method_ uri
@@ -140,13 +148,22 @@ module Make (Handler : HANDLER) :
 
   include Make_requests (struct
     type nonrec 'a res = 'a t
-    and error = error
+    and error = E.t
 
     let call ?(headers = []) ?body response method_ uri =
       _call ~headers ?body response method_ uri
       |> Handler.Monad.map ~f:(fun (body, _) -> body)
   end)
 end
+
+module Make (Handler : HANDLER) =
+  Make'
+    (Handler)
+    (struct
+      type t = Handler.error
+
+      let map e = e
+    end)
 
 module Cohttp_ = Cohttp
 
