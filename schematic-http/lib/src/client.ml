@@ -218,7 +218,7 @@ let pp_retry =
   using (fun i -> if i <= 1 then None else Some i)
   @@ option ~none:nop @@ fmt " (%i retries)"
 
-module Rate_limit' (Rate : RATE_LIMIT) (Handler : HANDLER) = struct
+module Rate_limit' (Rate : RATE_LIMIT') (Handler : HANDLER) = struct
   include Handler
 
   let retry_after = "retry-after"
@@ -269,11 +269,7 @@ module Rate_limit' (Rate : RATE_LIMIT) (Handler : HANDLER) = struct
     raw 0 ()
 end
 
-module Rate_limit (Rate : sig
-  val backoff : int -> int
-  val sleep : float -> unit Lwt.t
-end)
-(Handler : HANDLER) =
+module Rate_limit (Rate : RATE_LIMIT) (Handler : HANDLER) =
   Rate_limit'
     (struct
       include Rate
