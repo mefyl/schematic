@@ -91,6 +91,7 @@ end
 
 module type RATE_LIMIT = sig
   val backoff : int -> int
+  val rate_limited : Cohttp.Response.t -> bool
   val sleep : float -> unit Lwt.t
 end
 

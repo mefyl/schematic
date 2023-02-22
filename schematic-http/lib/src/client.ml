@@ -196,17 +196,12 @@ struct
     Lwt.catch f catch
 end
 
-module type RATE_LIMIT = sig
-  val backoff : int -> int
-  val sleep : float -> unit Lwt.t
-end
-
 let pp_retry =
   let open Fmt in
   using (fun i -> if i <= 1 then None else Some i)
   @@ option ~none:nop @@ fmt " (%i retries)"
 
-module Rate_limit (Rate : RATE_LIMIT) (Handler : HANDLER) = struct
+module Rate_limit' (Rate : RATE_LIMIT) (Handler : HANDLER) = struct
   include Handler
 
   let retry_after = "retry-after"
@@ -248,15 +243,30 @@ module Rate_limit (Rate : RATE_LIMIT) (Handler : HANDLER) = struct
     let rec raw errors () =
       Handler.Monad.bind (Handler.raw ?headers ?body method_ uri)
         ~f:(fun ((resp, _) as r) ->
-          match Cohttp_.Response.status resp with
-          | `Service_unavailable | `Too_many_requests ->
+          if Rate.rate_limited resp then
             let* backoff = backoff errors uri resp in
             let* () = Rate.sleep (Float.of_int backoff) in
             raw (errors + 1) ()
-          | _ -> Handler.Monad.return r)
+          else Handler.Monad.return r)
     in
     raw 0 ()
 end
+
+module Rate_limit (Rate : sig
+  val backoff : int -> int
+  val sleep : float -> unit Lwt.t
+end)
+(Handler : HANDLER) =
+  Rate_limit'
+    (struct
+      include Rate
+
+      let rate_limited resp =
+        match Cohttp_.Response.status resp with
+        | `Service_unavailable | `Too_many_requests -> true
+        | _ -> false
+    end)
+    (Handler)
 
 module Optional (Handler : HANDLER) = struct
   include Handler

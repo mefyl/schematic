@@ -3,7 +3,16 @@ include module type of Client_intf
 module Make (Handler : HANDLER) :
   S with type 'a t = 'a Handler.response and type error = Handler.error
 
-module Rate_limit (Rate : RATE_LIMIT) (Handler : HANDLER) :
+module Rate_limit (Rate : sig
+  val backoff : int -> int
+  val sleep : float -> unit Lwt.t
+end)
+(Handler : HANDLER) :
+  HANDLER
+    with type 'a response = 'a Handler.response
+     and type error = Handler.error
+
+module Rate_limit' (Rate : RATE_LIMIT) (Handler : HANDLER) :
   HANDLER
     with type 'a response = 'a Handler.response
      and type error = Handler.error
