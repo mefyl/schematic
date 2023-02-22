@@ -17,10 +17,10 @@ license: "LGPL-3.0-or-later"
 homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
-  "dune" {>= "2.9"}
   "alcotest" {>= "1.1.0" & with-test}
   "base" {>= "0.13.1"}
   "base64" {>= "3.5.0"}
+  "dune" {>= "2.9" & < "3.7.0"}
   "ezjsonm" {>= "1.1.0"}
   "hlist" {>= "0.2.0" & < "0.3.0"}
   "ocaml" {>= "4.14.0"}

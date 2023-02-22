@@ -37,6 +37,13 @@
    (>= 0.13.1))
   (base64
    (>= 3.5.0))
+  ; Dune 3.7 chokes on installation with files named the same anywhere in the tree, eg.
+  ; Error: Multiple rules generated for
+  ; _build/install/default/lib/schematic/src/schema.ml:
+  ; - schematic/lib/dune:3
+  ; - schematic/ppx/dune:3
+  (dune
+   (< 3.7.0))
   (ezjsonm
    (>= 1.1.0))
   (hlist
