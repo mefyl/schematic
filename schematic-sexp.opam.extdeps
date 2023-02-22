@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic-sexp"
-version: "0.17.2"
+version: "0.17.3"
 synopsis: "Derive sexps from Ocaml objects"
 description: "Encode to and from s-expressions via a schema."
 maintainer: "mefyl <mefyl@gruntech.org>"
@@ -25,7 +25,7 @@ depends: [
   "csexp" {= "1.5.1"}
   "cstruct" {= "6.1.1"}
   "dune" {= "3.6.2"}
-  "dune-configurator" {= "3.6.2"}
+  "dune-configurator" {= "3.7.0"}
   "ezjsonm" {= "1.3.0"}
   "fmt" {= "0.9.0"}
   "hex" {= "1.5.0"}
