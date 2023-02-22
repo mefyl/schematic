@@ -151,10 +151,9 @@ let expand_sig ~(context : context) types jsoo =
   let contents =
     match jsoo with
     | None -> []
-    | Some _ ->
+    | Some functions ->
       let f (t, type_context) =
-        Jsoo.expand_sig ~context ~configuration:{ functions = true }
-          ~type_context
+        Jsoo.expand_sig ~context ~configuration:{ functions } ~type_context
           (type_ ~context ~type_context t)
       in
       List.map ~f types |> List.concat
