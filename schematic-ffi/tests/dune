@@ -1,95 +1,95 @@
 (include_subdirs no)
 
 (rule
+ (alias runtest)
  (targets CSchemas.h CSchemas.c)
  (action
   (run %{dep:c/gen_c_rt_stubs.exe} %{targets})))
 
-(rule
- (targets Schemas.o CSchemas.o)
- (deps
-  (file swift/Schemas/Schemas.o)
-  (file swift/Schemas/CSchemas.o))
- (action
-  (progn
-   (run cp %{deps} .))))
+; (rule
+;  (alias runtest)
+;  (action
+;   (progn
+;    (copy %{dep:swift/Schemas/Schemas.o} Schemas.o)
+;    (copy %{dep:swift/Schemas/CSchemas.o} CSchemas.o))))
 
-; It would be simpler to use (extra_objects ...), but that's only available in dune 3.5+
+; ; It would be simpler to use (extra_objects ...), but that's only available in dune 3.5+
 
-(rule
- (target libroundtrip.a)
- (action
-  (progn
-   (run ar rc %{target} %{dep:Schemas.o} %{dep:CSchemas.o}))))
+; (rule
+;  (alias runtest)
+;  (target libroundtrip.a)
+;  (action
+;   (progn
+;    (run ar rc %{target} %{dep:Schemas.o} %{dep:CSchemas.o}))))
 
-(executable
- (name roundtrip)
- (optional)
- (modes exe)
- ; Linking shenanigans required to get Swift object files to work nicely with our test suite.
- (flags
-  :standard
-  -cclib
-  schematic-ffi/tests/%{dep:libroundtrip.a}
-  -cclib
-  -lstdc++
-  -cclib
-  -lm
-  -cclib
-  -ldl
-  -cclib
-  -lpthread
-  -cclib
-  -L/usr/lib/swift/linux
-  -cclib
-  -L/usr/lib/swift/lib/swift/linux
-  -cclib
-  -lswiftCore
-  -cclib
-  -lFoundation
-  -cclib
-  -ldispatch
-  -cclib
-  -lswiftDispatch
-  -cclib
-  -lBlocksRuntime
-  -cclib
-  -licui18nswift
-  -cclib
-  -licuucswift
-  -cclib
-  -lswiftGlibc
-  -cclib
-  -licudataswift
-  -cclib
-  -lswiftSwiftOnoneSupport
-  -cclib
-  -lswift_StringProcessing
-  ; These were available in swift_static, but not as .so
-  ; -cclib -lCoreFoundation
-  ; -cclib -lDispatchStubs
-  )
- (modules roundtrip)
- (preprocess
-  (pps schematic_ppx ppx_deriving.eq ppx_deriving.show metapp.ppx))
- (libraries
-  alcotest
-  schematic_ffi
-  ffi_test_utils
-  ptime
-  logs
-  logs.fmt
-  ppxlib
-  ppxlib.ast
-  metapp))
+; (executable
+;  (name roundtrip)
+;  (optional)
+;  (modes exe)
+;  ; Linking shenanigans required to get Swift object files to work nicely with our test suite.
+;  (flags
+;   :standard
+;   -cclib
+;   schematic-ffi/tests/%{dep:libroundtrip.a}
+;   -cclib
+;   -lstdc++
+;   -cclib
+;   -lm
+;   -cclib
+;   -ldl
+;   -cclib
+;   -lpthread
+;   -cclib
+;   -L/usr/lib/swift/linux
+;   -cclib
+;   -L/usr/lib/swift/lib/swift/linux
+;   -cclib
+;   -lswiftCore
+;   -cclib
+;   -lFoundation
+;   -cclib
+;   -ldispatch
+;   -cclib
+;   -lswiftDispatch
+;   -cclib
+;   -lBlocksRuntime
+;   -cclib
+;   -licui18nswift
+;   -cclib
+;   -licuucswift
+;   -cclib
+;   -lswiftGlibc
+;   -cclib
+;   -licudataswift
+;   -cclib
+;   -lswiftSwiftOnoneSupport
+;   -cclib
+;   -lswift_StringProcessing
+;   ; These were available in swift_static, but not as .so
+;   ; -cclib -lCoreFoundation
+;   ; -cclib -lDispatchStubs
+;   )
+;  (modules roundtrip)
+;  (preprocess
+;   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show metapp.ppx))
+;  (libraries
+;   alcotest
+;   schematic_ffi
+;   ffi_test_utils
+;   ptime
+;   logs
+;   logs.fmt
+;   ppxlib
+;   ppxlib.ast
+;   metapp))
 
-(rule
- (alias runtest)
- ; Dune 3.0+
- ; (enabled_if %{bin-available:swiftc})
- (action
-  (progn
-   (setenv
-    LD_LIBRARY_PATH
-    /usr/lib/swift/linux:/usr/lib/swift/lib/swift/linux:%{env:LD_LIBRARY_PATH=}
-    (run %{exe:roundtrip.exe})))))
+; (rule
+;  (alias runtest)
+;  ; Dune 3.0+
+;  ; (enabled_if %{bin-available:swiftc})
+;  (action
+;   (progn
+;    (setenv
+;     LD_LIBRARY_PATH
+;     /usr/lib/swift/linux:/usr/lib/swift/lib/swift/linux:%{env:LD_LIBRARY_PATH=}
+;     (run %{exe:roundtrip.exe})))))

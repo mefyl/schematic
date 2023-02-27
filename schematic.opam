@@ -20,7 +20,7 @@ depends: [
   "alcotest" {>= "1.1.0" & with-test}
   "base" {>= "0.13.1"}
   "base64" {>= "3.5.0"}
-  "dune" {>= "2.9" & < "3.7.0"}
+  "dune" {>= "3.0" & < "3.7.0"}
   "ezjsonm" {>= "1.1.0"}
   "hlist" {>= "0.2.0" & < "0.3.0"}
   "ocaml" {>= "4.14.0"}
@@ -43,11 +43,9 @@ build: [
     name
     "-j"
     jobs
-    "--promote-install-files=false"
     "@install"
     "@runtest" {with-test}
     "@doc" {with-doc}
   ]
-  ["dune" "install" "-p" name "--create-install-files" name]
 ]
 dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"

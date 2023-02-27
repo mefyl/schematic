@@ -1,17 +1,15 @@
 (rule
+ (alias runtest)
  (targets Schemas.o CSchemas.o)
  (deps
-  ../../CSchemas.h
-  ../../CSchemas.c
   (source_tree .))
+ (enabled_if %{bin-available:swift})
  (action
   (progn
-   (chdir
-    Sources
-    (run mkdir -p Schemas CSchemas/include))
+   (run mkdir -p Sources/Schemas Sources/CSchemas/include)
    (run cp -rf %{ocaml_where}/caml Sources/CSchemas/include/caml)
-   (run cp ../../CSchemas.c Sources/CSchemas)
-   (run cp ../../CSchemas.h Sources/CSchemas/include)
+   (run cp %{dep:../../CSchemas.c} Sources/CSchemas)
+   (run cp %{dep:../../CSchemas.h} Sources/CSchemas/include)
    (run mv %{dep:../Schemas.swift} Sources/Schemas/)
    (chdir
     Schemas
@@ -21,5 +19,5 @@
     ; Fun fact: on Swift version 5.7.1-dev (LLVM 7e31b78ab3255fa, Swift 1e80674d67f5505),
     ; array conversions SIGSEGV on getAssociatedTypeWitnessSlow , but only in DEBUG mode.
     (run swift build -c release))
-   (run cp .build/release/CSchemas.build/CSchemas.c.o CSchemas.o)
-   (run cp .build/release/Schemas.build/Schemas.swift.o Schemas.o))))
+   (copy .build/release/CSchemas.build/CSchemas.c.o CSchemas.o)
+   (copy .build/release/Schemas.build/Schemas.swift.o Schemas.o))))

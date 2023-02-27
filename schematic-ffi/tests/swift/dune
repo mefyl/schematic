@@ -14,6 +14,7 @@
 
 (rule
  (targets Schemas.swift)
+ (alias runtest)
  (action
   (progn
    (run %{dep:gen_swift_rt_stubs.exe} %{targets}))))
