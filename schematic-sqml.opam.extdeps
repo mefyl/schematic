@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic-sqml"
-version: "0.17.3"
+version: "0.17.4"
 synopsis: "Derive SQML bindings from Ocaml types"
 description: "Deduce SQML bindings from schematic type metadata."
 maintainer: "mefyl <mefyl@gruntech.org>"
