@@ -34,7 +34,7 @@
     (>= 1.1.0)
     :with-test))
   (base
-   (>= 0.13.1))
+   (>= v0.15.0))
   (base64
    (>= 3.5.0))
   ; Dune 3.7 chokes on installation with files named the same anywhere in the tree, eg.

@@ -18,7 +18,7 @@ homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "alcotest" {>= "1.1.0" & with-test}
-  "base" {>= "0.13.1"}
+  "base" {>= "v0.15.0"}
   "base64" {>= "3.5.0"}
   "dune" {>= "3.0" & < "3.7.0"}
   "ezjsonm" {>= "1.1.0"}
