@@ -134,8 +134,7 @@
  (depends
   bake
   logs
-  (ppx_hash
-   (= v0.14.0))
+  ppx_hash
   (schematic
    (= :version))
   (metapp :with-test)))
