@@ -98,7 +98,7 @@ module Either = struct
                 });
         }
     in
-    Schema.make ~parametric (descriptor first second)
+    Schema.make ~id:"either" ~parametric (descriptor first second)
 
   let schema_versioned (_ : Schema.version) = schema
 end
