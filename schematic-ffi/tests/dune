@@ -6,15 +6,20 @@
   (run %{dep:c/gen_c_rt_stubs.exe} %{targets})))
 
 (rule
+ (enabled_if %{bin-available:swift})
  (action
-  (progn
-   (copy %{dep:swift/Schemas/Schemas.o} Schemas.o)
-   (copy %{dep:swift/Schemas/CSchemas.o} CSchemas.o))))
+  (copy swift/Schemas/Schemas.o Schemas.o)))
+
+(rule
+ (enabled_if %{bin-available:swift})
+ (action
+  (copy swift/Schemas/CSchemas.o CSchemas.o)))
 
 ; It would be simpler to use (extra_objects ...), but that's only available in dune 3.5+
 
 (rule
  (target libroundtrip.a)
+ (enabled_if %{bin-available:swift})
  (action
   (progn
    (run ar rc %{target} %{dep:Schemas.o} %{dep:CSchemas.o}))))

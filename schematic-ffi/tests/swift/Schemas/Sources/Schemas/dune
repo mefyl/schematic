@@ -1,0 +1,3 @@
+(rule
+ (action
+  (copy ../../../Schemas.swift Schemas.swift)))

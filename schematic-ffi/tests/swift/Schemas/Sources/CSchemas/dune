@@ -1,0 +1,3 @@
+(rule
+ (action
+  (copy %{dep:../../../../CSchemas.c} CSchemas.c)))
