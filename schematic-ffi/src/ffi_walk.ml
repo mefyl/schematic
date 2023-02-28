@@ -68,41 +68,48 @@ module Walk (W : WALK) = struct
     Logs.debug (fun m ->
         m "FFI Walk Of.descriptor: id=%a, d=%a@." (Fmt.option Fmt.string) id
           Schema.pp_descriptor d);
-    match d with
-    | Any _ -> failwith "unsupported"
-    | Bool -> W.bool ()
-    | Float -> W.float ()
-    | Date -> W.date ()
-    | Fixpoint s -> descriptor id (Lazy.force s)
-    | Int -> W.int ()
-    | Ignore -> W.ignore ()
-    | Int64 -> W.int64 ()
-    | Json -> W.any ()
-    | List l -> W.list (schema l)
-    | Null -> W.null ()
-    | String -> W.string ()
-    | Time -> W.time ()
-    | Time_local -> W.time_local ()
-    | Map { descriptor = d; _ } as map_d ->
-      (match id with
-      | Some _ -> ()
-      | None ->
-        Fmt.failwith "Mapped descriptor %a must have an id"
-          Schematic.Schema.pp_descriptor map_d);
-      W.mapped (descriptor id d)
-    | Mapping s -> W.mapping (schema s)
-    | Nullable s -> W.nullable (schema s)
-    | String_const s -> W.string_const s
-    | Object { fields = f; _ } -> W.object_ (fields f)
-    | Tuple { items; _ } -> W.tuple @@ tuple items
-    | Union { cases; polymorphic; key = _ } ->
-      let id = Option.value_exn id in
-      let cases =
-        cases
-        |> List.map ~f:(fun (Schema.Case { name; raw_name; schema = s; _ }) ->
-               (name, raw_name, schema s))
-      in
-      W.union ~name:id ~cases ~polymorphic
+    let f () =
+      match d with
+      | Any _ -> failwith "unsupported"
+      | Bool -> W.bool ()
+      | Float -> W.float ()
+      | Date -> W.date ()
+      | Fixpoint s -> descriptor id (Lazy.force s)
+      | Int -> W.int ()
+      | Ignore -> W.ignore ()
+      | Int64 -> W.int64 ()
+      | Json -> W.any ()
+      | List l -> W.list (schema l)
+      | Null -> W.null ()
+      | String -> W.string ()
+      | Time -> W.time ()
+      | Time_local -> W.time_local ()
+      | Map { descriptor = d; _ } as map_d ->
+        (match id with
+        | Some _ -> ()
+        | None ->
+          Fmt.failwith "Mapped descriptor %a must have an id"
+            Schematic.Schema.pp_descriptor map_d);
+        W.mapped (descriptor id d)
+      | Mapping s -> W.mapping (schema s)
+      | Nullable s -> W.nullable (schema s)
+      | String_const s -> W.string_const s
+      | Object { fields = f; _ } -> W.object_ (fields f)
+      | Tuple { items; _ } -> W.tuple @@ tuple items
+      | Union { cases; polymorphic; key = _ } ->
+        let id = Option.value_exn id in
+        let cases =
+          cases
+          |> List.map ~f:(fun (Schema.Case { name; raw_name; schema = s; _ }) ->
+                (name, raw_name, schema s))
+        in
+        W.union ~name:id ~cases ~polymorphic
+    in
+    try
+      f ()
+    with e ->
+      let msg = Fmt.str "Error while processing descriptor (id = %a): %a" Fmt.(option string) id Schema.pp_descriptor d in
+      Base.Exn.reraise e msg
 
   and schema : type t. t Schema.t -> W.t =
    fun ({ id; descriptor = d; parametric = p } as schema) ->
