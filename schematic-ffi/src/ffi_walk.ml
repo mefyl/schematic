@@ -115,7 +115,11 @@ module Walk (W : WALK) = struct
         Some
           (fun () ->
             let t = parametric id p in
-            W.schema id None (fun () -> t))
+            let id = match id with
+              | Some id -> id
+              | None -> W.name t
+            in
+            W.schema (Some id) None (fun () -> t))
     in
     try W.schema id parametric schema
     with e ->
