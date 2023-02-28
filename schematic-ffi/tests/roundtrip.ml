@@ -301,5 +301,22 @@ let () =
                 [%e pp_mapped],
                 [%e equal_mapped],
                 [%e ([ B; A ] : mapped list)] );
+              ( "reified_remote_1",
+                [%t: Reified_remote_1.t],
+                [%e reified_remote_1_rt_id],
+                [%e Reified_remote_1.pp],
+                [%e Reified_remote_1.equal],
+                [%e
+                  [
+                    None;
+                    Some Missing;
+                    Some (Loaded { value = { a = 53; b = -3 } });
+                  ]] );
+              ( "reified_remote_2",
+                [%t: Reified_remote_2.t],
+                [%e reified_remote_2_rt_id],
+                [%e Reified_remote_2.pp],
+                [%e Reified_remote_2.equal],
+                [%e [ None; Some Missing; Some (Loaded { value = 99 }) ]] );
             ]] );
     ]

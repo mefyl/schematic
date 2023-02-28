@@ -288,6 +288,26 @@ type 'a option_like =
   | Noneish
 [@@deriving schema, eq, show]
 
+(* Parametric type with name overrides *)
+module Remote = struct
+  type 'a loaded =
+    | Loaded of { value : 'a }
+    | Missing
+  [@@schematic.name "remote-loaded"]
+
+  and 'a t = 'a loaded option
+  [@@schematic.name "remote"] [@@deriving schema, eq, show]
+end
+
+(* Two reifications of the same parametric type to check for conflicts. *)
+module Reified_remote_1 = struct
+  type t = primitive_record Remote.t [@@deriving schema, eq, show]
+end
+
+module Reified_remote_2 = struct
+  type t = int Remote.t [@@deriving schema, eq, show]
+end
+
 let exported_schemas =
   [
     Schema.pack (option_schema int_schema);
@@ -331,4 +351,6 @@ let exported_schemas =
       { (option_like_schema int_schema) with id = Some "int-option-like" };
     Schema.pack
       { (option_like_schema string_schema) with id = Some "string-option-like" };
+    Schema.pack Reified_remote_1.schema;
+    Schema.pack Reified_remote_2.schema;
   ]
