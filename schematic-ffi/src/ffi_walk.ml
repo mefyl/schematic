@@ -117,7 +117,10 @@ module Walk (W : WALK) = struct
             let t = parametric id p in
             W.schema id None (fun () -> t))
     in
-    W.schema id parametric schema
+    try W.schema id parametric schema
+    with e ->
+      let msg = Fmt.str "Error while processing schema (id = %a)@." Fmt.(option string) id in
+      Base.Exn.reraise e msg
 
   and parametric : type t. string option -> t Schema.parametric -> W.t =
    fun id p ->
