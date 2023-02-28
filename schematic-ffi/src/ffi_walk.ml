@@ -22,7 +22,6 @@ module type WALK = sig
   include WALK_TYPES
 
   val pp : t Fmt.t
-
   val name : t -> string
 
   (** [schema id parametric schema] *)
@@ -66,6 +65,9 @@ end
 module Walk (W : WALK) = struct
   let rec descriptor : type t. string option -> t Schema.descriptor -> W.t =
    fun id d ->
+    Logs.debug (fun m ->
+        m "FFI Walk Of.descriptor: id=%a, d=%a@." (Fmt.option Fmt.string) id
+          Schema.pp_descriptor d);
     match d with
     | Any _ -> failwith "unsupported"
     | Bool -> W.bool ()
@@ -103,7 +105,8 @@ module Walk (W : WALK) = struct
       W.union ~name:id ~cases ~polymorphic
 
   and schema : type t. t Schema.t -> W.t =
-   fun { id; descriptor = d; parametric = p } ->
+   fun ({ id; descriptor = d; parametric = p } as schema) ->
+    Logs.debug (fun m -> m "FFI Walk Of.schema: %a@." Schema.pp schema);
     let schema () = descriptor id d
     and parametric =
       match p with
@@ -111,16 +114,20 @@ module Walk (W : WALK) = struct
       | Some p ->
         Some
           (fun () ->
-            let t = parametric p in
-            let name = W.name t in
-            W.schema (Some name) None (fun () -> t))
+            let t = parametric id p in
+            W.schema id None (fun () -> t))
     in
     W.schema id parametric schema
 
-  and parametric : type t. t Schema.parametric -> W.t = function
-    | Plain { name; descriptor = d } -> descriptor (Some name) d
-    | Parametric { name = _; parameter; next } ->
-      parametric (next { parameter with parametric = None })
+  and parametric : type t. string option -> t Schema.parametric -> W.t =
+   fun id p ->
+    match p with
+    | Plain { name; descriptor = d } ->
+      Logs.debug (fun m -> m "Ffi_walk parametric Plain name: %s@." name);
+      descriptor id d
+    | Parametric { name; parameter; next } ->
+      Logs.debug (fun m -> m "Ffi_walk parametric Parametric name: %s@." name);
+      parametric id (next { parameter with parametric = None })
 
   and fields : type t. t Schema.fields -> W.fields = function
     | FieldEnd -> W.fields_empty ()
