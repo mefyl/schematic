@@ -1,13 +1,11 @@
 (include_subdirs no)
 
 (rule
- (alias runtest)
  (targets CSchemas.h CSchemas.c)
  (action
   (run %{dep:c/gen_c_rt_stubs.exe} %{targets})))
 
 (rule
- (alias runtest)
  (action
   (progn
    (copy %{dep:swift/Schemas/Schemas.o} Schemas.o)
@@ -16,7 +14,6 @@
 ; It would be simpler to use (extra_objects ...), but that's only available in dune 3.5+
 
 (rule
- (alias runtest)
  (target libroundtrip.a)
  (action
   (progn
@@ -87,6 +84,7 @@
  (alias runtest)
  ; Dune 3.0+
  ; (enabled_if %{bin-available:swiftc})
+ (enabled_if %{bin-available:swift})
  (action
   (progn
    (setenv
