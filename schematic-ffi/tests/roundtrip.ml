@@ -9,7 +9,7 @@ open Ffi_test_utils.Types
 
    Sadly enough, OCaml will not warn us if we exposed a primitive involving a
    type that itself contains a type whose boxed/unboxed status is ambiguous.
-   This is dangerous.
+   This is dangerous. XXX.
 
    For now (4.14.0) it will work by default, but this may break in the future.
    [@@boxed] will help. *)
