@@ -24,10 +24,10 @@ include Marks.Make (struct
 end)
 
 module Of = Ffi_walk.Walk (struct
-  type res = c * Marks.t
+  type res = c * Marks.t [@@deriving show]
   type fields = (string * c) list * Marks.t
   type case = string * c
-  type t = res
+  type t = res [@@deriving show]
 
   (* Utils *)
   let name (c, _marks) = c_typename c |> Identifier.to_string

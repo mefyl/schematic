@@ -21,6 +21,8 @@ end
 module type WALK = sig
   include WALK_TYPES
 
+  val pp : t Fmt.t
+
   val name : t -> string
 
   (** [schema id parametric schema] *)
