@@ -101,14 +101,17 @@ module Walk (W : WALK) = struct
         let cases =
           cases
           |> List.map ~f:(fun (Schema.Case { name; raw_name; schema = s; _ }) ->
-                (name, raw_name, schema s))
+                 (name, raw_name, schema s))
         in
         W.union ~name:id ~cases ~polymorphic
     in
-    try
-      f ()
+    try f ()
     with e ->
-      let msg = Fmt.str "Error while processing descriptor (id = %a): %a" Fmt.(option string) id Schema.pp_descriptor d in
+      let msg =
+        Fmt.str "Error while processing descriptor (id = %a): %a"
+          Fmt.(option string)
+          id Schema.pp_descriptor d
+      in
       Base.Exn.reraise e msg
 
   and schema : type t. t Schema.t -> W.t =
@@ -122,15 +125,16 @@ module Walk (W : WALK) = struct
         Some
           (fun () ->
             let t = parametric id p in
-            let id = match id with
-              | Some id -> id
-              | None -> W.name t
-            in
+            let id = match id with Some id -> id | None -> W.name t in
             W.schema (Some id) None (fun () -> t))
     in
     try W.schema id parametric schema
     with e ->
-      let msg = Fmt.str "Error while processing schema (id = %a)@." Fmt.(option string) id in
+      let msg =
+        Fmt.str "Error while processing schema (id = %a)@."
+          Fmt.(option string)
+          id
+      in
       Base.Exn.reraise e msg
 
   and parametric : type t. string option -> t Schema.parametric -> W.t =

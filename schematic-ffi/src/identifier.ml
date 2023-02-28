@@ -13,8 +13,7 @@ let make s =
   if List.mem reserved_names s ~equal:String.equal then Id (s ^ "_")
   else
     let s =
-      String.split ~on:'-' s
-      |> String.concat ~sep:"_"
+      String.split ~on:'-' s |> String.concat ~sep:"_"
       |> String.substr_replace_all ~pattern:"'" ~with_:"_sq_"
       |> String.substr_replace_all ~pattern:"\"" ~with_:"_dblq_"
     in
