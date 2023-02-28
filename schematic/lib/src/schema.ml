@@ -94,9 +94,9 @@ and pp_tuple : type t. t tuple Fmt.t =
 
 and pp : type u. u t Fmt.t =
  fun f { descriptor; id = sch_id; parametric = _ } ->
-  Fmt.(
-    fmt "schema %a descriptor = %a" f (option string) sch_id pp_descriptor
-      descriptor)
+  match sch_id with
+  | Some sch_id -> Fmt.(fmt "%s = %a" f sch_id pp_descriptor descriptor)
+  | None -> pp_descriptor f descriptor
 
 (* Inline helpers *)
 
