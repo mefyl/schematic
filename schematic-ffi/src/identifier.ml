@@ -8,10 +8,16 @@ type t = Id of string [@@deriving eq, ord, hash]
 let reserved_names = [ "time"; "id"; "self" ]
 
 (* This is assumed to be idempotent. *)
+(* XXX(perf): this is a very naive implementation. *)
 let make s =
   if List.mem reserved_names s ~equal:String.equal then Id (s ^ "_")
   else
-    let s = String.split ~on:'-' s |> String.concat ~sep:"_" in
+    let s =
+      String.split ~on:'-' s
+      |> String.concat ~sep:"_"
+      |> String.substr_replace_all ~pattern:"'" ~with_:"_sq_"
+      |> String.substr_replace_all ~pattern:"\"" ~with_:"_dblq_"
+    in
     Id s
 
 let map ~f = function Id s -> Id (f s)
