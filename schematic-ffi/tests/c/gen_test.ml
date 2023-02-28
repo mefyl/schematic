@@ -577,42 +577,50 @@ let pretty_string =
   let pp_string ppf x = Fmt.pf ppf "{|\n%s\n|}" x in
   Alcotest.testable pp_string String.( = )
 
-let check_unordered_strings name expected actual =
+let check_unordered_strings ~here name expected actual =
   let actual = actual |> List.sort ~compare:String.compare in
   let expected = expected |> List.sort ~compare:String.compare in
-  Alcotest.(check (list pretty_string) name expected actual)
+  Alcotest.(check ~here (list pretty_string) name expected actual)
 
 module Generate_types = struct
-  let test schema expected =
+  let test ~here schema expected =
     let actual =
       ctypes_of_schema schema |> List.map ~f:C.export
       |> List.map ~f:(fun gen -> "\n" ^ C.typedef_src gen)
       |> List.sort ~compare:String.compare
     in
-    check_unordered_strings "typedefs" expected actual
+    check_unordered_strings ~here "typedefs" expected actual
 
-  let primitive_record () = test primitive_record_schema [ primitive_record_c ]
-  let type_alias () = test type_alias_schema [ type_alias_c ]
-  let nested () = test wrapper_schema [ primitive_record_c; wrapper_c ]
-  let string () = test string_wrapper_schema [ string_wrapper_c ]
-  let basic_variant () = test basic_variant_schema [ basic_variant_c ]
+  let primitive_record () =
+    test ~here:[%here] primitive_record_schema [ primitive_record_c ]
+
+  let type_alias () = test ~here:[%here] type_alias_schema [ type_alias_c ]
+
+  let nested () =
+    test ~here:[%here] wrapper_schema [ primitive_record_c; wrapper_c ]
+
+  let string () = test ~here:[%here] string_wrapper_schema [ string_wrapper_c ]
+
+  let basic_variant () =
+    test ~here:[%here] basic_variant_schema [ basic_variant_c ]
 
   let payload_variant () =
-    test payload_variant_schema [ tuple_int_string_c; payload_variant_c ]
+    test ~here:[%here] payload_variant_schema
+      [ tuple_int_string_c; payload_variant_c ]
 
   let record_with_variant () =
-    test record_with_variant_schema
+    test ~here:[%here] record_with_variant_schema
       [ tuple_int_string_c; payload_variant_c; record_with_variant_c ]
 
   let pair_alias () =
-    test pair_alias_schema [ string_int_tuple_c; pair_alias_c ]
+    test ~here:[%here] pair_alias_schema [ string_int_tuple_c; pair_alias_c ]
 
   let record_with_pair_alias () =
-    test record_with_pair_alias_schema
+    test ~here:[%here] record_with_pair_alias_schema
       [ string_int_tuple_c; pair_alias_c; record_with_pair_alias_c ]
 
   let behemoth () =
-    test behemoth_schema
+    test ~here:[%here] behemoth_schema
       [
         primitive_record_c;
         wrapper_c;
@@ -626,48 +634,52 @@ module Generate_types = struct
         behemoth_c;
       ]
 
-  let collection () = test collection_schema [ int_array_c; collection_c ]
+  let collection () =
+    test ~here:[%here] collection_schema [ int_array_c; collection_c ]
 
   let reified_param () =
-    test
+    test ~here:[%here]
       (parametric_record_schema primitive_record_schema)
       [ primitive_record_in_parametric_c; primitive_record_c ]
 
   let string_option_record () =
-    test string_option_record_schema
+    test ~here:[%here] string_option_record_schema
       [ string_option_record_c; string_wrapper_option_c; string_wrapper_c ]
 
   let variant_with_inline_record_payload () =
-    test variant_with_inline_record_payload_schema
+    test ~here:[%here] variant_with_inline_record_payload_schema
       [ variant_with_inline_record_payload_c; inline_payload_c ]
 end
 
 module Of_caml = struct
-  let test schema expected =
+  let test ~here schema expected =
     let actual =
       C.ctypes_of_schema schema |> List.map ~f:C.export
       |> List.map ~f:(fun C.{ of_caml; _ } ->
              C.impl_src of_caml |> fun s -> "\n" ^ s ^ "\n")
     in
-    check_unordered_strings "*_of_caml" expected actual
+    check_unordered_strings ~here "*_of_caml" expected actual
 
   let primitive_record () =
-    test primitive_record_schema [ primitive_record_of_caml ]
+    test ~here:[%here] primitive_record_schema [ primitive_record_of_caml ]
 
   let nested () =
-    test wrapper_schema [ wrapper_of_caml; primitive_record_of_caml ]
+    test ~here:[%here] wrapper_schema
+      [ wrapper_of_caml; primitive_record_of_caml ]
 
-  let basic_variant () = test basic_variant_schema [ basic_variant_of_caml ]
+  let basic_variant () =
+    test ~here:[%here] basic_variant_schema [ basic_variant_of_caml ]
 
   let payload_variant () =
-    test payload_variant_schema
+    test ~here:[%here] payload_variant_schema
       [ payload_variant_of_caml; tuple_int_string_of_caml ]
 
   let pair_alias () =
-    test pair_alias_schema [ pair_alias_of_caml; tuple_string_int_of_caml ]
+    test ~here:[%here] pair_alias_schema
+      [ pair_alias_of_caml; tuple_string_int_of_caml ]
 
   let record_with_pair_alias () =
-    test record_with_pair_alias_schema
+    test ~here:[%here] record_with_pair_alias_schema
       [
         record_with_pair_alias_of_caml;
         pair_alias_of_caml;
@@ -675,42 +687,48 @@ module Of_caml = struct
       ]
 
   let collection () =
-    test collection_schema [ collection_of_caml; int_array_of_caml ]
+    test ~here:[%here] collection_schema
+      [ collection_of_caml; int_array_of_caml ]
 
-  let poly_basic () = test poly_basic_schema [ poly_basic_of_caml ]
+  let poly_basic () =
+    test ~here:[%here] poly_basic_schema [ poly_basic_of_caml ]
 
   let poly_payload () =
-    test poly_payload_schema [ poly_payload_of_caml; tuple_int_string_of_caml ]
+    test ~here:[%here] poly_payload_schema
+      [ poly_payload_of_caml; tuple_int_string_of_caml ]
 
-  let mapped () = test mapped_schema [ mapped_of_caml ]
+  let mapped () = test ~here:[%here] mapped_schema [ mapped_of_caml ]
 end
 
 module To_caml = struct
-  let test schema expected =
+  let test ~here schema expected =
     let actual =
       C.ctypes_of_schema schema |> List.map ~f:C.export
       |> List.map ~f:(fun C.{ to_caml; _ } ->
              C.impl_src to_caml |> fun s -> "\n" ^ s ^ "\n")
     in
-    check_unordered_strings "*_to_caml" expected actual
+    check_unordered_strings ~here "*_to_caml" expected actual
 
   let primitive_record () =
-    test primitive_record_schema [ primitive_record_to_caml ]
+    test ~here:[%here] primitive_record_schema [ primitive_record_to_caml ]
 
   let nested () =
-    test wrapper_schema [ wrapper_to_caml; primitive_record_to_caml ]
+    test ~here:[%here] wrapper_schema
+      [ wrapper_to_caml; primitive_record_to_caml ]
 
-  let basic_variant () = test basic_variant_schema [ basic_variant_to_caml ]
+  let basic_variant () =
+    test ~here:[%here] basic_variant_schema [ basic_variant_to_caml ]
 
   let payload_variant () =
-    test payload_variant_schema
+    test ~here:[%here] payload_variant_schema
       [ payload_variant_to_caml; tuple_int_string_to_caml ]
 
   let pair_alias () =
-    test pair_alias_schema [ pair_alias_to_caml; tuple_string_int_to_caml ]
+    test ~here:[%here] pair_alias_schema
+      [ pair_alias_to_caml; tuple_string_int_to_caml ]
 
   let record_with_pair_alias () =
-    test record_with_pair_alias_schema
+    test ~here:[%here] record_with_pair_alias_schema
       [
         record_with_pair_alias_to_caml;
         pair_alias_to_caml;
@@ -718,14 +736,17 @@ module To_caml = struct
       ]
 
   let collection () =
-    test collection_schema [ collection_to_caml; int_array_to_caml ]
+    test ~here:[%here] collection_schema
+      [ collection_to_caml; int_array_to_caml ]
 
-  let poly_basic () = test poly_basic_schema [ poly_basic_to_caml ]
+  let poly_basic () =
+    test ~here:[%here] poly_basic_schema [ poly_basic_to_caml ]
 
   let poly_payload () =
-    test poly_payload_schema [ poly_payload_to_caml; tuple_int_string_to_caml ]
+    test ~here:[%here] poly_payload_schema
+      [ poly_payload_to_caml; tuple_int_string_to_caml ]
 
-  let mapped () = test mapped_schema [ mapped_to_caml ]
+  let mapped () = test ~here:[%here] mapped_schema [ mapped_to_caml ]
 end
 
 let () =
@@ -750,6 +771,7 @@ let () =
             test_case "string_option_record" `Quick string_option_record;
             test_case "variant: inline record" `Quick
               variant_with_inline_record_payload;
+            (* test_case "remote" `Quick remote; *)
           ] );
       ( "of_caml",
         Of_caml.

@@ -19,5 +19,5 @@
     ; Fun fact: on Swift version 5.7.1-dev (LLVM 7e31b78ab3255fa, Swift 1e80674d67f5505),
     ; array conversions SIGSEGV on getAssociatedTypeWitnessSlow , but only in DEBUG mode.
     (run swift build -c release))
-   (copy .build/release/CSchemas.build/CSchemas.c.o CSchemas.o)
-   (copy .build/release/Schemas.build/Schemas.swift.o Schemas.o))))
+   (run cp .build/release/CSchemas.build/CSchemas.c.o CSchemas.o)
+   (run cp .build/release/Schemas.build/Schemas.swift.o Schemas.o))))
