@@ -31,6 +31,7 @@ module Binding = struct
   let reserved =
     [
       "as";
+      "await";
       "case";
       "class";
       "default";
@@ -45,6 +46,7 @@ module Binding = struct
       "func";
       "guard";
       "init";
+      "internal";
       "nil";
       "out";
       "raise";
@@ -54,8 +56,14 @@ module Binding = struct
       "switch";
       "throw";
       "true";
-      "internal"
+      "where";
+      "while";
     ]
+
+
+
+  let unreserve s =
+    if List.mem ~equal:String.equal reserved s then s ^ "_" else s
 
   let s s =
     (* camelCase *)
@@ -66,7 +74,7 @@ module Binding = struct
         String.concat ~sep:"" (h :: t)
       | [] -> ""
     in
-    if List.mem ~equal:String.equal reserved s then s ^ "_" else s
+    unreserve s
 
   let id id = Identifier.to_string id |> s
 end
