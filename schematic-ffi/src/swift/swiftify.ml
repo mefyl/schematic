@@ -54,6 +54,7 @@ module Binding = struct
       "switch";
       "throw";
       "true";
+      "internal"
     ]
 
   let s s =
