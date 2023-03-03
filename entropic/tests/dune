@@ -1,0 +1,5 @@
+(test
+ (name entropic)
+ (libraries alcotest cryptokit schematic schematic.entropic)
+ (preprocess
+  (pps ppx_here schematic.ppx)))

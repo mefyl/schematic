@@ -1,4 +1,5 @@
 (dirs
+ entropic
  schematic
  schematic-ffi
  schematic-http
@@ -22,6 +23,7 @@
   schematic-sexp.opam
   schematic-sqml.opam
   schematic.opam
+  (alias_rec entropic/default)
   (alias_rec schematic/default)
   (alias_rec schematic-http/default)
   (alias_rec schematic-jsoo/default)

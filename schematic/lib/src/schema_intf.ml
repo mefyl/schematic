@@ -71,16 +71,16 @@ and _ descriptor =
   | Mapping : 'a t -> (string * 'a) list descriptor
   | Null : unit descriptor
   | Nullable : 'a t -> 'a option descriptor
-  | String : string descriptor
-  | String_const : string -> unit descriptor
-  | Time : Ptime.t descriptor
-  | Time_local : (Ptime.t * Ptime.tz_offset_s) descriptor
   | Object : {
       decode : 'fields Hlist.t -> 't;
       encode : 't -> 'fields Hlist.t;
       fields : 'fields Hlist.t fields;
     }
       -> 't descriptor
+  | String : string descriptor
+  | String_const : string -> unit descriptor
+  | Time : Ptime.t descriptor
+  | Time_local : (Ptime.t * Ptime.tz_offset_s) descriptor
   | Tuple : {
       decode : 'tuple Hlist.t -> 't;
       encode : 't -> 'tuple Hlist.t;

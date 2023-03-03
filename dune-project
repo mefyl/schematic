@@ -145,3 +145,11 @@
  (depends
   (schematic
    (= :version))))
+
+(package
+ (name entropic)
+ (synopsis "Random dataset generation based on schematic")
+ (depends
+  cryptokit
+  (schematic
+   (= :version))))
