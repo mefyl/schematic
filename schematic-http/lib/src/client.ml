@@ -199,12 +199,23 @@ struct
         Lwt_list.iter_s f (Option.value ~default:[] headers)
       in
       let headers = Option.map Cohttp.Header.of_list headers in
-      let* resp, body = Client.call ?headers ?body method_ uri in
-      match Cohttp.Response.status resp with
-      | `Code 0 as status ->
-        (* CORS or connectivity issue *)
-        Lwt_result.fail Error.(make ~method_ ~status ~reason:`Networking uri)
-      | _ -> Lwt_result.return (resp, body)
+      Lwt.catch
+        (fun () ->
+          Client.call ?headers ?body method_ uri |> Lwt.map Base.Result.return)
+        (function
+          | Cohttp_lwt.Connection.Retry
+          | Cohttp_lwt.Connection_cache.(Name_resolution_failed | Retry) ->
+            Lwt_result.fail Error.(make ~method_ ~reason:`Networking uri)
+          | e ->
+            Fmt.epr "Encountered unhandled exception in schematic-http, dying@.";
+            raise e)
+      |> Lwt_result.bind ~f:(fun (resp, body) ->
+             match Cohttp.Response.status resp with
+             | `Code 0 as status ->
+               (* CORS or connectivity issue *)
+               Lwt_result.fail
+                 Error.(make ~method_ ~status ~reason:`Networking uri)
+             | _ -> Lwt_result.return (resp, body))
     and catch (e : exn) =
       let* () =
         Logs.err (fun m ->

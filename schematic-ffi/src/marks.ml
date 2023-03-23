@@ -26,7 +26,8 @@ end
 module Make (S : MARK) = struct
   let ensure_consistent id l r =
     if not (S.equal (fst l) (fst r)) then
-      Fmt.failwith "'%s' had duplicate definitions" id
+      Fmt.failwith "'%s' had duplicate definitions:\n%a\nand\n%a" id S.pp
+        (fst l) S.pp (fst r)
     else l
 
   module rec Mark : (V with type t = string * (S.t * Marks.t)) = struct
