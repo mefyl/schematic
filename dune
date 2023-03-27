@@ -42,6 +42,12 @@
    (run
     %{dep:.logistic/dune/extdeps/extdeps.exe}
     generate
+    --name
+    schematic
+    --both
+    bake,fmt,ppx_deriving,ppx_hash,ppx_here,semver2
+    --cross
+    base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
     --exclude
     acid,bake,hlist,sqml,timmy))))
 

@@ -12,6 +12,7 @@ let parse path =
 let pp_file = OpamPrinter.FullPos.format_opamfile
 let input = Cmdliner.Arg.(opt (some string) None & info [ "i"; "input" ])
 let exclude = Cmdliner.Arg.(opt (list string) [] & info [ "e"; "exclude" ])
+let repo_name = Cmdliner.Arg.(opt (some string) None & info [ "n"; "name" ])
 let cross_both = Cmdliner.Arg.(opt (list string) [] & info [ "both" ])
 let cross = Cmdliner.Arg.(opt (list string) [] & info [ "cross" ])
 
@@ -30,7 +31,7 @@ let pp_pos fmt
 let () =
   let open Cmdliner in
   let generate =
-    let generate exclude both cross =
+    let generate name exclude both cross =
       let* repository, packages =
         let (status, stdout), stderr =
           Shexp_process.(
@@ -52,7 +53,10 @@ let () =
                      Sexplib.Sexp.pp sexp))
             |> Result.all
             >>= function
-            | hd :: _ as packages -> Result.return (hd, packages)
+            | hd :: _ as packages -> (
+              match name with
+              | Some name -> Result.return (name, packages)
+              | None -> Result.return (hd, packages))
             | [] -> Result.fail "dune describe opam-files yielded no entries")
           | _ ->
             Result.fail
@@ -173,7 +177,9 @@ let () =
                           Atom "--both";
                           Atom (String.concat ~sep:"," both);
                           Atom "--cross";
-                          Atom (String.concat ~sep:"," cross);
+                          Atom
+                            (String.concat ~sep:","
+                               (packages @ exclude @ cross));
                         ];
                     ];
                 ];
@@ -187,8 +193,8 @@ let () =
       |> Result.return
     in
     Term.(
-      const generate $ Arg.value exclude $ Arg.value cross_both
-      $ Arg.value cross)
+      const generate $ Arg.value repo_name $ Arg.value exclude
+      $ Arg.value cross_both $ Arg.value cross)
     |> Cmd.(v (info "generate"))
   and rewrite =
     let open OpamParserTypes.FullPos in
@@ -336,7 +342,7 @@ let () =
         | _ -> Result.fail (None, {|expected a list for "build"|})
       and rewrite_depends = function
         | List depends ->
-          let rewrite ({ pelem = dep; _ } as item) =
+          let rec rewrite ({ pelem = dep; _ } as item) =
             if filter_doc_test dep then
               match dep with
               | String dep when List.mem ~equal:String.equal both dep ->
@@ -345,8 +351,13 @@ let () =
                     { item with pelem = String dep };
                     { item with pelem = String (dep ^ "-ios") };
                   ]
-              | String dep when List.mem ~equal:String.equal cross dep ->
+              | String dep
+                when List.mem ~equal:String.equal ("ocaml" :: cross) dep ->
                 Some [ { item with pelem = String (dep ^ "-ios") } ]
+              | Option (value, options) ->
+                let+ values = rewrite value in
+                List.map values ~f:(fun value ->
+                    { item with pelem = Option (value, options) })
               | _ -> Some [ item ]
             else None
           in
