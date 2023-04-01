@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic-sexp"
-version: "0.17.4"
+version: "0.17.5"
 synopsis: "Derive sexps from Ocaml objects"
 description: "Encode to and from s-expressions via a schema."
 maintainer: "mefyl <mefyl@gruntech.org>"
@@ -10,6 +10,9 @@ homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "ocamlformat" {= "0.24.1"}
+  "opam-file-format"
+  "sexplib"
+  "shexp"
   "alcotest" {= "1.7.0" & with-test}
   "angstrom" {= "0.15.0"}
   "astring" {= "0.8.5" & with-test}
@@ -28,13 +31,7 @@ depends: [
   "ezjsonm" {= "1.3.0"}
   "fmt" {= "0.9.0"}
   "hex" {= "1.5.0"}
-  "js_of_ocaml" {= "5.0.1"}
-  "js_of_ocaml-compiler" {= "5.0.1"}
-  "js_of_ocaml-ppx" {= "5.0.1"}
   "jsonm" {= "1.0.2"}
-  "menhir" {= "20220210"}
-  "menhirLib" {= "20220210"}
-  "menhirSdk" {= "20220210"}
   "metapp" {= "0.4.4"}
   "num" {= "1.4"}
   "ocaml" {= "4.14.1"}
@@ -64,6 +61,5 @@ depends: [
   "uchar" {= "0.0.2"}
   "uri" {= "4.2.0"}
   "uutf" {= "1.0.3"}
-  "yojson" {= "2.0.2"}
 ]
 dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"

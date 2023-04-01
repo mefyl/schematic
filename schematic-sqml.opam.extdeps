@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic-sqml"
-version: "0.17.4"
+version: "0.17.5"
 synopsis: "Derive SQML bindings from Ocaml types"
 description: "Deduce SQML bindings from schematic type metadata."
 maintainer: "mefyl <mefyl@gruntech.org>"
@@ -10,6 +10,9 @@ homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "ocamlformat" {= "0.24.1"}
+  "opam-file-format"
+  "sexplib"
+  "shexp"
   "alcotest" {= "1.7.0" & with-test}
   "angstrom" {= "0.15.0"}
   "astring" {= "0.8.5" & with-test}
