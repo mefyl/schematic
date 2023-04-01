@@ -1,4 +1,4 @@
-module V0_17_4 = struct
+module V0_17_5 = struct
   module Error = Error
   module Base64 = B64
 
@@ -15,6 +15,7 @@ module V0_17_4 = struct
   module Version = Version
 end
 
+module V0_17_4 = V0_17_5
 module V0_17_3 = V0_17_4
 module V0_17_2 = V0_17_3
 module V0_17_1 = V0_17_2
