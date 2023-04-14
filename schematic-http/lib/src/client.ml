@@ -90,7 +90,6 @@ module Make (Handler : HANDLER) :
   type 'a t = 'a response
   type error = Handler.error
 
-  let encode (schema, value) = Coding.encode schema value |> Body.of_string
   let empty = empty
   let stream = stream
   let string = string
@@ -106,8 +105,14 @@ module Make (Handler : HANDLER) :
         ->
         ( Some Body.(of_string s),
           ("Content-Length", Int.to_string (String.length s)) :: headers )
-      | Some body -> (Some (encode body), headers)
-      | None -> (None, headers)
+      | Some (schema, value) ->
+        let body = Coding.encode schema value in
+        ( Some (Body.of_string body),
+          ("Content-Length", Int.to_string (String.length body)) :: headers )
+      | None -> (
+        match method_ with
+        | `POST | `PUT | `PATCH -> (None, ("Content-Length", "0") :: headers)
+        | _ -> (None, headers))
     in
     let headers =
       match body with
