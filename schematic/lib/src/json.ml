@@ -34,7 +34,7 @@ let rec pp f json =
 
 type Coding.any += Json of Ezjsonm.value
 
-module Json_coding : Coding.IMPL with type t = Ezjsonm.value = struct
+module Impl : Coding.IMPL with type t = Ezjsonm.value = struct
   type t = Ezjsonm.value
 
   let name = "JSON"
@@ -93,8 +93,8 @@ module Json_coding : Coding.IMPL with type t = Ezjsonm.value = struct
     | _, None, _ -> Result.fail (Some "missing timezone")
 end
 
-module Make (Impl : Impl) = struct
-  include Coding.Make (Json_coding)
+module Make (Json_impl : Impl) = struct
+  include Coding.Make (Impl)
 
   let from_channel c =
     match Ezjsonm.value_from_channel c with
@@ -102,9 +102,9 @@ module Make (Impl : Impl) = struct
     | exception Ezjsonm.Parse_error (_, msg) -> Result.fail msg
 
   let content_type = "application/json"
-  let of_string s = Impl.of_string s
+  let of_string s = Json_impl.of_string s
   let to_channel chan t = Ezjsonm.value_to_channel ~minify:true chan t
-  let to_string t = Impl.to_string t
+  let to_string t = Json_impl.to_string t
   let pp = pp
   let to_ezjsonm v = v
 

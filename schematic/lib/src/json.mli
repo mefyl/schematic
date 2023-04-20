@@ -1,4 +1,5 @@
 include module type of Json_intf
+module Impl : Coding.IMPL with type t = t
 include S
 
 val schema : t Schema.t

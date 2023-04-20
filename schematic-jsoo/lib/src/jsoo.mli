@@ -1,4 +1,5 @@
 include module type of Jsoo_intf
+module Impl : Schematic.Coding.IMPL with type t = Js_of_ocaml.Js.Unsafe.any
 include Schematic.Coding.S with type t = Js_of_ocaml.Js.Unsafe.any
 
 val helpers :

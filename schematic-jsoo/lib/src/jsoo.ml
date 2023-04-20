@@ -18,7 +18,7 @@ let ( let+ ) = Option.( >>| )
 
 type Schematic.Coding.any += Jsoo of Js.Unsafe.any
 
-module Jsoo_coding : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
+module Impl : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
   type t = Js.Unsafe.any
 
   let name = "javascript"
@@ -122,7 +122,7 @@ module Jsoo_coding : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
     Result.map (to_time v) ~f:(fun time -> (time, 0 (* FIXME *)))
 end
 
-include Schematic.Coding.Make (Jsoo_coding)
+include Schematic.Coding.Make (Impl)
 
 let helpers name schema =
   let rec to_js v = encode schema v |> Js.Unsafe.coerce
@@ -145,6 +145,6 @@ let helpers_typed (module _ : JS with type t = 't and type js = 'js) name schema
     (of_js : 'js -> ('t, Schematic.Error.decoding) Result.t),
     (of_js_exn : 'js -> 't) )
 
-include Schematic.Coding.Any (Jsoo_coding)
+include Schematic.Coding.Any (Impl)
 
 type js = t
