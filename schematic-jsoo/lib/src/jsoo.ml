@@ -24,14 +24,14 @@ module Impl : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
   let name = "javascript"
   let compare _ _ = failwith "FIXME"
   let pp fmt t = Fmt.string fmt @@ Js.to_string @@ Js._JSON##stringify t
-  let type_name o = Js_of_ocaml.Js.typeof o |> Js.to_string
+
+  let type_name o =
+    if Js.Opt.return o == Js.null then "null"
+    else Js_of_ocaml.Js.typeof o |> Js.to_string
 
   let key_get =
     let f o f =
-      try
-        if Js_of_ocaml.Js.typeof o == Js.string "object" then
-          Js.Unsafe.get o (Js.string f) |> Js.Optdef.to_option |> Result.return
-        else Result.fail "null or undefined"
+      try Js.Unsafe.get o (Js.string f) |> Js.Optdef.to_option |> Result.return
       with _ ->
         Result.fail @@ Schematic.Coding.type_error "object" (type_name o)
     in
@@ -40,10 +40,8 @@ module Impl : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
   let key_set =
     let f o f v =
       try
-        if Js_of_ocaml.Js.typeof o == Js.string "object" then
-          let () = Js.Unsafe.set o (Js.string f) v in
-          Result.return o
-        else Result.fail "null or undefined"
+        let () = Js.Unsafe.set o (Js.string f) v in
+        Result.return o
       with _ ->
         Result.fail @@ Schematic.Coding.type_error "object" (type_name o)
     in
@@ -81,9 +79,11 @@ module Impl : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
   let to_date = `Custom date_of_js
 
   let to_fields o =
-    let f key = (Js.to_string key, Js_of_ocaml.Js.Unsafe.get o key) in
-    Option.return @@ List.map ~f @@ Array.to_list @@ Js.to_array
-    @@ Js_of_ocaml.Js.object_keys o
+    match Js_of_ocaml.Js.object_keys o with
+    | keys ->
+      let f key = (Js.to_string key, Js_of_ocaml.Js.Unsafe.get o key) in
+      Option.return @@ List.map ~f @@ Array.to_list @@ Js.to_array keys
+    | exception _ -> None
 
   let to_float v =
     if Js.typeof v == Js.string "number" then

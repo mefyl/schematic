@@ -287,6 +287,19 @@ struct
              reason = {|no union case was matched for {"invalid": "payload"}|};
            })
         error
+
+    type null_object =
+      | Object of { x : int }
+      | Null of unit
+    [@@deriving eq, schema, show]
+
+    (* Used to fail on Jsoo with:
+
+       TypeError: Cannot convert undefined or null to object *)
+    let null_object () =
+      test ~here:[%here] "null object"
+        (Alcotest.testable pp_null_object equal_null_object)
+        null_object_schema (Null ()) [%ezjsonm None]
   end
 
   (* Polymorphic variant *)
@@ -1369,6 +1382,7 @@ struct
           test_case "singleton variant" `Quick Variant.singleton;
           test_case "computed variant field" `Quick Variant.computed;
           test_case "unmatched variant" `Quick Variant.no_match;
+          test_case "null object" `Quick Variant.null_object;
           test_case "polymorphic variant" `Quick Polymorphic_variant.payload;
           test_case "keyed polymorphic variant" `Quick Polymorphic_variant.keyed;
           test_case "alias" `Quick alias;
