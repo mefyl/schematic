@@ -3,9 +3,10 @@
 (library
  (name schematic)
  (public_name schematic)
- (libraries base base64 ezjsonm fmt hlist ptime semver2 uri)
+ (libraries base base64 ezjsonm fmt hlist landmarks ptime semver2 uri)
  (preprocess
   (pps
+   landmarks-ppx
    schematic_ppx_inside
    ppx_deriving.eq
    ppx_deriving.make

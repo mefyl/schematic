@@ -4,7 +4,7 @@ open Js_of_ocaml
 let ( == ) = Caml.( == )
 let _Array = Js.Unsafe.global##._Array
 
-let rec of_js (o : Js.Unsafe.any) =
+let[@landmark "Schematic_jsoo.Json.of_js"] rec of_js (o : Js.Unsafe.any) =
   let o = Js.Unsafe.coerce o in
   if o == Js.Unsafe.pure_js_expr "null" then `Null
   else if Js.typeof o == Js.string "string" then `String (Js.to_string o)
@@ -20,7 +20,7 @@ let rec of_js (o : Js.Unsafe.any) =
     in
     `O entries
 
-let rec to_js x =
+let[@landmark "Schematic_jsoo.Json.to_js"] rec to_js x =
   match x with
   | `Null -> Js.Unsafe.pure_js_expr "null"
   | `String s -> Js.string s |> Js.Unsafe.coerce
@@ -33,10 +33,13 @@ let rec to_js x =
     let () = List.iter ~f o in
     res |> Js.Unsafe.coerce
 
-let of_string s =
+let[@landmark "Schematic_jsoo.Json.of_string"] of_string s =
   try
-    let json = Js._JSON##parse (Js.string s) in
-    Result.return @@ of_js json
+    let[@landmark "JSON.parse"] js = Js._JSON##parse (Js.string s) in
+    Result.return @@ of_js js
   with _ -> Result.fail "parse error"
 
-let to_string t = to_js t |> Js_of_ocaml.Json.output |> Js.to_string
+let[@landmark "Schematic_jsoo.Json.to_string"] to_string t =
+  let js = to_js t in
+  let[@landmark "JSON.stringify"] json = Js_of_ocaml.Json.output js in
+  Js.to_string json

@@ -46,13 +46,15 @@
    (< 3.7.0))
   (ezjsonm
    (>= 1.1.0))
+  fmt
   (hlist
    (and
     (>= 0.2.0)
     (< 0.3.0)))
+  landmarks
+  landmarks-ppx
   (ocaml
    (>= 4.14.0))
-  fmt
   ppxlib
   ppx_deriving
   ppx_here
@@ -80,6 +82,8 @@
    (>= 4.0.0))
   (js_of_ocaml-ppx
    (>= 4.0.0))
+  landmarks
+  landmarks-ppx
   (schematic
    (= :version))))
 

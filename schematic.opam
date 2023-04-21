@@ -22,9 +22,11 @@ depends: [
   "base64" {>= "3.5.0"}
   "dune" {>= "3.0" & < "3.7.0"}
   "ezjsonm" {>= "1.1.0"}
-  "hlist" {>= "0.2.0" & < "0.3.0"}
-  "ocaml" {>= "4.14.0"}
   "fmt"
+  "hlist" {>= "0.2.0" & < "0.3.0"}
+  "landmarks"
+  "landmarks-ppx"
+  "ocaml" {>= "4.14.0"}
   "ppxlib"
   "ppx_deriving"
   "ppx_here"
@@ -49,3 +51,7 @@ build: [
   ]
 ]
 dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"
+pin-depends: [
+  [ "landmarks.1.4" "git+https://github.com/routineco/landmarks.git#js" ]
+  [ "landmarks-ppx.1.4" "git+https://github.com/routineco/landmarks.git#js" ]
+]

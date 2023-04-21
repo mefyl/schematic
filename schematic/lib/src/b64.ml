@@ -5,6 +5,7 @@ module Make (C : Coding.S with type t = string) :
   Coding.S with type t = string = struct
   type t = string
 
+  let name = "base64"
   let alphabet = Base64.uri_safe_alphabet
 
   let decode schema s =
