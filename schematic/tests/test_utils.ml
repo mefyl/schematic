@@ -58,3 +58,5 @@ module Testables = struct
     module String_pair = Make (String_pair)
   end
 end
+
+module Tests = Tests
