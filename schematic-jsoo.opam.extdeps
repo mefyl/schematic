@@ -24,13 +24,13 @@ depends: [
   "base-unix" {= "base"}
   "base64" {= "3.5.1"}
   "bigstringaf" {= "0.9.1"}
-  "cmdliner" {= "1.1.1"}
+  "cmdliner" {= "1.2.0"}
   "conf-npm" {= "1" & with-test}
   "cppo" {= "1.6.9"}
-  "csexp" {= "1.5.1"}
+  "csexp" {= "1.5.2"}
   "cstruct" {= "6.2.0"}
   "dune" {= "3.6.2"}
-  "dune-configurator" {= "3.7.0"}
+  "dune-configurator" {= "3.7.1"}
   "ezjsonm" {= "1.3.0"}
   "fmt" {= "0.9.0"}
   "hex" {= "1.5.0"}
@@ -38,9 +38,11 @@ depends: [
   "js_of_ocaml-compiler" {= "5.0.1"}
   "js_of_ocaml-ppx" {= "5.0.1"}
   "jsonm" {= "1.0.2"}
-  "menhir" {= "20220210"}
-  "menhirLib" {= "20220210"}
-  "menhirSdk" {= "20220210"}
+  "landmarks" {= "1.4"}
+  "landmarks-ppx" {= "1.4"}
+  "menhir" {= "20230415"}
+  "menhirLib" {= "20230415"}
+  "menhirSdk" {= "20230415"}
   "metapp" {= "0.4.4"}
   "ocaml" {= "4.14.1"}
   "ocaml-base-compiler" {= "4.14.1"}
@@ -70,3 +72,7 @@ depends: [
   "yojson" {= "2.0.2"}
 ]
 dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"
+pin-depends: [
+  ["landmarks.1.4" "git+https://github.com/routineco/landmarks.git#js"]
+  ["landmarks-ppx.1.4" "git+https://github.com/routineco/landmarks.git#js"]
+]
