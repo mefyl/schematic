@@ -3,14 +3,14 @@ DIR=$(patsubst %/,%,$(dir $(MAKEFILE)))
 OCAML_VERSION ?= $(shell ocamlc --version)
 DUNE=opam exec -- dune
 
+-include Makefile.ci
+
 ifdef DOCKERFILE_BASE
 DOCKERFILE_SUFFIX=.$(DOCKERFILE_BASE)
 endif
 
 DOCKER_DIR := .
-DOCKER_FILE := $(dir $(MAKEFILE_LIST))Dockerfile.ci$(DOCKERFILE_SUFFIX)
-
--include Makefile.ci
+DOCKER_FILE := $(dir $(firstword $(MAKEFILE_LIST)))Dockerfile.ci$(DOCKERFILE_SUFFIX)
 
 build:
 	if test -d /root/node_modules; then ln -s /root/node_modules; fi
@@ -42,7 +42,7 @@ package/clean:
 ci/image:
 	if test -n "$(CI_ID_RSA)"; then cp "$(CI_ID_RSA)" $(DOCKER_DIR)/id_rsa; fi
 	if test -n "$(CI_ID_RSA_PUB)"; then cp "$(CI_ID_RSA_PUB)" $(DOCKER_DIR)/id_rsa.pub; fi
-	if test -z "$$FROM_SCRATCH"; then \
+	if test -z "$$FROM_SCRATCH" && ! test -z "$(IMAGE_CI)"; then \
 		CACHE='--cache-from "$(IMAGE_CI)$(VARIANT)" --cache-from "$(IMAGE_CI_MASTER)$(VARIANT)" --cache-from "$(IMAGE_CI_MASTER)"'; \
 	else \
 		echo "building from scratch"; \
