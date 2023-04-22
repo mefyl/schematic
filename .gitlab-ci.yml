@@ -6,7 +6,7 @@ variables:
     OCAML_VERSION: "4.14.0"
 
 toolchain:
-  extends: .ocaml-toolchain
+  extends: .toolchain
   variables:
     # Opam does not install sqml with `--deps-only` because it depends
     # (optionally) on schematic via timmy.

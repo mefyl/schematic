@@ -9,7 +9,7 @@ FROM opam-base
 
 ENV OPAMROOTISOK=1
 ENV ENV="/etc/profile"
-ADD .logistic/id_rsa* /root/.ssh/
+ADD id_rsa* /root/.ssh/
 RUN chmod 600 /root/.ssh/id_rsa
 RUN ssh-keyscan gitlab.routine.co > /root/.ssh/known_hosts
 # No recursive lookup available
@@ -18,11 +18,11 @@ RUN if test -n "$PACKAGES"; then apk add --no-cache $PACKAGES; fi
 ADD .exists *.opam.extdeps /root/
 RUN opam update && \
     if EXTDEPS=$(find /root -name '*.extdeps'); then \
-      for f in /root/*.extdeps; do mv ${f} ${f%.extdeps}; done \
+      for f in $EXTDEPS; do mv ${f} ${f%.extdeps}; done \
     fi && \
     opam switch create /root --confirm-level=unsafe-yes --deps-only --with-test --with-doc && \
     opam config --switch=/root set jobs $(nproc) && \
-    opam switch --switch=/root set-invariant ocamlformat.0.24.1 && \
+    opam pin --switch=/root --no-action ocamlformat 0.24.1  && \
     opam clean --switch=/root -a -c -s --logs -r && \
     rm -rf /root/.cache/dune
 ENV OPAMSWITCH=/root

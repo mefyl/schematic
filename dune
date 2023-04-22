@@ -32,7 +32,7 @@
   (alias_rec schematic-ffi/default)))
 
 (rule
- (target dune.extdeps.inc)
+ (target dune.inc)
  (alias extdeps)
  (deps dune-project)
  (mode (promote))
@@ -44,11 +44,11 @@
     generate
     --name
     schematic
-    --both
+    --cross-both
     bake,fmt,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross
     base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
-    --exclude
+    --local
     acid,bake,hlist,sqml,timmy))))
 
-(include dune.extdeps.inc)
+(include dune.inc)

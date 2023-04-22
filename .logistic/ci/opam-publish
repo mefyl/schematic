@@ -13,7 +13,6 @@ make_opam () {
     opam exec -- dune build "$FILE.opam"
     mkdir -p "$PKG_PATH"
     cp "_build/default/$FILE.opam" "$PKG_PATH/opam"
-    test "$2n" != "n" && sed -i "$2" "$PKG_PATH/opam"
     git -C "/tmp/opam" add "$PKG_PATH/opam"
 }
 
