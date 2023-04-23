@@ -1,2 +1,2 @@
 include Schematic.Json.S
-module String : Schematic.Coding.S with type t = string
+module String : Schematic.Coding.STR with type t = string

@@ -1,12 +1,16 @@
-(* Check generating Jsoo binding does not prevent running natively *)
+module Jsoo = Test_utils.Tests.Make (struct
+  include Schematic_jsoo.Jsoo
 
-module Schemas_library = struct
-  type Schematic.Schema.library += V
+  let to_string js = Js_of_ocaml.(Json.output js |> Js.to_string)
+  let local_time_support = false
 
-  let v = V
-end
+  let t =
+    Alcotest.testable
+      (fun fmt js -> Fmt.string fmt @@ to_string js)
+      (fun l r -> String.equal (to_string l) (to_string r))
 
-type jsoo = { jsoo : int } [@@deriving schema ~jsoo:false]
+  let of_json _ = None
+  let extra_test ~here:_ _ _ = ()
+end)
 
-let _ignore (_ : jsoo_js) = ()
-let () = Fmt.pr "%a" Schematic.Schema.pp jsoo_schema
+let () = Alcotest.run "Schematic_jsoo.Jsoo" Jsoo.tests
