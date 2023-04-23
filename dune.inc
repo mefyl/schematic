@@ -10,7 +10,8 @@
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
     %{dep:entropic.opam} --cross
     entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
-    --cross-both bake,fmt,ppx_deriving,ppx_hash,ppx_here,semver2
+    --cross-both
+    bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross-exclude ""))))
 (rule (target entropic-ios.%{version:entropic}.opam)
  (deps (:opam entropic-ios.opam))
@@ -41,7 +42,8 @@
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
     %{dep:schematic.opam} --cross
     entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
-    --cross-both bake,fmt,ppx_deriving,ppx_hash,ppx_here,semver2
+    --cross-both
+    bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross-exclude ""))))
 (rule (target schematic-ios.%{version:schematic}.opam)
  (deps (:opam schematic-ios.opam))
@@ -72,7 +74,8 @@
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
     %{dep:schematic-cli.opam} --cross
     entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
-    --cross-both bake,fmt,ppx_deriving,ppx_hash,ppx_here,semver2
+    --cross-both
+    bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross-exclude ""))))
 (rule (target schematic-cli-ios.%{version:schematic-cli}.opam)
  (deps (:opam schematic-cli-ios.opam))
@@ -103,7 +106,8 @@
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
     %{dep:schematic-ffi.opam} --cross
     entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
-    --cross-both bake,fmt,ppx_deriving,ppx_hash,ppx_here,semver2
+    --cross-both
+    bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross-exclude ""))))
 (rule (target schematic-ffi-ios.%{version:schematic-ffi}.opam)
  (deps (:opam schematic-ffi-ios.opam))
@@ -134,7 +138,8 @@
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
     %{dep:schematic-http.opam} --cross
     entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
-    --cross-both bake,fmt,ppx_deriving,ppx_hash,ppx_here,semver2
+    --cross-both
+    bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross-exclude ""))))
 (rule (target schematic-http-ios.%{version:schematic-http}.opam)
  (deps (:opam schematic-http-ios.opam))
@@ -165,7 +170,8 @@
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
     %{dep:schematic-jsoo.opam} --cross
     entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
-    --cross-both bake,fmt,ppx_deriving,ppx_hash,ppx_here,semver2
+    --cross-both
+    bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross-exclude ""))))
 (rule (target schematic-jsoo-ios.%{version:schematic-jsoo}.opam)
  (deps (:opam schematic-jsoo-ios.opam))
@@ -196,7 +202,8 @@
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
     %{dep:schematic-sexp.opam} --cross
     entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
-    --cross-both bake,fmt,ppx_deriving,ppx_hash,ppx_here,semver2
+    --cross-both
+    bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross-exclude ""))))
 (rule (target schematic-sexp-ios.%{version:schematic-sexp}.opam)
  (deps (:opam schematic-sexp-ios.opam))
@@ -227,7 +234,8 @@
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
     %{dep:schematic-sqml.opam} --cross
     entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
-    --cross-both bake,fmt,ppx_deriving,ppx_hash,ppx_here,semver2
+    --cross-both
+    bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross-exclude ""))))
 (rule (target schematic-sqml-ios.%{version:schematic-sqml}.opam)
  (deps (:opam schematic-sqml-ios.opam))

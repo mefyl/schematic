@@ -45,7 +45,7 @@
     --name
     schematic
     --cross-both
-    bake,fmt,ppx_deriving,ppx_hash,ppx_here,semver2
+    bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross
     base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
     --local
