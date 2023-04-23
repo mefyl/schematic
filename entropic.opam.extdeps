@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "entropic"
-version: "0.17.5"
+version: "0.17.6"
 synopsis: "Random dataset generation based on schematic"
 maintainer: "mefyl <mefyl@gruntech.org>"
 authors: "mefyl <mefyl@gruntech.org>"
