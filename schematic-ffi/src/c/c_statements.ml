@@ -15,4 +15,9 @@ let val_long = Fmt.str "Val_long(%s)"
 let c_assert = Fmt.str "assert(%s)"
 
 let assert_block_size v n =
-  c_assert (Fmt.str "Is_block(%s) && Wosize_val(%s) == %d" v v n)
+  [
+    c_assert (Fmt.str "Is_block(%s)" v);
+    Fmt.str
+      {|if (Wosize_val(%s) != %d) { fprintf(stderr, "invalid block size: %%ld != %%d\\n", Wosize_val(%s), %d); assert(Wosize_val(%s) == %d); }|}
+      v n v n v n;
+  ]

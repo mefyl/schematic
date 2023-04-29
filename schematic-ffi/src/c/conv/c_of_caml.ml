@@ -16,10 +16,8 @@ let struct_of_caml name (`Struct { fields }) =
              conv_fn (field "v" field_idx))
   in
   let statements =
-    [
-      Fmt.str "%s res" (Identifier.to_string name);
-      assert_block_size "v" (List.length fields);
-    ]
+    Fmt.str "%s res" (Identifier.to_string name)
+    :: assert_block_size "v" (List.length fields)
     @ field_stores
   in
   ([], const pp_statements statements)
@@ -60,8 +58,7 @@ let payload_variant_of_caml
       (Some
          (const pp_statements
             (assert_block_size "v" (List.length accessor_stmts)
-             :: accessor_stmts
-            @ [ "break" ])))
+            @ accessor_stmts @ [ "break" ])))
       fmt ()
   in
   let rich_case =
@@ -144,11 +141,11 @@ let poly_variant_of_caml name
 
       let body =
         const pp_statements
-          [
-            assert_block_size "v" 2;
-            "int tag = Field(v, 0)";
-            "res.payload = malloc(sizeof(*res.payload))";
-          ]
+          (assert_block_size "v" 2
+          @ [
+              "int tag = Field(v, 0)";
+              "res.payload = malloc(sizeof(*res.payload))";
+            ])
         ++ cut
         ++ (const string "if (0) {}" ++ cut ++ elses ++ cut
            ++ const string "else assert(0);")
@@ -171,14 +168,12 @@ let tuple_of_caml (`Tuple members) =
   let tuptype = tuple_name members in
   let pp =
     const pp_statements
-    @@ [
-         Fmt.str "%a res" Identifier.pp tuptype;
-         assert_block_size "v" (List.length members);
-       ]
-    @ (members
-      |> List.mapi ~f:(fun field_idx c ->
-             Fmt.str "res.t%d = %a(%s)" field_idx Identifier.pp
-               (of_caml_name_for_c c) (field "v" field_idx)))
+      (Fmt.str "%a res" Identifier.pp tuptype
+       :: assert_block_size "v" (List.length members)
+      @ (members
+        |> List.mapi ~f:(fun field_idx c ->
+               Fmt.str "res.t%d = %a(%s)" field_idx Identifier.pp
+                 (of_caml_name_for_c c) (field "v" field_idx))))
   in
   ([], pp)
 
@@ -189,14 +184,13 @@ let array_of_caml (`Array elem_type) =
   in
   let set_for =
     block ~indent "for (int64_t i = 0; i < res.len; i++)"
-      (const pp_statements
-         [
-           assert_block_size "l" 2;
-           Fmt.str "res.data[i] = %a(%s)" Identifier.pp
-             (of_caml_name_for_c elem_type)
-             (field "l" 0);
-           Fmt.str "l = %s" (field "l" 1);
-         ])
+      (const pp_statements @@ assert_block_size "l" 2
+      @ [
+          Fmt.str "res.data[i] = %a(%s)" Identifier.pp
+            (of_caml_name_for_c elem_type)
+            (field "l" 0);
+          Fmt.str "l = %s" (field "l" 1);
+        ])
   in
   let pp =
     const pp_statements

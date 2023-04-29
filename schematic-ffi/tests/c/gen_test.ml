@@ -17,7 +17,8 @@ let primitive_record_of_caml =
 primitive_record primitive_record_of_caml(value v) {
   CAMLparam1(v);
   primitive_record res;
-  assert(Is_block(v) && Wosize_val(v) == 2);
+  assert(Is_block(v));
+  if (Wosize_val(v) != 2) { fprintf(stderr, "invalid block size: %ld != %d\\n", Wosize_val(v), 2); assert(Wosize_val(v) == 2); };
   res.a = int_of_caml(Field(v, 0));
   res.b = int_of_caml(Field(v, 1));
   CAMLreturnT(primitive_record, res);
@@ -55,7 +56,8 @@ let wrapper_of_caml =
 wrapper wrapper_of_caml(value v) {
   CAMLparam1(v);
   wrapper res;
-  assert(Is_block(v) && Wosize_val(v) == 2);
+  assert(Is_block(v));
+  if (Wosize_val(v) != 2) { fprintf(stderr, "invalid block size: %ld != %d\\n", Wosize_val(v), 2); assert(Wosize_val(v) == 2); };
   res.somevar = int_of_caml(Field(v, 0));
   res.r = primitive_record_of_caml(Field(v, 1));
   CAMLreturnT(wrapper, res);
@@ -147,11 +149,13 @@ payload_variant payload_variant_of_caml(value v) {
     res.payload = malloc(sizeof(*res.payload));
     switch (Tag_val(v)) {
       case 0:
-        assert(Is_block(v) && Wosize_val(v) == 1);
+        assert(Is_block(v));
+        if (Wosize_val(v) != 1) { fprintf(stderr, "invalid block size: %ld != %d\\n", Wosize_val(v), 1); assert(Wosize_val(v) == 1); };
         res.payload->someint = int_of_caml(Field(v, 0));
         break;
       case 1:
-        assert(Is_block(v) && Wosize_val(v) == 2);
+        assert(Is_block(v));
+        if (Wosize_val(v) != 2) { fprintf(stderr, "invalid block size: %ld != %d\\n", Wosize_val(v), 2); assert(Wosize_val(v) == 2); };
         res.payload->a_pair.t0 = int_of_caml(Field(v, 0));
         res.payload->a_pair.t1 = string_of_caml(Field(v, 1));
         break;
@@ -226,7 +230,8 @@ let tuple_string_int_of_caml =
 tuple_string_int tuple_string_int_of_caml(value v) {
   CAMLparam1(v);
   tuple_string_int res;
-  assert(Is_block(v) && Wosize_val(v) == 2);
+  assert(Is_block(v));
+  if (Wosize_val(v) != 2) { fprintf(stderr, "invalid block size: %ld != %d\\n", Wosize_val(v), 2); assert(Wosize_val(v) == 2); };
   res.t0 = string_of_caml(Field(v, 0));
   res.t1 = int_of_caml(Field(v, 1));
   CAMLreturnT(tuple_string_int, res);
@@ -265,7 +270,8 @@ let record_with_pair_alias_of_caml =
 record_with_pair_alias record_with_pair_alias_of_caml(value v) {
   CAMLparam1(v);
   record_with_pair_alias res;
-  assert(Is_block(v) && Wosize_val(v) == 2);
+  assert(Is_block(v));
+  if (Wosize_val(v) != 2) { fprintf(stderr, "invalid block size: %ld != %d\\n", Wosize_val(v), 2); assert(Wosize_val(v) == 2); };
   res.a = int_of_caml(Field(v, 0));
   res.pair_alias = pair_alias_of_caml(Field(v, 1));
   CAMLreturnT(record_with_pair_alias, res);
@@ -355,7 +361,8 @@ int_array int_array_of_caml(value v) {
   l = v;
   res.data = malloc(sizeof(*res.data) * res.len);
   for (int64_t i = 0; i < res.len; i++) {
-    assert(Is_block(l) && Wosize_val(l) == 2);
+    assert(Is_block(l));
+    if (Wosize_val(l) != 2) { fprintf(stderr, "invalid block size: %ld != %d\\n", Wosize_val(l), 2); assert(Wosize_val(l) == 2); };
     res.data[i] = int_of_caml(Field(l, 0));
     l = Field(l, 1);
   }
@@ -385,7 +392,8 @@ let tuple_int_string_of_caml =
 tuple_int_string tuple_int_string_of_caml(value v) {
   CAMLparam1(v);
   tuple_int_string res;
-  assert(Is_block(v) && Wosize_val(v) == 2);
+  assert(Is_block(v));
+  if (Wosize_val(v) != 2) { fprintf(stderr, "invalid block size: %ld != %d\\n", Wosize_val(v), 2); assert(Wosize_val(v) == 2); };
   res.t0 = int_of_caml(Field(v, 0));
   res.t1 = string_of_caml(Field(v, 1));
   CAMLreturnT(tuple_int_string, res);
@@ -462,7 +470,8 @@ poly_payload poly_payload_of_caml(value v) {
   else if (v == Val_long(65)) res.tag = poly_payload_a_tag;
   else if (v == Val_long(66)) res.tag = poly_payload_b_tag;
   else if (Is_block(v)) {
-    assert(Is_block(v) && Wosize_val(v) == 2);
+    assert(Is_block(v));
+    if (Wosize_val(v) != 2) { fprintf(stderr, "invalid block size: %ld != %d\\n", Wosize_val(v), 2); assert(Wosize_val(v) == 2); };
     int tag = Field(v, 0);
     res.payload = malloc(sizeof(*res.payload));
     if (0) {}
