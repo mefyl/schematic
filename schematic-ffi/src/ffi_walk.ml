@@ -97,7 +97,7 @@ module Walk (W : WALK) = struct
       | Object { fields = f; _ } -> W.object_ (fields f)
       | Tuple { items; _ } -> W.tuple @@ tuple items
       | Union { cases; polymorphic; key = _ } ->
-        let id = Option.value_exn id in
+        let id = Option.value_exn ~here:[%here] id in
         let cases =
           cases
           |> List.map ~f:(fun (Schema.Case { name; raw_name; schema = s; _ }) ->

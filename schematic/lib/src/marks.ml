@@ -119,7 +119,7 @@ module Make (S : MARK) = struct
     let of_parametric = M.of_parametric
 
     let mark_of_schema Schema.{ id; descriptor; parametric } =
-      let id = id |> Option.value_exn in
+      let id = id |> Option.value_exn ~here:[%here] in
       match parametric with
       | None -> (id, lazy (M.of_descriptor (Some id) descriptor))
       | Some parametric -> (id, lazy (M.of_parametric parametric))

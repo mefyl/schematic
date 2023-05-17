@@ -161,7 +161,9 @@ module Make (S : MARK) = struct
     let mark_of_schema Schema.{ id; descriptor; parametric = _ } =
       let res, marks = M.of_descriptor id descriptor in
       let id_inner, res = M.identified res in
-      let id = Option.first_some id id_inner |> Option.value_exn in
+      let id =
+        Option.first_some id id_inner |> Option.value_exn ~here:[%here]
+      in
       (* We only consider reifications, hence why `parametric` is ignored. *)
       (id, (res, marks))
 
