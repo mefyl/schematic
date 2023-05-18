@@ -106,8 +106,8 @@ end
 module Result = struct
   include Base.Result
 
-  let schema t error_schema =
-    let descriptor t error_schema =
+  let schema t error =
+    let descriptor t error =
       Schema.Union
         {
           polymorphic = false;
@@ -125,7 +125,7 @@ module Result = struct
                 {
                   name = "error";
                   raw_name = "Error";
-                  schema = error_schema;
+                  schema = error;
                   encoder =
                     (function Result.Error x -> Some x | Result.Ok _ -> None);
                   decoder = Result.fail;
@@ -144,14 +144,19 @@ module Result = struct
               Parametric
                 {
                   name = "error";
-                  parameter = error_schema;
+                  parameter = error;
                   next =
                     (fun error ->
                       Plain { name = "result"; descriptor = descriptor t error });
                 });
         }
     in
-    Schema.make ~parametric (descriptor t error_schema)
+    let id =
+      match (t.id, error.id) with
+      | Some t, Some error -> Some (Fmt.str "%s-%s-result" t error)
+      | _ -> None
+    in
+    Schema.make ?id ~parametric (descriptor t error)
 
   let schema_versioned _ = schema
 end
