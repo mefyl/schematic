@@ -662,3 +662,60 @@ let name_combine schema name =
 let fixpoint f =
   let rec self = Fixpoint (lazy (f self)) in
   f self
+
+let atom v = Sexp.Atom v
+
+and option_to_sexp ~f = function
+  | None -> Sexp.List []
+  | Some v -> Sexp.List [ f v ]
+
+let rec to_sexp : type a. a t -> Sexp.t =
+ fun { id; descriptor; _ } ->
+  List
+    [
+      List [ Atom "id"; option_to_sexp ~f:atom id ];
+      List [ Atom "descriptor"; descriptor_to_sexp descriptor ];
+    ]
+
+and descriptor_to_sexp : type a. a descriptor -> Sexp.t = function
+  | Any (module Impl : Coding_intf.IMPL with type t = a) ->
+    List [ Atom "Any"; Atom Impl.name ]
+  | Bool -> Atom "Bool"
+  | Date -> Atom "Date"
+  | Fixpoint f -> descriptor_to_sexp (Lazy.force f)
+  | Float -> Atom "Float"
+  | Ignore -> Atom "Ignore"
+  | Int -> Atom "Int"
+  | Int64 -> Atom "Int64"
+  | Json -> Atom "Json"
+  | List s -> List [ Atom "List"; to_sexp s ]
+  | Map { descriptor; _ } -> List [ Atom "Map"; descriptor_to_sexp descriptor ]
+  | Mapping s -> List [ Atom "Mapping"; to_sexp s ]
+  | Null -> Atom "Null"
+  | Nullable s -> List [ Atom "Nullable"; to_sexp s ]
+  | Object { fields; _ } -> List (Atom "Object" :: fields_to_sexp fields)
+  | String -> Atom "String"
+  | String_const s -> List [ Atom "String_const"; Atom s ]
+  | Time -> Atom "Time"
+  | Time_local -> Atom "Time_local"
+  | Tuple { items; _ } -> List (Atom "Tuple" :: items_to_sexp items)
+  | Union { key; cases; _ } ->
+    let tail = List.map ~f:case_to_sexp cases in
+    let tail =
+      match key with
+      | Some key -> Sexp.List [ Atom "key"; Atom key ] :: tail
+      | None -> tail
+    in
+    List (Atom "Union" :: tail)
+
+and case_to_sexp : type f. f case -> Sexp.t =
+ fun (Case { name; schema; _ }) -> List [ Atom name; to_sexp schema ]
+
+and fields_to_sexp : type f. f fields -> Sexp.t list = function
+  | FieldEnd -> []
+  | Field { field = { name; schema; _ }; rest } ->
+    List [ Atom name; to_sexp (field_schema schema) ] :: fields_to_sexp rest
+
+and items_to_sexp : type f. f tuple -> Sexp.t list = function
+  | ItemEnd -> []
+  | Item { schema; rest } -> to_sexp schema :: items_to_sexp rest

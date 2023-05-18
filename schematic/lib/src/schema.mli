@@ -59,3 +59,6 @@ module Walk (W : WALK) : sig
   val parametric : 't parametric -> W.t W.M.t
   val schema : 't t -> W.t W.M.t
 end
+
+val to_sexp : _ t -> Base.Sexp.t
+val descriptor_to_sexp : _ descriptor -> Base.Sexp.t

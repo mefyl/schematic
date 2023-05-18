@@ -97,7 +97,15 @@ module Walk (W : WALK) = struct
       | Object { fields = f; _ } -> W.object_ (fields f)
       | Tuple { items; _ } -> W.tuple @@ tuple items
       | Union { cases; polymorphic; key = _ } ->
-        let id = Option.value_exn ~here:[%here] id in
+        let id =
+          match id with
+          | Some id -> id
+          | None ->
+            Error.(
+              raise @@ of_info
+              @@ Info.create ~here:[%here] "union schema must have an id" d
+                   Schematic.Schema.descriptor_to_sexp)
+        in
         let cases =
           cases
           |> List.map ~f:(fun (Schema.Case { name; raw_name; schema = s; _ }) ->
@@ -108,9 +116,9 @@ module Walk (W : WALK) = struct
     try f ()
     with e ->
       let msg =
-        Fmt.str "Error while processing descriptor (id = %a): %a"
+        Fmt.str "error while processing descriptor (id = %a)"
           Fmt.(option string)
-          id Schema.pp_descriptor d
+          id
       in
       Base.Exn.reraise e msg
 
@@ -131,9 +139,7 @@ module Walk (W : WALK) = struct
     try W.schema id parametric schema
     with e ->
       let msg =
-        Fmt.str "Error while processing schema (id = %a)@."
-          Fmt.(option string)
-          id
+        Fmt.str "error while processing schema (id = %a)" Fmt.(option string) id
       in
       Base.Exn.reraise e msg
 
