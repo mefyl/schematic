@@ -485,8 +485,16 @@ module Walk (W : WALK) = struct
         let f { name; requirement; schema = s; _ } =
           W.field name (required requirement) (schema @@ field_schema s)
         and filter field =
+          let s = field_schema field.schema in
           W.inline
-            (fun () -> descriptor (field_schema field.schema).descriptor)
+            (match s.parametric with
+            | None -> None
+            | Some p ->
+              Some
+                (fun () ->
+                  let name, args, eff_args, t = parametric p in
+                  W.parametric name args eff_args t))
+            (fun () -> schema { s with id = None })
             field
         in
         Inline.schema o { f; filter = Some filter }

@@ -39,7 +39,7 @@ end)
 module Of = Schema.Walk (struct
   type field =
     | Field of (string * t * bool)
-    | Type of string
+    | Type of t
 
   type nonrec t = t
 
@@ -91,12 +91,18 @@ module Of = Schema.Walk (struct
     let+ schema = schema in
     Field (name, schema, required)
 
-  let inline s = function
-    | Schema.{ schema = Inline { id = Some id; _ }; _ } ->
+  let inline (parametric : (unit -> Marks.t -> t * Marks.t) option) schema s =
+    match (parametric, s) with
+    | _, Schema.{ schema = Inline { id = Some id; _ }; _ } ->
       Some
         (fun marks ->
-          let mark = (id, lazy (s () marks)) in
-          (Type (name id), Marks.add marks mark))
+          let mark = (id, lazy (schema () marks)) in
+          (Type (Atom (name id)), Marks.add marks mark))
+    | Some parametric, _ ->
+      Some
+        (fun marks ->
+          let t, marks = parametric () marks in
+          (Type t, marks))
     | _ -> None
 
   let float = atom "number"
@@ -127,9 +133,7 @@ module Of = Schema.Walk (struct
           | Type t -> Second t)
       in
       let object_ = Object { fields } in
-      match types with
-      | [] -> object_
-      | _ -> Intersection (object_ :: List.map ~f:(fun t -> Atom t) types)
+      match types with [] -> object_ | _ -> Intersection (object_ :: types)
     in
     let+ fields = fields in
     match fields with

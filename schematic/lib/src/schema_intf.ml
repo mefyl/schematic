@@ -149,7 +149,11 @@ module type WALK = sig
 
       The field is not inlined and replaced with the return value if it is not
       [None]. The [schema] argument can be used to walk the field schema. *)
-  val inline : (unit -> t M.t) -> ('t, 'req) schema_field -> field M.t option
+  val inline :
+    (unit -> t M.t) option ->
+    (unit -> t M.t) ->
+    ('t, 'req) schema_field ->
+    field M.t option
 
   (* Union *)
 
