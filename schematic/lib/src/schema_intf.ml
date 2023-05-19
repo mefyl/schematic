@@ -205,3 +205,9 @@ module Make_inline (M : Base.Monad.S) = struct
   (** A ['res inline] maps a field and a value for that field to a ['res]. *)
   type 'res inline_v = { f : 't 'req. ('t, 'req) field -> 'req -> 'res M.t }
 end
+
+module Name = struct
+  type t =
+    | Id of string
+    | Parametric of string * t list
+end

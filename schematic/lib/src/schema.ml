@@ -666,6 +666,51 @@ let unpack { unpack } (Pack schema) = unpack schema
 
 let name_combine schema name =
   match schema.id with Some id -> id ^ "-" ^ name | None -> name
+let rec name : type a. a t -> Name.t option =
+  let ( let* ) = Option.( >>= )
+  and ( let+ ) = Option.( >>| ) in
+  function
+  | { id = Some id; _ } -> Some (Id id)
+  | { parametric = Some parametric; _ } ->
+    let rec f = function
+      | Plain { name; _ } -> Some (name, [])
+      | Parametric { parameter; next; _ } ->
+        let* parametric, parameters = f (next parameter) in
+        let+ parameter = name parameter in
+        (parametric, parameter :: parameters)
+    in
+    let+ name, parameters = f parametric in
+    Name.Parametric (name, parameters)
+  | { descriptor = Any (module Impl : Coding_intf.IMPL with type t = a); _ } ->
+    Some (Id "any")
+  | { descriptor = Bool; _ } -> Some (Id "bool")
+  | { descriptor = Date; _ } -> Some (Id "date")
+  | { descriptor = Fixpoint f; _ } as s ->
+    name { s with descriptor = Lazy.force f }
+  | { descriptor = Float; _ } -> Some (Id "float")
+  | { descriptor = Ignore; _ } -> Some (Id "ignore")
+  | { descriptor = Int; _ } -> Some (Id "int")
+  | { descriptor = Int64; _ } -> Some (Id "int64")
+  | { descriptor = Json; _ } -> Some (Id "json")
+  | { descriptor = List p; _ } ->
+    let+ p = name p in
+    Name.Parametric ("list", [ p ])
+  | { descriptor = Map _; _ } -> None
+  | { descriptor = Mapping p; _ } ->
+    let+ p = name p in
+    Name.Parametric ("mapping", [ p ])
+  | { descriptor = Null; _ } -> Some (Id "null")
+  | { descriptor = Nullable p; _ } ->
+    let+ p = name p in
+    Name.Parametric ("option", [ p ])
+  | { descriptor = Object _; _ } -> None
+  | { descriptor = String; _ } -> Some (Id "string")
+  | { descriptor = String_const _; _ } -> None
+  | { descriptor = Time; _ } -> Some (Id "time")
+  | { descriptor = Time_local; _ } -> Some (Id "time_local")
+  | { descriptor = Tuple _; _ } -> None
+  | { descriptor = Union _; _ } -> None
+
 
 let fixpoint f =
   let rec self = Fixpoint (lazy (f self)) in

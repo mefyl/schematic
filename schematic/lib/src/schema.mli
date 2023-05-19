@@ -62,3 +62,4 @@ end
 
 val to_sexp : _ t -> Base.Sexp.t
 val descriptor_to_sexp : _ descriptor -> Base.Sexp.t
+val name : _ t -> Name.t option
