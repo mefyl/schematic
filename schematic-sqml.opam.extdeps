@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic-sqml"
-version: "0.17.6"
+version: "0.17.7"
 synopsis: "Derive SQML bindings from Ocaml types"
 description: "Deduce SQML bindings from schematic type metadata."
 maintainer: "mefyl <mefyl@gruntech.org>"
@@ -71,7 +71,7 @@ depends: [
   "uchar" {= "0.0.2"}
   "uri" {= "4.2.0"}
   "uutf" {= "1.0.3"}
-  "yojson" {= "2.0.2"}
+  "yojson" {= "2.1.0"}
 ]
 dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"
 pin-depends: [
