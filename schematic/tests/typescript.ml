@@ -121,28 +121,54 @@ module Generate_types = struct
 
   let record () = test ~here:[%here] record_schema record_typescript
 
-  type string_or_int = (string, int) Either.t [@@deriving schema]
+  module Parametric = struct
+    type string_or_int = (string, int) Either.t [@@deriving schema]
 
-  type ('t, 'error) res =
-    | Ok of 't
-    | Error of 'error
-  [@@schematic.union_key "status"]
-  [@@schematic.name "result"]
-  [@@deriving schema]
+    type ('t, 'error) res =
+      | Ok of 't
+      | Error of 'error
+    [@@schematic.union_key "status"]
+    [@@schematic.name "result"]
+    [@@deriving schema]
 
-  type record_res = (record, string) res [@@deriving schema]
+    type record_res = (record, string) res [@@deriving schema]
 
-  let parametric () =
-    test ~here:[%here] string_or_int_schema
-      [
-        ("StringOrInt", "Either<string, number>");
-        ("Either<First, Second>", "First | Second");
-      ];
-    test ~here:[%here] record_res_schema
-    @@ ("RecordRes", "Result<Record, string>")
-       :: ( "Result<T, Error>",
-            {|T & { "status": "ok" } | Error & { "status": "error" }|} )
-       :: record_typescript
+    let simple () =
+      test ~here:[%here] string_or_int_schema
+        [
+          ("StringOrInt", "Either<string, number>");
+          ("Either<First, Second>", "First | Second");
+        ];
+      test ~here:[%here] record_res_schema
+      @@ ("RecordRes", "Result<Record, string>")
+         :: ( "Result<T, Error>",
+              {|T & { "status": "ok" } | Error & { "status": "error" }|} )
+         :: record_typescript
+
+    type 'v variant_inline = V of { v : 'v [@schematic.inline] }
+    [@@deriving schema]
+
+    type record = { field : int } [@@deriving schema]
+    type inline = record variant_inline [@@deriving schema]
+
+    let inline () =
+      test ~here:[%here] inline_schema
+        [
+          ("Inline", "VariantInline<Record>");
+          ("Record", "{ \"field\": number }");
+          ("VariantInline<V>", "{  } & V");
+        ]
+
+    type inline_ignore = Schematic.Schemas.ignore variant_inline
+    [@@deriving schema]
+
+    let inline_ignore () =
+      test ~here:[%here] inline_ignore_schema
+        [
+          ("InlineIgnore", "VariantInline<{  }>");
+          ("VariantInline<V>", "{  } & V");
+        ]
+  end
 
   let tuple () = test ~here:[%here] tuple_schema [ tuple_typescript ]
 
@@ -282,7 +308,9 @@ let () =
         Generate_types.
           [
             test_case "nullable" `Quick nullable;
-            test_case "parametric" `Quick parametric;
+            test_case "parametric-simple" `Quick Parametric.simple;
+            test_case "parametric inline" `Quick Parametric.inline;
+            test_case "parametric inline ignore" `Quick Parametric.inline_ignore;
             test_case "record" `Quick record;
             test_case "recursive" `Quick recursive;
             test_case "tuple" `Quick tuple;

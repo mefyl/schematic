@@ -529,7 +529,21 @@ module Walk (W : WALK) = struct
     | Parametric { name; parameter; next } ->
       let template_name, args, eff_args, t =
         parametric
-          (next { parameter with id = Some ("#" ^ name); parametric = None })
+          (next
+             {
+               id = Some ("#" ^ name);
+               (* FIXME: Ensure we don't keep eg. an `Ignore` schema that would
+                  be discarded. Handle that better with an actual `Var`
+                  descriptor.*)
+               descriptor =
+                 Map
+                   {
+                     decode = (fun _ -> failwith "unreachable");
+                     encode = (fun _ -> failwith "unreachable");
+                     descriptor = Int;
+                   };
+               parametric = None;
+             })
       in
       (template_name, name :: args, schema parameter :: eff_args, t)
 

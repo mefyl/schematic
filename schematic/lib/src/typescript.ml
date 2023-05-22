@@ -53,18 +53,17 @@ module Of = Schema.Walk (struct
 
   (* Schema *)
 
+  let of_id id s =
+    if String.is_prefix ~prefix:"#" id then
+      M.return (Atom (name @@ String.subo ~pos:1 id))
+    else fun marks ->
+      let mark = (id, lazy (s () marks)) in
+      (Atom (name id), Marks.add marks mark)
+
   let schema id parametric s =
     match parametric with
     | Some parametric -> parametric ()
-    | None -> (
-      match id with
-      | None -> s ()
-      | Some id ->
-        if String.is_prefix ~prefix:"#" id then
-          M.return (Atom (name @@ String.subo ~pos:1 id))
-        else fun marks ->
-          let mark = (id, lazy (s () marks)) in
-          (Atom (name id), Marks.add marks mark))
+    | None -> ( match id with None -> s () | Some id -> of_id id s)
 
   let parametric template_name args effective t =
     let* t = t
@@ -94,10 +93,9 @@ module Of = Schema.Walk (struct
   let inline (parametric : (unit -> Marks.t -> t * Marks.t) option) schema s =
     match (parametric, s) with
     | _, Schema.{ schema = Inline { id = Some id; _ }; _ } ->
-      Some
-        (fun marks ->
-          let mark = (id, lazy (schema () marks)) in
-          (Type (Atom (name id)), Marks.add marks mark))
+      Option.return
+      @@ let+ t = of_id id schema in
+         Type t
     | Some parametric, _ ->
       Some
         (fun marks ->
@@ -108,7 +106,7 @@ module Of = Schema.Walk (struct
   let float = atom "number"
   let date = atom "Date"
   let int = float
-  let ignore = atom "null"
+  let ignore marks = (Object { fields = [] }, marks)
   let int64 = float
 
   let list elt =
