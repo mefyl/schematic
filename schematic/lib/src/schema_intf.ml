@@ -210,4 +210,5 @@ module Name = struct
   type t =
     | Id of string
     | Parametric of string * t list
+  [@@deriving eq, ord]
 end

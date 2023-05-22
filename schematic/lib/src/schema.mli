@@ -50,8 +50,8 @@ val pack : _ t -> pack
 type 'res unpacker = { unpack : 't. 't t -> 'res }
 
 val unpack : 'res unpacker -> pack -> 'res
-val name_combine : _ t -> string -> string
 val make : ?id:string -> ?parametric:'t parametric -> 't descriptor -> 't t
+val name_combine : _ t -> string -> string
 val fixpoint : ('a descriptor -> 'a descriptor) -> 'a descriptor
 
 module Walk (W : WALK) : sig
@@ -62,4 +62,18 @@ end
 
 val to_sexp : _ t -> Base.Sexp.t
 val descriptor_to_sexp : _ descriptor -> Base.Sexp.t
-val name : _ t -> Name.t option
+
+module Name : sig
+  include module type of Name
+
+  val pp : t Fmt.t
+  val to_string : t -> string
+  val to_id : t -> string
+  val sexp_of_t : t -> Base.Sexp.t
+
+  include Base.Comparable.S with type t := t
+
+  val of_schema : _ Schema_intf.t -> t option
+  val of_parametric : _ Schema_intf.parametric -> t option
+  val combine : _ Schema_intf.t -> string -> string option
+end

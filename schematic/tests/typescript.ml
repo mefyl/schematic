@@ -220,8 +220,8 @@ module Generate_types = struct
   let option_default () =
     test ~here:[%here] option_default_schema
       [
-        ("OptionDefault", {|{ "od"?: HiddenOption }|});
-        ("HiddenOption", {|number | null | null|});
+        ("IntOptionHiddenOption", {|number | null | null|});
+        ("OptionDefault", {|{ "od"?: IntOptionHiddenOption }|});
       ]
 
   type a = A

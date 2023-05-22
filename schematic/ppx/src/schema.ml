@@ -29,12 +29,11 @@ let expanded_of_descriptor ~loc ?(id = [%expr None])
 let schema_of_expanded ~loc = function
   | Components { descriptor; id; parametric } ->
     [%expr
-      Schema.
-        {
-          descriptor = [%e descriptor];
-          id = [%e id];
-          parametric = [%e parametric];
-        }]
+      {
+        Schema.descriptor = [%e descriptor];
+        id = [%e id];
+        parametric = [%e parametric];
+      }]
   | Expression e -> e
 
 let rec encode_type ~context ~type_context core_type =
@@ -374,7 +373,7 @@ and expand_any_variant ~context ~type_context poly options =
               expanded_of_descriptor ~loc
                 [%expr
                   let __schematic_case name =
-                    Case
+                    Schema.Case
                       {
                         name;
                         (* FIXME: see above. *)
@@ -556,17 +555,16 @@ let close ~configuration:_ ~context ~type_context schema =
         match param with
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
           let combine =
-            if context.global.inside then [%expr Schema.name_combine]
-            else [%expr Schematic.Schema.name_combine]
+            if context.global.inside then [%expr Schema.Name.combine]
+            else [%expr Schematic.Schema.Name.combine]
           in
           [%expr
             match [%e exp] with
             | None -> None
             | Some id ->
-              Some
-                ([%e combine]
-                   [%e Ast.evar (param_prefix ^ schema_name_versioned name)]
-                   id)]
+              [%e combine]
+                [%e Ast.evar (param_prefix ^ schema_name_versioned name)]
+                id]
         | [%type: _], _ -> exp
         | t, _ ->
           Ppxlib.Location.raise_errorf ~loc
@@ -652,16 +650,23 @@ let close ~configuration:_ ~context ~type_context schema =
                             in
                             res)]
               else params_wrap c.descriptor]
+          in
+          let __schematic_parametric : _ Schema.parametric option =
+            match [%e schema_id] with
+            | None -> None
+            | Some __schematic_schema_id -> [%e parametric]
           and id = [%e id] in
-          Schema.
-            {
-              descriptor = [%e descriptor];
-              id;
-              parametric =
-                (match [%e schema_id] with
+          {
+            Schema.descriptor = [%e descriptor];
+            id =
+              (match __schematic_parametric with
+              | None -> id
+              | Some parametric -> (
+                match Schema.Name.of_parametric parametric with
                 | None -> None
-                | Some __schematic_schema_id -> [%e parametric]);
-            }],
+                | Some name -> Some (Schema.Name.to_id name)));
+            parametric = __schematic_parametric;
+          }],
         cache )
     | Expression e ->
       let e =
