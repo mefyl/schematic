@@ -10,7 +10,7 @@ FROM opam-base
 ENV OPAMROOTISOK=1
 ENV ENV="/etc/profile"
 ADD id_rsa* /root/.ssh/
-RUN chmod 600 /root/.ssh/id_rsa
+RUN if test -e /root/.ssh/id_rsa; then chmod 600 /root/.ssh/id_rsa; else mkdir -p /root/.ssh; fi
 RUN ssh-keyscan gitlab.routine.co > /root/.ssh/known_hosts
 # No recursive lookup available
 ARG PACKAGES
@@ -29,7 +29,8 @@ ENV OPAMSWITCH=/root
 
 ARG OPAM_PACKAGES OPAM_WITHOUT_PACKAGES
 ADD .exists *.opam /root/
-RUN opam repository add --all routine git@gitlab.routine.co:routine/opam && \
+RUN --mount=type=ssh \
+    opam repository add --all routine git@gitlab.routine.co:routine/opam && \
     opam update && \
     opam install --confirm-level=unsafe-yes --deps-only --with-test /root && \
     (if test -n "$OPAM_PACKAGES"; then opam install --confirm-level=unsafe-yes $OPAM_PACKAGES; fi) && \
