@@ -266,9 +266,10 @@ let () =
                 [%e pp_poly_payload],
                 [%e equal_poly_payload],
                 [%e [ `A; `B; `Single 532442; `Tuple (213, ":)") ]] );
-              ( "string_wrapper_parametric_record_ultra_generic",
+              ( "int_string_wrapper_parametric_record_string_ultra_generic",
                 [%t: reified_ultra_generic],
-                [%e string_wrapper_parametric_record_ultra_generic_rt_id],
+                [%e
+                  int_string_wrapper_parametric_record_string_ultra_generic_rt_id],
                 [%e
                   pp_ultra_generic Base.Int.pp
                     (pp_parametric_record pp_string_wrapper)
