@@ -3,6 +3,8 @@ module Schema : module type of Schema
 type json = Ezjsonm.value
 type ignore = unit
 
+val array_schema : 'a Schema.t -> 'a array Schema.t
+val array_schema_versioned : Schema.version -> 'a Schema.t -> 'a array Schema.t
 val pp_ignore : Base.Formatter.t -> ignore -> unit
 val equal_ignore : ignore -> ignore -> bool
 val compare_ignore : ignore -> ignore -> int

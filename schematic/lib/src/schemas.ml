@@ -47,6 +47,13 @@ let string_schema_versioned (_ : Schema.version) = string_schema
 let unit_schema = Schema.make Null
 let unit_schema_versioned (_ : Schema.version) = unit_schema
 
+let array_schema schema =
+  Schema.map ~encode:Array.to_list
+    ~decode:(Fn.compose Result.return Array.of_list)
+    (list_schema schema)
+
+let array_schema_versioned _ = array_schema
+
 module Either = struct
   include Base.Either
 
