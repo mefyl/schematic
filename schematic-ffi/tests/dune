@@ -15,7 +15,8 @@
  (action
   (copy swift/Schemas/CSchemas.o CSchemas.o)))
 
-; It would be simpler to use (extra_objects ...), but that's only available in dune 3.5+
+; It would be simpler to use (extra_objects ...), but that's only
+; available in dune 3.5+
 
 (rule
  (target libroundtrip.a)
@@ -28,7 +29,8 @@
  (name roundtrip)
  (optional)
  (modes exe)
- ; Linking shenanigans required to get Swift object files to work nicely with our test suite.
+ ; Linking shenanigans required to get Swift object files to work
+ ; nicely with our test suite.
  (flags
   :standard
   -cclib
