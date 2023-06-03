@@ -20,13 +20,13 @@ let ptime =
 let ptime_local =
   lazy
     (let open Schematic.Schemas in
-    let x : Ptime.t * int = (Ptime.min, 1) in
-    let (_ : Ptime.local) = x in
-    ())
+     let x : Ptime.t * int = (Ptime.min, 1) in
+     let (_ : Ptime.local) = x in
+     ())
 
 let date =
   lazy
     (let open Schematic.Schemas in
-    let x : int * int * int = (2022, 7, 1) in
-    let (_ : Ptime.date) = x in
-    ())
+     let x : int * int * int = (2022, 7, 1) in
+     let (_ : Ptime.date) = x in
+     ())
