@@ -98,20 +98,23 @@ module Make (Handler : HANDLER) :
       ?(body : (body Schematic.Schema.t * body) option)
       (response : response Schematic.Schema.t) method_ uri =
     let body, headers =
+      let content_length l headers =
+        if Handler.send_content_length then
+          ("Content-Length", Int.to_string l) :: headers
+        else headers
+      in
       match body with
       | Some (schema, s) when Obj.magic schema == stream ->
         (Some Body.(of_stream (Obj.magic s)), headers)
       | Some (({ descriptor = String; _ } as schema), s) when schema == string
         ->
-        ( Some Body.(of_string s),
-          ("Content-Length", Int.to_string (String.length s)) :: headers )
+        (Some Body.(of_string s), content_length (String.length s) headers)
       | Some (schema, value) ->
         let body = Coding.encode schema value in
-        ( Some (Body.of_string body),
-          ("Content-Length", Int.to_string (String.length body)) :: headers )
+        (Some (Body.of_string body), content_length (String.length body) headers)
       | None -> (
         match method_ with
-        | `POST | `PUT | `PATCH -> (None, ("Content-Length", "0") :: headers)
+        | `POST | `PUT | `PATCH -> (None, content_length 0 headers)
         | _ -> (None, headers))
     in
     let headers =
@@ -181,6 +184,8 @@ module Cohttp
 struct
   type 'a response = 'a
   type error = Error.never
+
+  let send_content_length = true
 
   module Coding = Coding
   module Monad = Lwt_result

@@ -129,6 +129,12 @@ module type HANDLER = sig
   module Monad :
     Base.Monad.S2 with type ('a, 'error) t = ('a response, 'error) Lwt_result.t
 
+  (** Whether to send content length headers.
+
+      Browser XHR automatically fills content-length for security reasons and
+      will yield an annoying warning on each request if it is set manually. *)
+  val send_content_length : bool
+
   val raw :
     ?headers:(string * string) list ->
     ?body:Body.t ->
