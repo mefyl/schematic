@@ -69,6 +69,7 @@ module Either = struct
                   name = "first";
                   raw_name = "First";
                   schema = first;
+                  inline = false;
                   encoder = (function First x -> Some x | Second _ -> None);
                   decoder = Either.first;
                 };
@@ -77,6 +78,7 @@ module Either = struct
                   name = "second";
                   raw_name = "Second";
                   schema = second;
+                  inline = false;
                   encoder = (function Second x -> Some x | First _ -> None);
                   decoder = Either.second;
                 };
@@ -125,6 +127,7 @@ module Result = struct
                   name = "t";
                   raw_name = "Ok";
                   schema = t;
+                  inline = false;
                   encoder = (function Ok x -> Some x | Error _ -> None);
                   decoder = Result.return;
                 };
@@ -133,6 +136,7 @@ module Result = struct
                   name = "error";
                   raw_name = "Error";
                   schema = error;
+                  inline = false;
                   encoder =
                     (function Result.Error x -> Some x | Result.Ok _ -> None);
                   decoder = Result.fail;

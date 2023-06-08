@@ -138,12 +138,12 @@ let expr_option ~loc expr = function
    streamline constructors arguments handling. *)
 
 type normalized_ctor = {
-  count : int;
   ctor_pattern : (int -> pattern) -> pattern;
   ctor_value : (int -> core_type -> expression) -> expression;
+  inline : bool;
   pattern : (int -> pattern) -> pattern;
-  value : (int -> core_type -> expression) -> expression;
   type_ : core_type;
+  value : (int -> core_type -> expression) -> expression;
 }
 
 let constructor_arguments_normalize ~loc =
@@ -155,9 +155,9 @@ let constructor_arguments_normalize ~loc =
     and value f = f 0 type_ in
     Some
       {
-        count = 1;
         ctor_pattern = pattern;
         ctor_value = value;
+        inline = false;
         pattern;
         type_;
         value;
@@ -170,9 +170,9 @@ let constructor_arguments_normalize ~loc =
     and value f = Ast.pexp_tuple (List.mapi ~f types) in
     Some
       {
-        count = List.length types;
         ctor_pattern = pattern;
         ctor_value = value;
+        inline = true;
         pattern;
         type_;
         value;
@@ -208,15 +208,7 @@ let constructor_arguments_normalize ~loc =
         and value f = Ast.pexp_tuple (List.mapi ~f types) in
         (Ast.ptyp_tuple types, pattern, value)
     in
-    Some
-      {
-        count = List.length fields;
-        ctor_pattern;
-        ctor_value;
-        pattern;
-        type_;
-        value;
-      }
+    Some { ctor_pattern; ctor_value; inline = true; pattern; type_; value }
 
 let expand_field _
     {

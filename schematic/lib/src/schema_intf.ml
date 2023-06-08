@@ -7,11 +7,14 @@ type (_, _) requirement =
 
 type _ case =
   | Case : {
+      decoder : 'a -> 't;
+      encoder : 't -> 'a option;
+      inline : bool;
+          (** Whether the tuple or record argument is inlined in the OCaml
+              memory representation of the constructor. *)
       name : string;
       raw_name : string;
       schema : 'a t;
-      encoder : 't -> 'a option;
-      decoder : 'a -> 't;
     }
       -> 't case
 

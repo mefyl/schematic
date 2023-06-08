@@ -357,7 +357,7 @@ and expand_any_variant ~context ~type_context poly options =
              ~f:(Fn.compose Ast.elist (List.map ~f:Ast.estring))
              (Ast.elist []) aliases)
     in
-    let schema, ctor_pattern, ctor_value, pattern, value =
+    let schema, inline, ctor_pattern, ctor_value, pattern, value =
       match constructor_arguments_normalize ~loc pcd_args with
       | None ->
         let schema =
@@ -384,6 +384,7 @@ and expand_any_variant ~context ~type_context poly options =
                             id = None;
                             parametric = None;
                           };
+                        inline = false;
                         encoder = (fun () -> Some ());
                         decoder = (fun () -> ());
                       }
@@ -406,8 +407,8 @@ and expand_any_variant ~context ~type_context poly options =
                     decode = (fun Hlist.[] -> ());
                   }]
         in
-        (schema, None, None, None, None)
-      | Some { ctor_pattern; ctor_value; pattern; type_; value; _ } ->
+        (schema, false, None, None, None, None)
+      | Some { ctor_pattern; ctor_value; inline; pattern; type_; value; _ } ->
         let p i = Ast.pvar (Fmt.str "f%i" i)
         and v i _ = Ast.evar (Fmt.str "f%i" i) in
         let schema =
@@ -424,8 +425,8 @@ and expand_any_variant ~context ~type_context poly options =
               (List.map ~f:(expand_field context) fields @ computed_fields)
           | [], _ -> encode_type ~context ~type_context type_
         in
-
         ( schema,
+          inline,
           Some (ctor_pattern p),
           Some (ctor_value v),
           Some (pattern p),
@@ -450,11 +451,12 @@ and expand_any_variant ~context ~type_context poly options =
       [%expr
         Schema.Case
           {
+            decoder = [%e destruct];
+            encoder = [%e construct];
+            inline = [%e Ast.ebool inline];
             name = [%e name];
             raw_name = [%e Ast.estring txt];
             schema = [%e schema_of_expanded ~loc schema];
-            encoder = [%e construct];
-            decoder = [%e destruct];
           }]
   and key =
     match type_context.attributes.union_key with
