@@ -27,19 +27,19 @@ let payload_variant_of_caml
   let plain_case =
     const pp_statements [ "res.tag = Int_val(v)"; "assert(res.tag < n_basic)" ]
   in
-  let case : (int * (Identifier.t * c)) Fmt.t =
-   fun fmt (i, (field_name, c)) ->
+  let case : (int * regular_variant_constr) Fmt.t =
+   fun fmt (i, { name = field_name; type_ = c; inline }) ->
     let accessor_stmts =
       match c with
       (* Inline tuple payload *)
-      | `Atom (_, Some (`Tuple members)) ->
+      | `Atom (_, Some (`Tuple members)) when inline ->
         members
         |> List.mapi ~f:(fun field_idx c ->
                Fmt.str "res.payload->%a.t%d = %a(Field(v, %d))" Identifier.pp
                  field_name field_idx Identifier.pp (of_caml_name_for_c c)
                  field_idx)
       (* Inline record payload *)
-      | `Struct { fields } ->
+      | `Struct { fields } when inline ->
         fields
         |> List.mapi ~f:(fun i (inline_field_name, field_c) ->
                Fmt.str "res.payload->%a.%a = %a(%s)" Identifier.pp field_name
@@ -48,6 +48,7 @@ let payload_variant_of_caml
                  (field "v" i))
       (* Unary payload *)
       | _ ->
+        assert (not inline);
         [
           Fmt.str "res.payload->%a = %a(%s)" Identifier.pp field_name
             Identifier.pp (of_caml_name_for_c c) (field "v" 0);
@@ -122,8 +123,10 @@ let poly_variant_of_caml name
     if basic_only then basic
     else
       let elses =
-        let pp_rich : (Identifier.t * int * c) Fmt.t =
-         fun fmt (id, hash, constr_c) ->
+        let pp_rich : poly_variant_constr Fmt.t =
+         fun fmt { name = id; type_ = constr_c; hash; inline = _ } ->
+          (* **NOTE** do no implement inline-related flattening, refer to:
+           * https://v2.ocaml.org/manual/intfc.html#ss:c-polyvar *)
           let elseif = Fmt.str "else if (tag == Val_long(%d))" hash in
           let body =
             const pp_statements

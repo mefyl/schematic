@@ -94,19 +94,19 @@ module Of = Ffi_walk.Walk (struct
       in
       (`Struct { fields }, marks)
 
-  let union ~name ~polymorphic ~(cases : (string * string * (c * Marks.t)) list)
-      =
+  let union ~name ~polymorphic
+      ~(cases : (string * string * (c * Marks.t) * bool) list) =
     let constructors, marks =
       cases
-      |> List.map ~f:(fun (s, raw_s, (c, m)) ->
-             ((Identifier.make s, raw_s, c), m))
+      |> List.map ~f:(fun (s, raw_s, (c, m), inline) ->
+             ((Identifier.make s, raw_s, c, inline), m))
       |> List.unzip
     in
     let marks = marks |> Marks.merge in
     let basic, rich =
       constructors
       |> List.partition_map ~f:(function
-           | s, raw_s, `Void -> First (s, raw_s)
+           | s, raw_s, `Void, _ -> First (s, raw_s)
            | x -> Second x)
     in
     (* Give names to inline payload types that would otherwise be impossible to
@@ -117,7 +117,7 @@ module Of = Ffi_walk.Walk (struct
        payloads *)
     let inline_payload_marks =
       rich
-      |> List.map ~f:(fun (id, _, constr_c) ->
+      |> List.map ~f:(fun (id, _, constr_c, _) ->
              match constr_c with
              | `Tuple _ | `Struct _ ->
                let id =
@@ -136,13 +136,18 @@ module Of = Ffi_walk.Walk (struct
       in
       let rich =
         List.map
-          ~f:(fun (id, raw_name, c) -> (id, hash_variant raw_name, c))
+          ~f:(fun (id, raw_name, c, inline) ->
+            { name = id; type_ = c; hash = hash_variant raw_name; inline })
           rich
       in
       (`Poly_variant { name; basic; rich }, marks)
     else
       let basic = List.map ~f:(fun (id, _) -> id) basic in
-      let rich = List.map ~f:(fun (id, _, c) -> (id, c)) rich in
+      let rich =
+        List.map
+          ~f:(fun (id, _, c, inline) -> { name = id; type_ = c; inline })
+          rich
+      in
       (`Variant ({ name; basic; rich } : regular_variant), marks)
 
   let tuple ts =

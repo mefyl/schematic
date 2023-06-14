@@ -4,7 +4,7 @@ open Swift_conv
 open Swift_utils
 open Swift_typeexpr
 
-let case_decls basic rich =
+let case_decls basic (rich : regular_variant_constr list) =
   let open Fmt in
   let basic =
     let basic_case =
@@ -15,7 +15,7 @@ let case_decls basic rich =
   in
   let rich =
     let rich_case =
-      let pp f (id, c) =
+      let pp f ({ name = id; type_ = c; inline = _ } : regular_variant_constr) =
         let swift_case = Swiftify.Binding.id id in
         match c with
         (* Inline tuples are special-cased to avoid extra parentheses *)
@@ -122,7 +122,8 @@ let type_decl fmt (c_name, ts) =
           body f ()
       in
       let variant :
-          (Identifier.t * Identifier.t list * (Identifier.t * c) list) Fmt.t =
+          (Identifier.t * Identifier.t list * regular_variant_constr list) Fmt.t
+          =
        fun fmt (_, basic, rich) ->
         let all_basic = List.is_empty rich in
         let to_c =
@@ -134,7 +135,11 @@ let type_decl fmt (c_name, ts) =
           in
           let rich =
             rich
-            |> List.map ~f:(fun (id, c) ->
+            |> List.map
+                 ~f:(fun
+                      ({ name = id; type_ = c; inline = _ } :
+                        regular_variant_constr)
+                    ->
                    to_c_case ~all_basic ~c_variant_name:c_name
                      ~c_constructor_name:id ~c_constructor_type:(Some c))
           in
@@ -149,7 +154,11 @@ let type_decl fmt (c_name, ts) =
           in
           let rich =
             rich
-            |> List.map ~f:(fun (id, c) ->
+            |> List.map
+                 ~f:(fun
+                      ({ name = id; type_ = c; inline = _ } :
+                        regular_variant_constr)
+                    ->
                    of_c_case ~all_basic ~swift_type_name ~c_variant_name:c_name
                      ~c_constructor_name:id ~c_constructor_type:(Some c))
           in

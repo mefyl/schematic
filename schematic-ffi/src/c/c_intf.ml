@@ -19,14 +19,26 @@ type c_leaf =
 type regular_variant = {
   name : Identifier.t;
   basic : Identifier.t list;
-  rich : (Identifier.t * c) list;
+  rich : regular_variant_constr list;
+}
+
+and regular_variant_constr = {
+  name : Identifier.t;
+  type_ : c;
+  inline : bool; (* whether the content is inlined in the OCaml type or not *)
 }
 
 and poly_variant = {
   name : Identifier.t;
-  (* int: hash *)
   basic : (Identifier.t * int) list;
-  rich : (Identifier.t * int * c) list;
+  rich : poly_variant_constr list;
+}
+
+and poly_variant_constr = {
+  name : Identifier.t;
+  type_ : c;
+  hash : int; (* the hash of the polymorphic variant constructor *)
+  inline : bool; (* whether the content is inlined in the OCaml type or not *)
 }
 
 and c_struct = { fields : (Identifier.t * c) list }
@@ -137,9 +149,13 @@ let rec concrete_type = function
   | `Atom (_, None) -> None
   | t -> Some t
 
-let normalize_poly_variant_members basic rich =
+let normalize_poly_variant_members basic (rich : poly_variant_constr list) =
   let basic = List.map ~f:fst basic in
-  let rich = List.map ~f:(fun (id, _, c) -> (id, c)) rich in
+  let rich =
+    List.map
+      ~f:(fun { name; type_; hash = _; inline } -> { name; type_; inline })
+      rich
+  in
   (basic, rich)
 
 let inline_record_c_name ~variant_name ~constructor_name =
@@ -150,7 +166,7 @@ let reified_option_c (c : c) =
     ({
        name = option_name c;
        basic = [ Identifier.make "none" ];
-       rich = [ (Identifier.make "some", c) ];
+       rich = [ { name = Identifier.make "some"; type_ = c; inline = false } ];
      }
       : regular_variant)
 

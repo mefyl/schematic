@@ -191,6 +191,9 @@ type with_computed = { non_computed : int }
 
 type tuple_int_string_alias = int * string [@@deriving schema, show, eq]
 
+type tuple_int_string_option_alias = (int * string) option
+[@@deriving schema, show, eq]
+
 module Mapped = struct
   type t =
     | A
@@ -342,6 +345,7 @@ let exported_schemas =
     Schema.pack evil_defaults_schema;
     Schema.pack reified_ultra_generic_schema;
     Schema.pack tuple_int_string_alias_schema;
+    Schema.pack tuple_int_string_option_alias_schema;
     Schema.pack with_computed_schema;
     Schema.pack mapped_schema;
     Schema.pack Event_1.schema;

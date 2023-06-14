@@ -400,6 +400,41 @@ tuple_int_string tuple_int_string_of_caml(value v) {
 }
 |}
 
+let tuple_int_string_option_of_caml =
+  {|
+tuple_int_string_option tuple_int_string_option_of_caml(value v) {
+  CAMLparam1(v);
+  tuple_int_string_option res = {.tag = -1, .payload = NULL};
+  const int n_basic = 1;
+  const int n_rich = 1;
+  if (Is_long(v)) {
+    res.tag = Int_val(v);
+    assert(res.tag < n_basic);
+  } else {
+    assert(Tag_val(v) < n_rich);
+    res.tag = n_basic + Tag_val(v);
+    res.payload = malloc(sizeof(*res.payload));
+    switch (Tag_val(v)) {
+      case 0:
+        assert(Is_block(v));
+        if (Wosize_val(v) != 1) { fprintf(stderr, "invalid block size: %ld != %d\\n", Wosize_val(v), 1); assert(Wosize_val(v) == 1); };
+        res.payload->some = tuple_int_string_of_caml(Field(v, 0));
+        break;
+    }
+  }
+  CAMLreturnT(tuple_int_string_option, res);
+}
+|}
+
+let tuple_int_string_option_alias_of_caml =
+  {|
+tuple_int_string_option_alias tuple_int_string_option_alias_of_caml(value v) {
+  CAMLparam1(v);
+  tuple_int_string_option res = tuple_int_string_option_of_caml(v);
+  CAMLreturnT(tuple_int_string_option_alias, res);
+}
+|}
+
 let poly_basic_of_caml =
   {|
 poly_basic poly_basic_of_caml(value v) {
@@ -498,6 +533,34 @@ value tuple_int_string_to_caml(tuple_int_string x) {
   v = caml_alloc_tuple(2);
   Store_field(v, 0, int_to_caml(x.t0));
   Store_field(v, 1, string_to_caml(x.t1));
+  CAMLreturn(v);
+}
+|}
+
+let tuple_int_string_option_to_caml =
+  {|
+value tuple_int_string_option_to_caml(tuple_int_string_option x) {
+  CAMLparam0();
+  CAMLlocal1(v);
+  switch (x.tag) {
+    case tuple_int_string_option_none_tag:
+      v = Val_int(0);
+      break;
+    case tuple_int_string_option_some_tag:
+      v = caml_alloc(1, 0);
+      Store_field(v, 0, tuple_int_string_to_caml(x.payload->some));
+      break;
+  }
+  CAMLreturn(v);
+}
+|}
+
+let tuple_int_string_option_alias_to_caml =
+  {|
+value tuple_int_string_option_alias_to_caml(tuple_int_string_option_alias x) {
+  CAMLparam0();
+  CAMLlocal1(v);
+  v = tuple_int_string_option_to_caml(x);
   CAMLreturn(v);
 }
 |}
@@ -706,6 +769,14 @@ module Of_caml = struct
     test ~here:[%here] poly_payload_schema
       [ poly_payload_of_caml; tuple_int_string_of_caml ]
 
+  let tuple_int_string_option () =
+    test ~here:[%here] tuple_int_string_option_alias_schema
+      [
+        tuple_int_string_of_caml;
+        tuple_int_string_option_of_caml;
+        tuple_int_string_option_alias_of_caml;
+      ]
+
   let mapped () = test ~here:[%here] mapped_schema [ mapped_of_caml ]
 end
 
@@ -755,6 +826,14 @@ module To_caml = struct
     test ~here:[%here] poly_payload_schema
       [ poly_payload_to_caml; tuple_int_string_to_caml ]
 
+  let tuple_int_string_option () =
+    test ~here:[%here] tuple_int_string_option_alias_schema
+      [
+        tuple_int_string_to_caml;
+        tuple_int_string_option_to_caml;
+        tuple_int_string_option_alias_to_caml;
+      ]
+
   let mapped () = test ~here:[%here] mapped_schema [ mapped_to_caml ]
 end
 
@@ -795,6 +874,7 @@ let () =
             test_case "basic polymorphic_variant" `Quick poly_basic;
             test_case "payload polymorphic_variant" `Quick poly_payload;
             test_case "mapped" `Quick mapped;
+            test_case "not inlined constructor" `Quick tuple_int_string_option;
           ] );
       ( "to_caml",
         To_caml.
@@ -809,5 +889,6 @@ let () =
             test_case "basic polymorphic_variant" `Quick poly_basic;
             test_case "payload polymorphic_variant" `Quick poly_payload;
             test_case "mapped" `Quick mapped;
+            test_case "not inlined constructor" `Quick tuple_int_string_option;
           ] );
     ]

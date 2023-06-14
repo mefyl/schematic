@@ -1,6 +1,7 @@
 open C_intf
 open Base
 
+(* [pp fmt ts] generates the entry corresponding to [ts] in <schemas.h> *)
 let pp fmt (ts : c) =
   let rec pp fmt (ts : c) =
     let printer =
@@ -17,11 +18,11 @@ let pp fmt (ts : c) =
       let union_ : (Identifier.t * _) list Fmt.t =
         block ~indent "union" (list ~sep:cut struct_or_union_field)
       in
-      let variant fmt (name, basic, rich) =
+      let variant fmt (name, basic, (rich : regular_variant_constr list)) =
         let is_basic = List.is_empty rich in
         (* An enum declaring each constructor of the variant. *)
         let enum =
-          let variant_names = basic @ List.map ~f:fst rich in
+          let variant_names = basic @ List.map ~f:(fun c -> c.name) rich in
           block ~indent "enum"
             (const
                (list
@@ -36,7 +37,8 @@ let pp fmt (ts : c) =
           else
             let tag_field = enum ++ const string " tag;" in
             let payload_field =
-              const union_ rich ++ const string "* payload;"
+              const union_ (List.map ~f:(fun x -> (x.name, x.type_)) rich)
+              ++ const string "* payload;"
             in
             let inner = tag_field ++ cut ++ payload_field in
             block ~indent "struct" inner
