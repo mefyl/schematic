@@ -48,14 +48,19 @@ let payload_variant_to_caml
     in
     let rich_cases : (string * unit Fmt.t) list =
       rich
-      |> List.mapi ~f:(fun i (constr_name, constr_type) ->
+      |> List.mapi
+           ~f:(fun
+                i
+                ({ name = constr_name; type_ = constr_type; inline } :
+                  regular_variant_constr)
+              ->
              Logs.debug (fun m ->
                  m "Rich case constructor type: %a" pp_c constr_type);
              let payload = Fmt.str "x.payload->%a" Identifier.pp constr_name in
              let n_fields, stmts =
                match constr_type with
                (* Inline tuple *)
-               | `Atom (_, Some (`Tuple members)) ->
+               | `Atom (_, Some (`Tuple members)) when inline ->
                  ( members |> List.length,
                    members
                    |> List.mapi ~f:(fun field_idx c ->
@@ -65,7 +70,7 @@ let payload_variant_to_caml
                           in
                           store ~dst:"v" ~field_idx ~field_val) )
                (* Inline record *)
-               | `Struct { fields } ->
+               | `Struct { fields } when inline ->
                  ( fields |> List.length,
                    fields
                    |> List.mapi ~f:(fun field_idx (field_name, c) ->
@@ -76,6 +81,7 @@ let payload_variant_to_caml
                           in
                           store ~dst:"v" ~field_idx ~field_val) )
                | _ ->
+                 assert (not inline);
                  ( 1,
                    [
                      (let field_val =
@@ -110,6 +116,8 @@ let payload_variant_to_caml
   ("x", pp)
 
 let poly_variant_to_caml (`Poly_variant { name; basic; rich; _ }) =
+  (* **NOTE** do no implement inline-related flattening, refer to:
+   * https://v2.ocaml.org/manual/intfc.html#ss:c-polyvar *)
   let basic_only = List.is_empty rich in
   let case_name = case_name ~rich:(not basic_only) in
   let cases =
@@ -124,7 +132,7 @@ let poly_variant_to_caml (`Poly_variant { name; basic; rich; _ }) =
     in
     let rich =
       rich
-      |> List.map ~f:(fun (id, hash, constr_c) ->
+      |> List.map ~f:(fun { name = id; type_ = constr_c; hash; inline = _ } ->
              let case = case_name name id |> Identifier.to_string in
              let c_pl = Fmt.str "x.payload->%a" Identifier.pp id in
              let payload_val =

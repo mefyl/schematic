@@ -39,7 +39,10 @@ module type WALK = sig
   (* Union *)
 
   val union :
-    name:string -> polymorphic:bool -> cases:(string * string * t) list -> t
+    name:string ->
+    polymorphic:bool ->
+    cases:(string * string * t * bool) list ->
+    t
 
   (* Descriptors *)
 
@@ -108,8 +111,9 @@ module Walk (W : WALK) = struct
         in
         let cases =
           cases
-          |> List.map ~f:(fun (Schema.Case { name; raw_name; schema = s; _ }) ->
-                 (name, raw_name, schema s))
+          |> List.map
+               ~f:(fun (Schema.Case { name; raw_name; schema = s; inline; _ })
+                  -> (name, raw_name, schema s, inline))
         in
         W.union ~name:id ~cases ~polymorphic
     in
