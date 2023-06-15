@@ -124,7 +124,7 @@ let poly_variant_of_caml name
     else
       let elses =
         let pp_rich : poly_variant_constr Fmt.t =
-         fun fmt { name = id; type_ = constr_c; hash; inline = _ } ->
+         fun fmt { name = id; type_ = constr_c; hash } ->
           (* **NOTE** do no implement inline-related flattening, refer to:
            * https://v2.ocaml.org/manual/intfc.html#ss:c-polyvar *)
           let elseif = Fmt.str "else if (tag == Val_long(%d))" hash in

@@ -137,7 +137,8 @@ module Of = Ffi_walk.Walk (struct
       let rich =
         List.map
           ~f:(fun (id, raw_name, c, inline) ->
-            { name = id; type_ = c; hash = hash_variant raw_name; inline })
+            assert (not inline);
+            { name = id; type_ = c; hash = hash_variant raw_name })
           rich
       in
       (`Poly_variant { name; basic; rich }, marks)
