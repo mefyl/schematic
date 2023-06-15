@@ -1,4 +1,3 @@
-include Ffi_intf
 include Ffi_schemas
 
 (* Core modules *)

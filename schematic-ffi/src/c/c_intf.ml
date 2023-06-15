@@ -38,7 +38,6 @@ and poly_variant_constr = {
   name : Identifier.t;
   type_ : c;
   hash : int; (* the hash of the polymorphic variant constructor *)
-  inline : bool; (* whether the content is inlined in the OCaml type or not *)
 }
 
 and c_struct = { fields : (Identifier.t * c) list }
@@ -153,7 +152,7 @@ let normalize_poly_variant_members basic (rich : poly_variant_constr list) =
   let basic = List.map ~f:fst basic in
   let rich =
     List.map
-      ~f:(fun { name; type_; hash = _; inline } -> { name; type_; inline })
+      ~f:(fun { name; type_; hash = _ } -> { name; type_; inline = false })
       rich
   in
   (basic, rich)

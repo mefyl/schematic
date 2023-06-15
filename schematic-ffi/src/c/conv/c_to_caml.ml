@@ -132,7 +132,7 @@ let poly_variant_to_caml (`Poly_variant { name; basic; rich; _ }) =
     in
     let rich =
       rich
-      |> List.map ~f:(fun { name = id; type_ = constr_c; hash; inline = _ } ->
+      |> List.map ~f:(fun { name = id; type_ = constr_c; hash } ->
              let case = case_name name id |> Identifier.to_string in
              let c_pl = Fmt.str "x.payload->%a" Identifier.pp id in
              let payload_val =
