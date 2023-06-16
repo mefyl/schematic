@@ -1,4 +1,4 @@
-module V0_17_8 = struct
+module V0_18_0 = struct
   module Error = Error
   module Base64 = B64
 
@@ -14,12 +14,3 @@ module V0_17_8 = struct
   module Typescript = Typescript
   module Version = Version
 end
-
-module V0_17_7 = V0_17_8
-module V0_17_6 = V0_17_7
-module V0_17_5 = V0_17_6
-module V0_17_4 = V0_17_5
-module V0_17_3 = V0_17_4
-module V0_17_2 = V0_17_3
-module V0_17_1 = V0_17_2
-module V0_17_0 = V0_17_1
