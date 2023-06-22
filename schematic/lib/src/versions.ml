@@ -14,3 +14,5 @@ module V0_18_0 = struct
   module Typescript = Typescript
   module Version = Version
 end
+
+module V0_18_2 = V0_18_0
