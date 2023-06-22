@@ -57,7 +57,7 @@
     :with-test))
   (ptime
    (>= 1.0.0))
-  semver2
+  (semver2 (>= 1.2.0))
   uri)
  ; Dune 3.7 chokes on installation with files named the same anywhere in the tree, eg.
  ; Error: Multiple rules generated for
