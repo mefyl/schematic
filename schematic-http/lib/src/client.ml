@@ -226,13 +226,20 @@ struct
                Lwt_result.fail
                  Error.(make ~method_ ~status ~reason:`Networking uri)
              | _ -> Lwt_result.return (resp, body))
-    and catch (e : exn) =
-      let* () =
-        Logs.err (fun m ->
-            m "fatal error requesting %a: exception escaped: %a" Uri.pp uri
-              Base.Exn.pp e)
-      in
-      raise e
+    and catch = function
+      | Unix.Unix_error (Unix.EBADF, _, _) ->
+        let* () =
+          Logs.info (fun m -> m "bad file descriptor requesting %a" Uri.pp uri)
+        in
+        Lwt_result.fail
+          Error.(make ~method_ ~status:(`Code 0) ~reason:`Networking uri)
+      | (e : exn) ->
+        let* () =
+          Logs.err (fun m ->
+              m "fatal error requesting %a: exception escaped: %a" Uri.pp uri
+                Base.Exn.pp e)
+        in
+        raise e
     in
     Lwt.catch f catch
 end
