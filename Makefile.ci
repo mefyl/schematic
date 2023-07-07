@@ -3,3 +3,4 @@ OCAML_VERSION=4.14.0
 # Opam does not install sqml with `--deps-only` because it depends
 # (optionally) on schematic via timmy.
 OPAM_PACKAGES=sqml.0.10.0
+PACKAGES=autoconf
