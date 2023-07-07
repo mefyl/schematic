@@ -227,9 +227,12 @@ struct
                  Error.(make ~method_ ~status ~reason:`Networking uri)
              | _ -> Lwt_result.return (resp, body))
     and catch = function
-      | Unix.Unix_error (Unix.EBADF, _, _) ->
+      | Unix.Unix_error ((Unix.EBADF as e), _, _)
+      | Unix.Unix_error ((Unix.EADDRNOTAVAIL (* Seen on iOS *) as e), _, _) ->
         let* () =
-          Logs.info (fun m -> m "bad file descriptor requesting %a" Uri.pp uri)
+          Logs.info (fun m ->
+              m "retryable unix exception requesting %a: %s" Uri.pp uri
+                (Unix.error_message e))
         in
         Lwt_result.fail
           Error.(make ~method_ ~status:(`Code 0) ~reason:`Networking uri)
