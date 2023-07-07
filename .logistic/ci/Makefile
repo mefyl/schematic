@@ -10,7 +10,9 @@ DOCKERFILE_SUFFIX=.$(DOCKERFILE_BASE)
 endif
 
 DOCKER_DIR := .
+ifndef DOCKER_FILE
 DOCKER_FILE := $(dir $(firstword $(MAKEFILE_LIST)))Dockerfile.ci$(DOCKERFILE_SUFFIX)
+endif
 
 build:
 	if test -d /root/node_modules; then ln -s /root/node_modules; fi
