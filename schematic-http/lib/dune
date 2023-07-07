@@ -3,6 +3,6 @@
 (library
  (name schematic_http)
  (public_name schematic-http)
- (libraries cohttp-lwt schematic)
+ (libraries cohttp-lwt schematic unix)
  (preprocess
   (pps ppx_deriving.eq ppx_deriving.make)))
