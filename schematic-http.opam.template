@@ -1,5 +1,0 @@
-pin-depends: [
-  [ "http.5.0.0" "git+https://github.com/routineco/ocaml-cohttp#96b4add00e71cef74e073073d4f045274b9f636c" ]
-  [ "cohttp.5.0.0" "git+https://github.com/routineco/ocaml-cohttp#96b4add00e71cef74e073073d4f045274b9f636c" ]
-  [ "cohttp-lwt.5.0.0" "git+https://github.com/routineco/ocaml-cohttp#96b4add00e71cef74e073073d4f045274b9f636c" ]
-]
