@@ -212,13 +212,19 @@ struct
       Lwt.catch
         (fun () ->
           Client.call ?headers ?body method_ uri |> Lwt.map Base.Result.return)
-        (function
-          | Cohttp_lwt.Connection.Retry
-          | Cohttp_lwt.Connection_cache.(Name_resolution_failed | Retry) ->
-            Lwt_result.fail Error.(make ~method_ ~reason:`Networking uri)
-          | e ->
-            Fmt.epr "Encountered unhandled exception in schematic-http, dying@.";
-            raise e)
+        (* FIXME: Cohttp has no API guarantees about exception that may escape
+           depending on the backend. Unreleased recent version yield [Retry]
+           exceptions, our own adds [Name_resolution_failed] on top of it, while
+           older version may raise [Failure] or whatnot. Pinning such a
+           fundamental libraries is a dependency nightmare, so we temporarily
+           consider all exceptions as retryable for maximal compatibility and
+           let final projects pin a specific version. *)
+          (fun e ->
+          let* () =
+            Logs.warn (fun m ->
+                m "treating cohttp exception as retryabale: %a" Base.Exn.pp e)
+          in
+          Lwt_result.fail Error.(make ~method_ ~reason:`Networking uri))
       |> Lwt_result.bind ~f:(fun (resp, body) ->
              match Cohttp.Response.status resp with
              | `Code 0 as status ->
