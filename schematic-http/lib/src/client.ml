@@ -197,6 +197,7 @@ struct
   end
 
   let raw ?headers ?body method_ uri =
+    let open Lwt in
     let f () =
       let* () =
         Logs.info (fun m ->
@@ -209,31 +210,15 @@ struct
         Lwt_list.iter_s f (Option.value ~default:[] headers)
       in
       let headers = Option.map Cohttp.Header.of_list headers in
-      Lwt.catch
-        (fun () ->
-          Client.call ?headers ?body method_ uri |> Lwt.map Base.Result.return)
-        (* FIXME: Cohttp has no API guarantees about exception that may escape
-           depending on the backend. Unreleased recent version yield [Retry]
-           exceptions, our own adds [Name_resolution_failed] on top of it, while
-           older version may raise [Failure] or whatnot. Pinning such a
-           fundamental libraries is a dependency nightmare, so we temporarily
-           consider all exceptions as retryable for maximal compatibility and
-           let final projects pin a specific version. *)
-          (fun e ->
-          let* () =
-            Logs.warn (fun m ->
-                m "treating cohttp exception as retryabale: %a" Base.Exn.pp e)
-          in
-          Lwt_result.fail Error.(make ~method_ ~reason:`Networking uri))
-      |> Lwt_result.bind ~f:(fun (resp, body) ->
-             match Cohttp.Response.status resp with
-             | `Code 0 as status ->
-               (* CORS or connectivity issue *)
-               Lwt_result.fail
-                 Error.(make ~method_ ~status ~reason:`Networking uri)
-             | _ -> Lwt_result.return (resp, body))
+      Client.call ?headers ?body method_ uri >>= fun (resp, body) ->
+      match Cohttp.Response.status resp with
+      | `Code 0 as status ->
+        (* CORS or connectivity issue *)
+        Lwt_result.fail Error.(make ~method_ ~status ~reason:`Networking uri)
+      | _ -> Lwt_result.return (resp, body)
     and catch = function
       | Unix.Unix_error ((Unix.EBADF as e), _, _)
+      | Unix.Unix_error ((Unix.ENOTCONN as e), _, _)
       | Unix.Unix_error ((Unix.EADDRNOTAVAIL (* Seen on iOS *) as e), _, _) ->
         let* () =
           Logs.info (fun m ->
@@ -243,12 +228,24 @@ struct
         Lwt_result.fail
           Error.(make ~method_ ~status:(`Code 0) ~reason:`Networking uri)
       | (e : exn) ->
+        (* FIXME: Cohttp has no API guarantees about exception that may escape
+           depending on the backend. Unreleased recent version yield [Retry]
+           exceptions, our own adds [Name_resolution_failed] on top of it, while
+           older version may raise [Failure] or whatnot. Pinning such a
+           fundamental libraries is a dependency nightmare, so we temporarily
+           consider all exceptions as retryable for maximal compatibility and
+           let final projects pin a specific version. *)
         let* () =
-          Logs.err (fun m ->
-              m "fatal error requesting %a: exception escaped: %a" Uri.pp uri
-                Base.Exn.pp e)
+          Logs.warn (fun m ->
+              m "treating cohttp exception as retryabale: %a" Base.Exn.pp e)
         in
-        raise e
+        Lwt_result.fail Error.(make ~method_ ~reason:`Networking uri)
+      (* let* () =
+       *   Logs.err (fun m ->
+       *       m "fatal error requesting %a: exception escaped: %a" Uri.pp uri
+       *         Base.Exn.pp e)
+       * in
+       * raise e *)
     in
     Lwt.catch f catch
 end
