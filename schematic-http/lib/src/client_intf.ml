@@ -2,10 +2,10 @@ module type BODY = sig
   type t
 
   val drain : t -> unit Lwt.t
-  val to_string : t -> string Lwt.t
-  val to_stream : t -> string Lwt_stream.t
-  val of_string : string -> t
-  val of_stream : string Lwt_stream.t -> t
+  val to_string : t -> (string, [> `Networking ] Error.t) Result.t Lwt.t
+  val to_stream : t -> (string, [> `Networking ] Error.t) Result.t Lwt_stream.t
+  val of_string : Cohttp.Code.meth -> Uri.t -> string -> t
+  val of_stream : Cohttp.Code.meth -> Uri.t -> string Lwt_stream.t -> t
 end
 
 type 'a response = {
@@ -76,11 +76,15 @@ module type S = sig
   module Body : BODY
 
   val empty : unit Schematic.Schema.t
-  val stream : string Lwt_stream.t Schematic.Schema.t
   val string : string Schematic.Schema.t
+  val stream : string Lwt_stream.t Schematic.Schema.t
 
-  module Response :
-    REQUESTS with type 'a res := 'a response t and type error := error
+  module Response : sig
+    val stream :
+      (string, [ `Networking ] Error.t) result Lwt_stream.t Schematic.Schema.t
+
+    include REQUESTS with type 'a res := 'a response t and type error := error
+  end
 
   include REQUESTS with type 'a res := 'a t and type error := error
 end

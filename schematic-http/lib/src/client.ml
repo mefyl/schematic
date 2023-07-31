@@ -18,9 +18,11 @@ end
 
 let ( let* ) = Lwt.bind
 let ( and* ) = Lwt.both
+let ( let*! ) = Lwt_result.( >>= )
+let ( and*! ) = Lwt_result.both
 let empty = Schematic.Schema.make Ignore
 
-let stream =
+let stream_schema () =
   Schematic.Schema.make
     (Map
        {
@@ -91,12 +93,14 @@ module Make (Handler : HANDLER) :
   type error = Handler.error
 
   let empty = empty
-  let stream = stream
+  let stream = stream_schema ()
+  let stream_response = stream_schema ()
   let string = string
 
   let _call (type body response) ?(headers = [])
       ?(body : (body Schematic.Schema.t * body) option)
       (response : response Schematic.Schema.t) method_ uri =
+    let open Lwt in
     let body, headers =
       let content_length l headers =
         if Handler.send_content_length then
@@ -105,13 +109,15 @@ module Make (Handler : HANDLER) :
       in
       match body with
       | Some (schema, s) when Obj.magic schema == stream ->
-        (Some Body.(of_stream (Obj.magic s)), headers)
+        (Some Body.(of_stream method_ uri (Obj.magic s)), headers)
       | Some (({ descriptor = String; _ } as schema), s) when schema == string
         ->
-        (Some Body.(of_string s), content_length (String.length s) headers)
+        ( Some Body.(of_string method_ uri s),
+          content_length (String.length s) headers )
       | Some (schema, value) ->
         let body = Coding.encode schema value in
-        (Some (Body.of_string body), content_length (String.length body) headers)
+        ( Some (Body.of_string method_ uri body),
+          content_length (String.length body) headers )
       | None -> (
         match method_ with
         | `POST | `PUT | `PATCH -> (None, content_length 0 headers)
@@ -133,14 +139,14 @@ module Make (Handler : HANDLER) :
           | { descriptor = Ignore; _ } when response == empty ->
             let* () = Body.drain body in
             Handler.Monad.return (() : response)
-          | schema when Obj.magic schema == stream ->
+          | schema when Obj.magic schema == stream_response ->
             Handler.Monad.return (Obj.magic (Body.to_stream body))
           | { descriptor = String; _ } as schema when schema == string ->
-            let* body = Body.to_string body in
+            let*! body = Body.to_string body in
             let* () = Logs.debug (fun m -> m "response body:\n%s" body) in
             Handler.Monad.return body
           | response -> (
-            let* body = Body.to_string body in
+            let*! body = Body.to_string body in
             let* () = Logs.debug (fun m -> m "response body:\n%s" body) in
             match Coding.decode response body with
             | Result.Ok body -> Handler.Monad.return body
@@ -152,19 +158,23 @@ module Make (Handler : HANDLER) :
         in
         Handler.Monad.map body ~f:(fun body -> (body, resp)))
 
-  module Response = Make_requests (struct
-    type nonrec 'a res = 'a Client_intf.response t
-    and error = Handler.error
+  module Response = struct
+    let stream = stream_response
 
-    let call ?(headers = []) ?body response method_ uri =
-      _call ~headers ?body response method_ uri
-      |> Handler.Monad.map ~f:(fun (body, resp) ->
-             {
-               body;
-               headers = Cohttp.Header.to_list resp.Cohttp.Response.headers;
-               status = resp.status;
-             })
-  end)
+    include Make_requests (struct
+      type nonrec 'a res = 'a Client_intf.response t
+      and error = Handler.error
+
+      let call ?(headers = []) ?body response method_ uri =
+        _call ~headers ?body response method_ uri
+        |> Handler.Monad.map ~f:(fun (body, resp) ->
+               {
+                 body;
+                 headers = Cohttp.Header.to_list resp.Cohttp.Response.headers;
+                 status = resp.status;
+               })
+    end)
+  end
 
   include Make_requests (struct
     type nonrec 'a res = 'a t
@@ -190,10 +200,68 @@ struct
   module Coding = Coding
   module Monad = Lwt_result
 
-  module Body = struct
-    include Cohttp_lwt.Body
+  let exn method_ uri = function
+    | Unix.Unix_error ((Unix.EBADF as e), _, _)
+    | Unix.Unix_error ((Unix.ENOTCONN as e), _, _)
+    | Unix.Unix_error ((Unix.EADDRNOTAVAIL (* Seen on iOS *) as e), _, _) ->
+      let* () =
+        Logs.info (fun m ->
+            m "retryable unix exception requesting %a: %s" Uri.pp uri
+              (Unix.error_message e))
+      in
+      Lwt_result.fail
+        Error.(make ~method_ ~status:(`Code 0) ~reason:`Networking uri)
+    | (e : exn) ->
+      (* FIXME: Cohttp has no API guarantees about exception that may escape
+         depending on the backend. Unreleased recent version yield [Retry]
+         exceptions, our own adds [Name_resolution_failed] on top of it, while
+         older version may raise [Failure] or whatnot. Pinning such a
+         fundamental libraries is a dependency nightmare, so we temporarily
+         consider all exceptions as retryable for maximal compatibility and let
+         final projects pin a specific version. *)
+      let* () =
+        Logs.warn (fun m ->
+            m "treating cohttp exception as retryabale: %a" Base.Exn.pp e)
+      in
+      Lwt_result.fail Error.(make ~method_ ~reason:`Networking uri)
+  (* let* () =
+   *   Logs.err (fun m ->
+   *       m "fatal error requesting %a: exception escaped: %a" Uri.pp uri
+   *         Base.Exn.pp e)
+   * in
+   * raise e *)
 
-    let drain = drain_body
+  module Body = struct
+    type t = {
+      cohttp : Cohttp_lwt.Body.t;
+      method_ : Cohttp.Code.meth;
+      uri : Uri.t;
+    }
+
+    let of_string method_ uri s =
+      { cohttp = Cohttp_lwt.Body.of_string s; method_; uri }
+
+    let of_stream method_ uri s =
+      { cohttp = Cohttp_lwt.Body.of_stream s; method_; uri }
+
+    let to_string { cohttp; method_; uri } =
+      let open Lwt in
+      catch
+        (fun () -> Cohttp_lwt.Body.to_string cohttp >|= Base.Result.return)
+        (exn method_ uri)
+
+    let to_stream { cohttp; method_; uri } =
+      let open Lwt in
+      Cohttp_lwt.Body.to_stream cohttp
+      |> Lwt_stream.wrap_exn
+      |> Lwt_stream.map_s (function
+           | Result.Ok _ as ok -> Lwt.return ok
+           | Result.Error e -> exn method_ uri e)
+
+    let drain { cohttp; _ } =
+      Lwt.catch
+        (fun () -> Cohttp_lwt.Body.drain_body cohttp)
+        (fun _ -> Lwt.return ())
   end
 
   let raw ?headers ?body method_ uri =
@@ -210,44 +278,17 @@ struct
         Lwt_list.iter_s f (Option.value ~default:[] headers)
       in
       let headers = Option.map Cohttp.Header.of_list headers in
-      Client.call ?headers ?body method_ uri >>= fun (resp, body) ->
+      Client.call ?headers
+        ?body:(Base.Option.map body ~f:(fun { Body.cohttp; _ } -> cohttp))
+        method_ uri
+      >>= fun (resp, body) ->
       match Cohttp.Response.status resp with
       | `Code 0 as status ->
         (* CORS or connectivity issue *)
         Lwt_result.fail Error.(make ~method_ ~status ~reason:`Networking uri)
-      | _ -> Lwt_result.return (resp, body)
-    and catch = function
-      | Unix.Unix_error ((Unix.EBADF as e), _, _)
-      | Unix.Unix_error ((Unix.ENOTCONN as e), _, _)
-      | Unix.Unix_error ((Unix.EADDRNOTAVAIL (* Seen on iOS *) as e), _, _) ->
-        let* () =
-          Logs.info (fun m ->
-              m "retryable unix exception requesting %a: %s" Uri.pp uri
-                (Unix.error_message e))
-        in
-        Lwt_result.fail
-          Error.(make ~method_ ~status:(`Code 0) ~reason:`Networking uri)
-      | (e : exn) ->
-        (* FIXME: Cohttp has no API guarantees about exception that may escape
-           depending on the backend. Unreleased recent version yield [Retry]
-           exceptions, our own adds [Name_resolution_failed] on top of it, while
-           older version may raise [Failure] or whatnot. Pinning such a
-           fundamental libraries is a dependency nightmare, so we temporarily
-           consider all exceptions as retryable for maximal compatibility and
-           let final projects pin a specific version. *)
-        let* () =
-          Logs.warn (fun m ->
-              m "treating cohttp exception as retryabale: %a" Base.Exn.pp e)
-        in
-        Lwt_result.fail Error.(make ~method_ ~reason:`Networking uri)
-      (* let* () =
-       *   Logs.err (fun m ->
-       *       m "fatal error requesting %a: exception escaped: %a" Uri.pp uri
-       *         Base.Exn.pp e)
-       * in
-       * raise e *)
+      | _ -> Lwt_result.return (resp, { Body.cohttp = body; method_; uri })
     in
-    Lwt.catch f catch
+    Lwt.catch f (exn method_ uri)
 end
 
 let pp_retry =
@@ -367,7 +408,8 @@ module Check_status (Status : STATUS) (Handler : HANDLER) = struct
                 m "unexpected status %s querying %a"
                   (Cohttp_.Code.string_of_status status)
                   Uri.pp uri)
-          and* body = Body.to_string body in
+          in
+          let*! body = Body.to_string body in
           match Handler.Coding.decode schema body with
           | Result.Ok error ->
             Lwt_result.fail
