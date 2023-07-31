@@ -2,13 +2,9 @@ module type BODY = sig
   type t
 
   val drain : t -> unit Lwt.t
-  val empty : t
-  val is_empty : t -> bool Lwt.t
   val to_string : t -> string Lwt.t
-  val to_string_list : t -> string list Lwt.t
   val to_stream : t -> string Lwt_stream.t
   val of_string : string -> t
-  val of_string_list : string list -> t
   val of_stream : string Lwt_stream.t -> t
 end
 
