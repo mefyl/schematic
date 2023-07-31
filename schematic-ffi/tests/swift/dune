@@ -15,6 +15,7 @@
 (rule
  (targets Schemas.swift)
  (alias runtest)
+ (package schematic-ffi)
  (action
   (progn
    (run %{dep:gen_swift_rt_stubs.exe} %{targets}))))
