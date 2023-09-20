@@ -23,86 +23,131 @@ include Marks.Make (struct
   module Id = Identifier
 end)
 
-module Of = Ffi_walk.Walk (struct
-  type res = c * Marks.t [@@deriving show]
-  type fields = (string * c) list * Marks.t
-  type case = string * c
-  type t = res [@@deriving show]
+(* FIXME: factor*)
+module State_monad = struct
+  module Make (State : sig
+    type t
+  end) =
+  struct
+    type 'a t = State.t -> 'a * State.t
 
-  (* Utils *)
-  let name (c, _marks) = c_typename c |> Identifier.to_string
-  let builtin c = (c, Lazy.force Marks.empty)
+    include Base.Monad.Make (struct
+      type nonrec 'a t = 'a t
+
+      let return v marks = (v, marks)
+
+      let bind v ~f marks =
+        let v, marks = v marks in
+        f v marks
+
+      let map =
+        let map v ~f marks =
+          let v, marks = v marks in
+          (f v, marks)
+        in
+        `Custom map
+    end)
+  end
+end
+
+module Of = Schematic.Schema.Walk (struct
+  type t = c
+  type case = string * string * t * bool
+
+  module M = State_monad.Make (struct
+    type t = Marks.t
+  end)
+
+  open M.Let_syntax
+
+  let ( let* ) = ( >>= )
+  let ( let+ ) = ( >>| )
+
+  type field = string * c
 
   (* Built-ins *)
 
-  let ignore () = builtin `Unit
+  let ignore = M.return `Unit
   let null = ignore
-  let int () = builtin `Int
-  let int64 () = builtin `Int64
-  let bool () = builtin `Bool
+  let int = M.return `Int
+  let int64 = M.return `Int64
+  let json = M.return `Json
+  let bool = M.return `Bool
 
-  let float () =
+  let float =
     (* "OCaml's floating-point numbers follow the IEEE 754 standard, using
        double precision (64 bits) numbers." *)
-    builtin `Double
+    M.return `Double
 
-  let string () = builtin `String
+  let string = M.return `String
 
   let string_const _s =
     (* Mainly used for individual union constructors *)
-    builtin `Void
+    M.return `Void
 
-  let any () = builtin `Json
+  let any = M.return `Json
 
-  let time () =
+  let time marks =
     Lazy.force Ffi_sanity_checks.ptime;
-    builtin `Time
+    (`Time, marks)
 
   (* The rest *)
 
   (* This will recurse forever if given a cyclic schema. *)
-  let schema (id : string option) parametric s =
+  let schema (id : string option) _ s =
     Logs.debug (fun m -> m "id: %a\n@." Fmt.(option string) id);
-    match parametric with
-    | Some parametric -> parametric ()
-    | None -> (
-      match id with
-      | None -> s ()
-      | Some id ->
-        let referenced_type : c = fst @@ s () in
-        (`Atom (Identifier.make id, Some referenced_type), Marks.make id s))
+    match id with
+    | None -> s ()
+    | Some id ->
+      fun marks ->
+        let s = s () in
+        let referenced_type : c = fst @@ s marks in
+        ( `Atom (Identifier.make id, Some referenced_type),
+          Marks.make id (fun () -> s marks) )
 
-  let nullable (c, marks) =
-    let name = option_name c in
-    let s () = (`Option c, marks) in
-    schema (Some (Identifier.to_string name)) None s
+  let parametric _ _ _ _ = failwith "parametric never used"
 
-  let fields_empty () = ([], Lazy.force Marks.empty)
+  let nullable s =
+    let* ast = s in
+    let name = option_name ast in
+    schema
+      (Some (Identifier.to_string name))
+      None
+      (fun () -> return (`Option ast))
 
-  let field : string -> required:bool -> t -> fields -> fields =
-   fun name ~required (ast, marks) (rest_ast, rest_marks) ->
-    let transform = if required then Fn.id else nullable in
-    let ast, marks = transform (ast, marks) in
-    let marks = Marks.merge [ marks; rest_marks ] in
-    ((name, ast) :: rest_ast, marks)
+  let field name required schema =
+    let+ ast = if required then schema else nullable schema in
+    (name, ast)
 
-  let object_ ((fields, marks) : fields) =
-    if List.is_empty fields then (`Void, marks)
-    else
+  let object_ fields =
+    fields >>| function
+    | [] -> `Void
+    | [ fields ] ->
       let fields =
         fields |> List.map ~f:(fun (s, c) -> (Identifier.make s, c))
       in
-      (`Struct { fields }, marks)
+      `Struct { fields }
+    | _ -> failwith "unreachable"
 
-  let union ~name ~polymorphic
-      ~(cases : (string * string * (c * Marks.t) * bool) list) =
-    let constructors, marks =
-      cases
-      |> List.map ~f:(fun (s, raw_s, (c, m), inline) ->
-             ((Identifier.make s, raw_s, c, inline), m))
-      |> List.unzip
+  let inline _ schema { Schematic.Schema.name; requirement; _ } =
+    Some (field name (Schematic.Schema.required requirement) (schema ()))
+
+  let case ~key:_ ~inline ~name ~raw_name case =
+    let+ ast = case in
+    (name, raw_name, ast, inline)
+
+  let union ~id ~polymorphic cases =
+    let name =
+      match id with
+      | Some id -> id
+      | None -> failwith "union schema must have an id"
     in
-    let marks = marks |> Marks.merge in
+    let* cases = cases in
+    let constructors =
+      cases
+      |> List.map ~f:(fun (s, raw_s, c, inline) ->
+             (Identifier.make s, raw_s, c, inline))
+    in
     let basic, rich =
       constructors
       |> List.partition_map ~f:(function
@@ -115,20 +160,22 @@ module Of = Ffi_walk.Walk (struct
        XXX: would be nice to reference those marks in the converter, but as it
        stands, this might break the distinction between inline and regular
        payloads *)
-    let inline_payload_marks =
-      rich
-      |> List.map ~f:(fun (id, _, constr_c, _) ->
-             match constr_c with
-             | `Tuple _ | `Struct _ ->
-               let id =
-                 inline_record_c_name ~variant_name:name ~constructor_name:id
-               in
-               let s () = (constr_c, marks) in
-               Marks.make id s
-             | _ -> Lazy.force Marks.empty)
-      |> Marks.merge
+    let+ () =
+      let inline_payload_marks =
+        rich
+        |> List.map ~f:(fun (id, _, constr_c, _) ->
+               match constr_c with
+               | `Tuple _ | `Struct _ ->
+                 let id =
+                   inline_record_c_name ~variant_name:name ~constructor_name:id
+                 in
+                 let s () = (constr_c, Lazy.force Marks.empty) in
+                 Marks.make id s
+               | _ -> Lazy.force Marks.empty)
+        |> Marks.merge
+      in
+      fun marks -> ((), Marks.merge [ marks; inline_payload_marks ])
     in
-    let marks = Marks.merge [ marks; inline_payload_marks ] in
     let name = Identifier.make name in
     if polymorphic then
       let basic =
@@ -141,7 +188,7 @@ module Of = Ffi_walk.Walk (struct
             { name = id; type_ = c; hash = hash_variant raw_name })
           rich
       in
-      (`Poly_variant { name; basic; rich }, marks)
+      `Poly_variant { name; basic; rich }
     else
       let basic = List.map ~f:(fun (id, _) -> id) basic in
       let rich =
@@ -149,59 +196,61 @@ module Of = Ffi_walk.Walk (struct
           ~f:(fun (id, _, c, inline) -> { name = id; type_ = c; inline })
           rich
       in
-      (`Variant ({ name; basic; rich } : regular_variant), marks)
+      `Variant ({ name; basic; rich } : regular_variant)
 
-  let tuple ts =
-    let items, marks = List.unzip ts in
-    let s () = (`Tuple items, Marks.merge marks) in
+  let tuple items =
+    let* items = items in
     let tuple_name = tuple_name items in
-    schema (Some (Identifier.to_string tuple_name)) None s
+    schema
+      (Some (Identifier.to_string tuple_name))
+      None
+      (fun () -> return (`Tuple items))
 
-  let list (c, marks) =
-    let s () = (`Array c, marks) in
-    let name = array_name c in
-    schema (Some (Identifier.to_string name)) None s
+  let list s =
+    let* ast = s in
+    let name = array_name ast in
+    schema
+      (Some (Identifier.to_string name))
+      None
+      (fun () -> return (`Array ast))
 
   (* Simplest possible encoding *)
   (* We could use a struct for "key" / "value" fields instead of a tuple. *)
-  let mapping t = tuple [ string (); t ] |> list
+  let mapping t = tuple (M.all [ string; t ]) |> list
 
-  let mapped : t -> t =
-   fun (c, marks) ->
-    let front_facing, marks =
-      match c_canonical_typename c with
-      | Some _ -> (c, marks)
+  let map s =
+    let+ front_facing =
+      let* ast = s in
+      match c_canonical_typename ast with
+      | Some _ -> M.return ast
       | None ->
-        let id = Identifier.to_string (c_typename c) in
-        let s () = (c, marks) in
-        schema (Some id) None s
+        let id = Identifier.to_string (c_typename ast) in
+        schema (Some id) None (fun () -> return ast)
     in
-    (`Mapped front_facing, marks)
+    `Mapped front_facing
 
   (* XXX: make those into built-ins? *)
 
   (* TODO: for clarity, use a struct *)
-  let time_local () =
+  let time_local marks =
     Lazy.force Ffi_sanity_checks.ptime_local;
-    tuple [ time (); int () ]
+    tuple (M.all [ time; int ]) marks
 
-  let date () =
+  let date marks =
     Lazy.force Ffi_sanity_checks.date;
-
-    let s () =
-      let int = fst (int ()) in
+    let s =
       (* This will work because a Ptime.date is a (int * int * int), which has
          the same memory representation as a struct with three int fields. *)
       let fields =
         [
-          (Identifier.make "year", int);
-          (Identifier.make "month", int);
-          (Identifier.make "day", int);
+          (Identifier.make "year", `Int);
+          (Identifier.make "month", `Int);
+          (Identifier.make "day", `Int);
         ]
       in
-      (`Struct { fields }, Lazy.force Marks.empty)
+      `Struct { fields }
     in
-    schema (Some "sch_date") None s
+    schema (Some "sch_date") None (fun () -> return s) marks
 end)
 
 include Make_mark_converter (struct
@@ -210,10 +259,10 @@ include Make_mark_converter (struct
     c_typename c |> Identifier.to_string |> fun s -> (s ^ "_2" |> Option.some, c)
 
   let of_descriptor id d =
-    try Of.descriptor id d
+    try Of.descriptor ~id d (Lazy.force Marks.empty)
     with e ->
       Logs.err (fun m ->
-          m "Exception thrown for descriptor '%a', %a"
+          m "Exception thrown for descriptor %a:@ @[%a@]"
             Fmt.(option string)
             id Schematic.Schema.pp_descriptor d);
       raise e

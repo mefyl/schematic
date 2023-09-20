@@ -42,6 +42,7 @@ module Of = Schema.Walk (struct
     | Type of t
 
   type nonrec t = t
+  type case = t
 
   module M = State_monad.Make (struct
     type t = Marks.t
@@ -113,6 +114,8 @@ module Of = Schema.Walk (struct
     let+ elt = elt in
     Template { name = "Array"; args = [ elt ] }
 
+  let map ts = ts
+
   let mapping elt =
     let+ elt = elt in
     Template { name = "Record"; args = [ Atom "string"; elt ] }
@@ -151,24 +154,24 @@ module Of = Schema.Walk (struct
 
   (* Union *)
 
-  let case key name schema =
+  let case ~key ~inline:_ ~name ~raw_name:_ schema =
     let+ schema = schema in
     match key with
     | None -> schema
     | Some key ->
       Intersection [ schema; Object { fields = [ (key, String name, true) ] } ]
 
-  let union cases =
+  let union ~id:_ ~polymorphic:_ cases =
     let+ cases = cases in
     Union cases
 end)
 
 include Make_mark_converter (struct
-  let of_descriptor _ descriptor = Of.descriptor descriptor Marks.empty
+  let of_descriptor id descriptor = Of.descriptor ~id descriptor Marks.empty
   let of_parametric parametric = Of.parametric parametric Marks.empty
 end)
 
-let of_descriptor d = Of.descriptor d Marks.empty |> fst
+let of_descriptor d = Of.descriptor ~id:None d Marks.empty |> fst
 let break sp id fmt _ = Caml.Format.pp_print_break fmt sp id
 
 let custom_break fits breaks fmt _ =

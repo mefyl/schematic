@@ -121,6 +121,7 @@ type ('t, 'req) schema_field = ('t, 'req) field
 
 module type WALK = sig
   type t
+  type case
   type field
 
   module M : Base.Monad.S
@@ -148,7 +149,7 @@ module type WALK = sig
       inlined. *)
   val object_ : field list list M.t -> t M.t
 
-  (** [inline schema field] potentially intercepts inline fields.
+  (** [parametric schema field] potentially intercepts inline fields.
 
       The field is not inlined and replaced with the return value if it is not
       [None]. The [schema] argument can be used to walk the field schema. *)
@@ -160,10 +161,15 @@ module type WALK = sig
 
   (* Union *)
 
-  (** [case key name t] *)
-  val case : string option -> string -> t M.t -> t M.t
+  val case :
+    key:string option ->
+    inline:bool ->
+    name:string ->
+    raw_name:string ->
+    t M.t ->
+    case M.t
 
-  val union : t list M.t -> t M.t
+  val union : id:string option -> polymorphic:bool -> case list M.t -> t M.t
 
   (* Descriptors *)
 
@@ -171,6 +177,7 @@ module type WALK = sig
   val bool : t M.t
   val float : t M.t
   val date : t M.t
+  val map : t M.t -> t M.t
   val mapping : t M.t -> t M.t
   val int : t M.t
   val ignore : t M.t

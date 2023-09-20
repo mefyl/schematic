@@ -461,12 +461,13 @@ module Walk (W : WALK) = struct
 
   module Inline = Make_inline (W.M)
 
-  let rec descriptor : type t. t descriptor -> W.t W.M.t = function
+  let rec descriptor : type t. id:string option -> t descriptor -> W.t W.M.t =
+   fun ~id -> function
     | Any _ -> W.any
     | Bool -> W.bool
     | Float -> W.float
     | Date -> W.date
-    | Fixpoint s -> descriptor (Lazy.force s)
+    | Fixpoint s -> descriptor ~id (Lazy.force s)
     | Int -> W.int
     | Ignore -> W.ignore
     | Int64 -> W.int64
@@ -476,7 +477,7 @@ module Walk (W : WALK) = struct
     | String -> W.string
     | Time -> W.time
     | Time_local -> W.time_local
-    | Map { descriptor = d; _ } -> descriptor d
+    | Map { descriptor = d; _ } -> W.map @@ descriptor ~id d
     | Mapping s -> W.mapping (schema s)
     | Nullable s -> W.nullable (schema s)
     | String_const s -> W.string_const s
@@ -501,16 +502,17 @@ module Walk (W : WALK) = struct
       in
       match fields with Ok fields -> W.object_ fields | Error e -> failwith e)
     | Tuple { items; _ } -> W.tuple @@ tuple items
-    | Union { cases; key; _ } ->
+    | Union { cases; key; polymorphic } ->
       let cases = List.map ~f:(case key) cases |> W.M.all in
-      W.union cases
+      W.union ~id ~polymorphic cases
 
-  and case : type t. string option -> t case -> W.t W.M.t =
-   fun key (Case { name; schema = s; _ }) -> W.case key name (schema s)
+  and case : type t. string option -> t case -> W.case W.M.t =
+   fun key (Case { inline; name; raw_name; schema = s; _ }) ->
+    W.case ~key ~inline ~name ~raw_name (schema s)
 
   and schema : type t. t Schema_intf.t -> W.t W.M.t =
    fun { id; descriptor = d; parametric = p } ->
-    let schema () = descriptor d
+    let schema () = descriptor ~id d
     and parametric =
       match p with
       | None -> None
@@ -525,7 +527,7 @@ module Walk (W : WALK) = struct
   and parametric :
       type t. t parametric -> string * string list * W.t W.M.t list * W.t W.M.t
       = function
-    | Plain { name; descriptor = d } -> (name, [], [], descriptor d)
+    | Plain { name; descriptor = d } -> (name, [], [], descriptor ~id:None d)
     | Parametric { name; parameter; next } ->
       let template_name, args, eff_args, t =
         parametric
