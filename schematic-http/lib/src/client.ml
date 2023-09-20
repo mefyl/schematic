@@ -19,7 +19,6 @@ end
 let ( let* ) = Lwt.bind
 let ( and* ) = Lwt.both
 let ( let*! ) = Lwt_result.( >>= )
-let ( and*! ) = Lwt_result.both
 let empty = Schematic.Schema.make Ignore
 
 let stream_schema () =
@@ -100,7 +99,6 @@ module Make (Handler : HANDLER) :
   let _call (type body response) ?(headers = [])
       ?(body : (body Schematic.Schema.t * body) option)
       (response : response Schematic.Schema.t) method_ uri =
-    let open Lwt in
     let body, headers =
       let content_length l headers =
         if Handler.send_content_length then
@@ -251,7 +249,6 @@ struct
         (exn method_ uri)
 
     let to_stream { cohttp; method_; uri } =
-      let open Lwt in
       Cohttp_lwt.Body.to_stream cohttp
       |> Lwt_stream.wrap_exn
       |> Lwt_stream.map_s (function
