@@ -186,6 +186,8 @@ end
 
 module Cohttp_ = Cohttp
 
+let uid = ref 0
+
 module Cohttp
     (Client : Cohttp_lwt.S.Client)
     (Coding : Schematic.Coding.STR with type t = string) =
@@ -233,27 +235,43 @@ struct
     type t = {
       cohttp : Cohttp_lwt.Body.t;
       method_ : Cohttp.Code.meth;
+      uid : int option;
       uri : Uri.t;
     }
 
     let of_string method_ uri s =
-      { cohttp = Cohttp_lwt.Body.of_string s; method_; uri }
+      { cohttp = Cohttp_lwt.Body.of_string s; method_; uid = None; uri }
 
     let of_stream method_ uri s =
-      { cohttp = Cohttp_lwt.Body.of_stream s; method_; uri }
+      { cohttp = Cohttp_lwt.Body.of_stream s; method_; uid = None; uri }
 
-    let to_string { cohttp; method_; uri } =
+    let pp_uid = Fmt.(option @@ fmt "[%x] ")
+
+    let to_string { cohttp; method_; uid; uri } =
       let open Lwt in
       catch
-        (fun () -> Cohttp_lwt.Body.to_string cohttp >|= Base.Result.return)
+        (fun () ->
+          let* body = Cohttp_lwt.Body.to_string cohttp in
+          let* () =
+            Logs.info (fun m ->
+                m "%a read %d bytes of body" pp_uid uid (String.length body))
+          in
+          Lwt_result.return body)
         (exn method_ uri)
 
-    let to_stream { cohttp; method_; uri } =
-      Cohttp_lwt.Body.to_stream cohttp
-      |> Lwt_stream.wrap_exn
-      |> Lwt_stream.map_s (function
-           | Result.Ok _ as ok -> Lwt.return ok
-           | Result.Error e -> exn method_ uri e)
+    let to_stream { cohttp; method_; uid; uri } =
+      let body =
+        Cohttp_lwt.Body.to_stream cohttp
+        |> Lwt_stream.wrap_exn
+        |> Lwt_stream.map_s (function
+             | Result.Ok _ as ok -> Lwt.return ok
+             | Result.Error e -> exn method_ uri e)
+      and log =
+        Lwt_stream.from @@ fun () ->
+        let* () = Logs.info (fun m -> m "%a done streaming body" pp_uid uid) in
+        Lwt.return None
+      in
+      Lwt_stream.append body log
 
     let drain { cohttp; _ } =
       Lwt.catch
@@ -262,15 +280,17 @@ struct
   end
 
   let raw ?headers ?body method_ uri =
+    let () = uid := !uid + 1 in
+    let uid = !uid in
     let open Lwt in
     let f () =
       let* () =
         Logs.info (fun m ->
-            m "%s %a" Cohttp.Code.(string_of_method method_) Uri.pp uri)
+            m "[%x] %s %a" uid Cohttp.Code.(string_of_method method_) Uri.pp uri)
       in
       let* () =
         let f (h, v) =
-          Logs.info (fun m -> m "  %s: %s" (Base.String.capitalize h) v)
+          Logs.info (fun m -> m "[%x]  %s: %s" uid (Base.String.capitalize h) v)
         in
         Lwt_list.iter_s f (Option.value ~default:[] headers)
       in
@@ -283,7 +303,13 @@ struct
       | `Code 0 as status ->
         (* CORS or connectivity issue *)
         Lwt_result.fail Error.(make ~method_ ~status ~reason:`Networking uri)
-      | _ -> Lwt_result.return (resp, { Body.cohttp = body; method_; uri })
+      | status ->
+        let* () =
+          Logs.info (fun m ->
+              m "[%x] %s" uid @@ Cohttp.Code.string_of_status status)
+        in
+        Lwt_result.return
+          (resp, { Body.cohttp = body; method_; uid = Some uid; uri })
     in
     Lwt.catch f (exn method_ uri)
 end
