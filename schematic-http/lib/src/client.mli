@@ -29,6 +29,16 @@ val check_status_is :
   Cohttp.Code.status_code ->
   (module STATUS with type error = Cohttp.Code.status_code)
 
+(** [With_timeout (Timeout) (Handler)] is [Handler] with timeout defaulting to
+    [Timeout.v]. *)
+module With_timeout (Timeout : sig
+  val v : Timmy.Span.t
+end)
+(Handler : HANDLER) :
+  HANDLER
+    with type 'a response = 'a Handler.response
+     and type error = Handler.error
+
 module With_headers (Headers : sig
   val headers : (string * string) list
 end)

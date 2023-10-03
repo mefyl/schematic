@@ -15,6 +15,7 @@ type 'a response = {
 }
 
 type ('a, 'body, 'response) request =
+  ?timeout:Timmy.Span.t ->
   ?headers:(string * string) list ->
   ?body:'body Schematic.Schema.t * 'body ->
   'response Schematic.Schema.t ->
@@ -136,6 +137,7 @@ module type HANDLER = sig
   val send_content_length : bool
 
   val raw :
+    ?timeout:Timmy.Span.t ->
     ?headers:(string * string) list ->
     ?body:Body.t ->
     Cohttp.Code.meth ->

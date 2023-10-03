@@ -1,4 +1,5 @@
 include Client_intf
+open Lwt.Infix
 
 let src = Logs.Src.create ~doc:"schematic HTTP client" "schematic-http"
 
@@ -16,10 +17,31 @@ module Lwt_result = struct
   end)
 end
 
-let ( let* ) = Lwt.bind
+let ( let* ) = ( >>= )
+let ( let+ ) = ( >|= )
 let ( and* ) = Lwt.both
 let ( let*! ) = Lwt_result.( >>= )
+let ( >>=! ) = Lwt_result.( >>= )
 let empty = Schematic.Schema.make Ignore
+let pp_uid = Fmt.(option @@ fmt "[%x] ")
+
+let with_timeout ?(cancel = false) ~method_ ~f name uid uri timeout v =
+  match timeout with
+  | None -> v
+  | Some timeout -> (
+    Lwt.choose [ v >|= Base.Option.return; (timeout >|= fun () -> None) ]
+    >>= function
+    | Some v ->
+      let () = if cancel then Lwt.cancel timeout in
+      Lwt.return v
+    | None ->
+      let+ () =
+        Logs.warn (fun m ->
+            m "%atimeout %s: %s %a" pp_uid uid name
+              Cohttp.Code.(string_of_method method_)
+              Uri.pp uri)
+      in
+      f (Result.Error Error.(make ~method_ ~reason:`Networking uri)))
 
 let stream_schema () =
   Schematic.Schema.make
@@ -51,17 +73,23 @@ struct
         with type 'a res := 'a Call.res
          and type error := Call.error)
 
-  let delete ?headers ?body response uri =
-    call ?headers ?body response `DELETE uri
+  let delete ?timeout ?headers ?body response uri =
+    call ?timeout ?headers ?body response `DELETE uri
 
-  let get ?headers ?body response uri = call ?headers ?body response `GET uri
-  let head ?headers ?body response uri = call ?headers ?body response `HEAD uri
+  let get ?timeout ?headers ?body response uri =
+    call ?timeout ?headers ?body response `GET uri
 
-  let patch ?headers ?body response uri =
-    call ?headers ?body response `PATCH uri
+  let head ?timeout ?headers ?body response uri =
+    call ?timeout ?headers ?body response `HEAD uri
 
-  let post ?headers ?body response uri = call ?headers ?body response `POST uri
-  let put ?headers ?body response uri = call ?headers ?body response `PUT uri
+  let patch ?timeout ?headers ?body response uri =
+    call ?timeout ?headers ?body response `PATCH uri
+
+  let post ?timeout ?headers ?body response uri =
+    call ?timeout ?headers ?body response `POST uri
+
+  let put ?timeout ?headers ?body response uri =
+    call ?timeout ?headers ?body response `PUT uri
 end
 
 module Map_error
@@ -76,8 +104,8 @@ struct
 
   type error = E.t
 
-  let raw ?headers ?body meth uri =
-    Handler.raw ?headers ?body meth uri
+  let raw ?timeout ?headers ?body meth uri =
+    Handler.raw ?timeout ?headers ?body meth uri
     |> Lwt_result.map_error (function
          | { Error.reason = `Http reason; _ } as error ->
            { error with reason = `Http (E.map reason) }
@@ -96,7 +124,7 @@ module Make (Handler : HANDLER) :
   let stream_response = stream_schema ()
   let string = string
 
-  let _call (type body response) ?(headers = [])
+  let _call (type body response) ?timeout ?(headers = [])
       ?(body : (body Schematic.Schema.t * body) option)
       (response : response Schematic.Schema.t) method_ uri =
     let body, headers =
@@ -131,7 +159,8 @@ module Make (Handler : HANDLER) :
         ("Content-Type", Handler.Coding.content_type) :: headers
       | _ -> headers
     in
-    Handler.Monad.bind (raw ~headers ?body method_ uri) ~f:(fun (resp, body) ->
+    Handler.Monad.bind (raw ?timeout ~headers ?body method_ uri)
+      ~f:(fun (resp, body) ->
         let body =
           match response with
           | { descriptor = Ignore; _ } when response == empty ->
@@ -163,8 +192,8 @@ module Make (Handler : HANDLER) :
       type nonrec 'a res = 'a Client_intf.response t
       and error = Handler.error
 
-      let call ?(headers = []) ?body response method_ uri =
-        _call ~headers ?body response method_ uri
+      let call ?timeout ?(headers = []) ?body response method_ uri =
+        _call ?timeout ~headers ?body response method_ uri
         |> Handler.Monad.map ~f:(fun (body, resp) ->
                {
                  body;
@@ -178,8 +207,8 @@ module Make (Handler : HANDLER) :
     type nonrec 'a res = 'a t
     and error = Handler.error
 
-    let call ?(headers = []) ?body response method_ uri =
-      _call ~headers ?body response method_ uri
+    let call ?timeout ?(headers = []) ?body response method_ uri =
+      _call ?timeout ~headers ?body response method_ uri
       |> Handler.Monad.map ~f:(fun (body, _) -> body)
   end)
 end
@@ -235,43 +264,61 @@ struct
     type t = {
       cohttp : Cohttp_lwt.Body.t;
       method_ : Cohttp.Code.meth;
+      timeout : unit Lwt.t option;
       uid : int option;
       uri : Uri.t;
     }
 
     let of_string method_ uri s =
-      { cohttp = Cohttp_lwt.Body.of_string s; method_; uid = None; uri }
+      {
+        cohttp = Cohttp_lwt.Body.of_string s;
+        method_;
+        timeout = None;
+        uid = None;
+        uri;
+      }
 
     let of_stream method_ uri s =
-      { cohttp = Cohttp_lwt.Body.of_stream s; method_; uid = None; uri }
+      {
+        cohttp = Cohttp_lwt.Body.of_stream s;
+        method_;
+        timeout = None;
+        uid = None;
+        uri;
+      }
 
-    let pp_uid = Fmt.(option @@ fmt "[%x] ")
-
-    let to_string { cohttp; method_; uid; uri } =
+    let to_string { cohttp; method_; timeout; uid; uri } =
       let open Lwt in
       catch
         (fun () ->
-          let* body = Cohttp_lwt.Body.to_string cohttp in
-          let* () =
-            Logs.info (fun m ->
-                m "%a read %d bytes of body" pp_uid uid (String.length body))
-          in
-          Lwt_result.return body)
+          with_timeout ~cancel:true ~method_ ~f:Base.Fn.id "reading body" uid
+            uri timeout
+          @@ let* body = Cohttp_lwt.Body.to_string cohttp in
+             let* () =
+               Logs.info (fun m ->
+                   m "%a read %d bytes of body" pp_uid uid (String.length body))
+             in
+             Lwt_result.return body)
         (exn method_ uri)
 
-    let to_stream { cohttp; method_; uid; uri } =
+    let to_stream { cohttp; method_; timeout; uid; uri } =
       let body =
         Cohttp_lwt.Body.to_stream cohttp
         |> Lwt_stream.wrap_exn
         |> Lwt_stream.map_s (function
              | Result.Ok _ as ok -> Lwt.return ok
              | Result.Error e -> exn method_ uri e)
-      and log =
-        Lwt_stream.from @@ fun () ->
-        let* () = Logs.info (fun m -> m "%a done streaming body" pp_uid uid) in
-        Lwt.return None
       in
-      Lwt_stream.append body log
+      Lwt_stream.from (fun () ->
+          with_timeout ~cancel:true ~method_ ~f:Base.Option.return
+            "reading body" uid uri timeout (Lwt_stream.get body)
+          >>= function
+          | Some _ as chunk -> Lwt.return chunk
+          | None ->
+            let+ () =
+              Logs.info (fun m -> m "%a done streaming body" pp_uid uid)
+            in
+            None)
 
     let drain { cohttp; _ } =
       Lwt.catch
@@ -279,7 +326,7 @@ struct
         (fun _ -> Lwt.return ())
   end
 
-  let raw ?headers ?body method_ uri =
+  let raw ?timeout ?headers ?body method_ uri =
     let () = uid := !uid + 1 in
     let uid = !uid in
     let open Lwt in
@@ -295,10 +342,20 @@ struct
         Lwt_list.iter_s f (Option.value ~default:[] headers)
       in
       let headers = Option.map Cohttp.Header.of_list headers in
-      Client.call ?headers
-        ?body:(Base.Option.map body ~f:(fun { Body.cohttp; _ } -> cohttp))
-        method_ uri
-      >>= fun (resp, body) ->
+      let request =
+        Client.call ?headers
+          ?body:(Base.Option.map body ~f:(fun { Body.cohttp; _ } -> cohttp))
+          method_ uri
+        >|= Base.Result.return
+      in
+      let timeout =
+        match timeout with
+        | None -> None
+        | Some delay -> Some (Timmy_lwt.sleep delay)
+      in
+      with_timeout ~method_ ~f:Base.Fn.id "reading headers" (Some uid) uri
+        timeout request
+      >>=! fun (resp, body) ->
       match Cohttp.Response.status resp with
       | `Code 0 as status ->
         (* CORS or connectivity issue *)
@@ -309,7 +366,7 @@ struct
               m "[%x] %s" uid @@ Cohttp.Code.string_of_status status)
         in
         Lwt_result.return
-          (resp, { Body.cohttp = body; method_; uid = Some uid; uri })
+          (resp, { Body.cohttp = body; method_; timeout; uid = Some uid; uri })
     in
     Lwt.catch f (exn method_ uri)
 end
@@ -357,9 +414,9 @@ module Rate_limit' (Rate : RATE_LIMIT') (Handler : HANDLER) = struct
         in
         default ())
 
-  let raw ?headers ?body method_ uri =
+  let raw ?timeout ?headers ?body method_ uri =
     let rec raw errors () =
-      Handler.Monad.bind (Handler.raw ?headers ?body method_ uri)
+      Handler.Monad.bind (Handler.raw ?timeout ?headers ?body method_ uri)
         ~f:(fun ((resp, _) as r) ->
           if Rate.rate_limited resp then
             let* backoff = backoff errors uri resp in
@@ -404,8 +461,8 @@ module Optional (Handler : HANDLER) = struct
 
   type 'a response = 'a option Handler.response
 
-  let raw ?headers ?body method_ uri =
-    Handler.Monad.map (Handler.raw ?headers ?body method_ uri)
+  let raw ?timeout ?headers ?body method_ uri =
+    Handler.Monad.map (Handler.raw ?timeout ?headers ?body method_ uri)
       ~f:(fun ((resp, _) as r) ->
         match Cohttp_.Response.status resp with
         | `Not_found -> None
@@ -418,7 +475,7 @@ module Check_status (Status : STATUS) (Handler : HANDLER) = struct
   type 'a response = 'a Handler.response
   type error = (Status.error, Handler.error) Error.status
 
-  let raw ?headers ?body method_ uri =
+  let raw ?timeout ?headers ?body method_ uri =
     let f ((resp, body) as r) =
       let status = Cohttp_.Response.status resp in
       let rec extract_error = function
@@ -465,7 +522,7 @@ module Check_status (Status : STATUS) (Handler : HANDLER) = struct
       extract_error (Status.check status)
     in
 
-    Handler.raw ?headers ?body method_ uri
+    Handler.raw ?timeout ?headers ?body method_ uri
     |> Lwt_result.map_error (function
          | Error.{ reason = `Http e; _ } as error ->
            { error with reason = `Http Error.(Valid_status e) }
@@ -499,7 +556,20 @@ end)
 struct
   include Handler
 
-  let raw ?(headers = []) ?body method_ uri =
+  let raw ?timeout ?(headers = []) ?body method_ uri =
     let headers = Headers.headers @ headers in
-    Handler.raw ~headers ?body method_ uri
+    Handler.raw ?timeout ~headers ?body method_ uri
+end
+
+module With_timeout (Timeout : sig
+  val v : Timmy.Span.t
+end)
+(Handler : HANDLER) =
+struct
+  include Handler
+
+  let raw ?timeout ?(headers = []) ?body method_ uri =
+    Handler.raw
+      ~timeout:(Option.value ~default:Timeout.v timeout)
+      ~headers ?body method_ uri
 end
