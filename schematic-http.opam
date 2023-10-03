@@ -11,6 +11,8 @@ depends: [
   "dune" {>= "3.0"}
   "cohttp-lwt" {>= "5.1.0" & < "5.2.0"}
   "lwt" {>= "5.6.0"}
+  "timmy" {>= "1.0.0" & < "2.0.0"}
+  "timmy-lwt" {>= "1.0.0" & < "2.0.0"}
   "schematic" {= version}
   "odoc" {with-doc}
 ]
