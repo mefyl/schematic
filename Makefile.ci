@@ -1,6 +1,6 @@
 DOCKERFILE_BASE=ubuntu
 OCAML_VERSION=4.14.0
-# Opam does not install sqml with `--deps-only` because it depends
-# (optionally) on schematic via timmy.
-OPAM_PACKAGES=sqml.0.10.0
+# Opam does not install these with `--deps-only` because they depend
+# (optionally) on schematic.
+OPAM_PACKAGES=timmy.1.0.4 timmy-lwt.1.0.4 sqml.0.10.6
 PACKAGES=autoconf
