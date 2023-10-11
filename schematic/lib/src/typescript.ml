@@ -93,9 +93,9 @@ module Of = Schema.Walk (struct
 
   let inline (parametric : (unit -> Marks.t -> t * Marks.t) option) schema s =
     match (parametric, s) with
-    | _, Schema.{ schema = Inline { id = Some id; _ }; _ } ->
+    | _, Schema.{ schema = Inline { id = Some _; _ }; _ } ->
       Option.return
-      @@ let+ t = of_id id schema in
+      @@ let+ t = schema () in
          Type t
     | Some parametric, _ ->
       Some

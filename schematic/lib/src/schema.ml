@@ -495,7 +495,7 @@ module Walk (W : WALK) = struct
                 (fun () ->
                   let name, args, eff_args, t = parametric p in
                   W.parametric name args eff_args t))
-            (fun () -> schema { s with id = None })
+            (fun () -> schema s)
             field
         in
         Inline.schema o { f; filter = Some filter }
