@@ -100,10 +100,9 @@ module Of = Schematic.Schema.Walk (struct
     | None -> s ()
     | Some id ->
       fun marks ->
-        let s = s () in
-        let referenced_type, marks = s marks in
+        let ((referenced_type, _) as res) = s () marks in
         ( `Atom (Identifier.make id, Some referenced_type),
-          Marks.make id (fun () -> (referenced_type, marks)) )
+          Marks.add marks @@ (id, res) )
 
   let parametric _ _ _ _ = failwith "parametric never used"
 
@@ -161,6 +160,7 @@ module Of = Schematic.Schema.Walk (struct
        stands, this might break the distinction between inline and regular
        payloads *)
     let+ () =
+     fun marks ->
       let inline_payload_marks =
         rich
         |> List.map ~f:(fun (id, _, constr_c, _) ->
@@ -169,12 +169,12 @@ module Of = Schematic.Schema.Walk (struct
                  let id =
                    inline_record_c_name ~variant_name:name ~constructor_name:id
                  in
-                 let s () = (constr_c, Lazy.force Marks.empty) in
+                 let s () = (constr_c, marks) in
                  Marks.make id s
-               | _ -> Lazy.force Marks.empty)
+               | _ -> marks)
         |> Marks.merge
       in
-      fun marks -> ((), Marks.merge [ marks; inline_payload_marks ])
+      ((), inline_payload_marks)
     in
     let name = Identifier.make name in
     if polymorphic then
