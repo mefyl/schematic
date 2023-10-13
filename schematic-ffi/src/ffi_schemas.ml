@@ -101,9 +101,9 @@ module Of = Schematic.Schema.Walk (struct
     | Some id ->
       fun marks ->
         let s = s () in
-        let referenced_type : c = fst @@ s marks in
+        let referenced_type, marks = s marks in
         ( `Atom (Identifier.make id, Some referenced_type),
-          Marks.make id (fun () -> s marks) )
+          Marks.make id (fun () -> (referenced_type, marks)) )
 
   let parametric _ _ _ _ = failwith "parametric never used"
 
