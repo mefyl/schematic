@@ -120,7 +120,7 @@ module Of = Schematic.Schema.Walk (struct
 
   let object_ fields =
     fields >>| function
-    | [] -> `Void
+    | [ [] ] -> `Void
     | [ fields ] ->
       let fields =
         fields |> List.map ~f:(fun (s, c) -> (Identifier.make s, c))
