@@ -167,8 +167,12 @@ module Of = Schema.Walk (struct
 end)
 
 include Make_mark_converter (struct
-  let of_descriptor id descriptor = Of.descriptor ~id descriptor Marks.empty
-  let of_parametric parametric = Of.parametric parametric Marks.empty
+  let identifier { Schema.id; _ } _ = Option.value_exn ~here:[%here] id
+
+  let convert id descriptor parametric =
+    match parametric with
+    | Some parametric -> Of.parametric parametric Marks.empty
+    | _ -> Of.descriptor ~id descriptor Marks.empty
 end)
 
 let of_descriptor d = Of.descriptor ~id:None d Marks.empty |> fst

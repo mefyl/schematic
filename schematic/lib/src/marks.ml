@@ -109,20 +109,21 @@ module Make (S : MARK) = struct
       (l @ leaf, marks)
 
   module Make_mark_converter (M : sig
-    val of_descriptor :
-      string option -> 'a Schema_intf.descriptor -> S.t * Marks.t
+    val identifier : 'a Schema_intf.t -> S.t -> string
 
-    val of_parametric : 'a Schema_intf.parametric -> S.t * Marks.t
+    val convert :
+      string option ->
+      'a Schema_intf.descriptor ->
+      'a Schema_intf.parametric option ->
+      S.t * Marks.t
   end) =
   struct
-    let of_descriptor = M.of_descriptor
-    let of_parametric = M.of_parametric
+    let of_descriptor d = M.convert None d None
 
-    let mark_of_schema Schema.{ id; descriptor; parametric } =
-      let id = id |> Option.value_exn ~here:[%here] in
-      match parametric with
-      | None -> (id, lazy (M.of_descriptor (Some id) descriptor))
-      | Some parametric -> (id, lazy (M.of_parametric parametric))
+    let mark_of_schema (Schema.{ id; descriptor; parametric } as schema) =
+      let ((t, _) as res) = M.convert id descriptor parametric in
+      let id = M.identifier schema t in
+      (id, lazy res)
 
     let of_schema_state marks s = of_mark marks @@ mark_of_schema s
 

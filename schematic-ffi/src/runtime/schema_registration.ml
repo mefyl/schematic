@@ -33,7 +33,7 @@ let rec traverse_descriptor :
           {|Mapped descriptor '%a' may not be used without a name, to prevent unsoundness.|}
           Schematic.Schema.pp_descriptor map_d
     in
-    let serialized, _ = Ffi_schemas.of_descriptor None serialized_d in
+    let serialized, _ = Ffi_schemas.of_descriptor serialized_d in
     let id = id |> Identifier.normalize_s in
     register_map id ~serialized ~encode ~decode;
     traverse_descriptor None serialized_d
