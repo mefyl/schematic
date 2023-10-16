@@ -1,6 +1,5 @@
 open Base
 
-(* Hide concrete type to prevent misuse *)
 type t
 
 val make : string -> t
