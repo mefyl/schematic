@@ -13,11 +13,9 @@ let hash_variant s =
   (* make it signed for 64 bits architectures *)
   if !accu > 0x3FFFFFFF then !accu - (1 lsl 31) else !accu
 
-include Marks.Make (struct
+include Schematic.Marks.Make (struct
   type t = c
 
-  let equal = equal_c
-  let compare = compare_c
   let pp = pp_c
 
   module Id = Identifier
@@ -102,7 +100,7 @@ module Of = Schematic.Schema.Walk (struct
       fun marks ->
         let ((referenced_type, _) as res) = s () marks in
         ( `Atom (Identifier.make id, Some referenced_type),
-          Marks.add marks @@ (id, res) )
+          Marks.add marks @@ (id, lazy res) )
 
   let parametric _ _ _ _ = failwith "parametric never used"
 
@@ -257,13 +255,62 @@ module Of = Schematic.Schema.Walk (struct
     schema (Some "sch_date") None (fun () -> return s) marks
 end)
 
+module Make_mark_converter (M : sig
+  val identified : c -> string option * c
+
+  val of_descriptor :
+    string option -> 'a Schematic.Schema.descriptor -> c * Marks.t
+end) =
+struct
+  let of_descriptor = M.of_descriptor
+
+  let mark_of_schema Schematic.Schema.{ id; descriptor; parametric = _ } =
+    let res, marks = M.of_descriptor id descriptor in
+    let id_inner, res = M.identified res in
+    let id = Option.first_some id id_inner |> Option.value_exn ~here:[%here] in
+    (* We only consider reifications, hence why `parametric` is ignored. *)
+    (id, lazy (res, marks))
+
+  let of_schema_state marks s = of_mark marks @@ mark_of_schema s
+
+  let unpacker marks =
+    let unpack :
+        type a. a Schematic.Schema.t -> (Identifier.t * c) list * Marks.t =
+     fun s -> of_schema_state marks s
+    in
+    { Schematic.Schema.unpack }
+
+  let of_schemas_state marks schemas =
+    let f (res, marks) s =
+      let ts, marks = Schematic.Schema.unpack (unpacker marks) s in
+      (res @ ts, marks)
+    in
+    List.fold_left ~init:([], marks) ~f schemas
+
+  type state = Marks.t
+
+  let state_empty = Marks.empty
+
+  let state_exclude schemas =
+    Marks.of_list
+      (List.map
+         ~f:(Schematic.Schema.unpack { unpack = mark_of_schema })
+         schemas)
+
+  let of_schemas ?(exclude = []) schemas =
+    let marks = state_exclude exclude in
+    of_schemas_state marks schemas |> fst
+
+  let of_schema schema = of_schema_state Marks.empty schema |> fst
+end
+
 include Make_mark_converter (struct
   (* FIXME: this is an ugly workaround. *)
   let identified c =
     c_typename c |> Identifier.to_string |> fun s -> (s ^ "_2" |> Option.some, c)
 
   let of_descriptor id d =
-    try Of.descriptor ~id d (Lazy.force Marks.empty)
+    try Of.descriptor ~id d Marks.empty
     with e ->
       Logs.err (fun m ->
           m "Exception thrown for descriptor %a:@ @[%a@]"

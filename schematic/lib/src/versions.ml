@@ -7,6 +7,7 @@ module V0_18_0 = struct
     module Schema = Json_schema
   end
 
+  module Marks = Marks
   module Schema = Schema
   module Schemas = Schemas
   module Coding = Coding
