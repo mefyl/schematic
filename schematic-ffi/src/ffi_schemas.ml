@@ -63,7 +63,7 @@ module Of = Schematic.Schema.Walk (struct
   let ( let* ) = ( >>= )
   let ( let+ ) = ( >>| )
 
-  type field = string * c
+  type field = (string * c) option
 
   (* Built-ins *)
 
@@ -114,12 +114,19 @@ module Of = Schematic.Schema.Walk (struct
       None
       (fun () -> return (`Option ast))
 
-  let field name required schema =
+  let field ~required name schema =
     let+ ast = if required then schema else nullable schema in
-    (name, ast)
+    Some (name, ast)
+
+  let inline _ schema { Schematic.Schema.name; requirement; _ } =
+    Some
+      (field ~required:(Schematic.Schema.required requirement) name (schema ()))
+
+  let field ~computed ~required name schema =
+    if computed then return None else field ~required name schema
 
   let object_ fields =
-    fields >>| function
+    fields >>| List.map ~f:List.filter_opt >>| function
     | [ [] ] -> `Void
     | [ fields ] ->
       let fields =
@@ -127,9 +134,6 @@ module Of = Schematic.Schema.Walk (struct
       in
       `Struct { fields }
     | _ -> failwith "unreachable"
-
-  let inline _ schema { Schematic.Schema.name; requirement; _ } =
-    Some (field name (Schematic.Schema.required requirement) (schema ()))
 
   let case ~key:_ ~inline ~name ~raw_name case =
     let+ ast = case in

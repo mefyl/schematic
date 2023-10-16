@@ -141,7 +141,7 @@ module type WALK = sig
 
       All schema details such as ignored fields and inlining are handled by the
       walker. *)
-  val field : string -> bool -> t M.t -> field M.t
+  val field : computed:bool -> required:bool -> string -> t M.t -> field M.t
 
   (** [object_ fields] combines the fields alternatives in a single object.
 

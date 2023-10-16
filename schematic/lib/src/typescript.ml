@@ -87,7 +87,7 @@ module Of = Schema.Walk (struct
   let json = atom "any"
   let bool = atom "boolean"
 
-  let field name required schema =
+  let field ~computed:_ ~required name schema =
     let+ schema = schema in
     Field (name, schema, required)
 

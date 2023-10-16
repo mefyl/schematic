@@ -6,6 +6,10 @@ let ( let+ ) v f = Caml.Result.map f v
 let ( and+ ) = Base.Result.Let_syntax.Let_syntax.both
 let make ?id ?parametric descriptor = { id; descriptor; parametric }
 
+let computed : type a b. (a, b) requirement -> bool = function
+  | Computed | Computed_optional -> true
+  | _ -> false
+
 let required : type a b. (a, b) requirement -> bool = function
   | Computed | Required -> true
   | _ -> false
@@ -484,7 +488,9 @@ module Walk (W : WALK) = struct
     | Object _ as o -> (
       let fields =
         let f { name; requirement; schema = s; _ } =
-          W.field name (required requirement) (schema @@ field_schema s)
+          W.field ~required:(required requirement)
+            ~computed:(computed requirement) name
+            (schema @@ field_schema s)
         and filter field =
           let s = field_schema field.schema in
           W.inline
