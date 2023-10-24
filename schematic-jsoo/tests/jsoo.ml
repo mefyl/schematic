@@ -1,3 +1,11 @@
+open Base
+
+module Schemas_library = struct
+  type Schematic.Schema.library += V
+
+  let v = V
+end
+
 module Jsoo = Test_utils.Tests.Make (struct
   include Schematic_jsoo.Jsoo
 
@@ -13,4 +21,25 @@ module Jsoo = Test_utils.Tests.Make (struct
   let extra_test ~here:_ _ _ = ()
 end)
 
-let () = Alcotest.run "Schematic_jsoo.Jsoo" Jsoo.tests
+module Errors = struct
+  type either_opt = { v : (int, bool) Either.t option } [@@deriving schema]
+
+  let undefined () =
+    let res =
+      Schematic_jsoo.Jsoo.decode either_opt_schema
+        (Js_of_ocaml.Js.Unsafe.inject
+           (object%js
+              val v = Js_of_ocaml.Js.undefined
+           end))
+    in
+    Alcotest.(
+      check ~here:[%here] (result pass reject)
+        "undefined in JSON does not choke")
+      (Result.Ok { v = None })
+      res
+
+  let tests = Alcotest.[ test_case "undefined" `Quick undefined ]
+end
+
+let () =
+  Alcotest.run "Schematic_jsoo.Jsoo" (("jsoo", Errors.tests) :: Jsoo.tests)

@@ -22,7 +22,9 @@
  (name jsoo)
  (modes js)
  (modules jsoo)
- (libraries alcotest js_of_ocaml schematic-jsoo test_utils))
+ (libraries alcotest js_of_ocaml schematic-jsoo test_utils)
+ (preprocess
+  (pps js_of_ocaml-ppx ppx_here schematic.ppx)))
 
 (rule
  (alias runtest)

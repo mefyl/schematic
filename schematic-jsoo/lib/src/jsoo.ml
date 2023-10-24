@@ -23,7 +23,11 @@ module Impl : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
 
   let name = "javascript"
   let compare _ _ = failwith "FIXME"
-  let pp fmt t = Fmt.string fmt @@ Js.to_string @@ Js._JSON##stringify t
+
+  let pp fmt t =
+    if Js.Optdef.test @@ Js.Optdef.return t then
+      Fmt.string fmt @@ Js.to_string @@ Js._JSON##stringify t
+    else Fmt.string fmt "undefined"
 
   let type_name o =
     if Js.Opt.return o == Js.null then "null"
