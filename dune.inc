@@ -9,7 +9,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
     %{dep:entropic.opam} --cross
-    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
     --cross-both
     bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross-exclude ""))))
@@ -28,7 +28,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite --input
     %{dep:entropic.opam.locked} --local
-    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy))))
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt))))
 (rule (target schematic.%{version:schematic}.opam)
  (deps (:opam schematic.opam))
  (action
@@ -41,7 +41,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
     %{dep:schematic.opam} --cross
-    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
     --cross-both
     bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross-exclude ""))))
@@ -60,7 +60,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite --input
     %{dep:schematic.opam.locked} --local
-    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy))))
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt))))
 (rule (target schematic-cli.%{version:schematic-cli}.opam)
  (deps (:opam schematic-cli.opam))
  (action
@@ -73,7 +73,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
     %{dep:schematic-cli.opam} --cross
-    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
     --cross-both
     bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross-exclude ""))))
@@ -92,7 +92,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite --input
     %{dep:schematic-cli.opam.locked} --local
-    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy))))
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt))))
 (rule (target schematic-ffi.%{version:schematic-ffi}.opam)
  (deps (:opam schematic-ffi.opam))
  (action
@@ -105,7 +105,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
     %{dep:schematic-ffi.opam} --cross
-    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
     --cross-both
     bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross-exclude ""))))
@@ -124,7 +124,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite --input
     %{dep:schematic-ffi.opam.locked} --local
-    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy))))
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt))))
 (rule (target schematic-http.%{version:schematic-http}.opam)
  (deps (:opam schematic-http.opam))
  (action
@@ -137,7 +137,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
     %{dep:schematic-http.opam} --cross
-    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
     --cross-both
     bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross-exclude ""))))
@@ -156,7 +156,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite --input
     %{dep:schematic-http.opam.locked} --local
-    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy))))
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt))))
 (rule (target schematic-jsoo.%{version:schematic-jsoo}.opam)
  (deps (:opam schematic-jsoo.opam))
  (action
@@ -169,7 +169,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
     %{dep:schematic-jsoo.opam} --cross
-    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
     --cross-both
     bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross-exclude ""))))
@@ -188,7 +188,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite --input
     %{dep:schematic-jsoo.opam.locked} --local
-    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy))))
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt))))
 (rule (target schematic-sexp.%{version:schematic-sexp}.opam)
  (deps (:opam schematic-sexp.opam))
  (action
@@ -201,7 +201,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
     %{dep:schematic-sexp.opam} --cross
-    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
     --cross-both
     bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross-exclude ""))))
@@ -220,7 +220,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite --input
     %{dep:schematic-sexp.opam.locked} --local
-    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy))))
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt))))
 (rule (target schematic-sqml.%{version:schematic-sqml}.opam)
  (deps (:opam schematic-sqml.opam))
  (action
@@ -233,7 +233,7 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
     %{dep:schematic-sqml.opam} --cross
-    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
     --cross-both
     bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross-exclude ""))))
@@ -252,4 +252,4 @@
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite --input
     %{dep:schematic-sqml.opam.locked} --local
-    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy))))
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt))))
