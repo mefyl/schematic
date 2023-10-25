@@ -4,7 +4,7 @@
    (progn (cat %{opam})
     (echo
      "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:entropic}\" }")))))
-(rule (alias default) (target entropic-ios.opam)
+(rule (target entropic-ios.opam)
  (action
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
@@ -36,7 +36,7 @@
    (progn (cat %{opam})
     (echo
      "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic}\" }")))))
-(rule (alias default) (target schematic-ios.opam)
+(rule (target schematic-ios.opam)
  (action
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
@@ -68,7 +68,7 @@
    (progn (cat %{opam})
     (echo
      "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-cli}\" }")))))
-(rule (alias default) (target schematic-cli-ios.opam)
+(rule (target schematic-cli-ios.opam)
  (action
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
@@ -100,7 +100,7 @@
    (progn (cat %{opam})
     (echo
      "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-ffi}\" }")))))
-(rule (alias default) (target schematic-ffi-ios.opam)
+(rule (target schematic-ffi-ios.opam)
  (action
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
@@ -132,7 +132,7 @@
    (progn (cat %{opam})
     (echo
      "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-http}\" }")))))
-(rule (alias default) (target schematic-http-ios.opam)
+(rule (target schematic-http-ios.opam)
  (action
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
@@ -164,7 +164,7 @@
    (progn (cat %{opam})
     (echo
      "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-jsoo}\" }")))))
-(rule (alias default) (target schematic-jsoo-ios.opam)
+(rule (target schematic-jsoo-ios.opam)
  (action
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
@@ -196,7 +196,7 @@
    (progn (cat %{opam})
     (echo
      "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-sexp}\" }")))))
-(rule (alias default) (target schematic-sexp-ios.opam)
+(rule (target schematic-sexp-ios.opam)
  (action
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input
@@ -228,7 +228,7 @@
    (progn (cat %{opam})
     (echo
      "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-sqml}\" }")))))
-(rule (alias default) (target schematic-sqml-ios.opam)
+(rule (target schematic-sqml-ios.opam)
  (action
   (with-stdout-to %{target}
    (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-ios --input

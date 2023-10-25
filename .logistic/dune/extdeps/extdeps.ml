@@ -166,7 +166,6 @@ let () =
           List
             [
               Atom "rule";
-              List [ Atom "alias"; Atom "default" ];
               List [ Atom "target"; Atom (package ^ "-ios.opam") ];
               List
                 [
@@ -269,7 +268,7 @@ let () =
                  {
                    value with
                    pelem =
-                     pin_depend "ocamlformat" "0.25.1"
+                     pin_depend "ocamlformat" "0.26.1"
                      :: { pelem = String "opam-file-format"; pos }
                      :: { pelem = String "sexplib"; pos }
                      :: { pelem = String "shexp"; pos }
