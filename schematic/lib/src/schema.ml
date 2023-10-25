@@ -291,7 +291,7 @@ module Make_inline (M : Base.Monad.S) = struct
                   | None -> next ()
                   | Some res ->
                     Result.return
-                    @@ let++ res = res in
+                    @@ let++ res in
                        [ [ res ] ])
               in
               inline_try ~inline ~outline field.schema
@@ -303,8 +303,8 @@ module Make_inline (M : Base.Monad.S) = struct
               | Optional -> inline_fields Optional rest
               | Required -> inline_fields Required rest
             in
-            let++ head = head
-            and++ tail = tail in
+            let++ head
+            and++ tail in
             Sequence.(
               cartesian_product (of_list head) (of_list tail)
               |> map ~f:(fun (h, t) -> h @ t)
@@ -337,8 +337,8 @@ module Make_inline (M : Base.Monad.S) = struct
               |> M.map ~f:Option.return
           in
           let+ res = inline schema.descriptor Required f in
-          let++ key = key
-          and++ res = res in
+          let++ key
+          and++ res in
           match key with
           | Some key -> List.map ~f:(fun l -> key :: l) res
           | None -> res

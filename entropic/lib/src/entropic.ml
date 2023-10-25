@@ -71,7 +71,7 @@ module Make (Entropy : Entropy.S) = struct
       Caml.Bytes.get_int64_ne bytes 0
     in
     let bool =
-      let+! byte = byte in
+      let+! byte in
       byte land 1 = 1
     and float =
       let+! int = int64 in
@@ -199,7 +199,7 @@ module Make (Entropy : Entropy.S) = struct
       | String_const _ -> return (Result.return ())
       | Time -> time
       | Time_local ->
-        let+! time = time
+        let+! time
         and+! offset =
           (* FIXME: some timezone have half hours offset *) range (-12) 12
         in

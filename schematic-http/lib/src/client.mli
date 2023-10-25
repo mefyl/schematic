@@ -31,24 +31,27 @@ val check_status_is :
 
 (** [With_timeout (Timeout) (Handler)] is [Handler] with timeout defaulting to
     [Timeout.v]. *)
-module With_timeout (Timeout : sig
-  val v : Timmy.Span.t
-end)
-(Handler : HANDLER) :
+module With_timeout
+    (Timeout : sig
+      val v : Timmy.Span.t
+    end)
+    (Handler : HANDLER) :
   HANDLER
     with type 'a response = 'a Handler.response
      and type error = Handler.error
 
-module With_headers (Headers : sig
-  val headers : (string * string) list
-end)
-(Handler : HANDLER) :
+module With_headers
+    (Headers : sig
+      val headers : (string * string) list
+    end)
+    (Handler : HANDLER) :
   HANDLER
     with type 'a response = 'a Handler.response
      and type error = Handler.error
 
 module Map_error
-    (Handler : HANDLER) (E : sig
+    (Handler : HANDLER)
+    (E : sig
       type t
 
       val map : Handler.error -> t

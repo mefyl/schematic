@@ -50,10 +50,10 @@ let payload_variant_to_caml
       rich
       |> List.mapi
            ~f:(fun
-                i
-                ({ name = constr_name; type_ = constr_type; inline } :
-                  regular_variant_constr)
-              ->
+               i
+               ({ name = constr_name; type_ = constr_type; inline } :
+                 regular_variant_constr)
+             ->
              Logs.debug (fun m ->
                  m "Rich case constructor type: %a" pp_c constr_type);
              let payload = Fmt.str "x.payload->%a" Identifier.pp constr_name in

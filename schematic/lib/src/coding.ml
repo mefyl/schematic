@@ -236,7 +236,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
                   in
                   decode_field omit context field_name schema requirement value
                 in
-                let* field = field in
+                let* field in
                 let* tail = decode_object rest in
                 Result.Ok Hlist.(field :: tail))
           in

@@ -137,14 +137,14 @@ let close ~configuration:{ name } ~context:_ ~type_context
         type columns = [%t columns_type] [@@warning "-unused-type-declaration"]
 
         let columns = Sqml.Column.List.([%e columns_list])
-          [@@warning "-unused-var-strict"]
+        [@@warning "-unused-var-strict"]
 
         type primary = [%t primary_type] [@@warning "-unused-type-declaration"]
 
         let primary columns =
           let open Sqml.Expression.Column.List in
           [%e explode_columns ~loc fields [%expr [%e primary]]]
-          [@@warning "-unused-var-strict"]
+        [@@warning "-unused-var-strict"]
       end)
 
       type mapped =
@@ -153,7 +153,7 @@ let close ~configuration:{ name } ~context:_ ~type_context
       let map columns =
         let open Hlist in
         [%e explode_columns ~loc fields record]
-        [@@warning "-unused-var-strict"]
+      [@@warning "-unused-var-strict"]
 
       let unmap [%p record_pattern] = Acid.Hlist.([%e columns_list])
 

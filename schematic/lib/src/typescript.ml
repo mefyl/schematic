@@ -11,7 +11,7 @@ type t =
       name : string;
       args : t list;
     }  (** [Template<T1, T2, ..., TN>] *)
-  | Tuple of t list  (** [\[T1, T2, ..., TN \]]*)
+  | Tuple of t list  (** [[T1, T2, ..., TN ]]*)
   | Union of t list  (** [T1 | T2 | ... | TN] *)
 [@@deriving show]
 
@@ -67,7 +67,7 @@ module Of = Schema.Walk (struct
     | None -> ( match id with None -> s () | Some id -> of_id id s)
 
   let parametric template_name args effective t =
-    let* t = t
+    let* t
     and* effective = M.all effective in
     fun marks ->
       let template_name = name template_name in
@@ -88,7 +88,7 @@ module Of = Schema.Walk (struct
   let bool = atom "boolean"
 
   let field ~computed:_ ~required name schema =
-    let+ schema = schema in
+    let+ schema in
     Field (name, schema, required)
 
   let inline (parametric : (unit -> Marks.t -> t * Marks.t) option) schema s =
@@ -111,19 +111,19 @@ module Of = Schema.Walk (struct
   let int64 = float
 
   let list elt =
-    let+ elt = elt in
+    let+ elt in
     Template { name = "Array"; args = [ elt ] }
 
   let map ts = ts
 
   let mapping elt =
-    let+ elt = elt in
+    let+ elt in
     Template { name = "Record"; args = [ Atom "string"; elt ] }
 
   let null = atom "null"
 
   let nullable schema =
-    let+ schema = schema in
+    let+ schema in
     Union [ schema; Atom "null" ]
 
   let object_ fields =
@@ -136,7 +136,7 @@ module Of = Schema.Walk (struct
       let object_ = Object { fields } in
       match types with [] -> object_ | _ -> Intersection (object_ :: types)
     in
-    let+ fields = fields in
+    let+ fields in
     match fields with
     | [] -> failwith "typescript: of_objects yielded no result"
     | [ fields ] -> f fields
@@ -147,7 +147,7 @@ module Of = Schema.Walk (struct
   let time_local = time
 
   let tuple items =
-    let+ items = items in
+    let+ items in
     Tuple items
 
   let string_const s marks = (Atom (Fmt.str "%S" s), marks)
@@ -155,14 +155,14 @@ module Of = Schema.Walk (struct
   (* Union *)
 
   let case ~key ~inline:_ ~name ~raw_name:_ schema =
-    let+ schema = schema in
+    let+ schema in
     match key with
     | None -> schema
     | Some key ->
       Intersection [ schema; Object { fields = [ (key, String name, true) ] } ]
 
   let union ~id:_ ~polymorphic:_ cases =
-    let+ cases = cases in
+    let+ cases in
     Union cases
 end)
 

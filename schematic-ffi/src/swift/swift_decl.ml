@@ -137,9 +137,9 @@ let type_decl fmt (c_name, ts) =
             rich
             |> List.map
                  ~f:(fun
-                      ({ name = id; type_ = c; inline = _ } :
-                        regular_variant_constr)
-                    ->
+                     ({ name = id; type_ = c; inline = _ } :
+                       regular_variant_constr)
+                   ->
                    to_c_case ~all_basic ~c_variant_name:c_name
                      ~c_constructor_name:id ~c_constructor_type:(Some c))
           in
@@ -156,9 +156,9 @@ let type_decl fmt (c_name, ts) =
             rich
             |> List.map
                  ~f:(fun
-                      ({ name = id; type_ = c; inline = _ } :
-                        regular_variant_constr)
-                    ->
+                     ({ name = id; type_ = c; inline = _ } :
+                       regular_variant_constr)
+                   ->
                    of_c_case ~all_basic ~swift_type_name ~c_variant_name:c_name
                      ~c_constructor_name:id ~c_constructor_type:(Some c))
           in

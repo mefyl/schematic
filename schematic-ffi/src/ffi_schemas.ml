@@ -143,7 +143,7 @@ module Of = Schematic.Schema.Walk (struct
       | Some id -> id
       | None -> failwith "union schema must have an id"
     in
-    let* cases = cases in
+    let* cases in
     let constructors =
       cases
       |> List.map ~f:(fun (s, raw_s, c, inline) ->
@@ -201,7 +201,7 @@ module Of = Schematic.Schema.Walk (struct
       `Variant ({ name; basic; rich } : regular_variant)
 
   let tuple items =
-    let* items = items in
+    let* items in
     let tuple_name = tuple_name items in
     schema
       (Some (Identifier.to_string tuple_name))

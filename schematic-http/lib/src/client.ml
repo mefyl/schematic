@@ -93,7 +93,8 @@ struct
 end
 
 module Map_error
-    (Handler : HANDLER) (E : sig
+    (Handler : HANDLER)
+    (E : sig
       type t
 
       val map : Handler.error -> t
@@ -549,10 +550,11 @@ let check_status_is expected =
   end : STATUS
     with type error = Cohttp_.Code.status_code)
 
-module With_headers (Headers : sig
-  val headers : (string * string) list
-end)
-(Handler : HANDLER) =
+module With_headers
+    (Headers : sig
+      val headers : (string * string) list
+    end)
+    (Handler : HANDLER) =
 struct
   include Handler
 
@@ -561,10 +563,11 @@ struct
     Handler.raw ?timeout ~headers ?body method_ uri
 end
 
-module With_timeout (Timeout : sig
-  val v : Timmy.Span.t
-end)
-(Handler : HANDLER) =
+module With_timeout
+    (Timeout : sig
+      val v : Timmy.Span.t
+    end)
+    (Handler : HANDLER) =
 struct
   include Handler
 
