@@ -194,7 +194,7 @@ module type WALK = sig
 end
 
 type library = ..
-type version = library -> Version.t option
+type version = library -> Semver.t option
 
 (** A descriptor mapped to the simplest atomic descriptor possible *)
 type 't flatten =

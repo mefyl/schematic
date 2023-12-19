@@ -32,3 +32,13 @@ module Option = struct
   include T
   include Base.Comparable.Make (T)
 end
+
+let schema =
+  let decode s =
+    match of_string s with
+    | Some version -> Result.Ok version
+    | None -> Result.Error (Fmt.str "invalid version: %s" s)
+  in
+  Schema.map ~decode ~encode:to_string @@ Schemas.string_schema
+
+let schema_versioned _ = schema
