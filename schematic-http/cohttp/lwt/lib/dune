@@ -1,0 +1,4 @@
+(library
+ (name schematic_cohttp_lwt)
+ (public_name schematic-cohttp-lwt)
+ (libraries cohttp-lwt logs nofuture-lwt schematic-http timmy-lwt))

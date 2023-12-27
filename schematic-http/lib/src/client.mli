@@ -1,27 +1,42 @@
 include module type of Client_intf
 
 module Make (Handler : HANDLER) :
-  S with type 'a t = 'a Handler.response and type error = Handler.error
-
-module Rate_limit (Rate : RATE_LIMIT) (Handler : HANDLER) :
-  HANDLER
-    with type 'a response = 'a Handler.response
+  S
+    with type t = Handler.t
+     and type 'a result = 'a Handler.result
      and type error = Handler.error
+     and module Future = Handler.Future
 
-module Rate_limit' (Rate : RATE_LIMIT') (Handler : HANDLER) :
+module Rate_limit
+    (Rate : RATE_LIMIT)
+    (Handler : HANDLER with module Future = Rate.Future) :
   HANDLER
-    with type 'a response = 'a Handler.response
+    with type t = Handler.t
+     and type 'a result = 'a Handler.result
+     and type error = Handler.error
+     and module Future = Handler.Future
+
+module Rate_limit'
+    (Rate : RATE_LIMIT')
+    (Handler : HANDLER with module Future = Rate.Future) :
+  HANDLER
+    with type t = Handler.t
+     and type 'a result = 'a Handler.result
      and type error = Handler.error
 
 module Optional (Handler : HANDLER) :
   HANDLER
-    with type 'a response = 'a option Handler.response
+    with type t = Handler.t
+     and type 'a result = 'a option Handler.result
      and type error = Handler.error
+     and module Future = Handler.Future
 
 module Check_status (Status : STATUS) (Handler : HANDLER) :
   HANDLER
-    with type 'a response = 'a Handler.response
+    with type t = Handler.t
+     and type 'a result = 'a Handler.result
      and type error = (Status.error, Handler.error) Error.status
+     and module Future = Handler.Future
 
 module Status_success : STATUS with type error = Cohttp.Code.status_code
 
@@ -37,8 +52,10 @@ module With_timeout
     end)
     (Handler : HANDLER) :
   HANDLER
-    with type 'a response = 'a Handler.response
+    with type t = Handler.t
+     and type 'a result = 'a Handler.result
      and type error = Handler.error
+     and module Future = Handler.Future
 
 module With_headers
     (Headers : sig
@@ -46,8 +63,10 @@ module With_headers
     end)
     (Handler : HANDLER) :
   HANDLER
-    with type 'a response = 'a Handler.response
+    with type t = Handler.t
+     and type 'a result = 'a Handler.result
      and type error = Handler.error
+     and module Future = Handler.Future
 
 module Map_error
     (Handler : HANDLER)
@@ -56,11 +75,10 @@ module Map_error
 
       val map : Handler.error -> t
     end) :
-  HANDLER with type 'a response = 'a Handler.response and type error = E.t
-
-module Cohttp
-    (Client : Cohttp_lwt.S.Client)
-    (Coding : Schematic.Coding.STR with type t = string) :
-  HANDLER with type 'a response = 'a and type error = Error.never
+  HANDLER
+    with type t = Handler.t
+     and type 'a result = 'a Handler.result
+     and type error = E.t
+     and module Future = Handler.Future
 
 val src : Logs.Src.t

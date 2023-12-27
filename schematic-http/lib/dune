@@ -3,6 +3,6 @@
 (library
  (name schematic_http)
  (public_name schematic-http)
- (libraries cohttp-lwt schematic timmy timmy-lwt unix)
+ (libraries cohttp logs nofuture schematic timmy unix)
  (preprocess
   (pps ppx_deriving.eq ppx_deriving.make)))
