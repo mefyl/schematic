@@ -1,6 +1,3 @@
-let ( let* ) = Lwt.( >>= )
-let ( let+ ) = Lwt.( >|= )
-
 include
   Schematic_http_tests.Make
     (Nofuture_lwt)

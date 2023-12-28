@@ -16,6 +16,8 @@ type 'a response = {
   status : Cohttp.Code.status_code;
 }
 
+type exn += Channel of [ `Networking ] Error.t
+
 module type REQUESTS = sig
   type ('a, 'body, 'response) t
   type 'a result

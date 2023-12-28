@@ -31,9 +31,10 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
   module Coding = Coding
   module Monad = Result
 
-  let handle_exn method_ uri = function
+  let error_of_exn method_ uri = function
     | Eio.Time.Timeout ->
-      Result.fail Schematic_http.Error.(make ~method_ ~reason:`Networking uri)
+      let () = Logs.info (fun m -> m "timeout requesting %a" Uri.pp uri) in
+      Schematic_http.Error.(make ~method_ ~reason:`Networking uri)
     | Unix.Unix_error ((Unix.EBADF as e), _, _)
     | Unix.Unix_error ((Unix.ENOTCONN as e), _, _)
     | Unix.Unix_error ((Unix.EADDRNOTAVAIL (* Seen on iOS *) as e), _, _) ->
@@ -42,9 +43,8 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
             m "retryable unix exception requesting %a: %s" Uri.pp uri
               (Unix.error_message e))
       in
-      Result.Error
-        Schematic_http.Error.(
-          make ~method_ ~status:(`Code 0) ~reason:`Networking uri)
+      Schematic_http.Error.(
+        make ~method_ ~status:(`Code 0) ~reason:`Networking uri)
     | (e : exn) ->
       (* FIXME: Cohttp has no API guarantees about exception that may escape
          depending on the backend. Unreleased recent version yield [Retry]
@@ -57,7 +57,7 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
         Logs.warn (fun m ->
             m "treating cohttp exception as retryabale: %a" Base.Exn.pp e)
       in
-      Result.Error Schematic_http.Error.(make ~method_ ~reason:`Networking uri)
+      Schematic_http.Error.(make ~method_ ~reason:`Networking uri)
 
   module Body = struct
     type nonrec t = {
@@ -86,21 +86,38 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
         uri;
       }
 
-    let to_string { body; method_; deadline; uid; uri } =
-      try
-        let timeout =
-          match deadline with
-          | None -> Eio.Time.Timeout.none
-          | Some ({ clock; mono_clock; _ }, deadline) ->
-            Eio.Time.Timeout.seconds mono_clock
-            @@ (deadline -. Eio.Time.now clock)
-        in
-        Eio.Time.Timeout.run_exn timeout @@ fun () ->
-        Eio.Flow.read_all body |> Result.return
-      with exn -> handle_exn method_ uri exn
+    let with_deadline deadline f =
+      let timeout =
+        match deadline with
+        | None -> Eio.Time.Timeout.none
+        | Some ({ clock; mono_clock; _ }, deadline) ->
+          Eio.Time.Timeout.seconds mono_clock @@ (deadline -. Eio.Time.now clock)
+      in
+      Eio.Time.Timeout.run_exn timeout f
 
-    let to_channel { body; _ } =
-      (body : _ Eio.Flow.source :> Eio.Flow.source_ty Eio.Resource.t)
+    let to_string { body; method_; deadline; uri; _ } =
+      try
+        with_deadline deadline @@ fun () ->
+        Eio.Flow.read_all body |> Result.return
+      with Eio.Time.Timeout as exn ->
+        raise (Schematic_http.Channel (error_of_exn method_ uri exn))
+
+    let to_channel { body; deadline; method_; uri; _ } =
+      match deadline with
+      | None -> body
+      | Some _ ->
+        let module Source_timeout = struct
+          type t = Eio.Flow.source_ty Eio.Resource.t
+
+          let single_read t dst =
+            try with_deadline deadline @@ fun () -> Eio.Flow.single_read t dst
+            with Eio.Time.Timeout as exn ->
+              raise (Schematic_http.Channel (error_of_exn method_ uri exn))
+
+          let read_methods = []
+        end in
+        let ops = Eio.Flow.Pi.source (module Source_timeout) in
+        Eio.Resource.T (body, ops)
 
     let drain _ =
       (* AFAICT cohttp-eio does not support keepalive and draining so far *) ()
@@ -149,5 +166,5 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
         in
         Result.return
           (resp, { Body.body; method_; deadline; uid = Some uid; uri })
-    with exn -> handle_exn method_ uri exn
+    with exn -> Result.Error (error_of_exn method_ uri exn)
 end

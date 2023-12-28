@@ -151,6 +151,7 @@ struct
       and pending = ref None in
       Lwt_io.make ~close:(fun () -> drain body) ~mode:Lwt_io.input
       @@ fun buffer pos size ->
+      let* () = Logs.info (fun m -> m "read chunk") in
       match !pending with
       | Some (chunk, chunk_pos) ->
         let length = String.length chunk - chunk_pos in
@@ -163,8 +164,8 @@ struct
           and () = pending := Some (chunk, chunk_pos + size) in
           Lwt.return size
       | None -> (
-        with_timeout ~cancel:true ~method_ ~f:Base.Option.return "reading body"
-          uid uri timeout (Lwt_stream.get stream)
+        with_timeout ~method_ ~f:Base.Option.return "reading body" uid uri
+          timeout (Lwt_stream.get stream)
         >>= function
         | Some (Result.Ok chunk) ->
           let length = String.length chunk in
@@ -175,7 +176,7 @@ struct
             let () = Lwt_bytes.blit_from_string chunk 0 buffer pos size
             and () = pending := Some (chunk, size) in
             Lwt.return size
-        | Some (Result.Error _) -> failwith "FIXME"
+        | Some (Result.Error e) -> raise (Schematic_http.Channel e)
         | None ->
           let+ () =
             Logs.info (fun m -> m "%a done streaming body" pp_uid uid)
