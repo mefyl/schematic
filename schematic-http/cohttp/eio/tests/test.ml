@@ -7,12 +7,8 @@ module Tests =
     (Schematic_cohttp_eio.Make (Schematic.Json.String))
 
 let () =
-  let test_suite env tests =
-    let client =
-      Schematic_cohttp_eio.make ~clock:(Eio.Stdenv.clock env)
-        ~mono_clock:(Eio.Stdenv.mono_clock env)
-        ~net:(Eio.Stdenv.net env)
-    in
+  let test_suite clock mono_clock net tests =
+    let client = Schematic_cohttp_eio.make ~clock ~mono_clock ~net in
     Alcotest.(
       run_with_args "schematic-cohttp-eio" (Cmdliner.Term.const client) tests)
   and test_case = Alcotest.test_case in

@@ -4,21 +4,6 @@ let src = Logs.Src.create ~doc:"schematic HTTP client" "schematic-http"
 
 module Logs = (val Logs.src_log src)
 
-let empty = Schematic.Schema.make Ignore
-
-let stream_schema () =
-  Schematic.Schema.make
-    (Map
-       {
-         decode =
-           (fun () ->
-             Result.Error "Schematic_http.stream_schema is a placeholder");
-         encode = (fun _ -> ());
-         descriptor = Ignore;
-       })
-
-let string = Schematic.Schema.make String
-
 module Map_error
     (Handler : HANDLER)
     (E : sig
@@ -46,24 +31,31 @@ module Make (Handler : HANDLER) = struct
 
   let ( let* ) v f = Handler.Future.bind v ~f
 
+  type 'a body =
+    | Empty : unit body
+    | Channel : Future.Scope.t -> Future.In_channel.t body
+    | Schema : 'a Schematic.Schema.t -> 'a body
+    | String : string body
+
   module Make_requests (Call : sig
-    type 'a res
+    type 'a result
     type error
 
     val call :
-      ( t,
-        Cohttp.Code.meth ->
-        Uri.t ->
-        ('response res, [> error Error.reason ] Error.t) Result.t Future.t,
-        'body,
-        'response )
-      request
+      t ->
+      ?timeout:Timmy.Span.t ->
+      ?headers:(string * string) list ->
+      ?body:'body body * 'body ->
+      'response body ->
+      Cohttp.Code.meth ->
+      Uri.t ->
+      ('response result, [> error Error.reason ] Error.t) Result.t Future.t
   end) =
   struct
     include (
       Call :
         module type of Call
-          with type 'a res := 'a Call.res
+          with type 'a result := 'a Call.result
            and type error := Call.error)
 
     let delete t ?timeout ?headers ?body response uri =
@@ -85,82 +77,80 @@ module Make (Handler : HANDLER) = struct
       call t ?timeout ?headers ?body response `PUT uri
   end
 
-  let empty = empty
-  let stream : Future.In_channel.t Schematic.Schema.t = stream_schema ()
-  let string = string
-
-  let _call (type body response) t ?timeout ?(headers = [])
-      ?(body : (body Schematic.Schema.t * body) option)
-      (response : response Schematic.Schema.t) method_ uri =
-    let body, headers =
-      let content_length l headers =
-        if Handler.send_content_length then
-          ("Content-Length", Int.to_string l) :: headers
-        else headers
-      in
-      match body with
-      | Some (schema, s) when Obj.magic schema == stream ->
-        (Some Body.(of_channel method_ uri (Obj.magic s)), headers)
-      | Some (({ descriptor = String; _ } as schema), s) when schema == string
-        ->
-        ( Some Body.(of_string method_ uri s),
-          content_length (String.length s) headers )
-      | Some (schema, value) ->
-        let body = Coding.encode schema value in
-        ( Some (Body.of_string method_ uri body),
-          content_length (String.length body) headers )
-      | None -> (
-        match method_ with
-        | `POST | `PUT | `PATCH -> (None, content_length 0 headers)
-        | _ -> (None, headers))
-    in
-    let headers =
-      match body with
-      | Some _
-        when Option.is_none
-               ((List.find_opt (fun (name, _) ->
-                     String.(lowercase_ascii name = "content-type")))
-                  headers) ->
-        ("Content-Type", Handler.Coding.content_type) :: headers
-      | _ -> headers
-    in
-    Future.Scope.run @@ fun scope ->
-    Handler.Monad.bind (raw t ~scope ?timeout ~headers ?body method_ uri)
-      ~f:(fun (resp, body) ->
-        let body =
-          match response with
-          | { descriptor = Ignore; _ } when response == empty ->
-            let* () = Body.drain body in
-            Handler.Monad.return (() : response)
-          | schema when Obj.magic schema == stream ->
-            Handler.Monad.return (Obj.magic (Body.to_channel body))
-          | { descriptor = String; _ } as schema when schema == string -> (
-            let* body = Body.to_string body in
-            match body with
-            | Result.Error _ as error -> Future.return error
-            | Result.Ok body ->
-              let () = Logs.debug (fun m -> m "response body:\n%s" body) in
-              Handler.Monad.return body)
-          | response -> (
-            let* body = Body.to_string body in
-            match body with
-            | Result.Error _ as error -> Future.return error
-            | Result.Ok body -> (
-              let () = Logs.debug (fun m -> m "response body:\n%s" body) in
-              match Coding.decode response body with
-              | Result.Ok body -> Handler.Monad.return body
-              | Result.Error e ->
-                Future.return
-                  (Result.Error
-                     (Error.make ~method_
-                        ~status:(Cohttp.Response.status resp)
-                        ~reason:(`Decoding e) uri))))
+  let _call (type request response) t ?timeout ?(headers = [])
+      ?(body : (request body * request) option) (response : response body)
+      method_ uri =
+    let call scope =
+      let body, headers =
+        let content_length l headers =
+          if Handler.send_content_length then
+            ("Content-Length", Int.to_string l) :: headers
+          else headers
         in
-        Handler.Monad.map body ~f:(fun body -> (body, resp)))
+        match body with
+        | Some (Channel _, channel) ->
+          (Some Body.(of_channel method_ uri channel), headers)
+        | Some (String, s) ->
+          ( Some Body.(of_string method_ uri s),
+            content_length (String.length s) headers )
+        | Some (Schema schema, value) ->
+          let body = Coding.encode schema value in
+          ( Some (Body.of_string method_ uri body),
+            content_length (String.length body) headers )
+        | Some (Empty, ()) | None -> (
+          match method_ with
+          | `POST | `PUT | `PATCH -> (None, content_length 0 headers)
+          | _ -> (None, headers))
+      in
+      let headers =
+        match body with
+        | Some _
+          when Option.is_none
+                 ((List.find_opt (fun (name, _) ->
+                       String.(lowercase_ascii name = "content-type")))
+                    headers) ->
+          ("Content-Type", Handler.Coding.content_type) :: headers
+        | _ -> headers
+      in
+      Handler.Monad.bind (raw t ~scope ?timeout ~headers ?body method_ uri)
+        ~f:(fun (resp, body) ->
+          let body =
+            match response with
+            | Empty ->
+              let* () = Body.drain body in
+              Handler.Monad.return (() : response)
+            | Channel _ -> Handler.Monad.return (Body.to_channel body)
+            | String -> (
+              let* body = Body.to_string body in
+              match body with
+              | Result.Error _ as error -> Future.return error
+              | Result.Ok body ->
+                let () = Logs.debug (fun m -> m "response body:\n%s" body) in
+                Handler.Monad.return body)
+            | Schema response -> (
+              let* body = Body.to_string body in
+              match body with
+              | Result.Error _ as error -> Future.return error
+              | Result.Ok body -> (
+                let () = Logs.debug (fun m -> m "response body:\n%s" body) in
+                match Coding.decode response body with
+                | Result.Ok body -> Handler.Monad.return body
+                | Result.Error e ->
+                  Future.return
+                    (Result.Error
+                       (Error.make ~method_
+                          ~status:(Cohttp.Response.status resp)
+                          ~reason:(`Decoding e) uri))))
+          in
+          Handler.Monad.map body ~f:(fun body -> (body, resp)))
+    in
+    match response with
+    | Channel scope -> call scope
+    | _ -> Future.Scope.run call
 
   module Response = struct
     include Make_requests (struct
-      type nonrec 'a res = 'a Client_intf.response result
+      type nonrec 'a result = 'a Client_intf.response result
       and error = Handler.error
 
       let call t ?timeout ?(headers = []) ?body response method_ uri =
@@ -175,7 +165,7 @@ module Make (Handler : HANDLER) = struct
   end
 
   include Make_requests (struct
-    type nonrec 'a res = 'a result
+    type nonrec 'a result = 'a result
     and error = Handler.error
 
     let call t ?timeout ?(headers = []) ?body response method_ uri =

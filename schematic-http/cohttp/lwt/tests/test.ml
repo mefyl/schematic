@@ -6,12 +6,9 @@ include
     (Nofuture_lwt)
     (Schematic_cohttp_lwt.Make (Cohttp_lwt_unix.Client) (Schematic.Json.String))
 
-let () = Logs.set_reporter @@ Logs_fmt.reporter ()
-let () = Logs.Src.set_level Schematic_http.src @@ Some Debug
-
 let () =
-  let test_suite env tests =
-    Lwt_eio.with_event_loop ~clock:env#clock @@ fun _ ->
+  let test_suite clock _ _ tests =
+    Lwt_eio.with_event_loop ~clock @@ fun _ ->
     Lwt_eio.run_lwt @@ fun () ->
     let client = Schematic_cohttp_lwt.make () in
     Alcotest_lwt.(

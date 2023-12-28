@@ -4,6 +4,10 @@ module Schemas_library = struct
   let v = V
 end
 
+let () = Logs.set_reporter @@ Logs_fmt.reporter ()
+let () = Logs.Src.set_level Schematic_http.src @@ Some Debug
+let () = Logs.set_level (Some Debug)
+
 type payload = {
   x : int;
   y : string;
@@ -13,13 +17,40 @@ type payload = {
 let const_payload = { x = 26; y = "105" }
 let payload = Alcotest.testable pp_payload equal_payload
 
-let server env sw =
+let server clock net sw =
   let server =
     let callback connection request body =
       match Cohttp.Request.uri request |> Uri.path with
       | "/big" ->
         let response = Cohttp.Response.make ()
         and body = Cohttp_eio.Body.of_string Data.v in
+        (response, body)
+      | "/big-slow" ->
+        let response = Cohttp.Response.make ()
+        and body =
+          let module String_source_chunked = struct
+            type t = {
+              s : string;
+              mutable offset : int;
+            }
+
+            let single_read t dst =
+              if t.offset = String.length t.s then raise End_of_file;
+              let len =
+                min 8 @@ min (Cstruct.length dst) (String.length t.s - t.offset)
+              in
+              let () = Logs.debug (fun m -> m "big-slow: send %d bytes" len) in
+              let () = Eio.Time.sleep clock 0.01 in
+              Cstruct.blit_from_string t.s t.offset dst 0 len;
+              t.offset <- t.offset + len;
+              len
+
+            let read_methods = []
+            let create s = { s; offset = 0 }
+          end in
+          let ops = Eio.Flow.Pi.source (module String_source_chunked) in
+          Eio.Resource.T (String_source_chunked.create Data.v, ops)
+        in
         (response, body)
       | "/cat" ->
         let response = Cohttp.Response.make () in
@@ -48,7 +79,7 @@ let server env sw =
        from the socket *)
   in
   let socket =
-    Eio.Net.listen env#net ~sw ~backlog:128 ~reuse_addr:true
+    Eio.Net.listen net ~sw ~backlog:128 ~reuse_addr:true
       (`Tcp (Eio.Net.Ipaddr.V4.loopback, port))
   in
   let () =
@@ -90,7 +121,7 @@ struct
   module Requests = struct
     let get_empty port client =
       let+ result =
-        Client.get client Client.empty
+        Client.get client Empty
         @@ Uri.make ~scheme:"http"
              ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
              ~port ~path:"/empty" ()
@@ -100,7 +131,7 @@ struct
 
     let get_json port client =
       let+ result =
-        Client.get client payload_schema
+        Client.get client (Schema payload_schema)
         @@ Uri.make ~scheme:"http"
              ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
              ~port ~path:"/const" ()
@@ -110,7 +141,7 @@ struct
 
     let get_string port client =
       let+ result =
-        Client.get client Client.string
+        Client.get client String
         @@ Uri.make ~scheme:"http"
              ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
              ~port ~path:"/const" ()
@@ -120,12 +151,13 @@ struct
         (Result.Ok (Schematic.Json.String.encode payload_schema const_payload))
         result
 
-    let get_stream port client =
+    let _get_stream port client path =
+      Future.Scope.run @@ fun scope ->
       let* result =
-        Client.get client Client.stream
+        Client.get client (Channel scope)
         @@ Uri.make ~scheme:"http"
              ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
-             ~port ~path:"/big" ()
+             ~port ~path ()
       in
       let+ result =
         match result with
@@ -137,10 +169,15 @@ struct
       Alcotest.(check ~here:[%here] (result string error))
         "request succeded" (Result.Ok Data.v) result
 
+    let get_stream port client = _get_stream port client "/big"
+    let get_stream_slow port client = _get_stream port client "/big-slow"
+
     let post port client =
       let post_payload = { x = 107; y = "44" } in
       let+ result =
-        Client.post client ~body:(payload_schema, post_payload) payload_schema
+        Client.post client
+          ~body:(Schema payload_schema, post_payload)
+          (Schema payload_schema)
         @@ Uri.make ~scheme:"http"
              ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
              ~port ~path:"/cat" ()
@@ -151,9 +188,26 @@ struct
 
   let run run test_case =
     Eio_main.run @@ fun env ->
+    let clock = Eio_mock.Clock.make ()
+    and mono_clock = Eio_mock.Clock.Mono.make ()
+    and net = Eio.Stdenv.net env in
     Eio.Switch.run @@ fun sw ->
-    let port = server env sw in
-    run env
+    let () =
+      Eio.Std.Fiber.fork_daemon ~sw @@ fun () ->
+      let rec advance () =
+        let () =
+          if Eio_mock.Clock.Mono.try_advance mono_clock then
+            Logs.debug (fun m -> m "advanced monotonic time");
+          if Eio_mock.Clock.try_advance clock then
+            Logs.debug (fun m -> m "advanced wall clock time")
+        in
+        let () = Eio.Fiber.yield () in
+        advance ()
+      in
+      advance ()
+    in
+    let port = server clock net sw in
+    run clock mono_clock net
       [
         ( "success",
           [
@@ -161,6 +215,7 @@ struct
             test_case "GET json" `Quick (Requests.get_json port);
             test_case "GET string" `Quick (Requests.get_string port);
             test_case "GET stream" `Quick (Requests.get_stream port);
+            test_case "GET stream" `Quick (Requests.get_stream_slow port);
             test_case "POST json" `Quick (Requests.post port);
           ] );
       ]

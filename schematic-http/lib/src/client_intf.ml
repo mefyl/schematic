@@ -16,77 +16,62 @@ type 'a response = {
   status : Cohttp.Code.status_code;
 }
 
-type ('client, 'a, 'body, 'response) request =
-  'client ->
-  ?timeout:Timmy.Span.t ->
-  ?headers:(string * string) list ->
-  ?body:'body Schematic.Schema.t * 'body ->
-  'response Schematic.Schema.t ->
-  'a
-
 module type REQUESTS = sig
-  type t
-  type 'a res
+  type ('a, 'body, 'response) t
+  type 'a result
   type error
 
   module Future : Nofuture.S
 
   val call :
-    ( t,
-      Cohttp.Code.meth ->
+    ( Cohttp.Code.meth ->
       Uri.t ->
-      ('response res, [> error Error.reason ] Error.t) Result.t Future.t,
+      ('response result, [> error Error.reason ] Error.t) Result.t Future.t,
       'body,
       'response )
-    request
+    t
 
   val delete :
-    ( t,
-      Uri.t ->
-      ('response res, [> error Error.reason ] Error.t) Result.t Future.t,
+    ( Uri.t ->
+      ('response result, [> error Error.reason ] Error.t) Result.t Future.t,
       'body,
       'response )
-    request
+    t
 
   val get :
-    ( t,
-      Uri.t ->
-      ('response res, [> error Error.reason ] Error.t) Result.t Future.t,
+    ( Uri.t ->
+      ('response result, [> error Error.reason ] Error.t) Result.t Future.t,
       'body,
       'response )
-    request
+    t
 
   val head :
-    ( t,
-      Uri.t ->
-      ('response res, [> error Error.reason ] Error.t) Result.t Future.t,
+    ( Uri.t ->
+      ('response result, [> error Error.reason ] Error.t) Result.t Future.t,
       'body,
       'response )
-    request
+    t
 
   val patch :
-    ( t,
-      Uri.t ->
-      ('response res, [> error Error.reason ] Error.t) Result.t Future.t,
+    ( Uri.t ->
+      ('response result, [> error Error.reason ] Error.t) Result.t Future.t,
       'body,
       'response )
-    request
+    t
 
   val post :
-    ( t,
-      Uri.t ->
-      ('response res, [> error Error.reason ] Error.t) Result.t Future.t,
+    ( Uri.t ->
+      ('response result, [> error Error.reason ] Error.t) Result.t Future.t,
       'body,
       'response )
-    request
+    t
 
   val put :
-    ( t,
-      Uri.t ->
-      ('response res, [> error Error.reason ] Error.t) Result.t Future.t,
+    ( Uri.t ->
+      ('response result, [> error Error.reason ] Error.t) Result.t Future.t,
       'body,
       'response )
-    request
+    t
 end
 
 module type S = sig
@@ -97,23 +82,37 @@ module type S = sig
   module Future : Nofuture.S
   module Body : BODY with module Future := Future
 
-  val empty : unit Schematic.Schema.t
-  val string : string Schematic.Schema.t
-  val stream : Future.In_channel.t Schematic.Schema.t
+  type 'a body =
+    | Empty : unit body
+    | Channel : Future.Scope.t -> Future.In_channel.t body
+    | Schema : 'a Schematic.Schema.t -> 'a body
+    | String : string body
 
   module Response : sig
     include
       REQUESTS
-        with type t := t
-         and type 'a res := 'a response result
+        with type ('a, 'body, 'response) t :=
+          t ->
+          ?timeout:Timmy.Span.t ->
+          ?headers:(string * string) list ->
+          ?body:'body body * 'body ->
+          'response body ->
+          'a
+         and type 'a result := 'a response result
          and type error := error
          and module Future := Future
   end
 
   include
     REQUESTS
-      with type t := t
-       and type 'a res := 'a result
+      with type ('a, 'body, 'response) t :=
+        t ->
+        ?timeout:Timmy.Span.t ->
+        ?headers:(string * string) list ->
+        ?body:'body body * 'body ->
+        'response body ->
+        'a
+       and type 'a result := 'a result
        and type error := error
        and module Future := Future
 end
