@@ -1,8 +1,8 @@
 open Utils
 include Schema_intf
 
-let ( let* ) = Caml.Result.bind
-let ( let+ ) v f = Caml.Result.map f v
+let ( let* ) = Stdlib.Result.bind
+let ( let+ ) v f = Stdlib.Result.map f v
 let ( and+ ) = Base.Result.Let_syntax.Let_syntax.both
 let make ?id ?parametric descriptor = { id; descriptor; parametric }
 

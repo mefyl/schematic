@@ -3,8 +3,8 @@ type t = Ezjsonm.value
 module type S = sig
   include Coding.STR with type t = t
 
-  val from_channel : Caml.in_channel -> (t, Error.parsing) Base.Result.t
-  val to_channel : Caml.out_channel -> t -> unit
+  val from_channel : In_channel.t -> (t, Error.parsing) Base.Result.t
+  val to_channel : Out_channel.t -> t -> unit
   val compare : t -> t -> int
   val equal : t -> t -> bool
   val pp : Base.Formatter.t -> t -> unit

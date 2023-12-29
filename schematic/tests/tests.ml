@@ -1349,10 +1349,10 @@ struct
 )|}
           (Fmt.str "@[%a@]" pp_range (version, version, 1245)));
       let buffer = Buffer.create 1024 in
-      let fmt = Caml.Format.formatter_of_buffer buffer in
-      let () = Caml.Format.pp_set_margin fmt 20 in
+      let fmt = Stdlib.Format.formatter_of_buffer buffer in
+      let () = Stdlib.Format.pp_set_margin fmt 20 in
       let () = Fmt.pf fmt "@[%a@]" pp_version version in
-      let () = Caml.Format.pp_print_flush fmt () in
+      let () = Stdlib.Format.pp_print_flush fmt () in
       Alcotest.(
         check ~here:[%here] string "version-narrow"
           {|{
