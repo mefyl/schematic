@@ -82,3 +82,8 @@ module Map_error
      and module Future = Handler.Future
 
 val src : Logs.Src.t
+
+module Private : sig
+  val error_of_exception :
+    Id.t option -> Cohttp.Code.meth -> Uri.t -> exn -> [> `Networking ] Error.t
+end

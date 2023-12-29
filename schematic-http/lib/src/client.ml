@@ -4,6 +4,33 @@ let src = Logs.Src.create ~doc:"schematic HTTP client" "schematic-http"
 
 module Logs = (val Logs.src_log src)
 
+module Private = struct
+  let error_of_exception id method_ uri = function
+    | Unix.Unix_error ((Unix.EBADF as e), _, _)
+    | Unix.Unix_error ((Unix.ENOTCONN as e), _, _)
+    | Unix.Unix_error ((Unix.EADDRNOTAVAIL (* Seen on iOS *) as e), _, _) ->
+      let () =
+        Logs.info (fun m ->
+            m "%aretryable unix exception requesting %a: %s" (Fmt.option Id.pp)
+              id Uri.pp uri (Unix.error_message e))
+      in
+      Error.(make ~method_ ~status:(`Code 0) ~reason:`Networking uri)
+    | (e : exn) ->
+      (* FIXME: Cohttp has no API guarantees about exception that may escape
+         depending on the backend. Unreleased recent version yield [Retry]
+         exceptions, our own adds [Name_resolution_failed] on top of it, while
+         older version may raise [Failure] or whatnot. Pinning such a
+         fundamental libraries is a dependency nightmare, so we temporarily
+         consider all exceptions as retryable for maximal compatibility and let
+         final projects pin a specific version. *)
+      let () =
+        Logs.warn (fun m ->
+            m "%atreating cohttp exception as retryabale: %a" (Fmt.option Id.pp)
+              id Base.Exn.pp e)
+      in
+      Error.(make ~method_ ~reason:`Networking uri)
+end
+
 module Map_error
     (Handler : HANDLER)
     (E : sig
@@ -16,8 +43,8 @@ struct
 
   type error = E.t
 
-  let raw t ~scope ?timeout ?headers ?body meth uri =
-    Handler.raw t ~scope ?timeout ?headers ?body meth uri
+  let raw t ~scope ?timeout ?headers ?body id meth uri =
+    Handler.raw t ~scope ?timeout ?headers ?body id meth uri
     |> Future.map
          ~f:
            (Result.map_error (function
@@ -112,8 +139,26 @@ module Make (Handler : HANDLER) = struct
           ("Content-Type", Handler.Coding.content_type) :: headers
         | _ -> headers
       in
-      Handler.Monad.bind (raw t ~scope ?timeout ~headers ?body method_ uri)
+      let id = Id.make () in
+      let () =
+        Logs.info (fun m ->
+            m "%a%s %a" Id.pp id
+              Cohttp.Code.(string_of_method method_)
+              Uri.pp uri)
+      in
+      let () =
+        let f (h, v) =
+          Logs.debug (fun m ->
+              m "%a  %s: %s" Id.pp id (Base.String.capitalize h) v)
+        in
+        List.iter f headers
+      in
+      Handler.Monad.bind (raw t ~scope ?timeout ~headers ?body id method_ uri)
         ~f:(fun (resp, body) ->
+          let () =
+            Logs.info (fun m ->
+                m "%a%s" Id.pp id @@ Cohttp.Code.string_of_status resp.status)
+          in
           let body =
             match response with
             | Empty ->
@@ -223,10 +268,10 @@ struct
         in
         default ())
 
-  let raw t ~scope ?timeout ?headers ?body method_ uri =
+  let raw t ~scope ?timeout ?headers ?body id method_ uri =
     let rec raw errors () =
       Handler.Monad.bind
-        (Handler.raw t ~scope ?timeout ?headers ?body method_ uri)
+        (Handler.raw t ~scope ?timeout ?headers ?body id method_ uri)
         ~f:(fun ((resp, _) as r) ->
           if Rate.rate_limited resp then
             let* backoff = backoff errors uri resp in
@@ -273,8 +318,9 @@ module Optional (Handler : HANDLER) = struct
     end)
   end
 
-  let raw t ~scope ?timeout ?headers ?body method_ uri =
-    Handler.Monad.map (Handler.raw t ~scope ?timeout ?headers ?body method_ uri)
+  let raw t ~scope ?timeout ?headers ?body id method_ uri =
+    Handler.Monad.map
+      (Handler.raw t ~scope ?timeout ?headers ?body id method_ uri)
       ~f:(fun ((resp, _) as r) ->
         match Cohttp_.Response.status resp with
         | `Not_found -> None
@@ -289,7 +335,7 @@ module Check_status (Status : STATUS) (Handler : HANDLER) = struct
   type 'a result = 'a Handler.result
   type error = (Status.error, Handler.error) Error.status
 
-  let raw t ~scope ?timeout ?headers ?body method_ uri =
+  let raw t ~scope ?timeout ?headers ?body id method_ uri =
     let f ((resp, body) as r) =
       let status = Cohttp_.Response.status resp in
       let rec extract_error = function
@@ -342,7 +388,7 @@ module Check_status (Status : STATUS) (Handler : HANDLER) = struct
       in
       extract_error (Status.check status)
     in
-    Handler.raw t ~scope ?timeout ?headers ?body method_ uri
+    Handler.raw t ~scope ?timeout ?headers ?body id method_ uri
     |> Future.map
          ~f:
            (Result.map_error (function

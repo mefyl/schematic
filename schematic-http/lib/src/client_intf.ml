@@ -176,6 +176,7 @@ module type HANDLER = sig
     ?timeout:Timmy.Span.t ->
     ?headers:(string * string) list ->
     ?body:Body.t ->
+    Id.t ->
     Cohttp.Code.meth ->
     Uri.t ->
     ( (Cohttp.Response.t * Body.t) result,

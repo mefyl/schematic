@@ -4,13 +4,12 @@ module Logs = (val Logs_lwt.src_log Schematic_http.src)
 let ( let* ) = ( >>= )
 let ( let+ ) = ( >|= )
 let ( >>=! ) = Lwt_result.( >>= )
-let pp_uid = Fmt.(option @@ fmt "[%x] ")
 
 type t = unit
 
 let make () = ()
 
-let with_timeout ?(cancel = false) ~method_ ~f name uid uri timeout v =
+let with_timeout ?(cancel = false) ~method_ ~f name id uri timeout v =
   match timeout with
   | None -> v
   | Some timeout -> (
@@ -22,7 +21,9 @@ let with_timeout ?(cancel = false) ~method_ ~f name uid uri timeout v =
     | None ->
       let+ () =
         Logs.warn (fun m ->
-            m "%atimeout %s: %s %a" pp_uid uid name
+            m "%atimeout %s: %s %a"
+              (Fmt.option Schematic_http.Id.pp)
+              id name
               Cohttp.Code.(string_of_method method_)
               Uri.pp uri)
       in
@@ -30,7 +31,8 @@ let with_timeout ?(cancel = false) ~method_ ~f name uid uri timeout v =
         (Result.Error
            Schematic_http.Error.(make ~method_ ~reason:`Networking uri)))
 
-let uid = ref 0
+let error_of_exception id method_ uri exn =
+  Lwt_result.fail (Schematic_http.Private.error_of_exception id method_ uri exn)
 
 module Make
     (Client : Cohttp_lwt.S.Client)
@@ -58,45 +60,12 @@ struct
     end)
   end
 
-  let exn method_ uri = function
-    | Unix.Unix_error ((Unix.EBADF as e), _, _)
-    | Unix.Unix_error ((Unix.ENOTCONN as e), _, _)
-    | Unix.Unix_error ((Unix.EADDRNOTAVAIL (* Seen on iOS *) as e), _, _) ->
-      let* () =
-        Logs.info (fun m ->
-            m "retryable unix exception requesting %a: %s" Uri.pp uri
-              (Unix.error_message e))
-      in
-      Lwt_result.fail
-        Schematic_http.Error.(
-          make ~method_ ~status:(`Code 0) ~reason:`Networking uri)
-    | (e : exn) ->
-      (* FIXME: Cohttp has no API guarantees about exception that may escape
-         depending on the backend. Unreleased recent version yield [Retry]
-         exceptions, our own adds [Name_resolution_failed] on top of it, while
-         older version may raise [Failure] or whatnot. Pinning such a
-         fundamental libraries is a dependency nightmare, so we temporarily
-         consider all exceptions as retryable for maximal compatibility and let
-         final projects pin a specific version. *)
-      let* () =
-        Logs.warn (fun m ->
-            m "treating cohttp exception as retryabale: %a" Base.Exn.pp e)
-      in
-      Lwt_result.fail
-        Schematic_http.Error.(make ~method_ ~reason:`Networking uri)
-  (* let* () =
-   *   Logs.err (fun m ->
-   *       m "fatal error requesting %a: exception escaped: %a" Uri.pp uri
-   *         Base.Exn.pp e)
-   * in
-   * raise e *)
-
   module Body = struct
     type t = {
       cohttp : Cohttp_lwt.Body.t;
       method_ : Cohttp.Code.meth;
       timeout : unit Lwt.t option;
-      uid : int option;
+      id : Schematic_http.Id.t option;
       uri : Uri.t;
     }
 
@@ -105,7 +74,7 @@ struct
         cohttp = Cohttp_lwt.Body.of_string s;
         method_;
         timeout = None;
-        uid = None;
+        id = None;
         uri;
       }
 
@@ -118,40 +87,41 @@ struct
         cohttp = Cohttp_lwt.Body.of_stream stream;
         method_;
         timeout = None;
-        uid = None;
+        id = None;
         uri;
       }
 
-    let to_string { cohttp; method_; timeout; uid; uri } =
+    let to_string { cohttp; method_; timeout; id; uri } =
       let open Lwt in
       catch
         (fun () ->
-          with_timeout ~cancel:true ~method_ ~f:Base.Fn.id "reading body" uid
-            uri timeout
+          with_timeout ~cancel:true ~method_ ~f:Base.Fn.id "reading body" id uri
+            timeout
           @@ let* body = Cohttp_lwt.Body.to_string cohttp in
              let* () =
-               Logs.info (fun m ->
-                   m "%a read %d bytes of body" pp_uid uid (String.length body))
+               Logs.debug (fun m ->
+                   m "%aread %d bytes of body"
+                     (Fmt.option Schematic_http.Id.pp)
+                     id (String.length body))
              in
              Lwt_result.return body)
-        (exn method_ uri)
+        (error_of_exception id method_ uri)
 
     let drain { cohttp; _ } =
       Lwt.catch
         (fun () -> Cohttp_lwt.Body.drain_body cohttp)
         (fun _ -> Lwt.return ())
 
-    let to_channel ({ cohttp; method_; timeout; uid; uri } as body) =
+    let to_channel ({ cohttp; method_; timeout; id; uri } as body) =
       let stream =
         Cohttp_lwt.Body.to_stream cohttp
         |> Lwt_stream.wrap_exn
         |> Lwt_stream.map_s (function
              | Result.Ok _ as ok -> Lwt.return ok
-             | Result.Error e -> exn method_ uri e)
+             | Result.Error e -> error_of_exception id method_ uri e)
       and pending = ref None in
       Lwt_io.make ~close:(fun () -> drain body) ~mode:Lwt_io.input
       @@ fun buffer pos size ->
-      let* () = Logs.info (fun m -> m "read chunk") in
       match !pending with
       | Some (chunk, chunk_pos) ->
         let length = String.length chunk - chunk_pos in
@@ -164,7 +134,7 @@ struct
           and () = pending := Some (chunk, chunk_pos + size) in
           Lwt.return size
       | None -> (
-        with_timeout ~method_ ~f:Base.Option.return "reading body" uid uri
+        with_timeout ~method_ ~f:Base.Option.return "reading body" id uri
           timeout (Lwt_stream.get stream)
         >>= function
         | Some (Result.Ok chunk) ->
@@ -179,26 +149,15 @@ struct
         | Some (Result.Error e) -> raise (Schematic_http.Channel e)
         | None ->
           let+ () =
-            Logs.info (fun m -> m "%a done streaming body" pp_uid uid)
+            Logs.info (fun m ->
+                m "%a done streaming body" (Fmt.option Schematic_http.Id.pp) id)
           in
           0)
   end
 
-  let raw () ~scope:_ ?timeout ?headers ?body method_ uri =
-    let () = uid := !uid + 1 in
-    let uid = !uid in
+  let raw () ~scope:_ ?timeout ?headers ?body id method_ uri =
     let open Lwt in
     let f () =
-      let* () =
-        Logs.info (fun m ->
-            m "[%x] %s %a" uid Cohttp.Code.(string_of_method method_) Uri.pp uri)
-      in
-      let* () =
-        let f (h, v) =
-          Logs.info (fun m -> m "[%x]  %s: %s" uid (Base.String.capitalize h) v)
-        in
-        Lwt_list.iter_s f (Option.value ~default:[] headers)
-      in
       let headers = Option.map Cohttp.Header.of_list headers in
       let request =
         Client.call ?headers
@@ -211,7 +170,7 @@ struct
         | None -> None
         | Some delay -> Some (Timmy_lwt.sleep delay)
       in
-      with_timeout ~method_ ~f:Base.Fn.id "reading headers" (Some uid) uri
+      with_timeout ~method_ ~f:Base.Fn.id "reading headers" (Some id) uri
         timeout request
       >>=! fun (resp, body) ->
       match Cohttp.Response.status resp with
@@ -220,12 +179,8 @@ struct
         Lwt_result.fail
           Schematic_http.Error.(make ~method_ ~status ~reason:`Networking uri)
       | status ->
-        let* () =
-          Logs.info (fun m ->
-              m "[%x] %s" uid @@ Cohttp.Code.string_of_status status)
-        in
         Lwt_result.return
-          (resp, { Body.cohttp = body; method_; timeout; uid = Some uid; uri })
+          (resp, { Body.cohttp = body; method_; timeout; id = Some id; uri })
     in
-    Lwt.catch f (exn method_ uri)
+    Lwt.catch f (error_of_exception (Some id) method_ uri)
 end
