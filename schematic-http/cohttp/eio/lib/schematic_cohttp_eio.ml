@@ -49,8 +49,14 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
     }
 
     let of_string method_ uri s =
+      let (Eio.Resource.T (impl, ops)) = Cohttp_eio.Body.of_string s in
       {
-        body = Cohttp_eio.Body.of_string s;
+        body =
+          Eio.Resource.T
+            ( impl,
+              Eio.Resource.handler
+                (H (Eio.Resource.Close, fun _ -> ())
+                :: Eio.Resource.bindings ops) );
         method_;
         deadline = None;
         id = None;
@@ -59,7 +65,8 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
 
     let of_channel method_ uri body =
       {
-        body : _ Eio.Flow.source :> Eio.Flow.source_ty Eio.Resource.t;
+        body : [> Eio.Flow.source_ty | `Close ] Eio.Flow.source
+        :> Cohttp_eio.Body.t;
         method_;
         deadline = None;
         id = None;
@@ -82,12 +89,23 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
       with Eio.Time.Timeout as exn ->
         raise (Schematic_http.Channel (error_of_exn id method_ uri exn))
 
-    let to_channel { body; deadline; method_; id; uri; _ } =
+    let drain _ =
+      (* AFAICT cohttp-eio does not support keepalive and draining so far *) ()
+
+    let to_channel ({ body; deadline; method_; id; uri; _ } as t) =
+      let body =
+        let (Eio.Resource.T (body, ops)) = body in
+        Eio.Resource.T
+          ( body,
+            Eio.Resource.handler
+              (H (Eio.Resource.Close, fun _ -> drain t)
+              :: Eio.Resource.bindings ops) )
+      in
       match deadline with
       | None -> body
       | Some _ ->
         let module Source_timeout = struct
-          type t = Eio.Flow.source_ty Eio.Resource.t
+          type t = Future.In_channel.t
 
           let single_read t dst =
             try with_deadline deadline @@ fun () -> Eio.Flow.single_read t dst
@@ -96,11 +114,13 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
 
           let read_methods = []
         end in
-        let ops = Eio.Flow.Pi.source (module Source_timeout) in
-        Eio.Resource.T (body, ops)
-
-    let drain _ =
-      (* AFAICT cohttp-eio does not support keepalive and draining so far *) ()
+        Eio.Resource.T
+          ( body,
+            Eio.Resource.handler
+              [
+                H (Eio.Resource.Close, Eio.Resource.close);
+                H (Eio.Flow.Pi.Source, (module Source_timeout));
+              ] )
   end
 
   let raw ({ client; clock; mono_clock } as t) ~scope ?timeout ?headers ?body id
@@ -118,7 +138,9 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
       Eio.Time.Timeout.run_exn timeout @@ fun () ->
       let resp, body =
         Cohttp_eio.Client.call ~sw:scope ?headers
-          ?body:(Base.Option.map body ~f:(fun { Body.body; _ } -> body))
+          ?body:
+            (Base.Option.map body ~f:(fun { Body.body; _ } ->
+                 (body :> Cohttp_eio.Body.t)))
           client method_ uri
       in
       match Cohttp.Response.status resp with
