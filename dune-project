@@ -124,10 +124,10 @@
  (name schematic-http)
  (synopsis "HTTP client with schematic encoding")
  (depends
-  (cohttp
+  (http
    (and
-    (>= 5.3.0)
-    (< 6.0.0)))
+    (>= 6.0.0~beta2)
+    (< 7.0.0)))
   (timmy
    (and
     (>= 1.0.0)
@@ -145,8 +145,8 @@
     :with-test))
   (cohttp-lwt
    (and
-    (>= 5.3.0)
-    (< 6.0.0)))
+    (>= 6.0.0~beta2)
+    (< 7.0.0)))
   (lwt
    (>= 5.6.0))
   (timmy-lwt
@@ -166,8 +166,8 @@
     :with-test))
   (cohttp-eio
    (and
-    (>= 5.3.0)
-    (< 6.0.0)))
+    (>= 6.0.0~beta2)
+    (< 7.0.0)))
   eio
   (schematic-http
    (= :version))))

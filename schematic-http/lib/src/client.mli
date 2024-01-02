@@ -38,11 +38,10 @@ module Check_status (Status : STATUS) (Handler : HANDLER) :
      and type error = (Status.error, Handler.error) Error.status
      and module Future = Handler.Future
 
-module Status_success : STATUS with type error = Cohttp.Code.status_code
+module Status_success : STATUS with type error = Http.Status.t
 
 val check_status_is :
-  Cohttp.Code.status_code ->
-  (module STATUS with type error = Cohttp.Code.status_code)
+  Http.Status.t -> (module STATUS with type error = Http.Status.t)
 
 (** [With_timeout (Timeout) (Handler)] is [Handler] with timeout defaulting to
     [Timeout.v]. *)
@@ -85,5 +84,5 @@ val src : Logs.Src.t
 
 module Private : sig
   val error_of_exception :
-    Id.t option -> Cohttp.Code.meth -> Uri.t -> exn -> [> `Networking ] Error.t
+    Id.t option -> Http.Method.t -> Uri.t -> exn -> [> `Networking ] Error.t
 end

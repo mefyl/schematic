@@ -6,14 +6,14 @@ module type BODY = sig
   val drain : t -> unit Future.t
   val to_string : t -> (string, [> `Networking ] Error.t) Result.t Future.t
   val to_channel : t -> Future.In_channel.t
-  val of_string : Cohttp.Code.meth -> Uri.t -> string -> t
-  val of_channel : Cohttp.Code.meth -> Uri.t -> Future.In_channel.t -> t
+  val of_string : Http.Method.t -> Uri.t -> string -> t
+  val of_channel : Http.Method.t -> Uri.t -> Future.In_channel.t -> t
 end
 
 type 'a response = {
   body : 'a;
   headers : (string * string) list;
-  status : Cohttp.Code.status_code;
+  status : Http.Status.t;
 }
 
 type exn += Channel of [ `Networking ] Error.t
@@ -26,7 +26,7 @@ module type REQUESTS = sig
   module Future : Nofuture.S
 
   val call :
-    ( Cohttp.Code.meth ->
+    ( Http.Method.t ->
       Uri.t ->
       ('response result, [> error Error.reason ] Error.t) Result.t Future.t,
       'body,
@@ -129,7 +129,7 @@ end
 module type RATE_LIMIT' = sig
   include RATE_LIMIT
 
-  val rate_limited : Cohttp.Response.t -> bool
+  val rate_limited : Http.Response.t -> bool
 end
 
 type 'error body_decoder =
@@ -143,7 +143,7 @@ module type STATUS = sig
   type error
 
   val check :
-    Cohttp.Code.status_code ->
+    Http.Status.t ->
     [ `Body_error of error Schematic.Schema.t
     | `Body_decoder of error body_decoder
     | `Error of error
@@ -177,9 +177,9 @@ module type HANDLER = sig
     ?headers:(string * string) list ->
     ?body:Body.t ->
     Id.t ->
-    Cohttp.Code.meth ->
+    Http.Method.t ->
     Uri.t ->
-    ( (Cohttp.Response.t * Body.t) result,
+    ( (Http.Response.t * Body.t) result,
       [> error Error.reason ] Error.t )
     Result.t
     Future.t

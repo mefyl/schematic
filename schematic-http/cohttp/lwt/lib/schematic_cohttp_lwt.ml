@@ -63,9 +63,9 @@ struct
   module Body = struct
     type t = {
       cohttp : Cohttp_lwt.Body.t;
+      id : Schematic_http.Id.t option;
       method_ : Cohttp.Code.meth;
       timeout : unit Lwt.t option;
-      id : Schematic_http.Id.t option;
       uri : Uri.t;
     }
 

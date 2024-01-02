@@ -74,7 +74,7 @@ module Make (Handler : HANDLER) = struct
       ?headers:(string * string) list ->
       ?body:'body body * 'body ->
       'response body ->
-      Cohttp.Code.meth ->
+      Http.Method.t ->
       Uri.t ->
       ('response result, [> error Error.reason ] Error.t) Result.t Future.t
   end) =
@@ -142,9 +142,7 @@ module Make (Handler : HANDLER) = struct
       let id = Id.make () in
       let () =
         Logs.info (fun m ->
-            m "%a%s %a" Id.pp id
-              Cohttp.Code.(string_of_method method_)
-              Uri.pp uri)
+            m "%a%s %a" Id.pp id (Http.Method.to_string method_) Uri.pp uri)
       in
       let () =
         let f (h, v) =
@@ -157,7 +155,7 @@ module Make (Handler : HANDLER) = struct
         ~f:(fun (resp, body) ->
           let () =
             Logs.info (fun m ->
-                m "%a%s" Id.pp id @@ Cohttp.Code.string_of_status resp.status)
+                m "%a%s" Id.pp id @@ Http.Status.to_string resp.status)
           in
           let body =
             match response with
@@ -184,7 +182,7 @@ module Make (Handler : HANDLER) = struct
                   Future.return
                     (Result.Error
                        (Error.make ~method_
-                          ~status:(Cohttp.Response.status resp)
+                          ~status:(Http.Response.status resp)
                           ~reason:(`Decoding e) uri))))
           in
           Handler.Monad.map body ~f:(fun body -> (body, resp)))
@@ -203,7 +201,7 @@ module Make (Handler : HANDLER) = struct
         |> Handler.Monad.map ~f:(fun (body, resp) ->
                {
                  body;
-                 headers = Cohttp.Header.to_list resp.Cohttp.Response.headers;
+                 headers = Http.Header.to_list resp.Http.Response.headers;
                  status = resp.status;
                })
     end)
@@ -218,8 +216,6 @@ module Make (Handler : HANDLER) = struct
       |> Handler.Monad.map ~f:(fun (body, _) -> body)
   end)
 end
-
-module Cohttp_ = Cohttp
 
 let pp_retry =
   let open Fmt in
@@ -246,7 +242,7 @@ struct
       let () = log Fmt.(fmt "for %i seconds") v in
       Future.return v
     in
-    match Cohttp_.Header.get Cohttp_.Response.(headers resp) retry_after with
+    match Http.Header.get Http.Response.(headers resp) retry_after with
     | None -> default ()
     | Some value -> (
       (* FIXME: handle dates *)
@@ -290,7 +286,7 @@ module Rate_limit
       include Rate
 
       let rate_limited resp =
-        match Cohttp_.Response.status resp with
+        match Http.Response.status resp with
         | `Service_unavailable | `Too_many_requests -> true
         | _ -> false
     end)
@@ -322,9 +318,7 @@ module Optional (Handler : HANDLER) = struct
     Handler.Monad.map
       (Handler.raw t ~scope ?timeout ?headers ?body id method_ uri)
       ~f:(fun ((resp, _) as r) ->
-        match Cohttp_.Response.status resp with
-        | `Not_found -> None
-        | _ -> Some r)
+        match Http.Response.status resp with `Not_found -> None | _ -> Some r)
 end
 
 module Check_status (Status : STATUS) (Handler : HANDLER) = struct
@@ -337,7 +331,7 @@ module Check_status (Status : STATUS) (Handler : HANDLER) = struct
 
   let raw t ~scope ?timeout ?headers ?body id method_ uri =
     let f ((resp, body) as r) =
-      let status = Cohttp_.Response.status resp in
+      let status = Http.Response.status resp in
       let rec extract_error = function
         | `Body_error schema ->
           extract_error
@@ -346,7 +340,7 @@ module Check_status (Status : STATUS) (Handler : HANDLER) = struct
           let () =
             Logs.warn (fun m ->
                 m "unexpected status %s querying %a"
-                  (Cohttp_.Code.string_of_status status)
+                  (Http.Status.to_string status)
                   Uri.pp uri)
           in
           let* body = Body.to_string body in
@@ -375,7 +369,7 @@ module Check_status (Status : STATUS) (Handler : HANDLER) = struct
           let () =
             Logs.warn (fun m ->
                 m "unexpected status %s querying %a"
-                  (Cohttp_.Code.string_of_status status)
+                  (Http.Status.to_string status)
                   Uri.pp uri)
           in
           let* () = Body.drain body in
@@ -399,23 +393,20 @@ module Check_status (Status : STATUS) (Handler : HANDLER) = struct
 end
 
 module Status_success = struct
-  type error = Cohttp_.Code.status_code
+  type error = Http.Status.t
 
   let check status =
-    if Cohttp_.Code.(is_success (code_of_status status)) then `Ok
-    else `Error status
+    match status with #Http.Status.success -> `Ok | status -> `Error status
 end
 
 let check_status_is expected =
-  let expected = Cohttp_.Code.code_of_status expected in
   (module struct
-    type error = Cohttp_.Code.status_code
+    type error = Http.Status.t
 
     let check status =
-      if Cohttp_.Code.code_of_status status = expected then `Ok
-      else `Error status
+      if Http.Status.compare status expected = 0 then `Ok else `Error status
   end : STATUS
-    with type error = Cohttp_.Code.status_code)
+    with type error = Http.Status.t)
 
 module With_headers
     (Headers : sig
