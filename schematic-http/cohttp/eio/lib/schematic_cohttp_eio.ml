@@ -18,8 +18,6 @@ let make ?https ~clock ~mono_clock ~net () =
 
 module Make (Coding : Schematic.Coding.STR with type t = string) = struct
   type nonrec t = t
-  type 'a result = 'a
-  type error = Schematic_http.Error.never
 
   module Future = Nofuture_eio
 
@@ -36,15 +34,16 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
               (Fmt.option Schematic_http.Id.pp)
               id Uri.pp uri)
       in
-      Schematic_http.Error.(make ~method_ ~reason:`Networking uri)
+      `Networking
     | exn -> Schematic_http.Private.error_of_exception id method_ uri exn
 
   module Body = struct
     type nonrec t = {
       body : Cohttp_eio.Body.t;
-      method_ : Cohttp.Code.meth;
       deadline : (t * float) option;
       id : Schematic_http.Id.t option;
+      method_ : Http.Method.t;
+      status : Http.Status.t option;
       uri : Uri.t;
     }
 
@@ -57,9 +56,10 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
               Eio.Resource.handler
                 (H (Eio.Resource.Close, fun _ -> ())
                 :: Eio.Resource.bindings ops) );
-        method_;
         deadline = None;
         id = None;
+        method_;
+        status = None;
         uri;
       }
 
@@ -67,9 +67,10 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
       {
         body : [> Eio.Flow.source_ty | `Close ] Eio.Flow.source
         :> Cohttp_eio.Body.t;
-        method_;
         deadline = None;
         id = None;
+        method_;
+        status = None;
         uri;
       }
 
@@ -82,17 +83,21 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
       in
       Eio.Time.Timeout.run_exn timeout f
 
-    let to_string { body; method_; deadline; id; uri; _ } =
+    let to_string { body; deadline; id; method_; status; uri; _ } =
       try
         with_deadline deadline @@ fun () ->
         Eio.Flow.read_all body |> Result.return
       with Eio.Time.Timeout as exn ->
-        raise (Schematic_http.Channel (error_of_exn id method_ uri exn))
+        raise
+          (Schematic_http.Channel
+             (Schematic_http.Error.make ~method_
+                ~reason:(error_of_exn id method_ uri exn)
+                ?status uri))
 
     let drain _ =
       (* AFAICT cohttp-eio does not support keepalive and draining so far *) ()
 
-    let to_channel ({ body; deadline; method_; id; uri; _ } as t) =
+    let to_channel ({ body; deadline; id; method_; status; uri; _ } as t) =
       let body =
         let (Eio.Resource.T (body, ops)) = body in
         Eio.Resource.T
@@ -110,7 +115,11 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
           let single_read t dst =
             try with_deadline deadline @@ fun () -> Eio.Flow.single_read t dst
             with Eio.Time.Timeout as exn ->
-              raise (Schematic_http.Channel (error_of_exn id method_ uri exn))
+              raise
+                (Schematic_http.Channel
+                   (Schematic_http.Error.make ~method_ ?status
+                      ~reason:(error_of_exn id method_ uri exn)
+                      uri))
 
           let read_methods = []
         end in
@@ -123,10 +132,9 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
               ] )
   end
 
-  let raw ({ client; clock; mono_clock } as t) ~scope ?timeout ?headers ?body id
+  let raw ({ client; clock; mono_clock } as t) ~scope ?timeout ~headers ?body id
       method_ uri =
     try
-      let headers = Option.map Cohttp.Header.of_list headers in
       let timeout, deadline =
         match timeout with
         | None -> (Eio.Time.Timeout.none, None)
@@ -137,18 +145,26 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
       in
       Eio.Time.Timeout.run_exn timeout @@ fun () ->
       let resp, body =
-        Cohttp_eio.Client.call ~sw:scope ?headers
+        Cohttp_eio.Client.call ~sw:scope ~headers
           ?body:
             (Base.Option.map body ~f:(fun { Body.body; _ } ->
                  (body :> Cohttp_eio.Body.t)))
           client method_ uri
       in
       match Cohttp.Response.status resp with
-      | `Code 0 as status ->
+      | `Code 0 ->
         (* CORS or connectivity issue *)
-        Result.fail
-          Schematic_http.Error.(make ~method_ ~status ~reason:`Networking uri)
+        Result.fail `Networking
       | status ->
-        Result.return (resp, { Body.body; method_; deadline; id = Some id; uri })
+        Result.return
+          ( resp,
+            {
+              Body.body;
+              deadline;
+              id = Some id;
+              method_;
+              status = Some status;
+              uri;
+            } )
     with exn -> Result.Error (error_of_exn (Some id) method_ uri exn)
 end

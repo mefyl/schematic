@@ -86,6 +86,10 @@ let server mono_clock net sw =
             (Schematic.Json.String.encode payload_schema const_payload)
         in
         (response, body)
+      | "/404" ->
+        let response = Cohttp.Response.make ~status:`Not_found ()
+        and body = Cohttp_eio.Body.of_string "INVALID" in
+        (response, body)
       | _ ->
         let response = Cohttp.Response.make ~status:`Not_found ()
         and body = Cohttp_eio.Body.of_string "" in
@@ -111,35 +115,35 @@ let server mono_clock net sw =
   | `Tcp (_, port) -> port
   | `Unix _ -> failwith "listen yielded a Unix socket"
 
+type reason =
+  [ `Decoding of Schematic.Error.decoding
+  | `Unexpected_status of
+    (Http.Status.t[@equal fun l r -> Http.Status.compare l r = 0])
+  | `Networking
+  ]
+[@@deriving eq]
+
+let pp_reason fmt = function
+  | #Schematic_http.Error.reason as reason ->
+    Schematic_http.Error.pp_reason fmt reason
+  | `Unexpected_status status ->
+    Fmt.pf fmt "unexpected status: %a" Http.Status.pp status
+
 let error =
   Alcotest.testable
-    Schematic_http.Error.(
-      pp @@ pp_reason @@ Fmt.of_to_string Cohttp.Code.string_of_status)
-    Schematic_http.Error.(equal @@ equal_reason @@ Stdlib.( = ))
+    (Schematic_http.Error.pp pp_reason)
+    (Schematic_http.Error.equal equal_reason)
 
 module Make
     (Future : Nofuture.S)
-    (Handler : Schematic_http.HANDLER
-                 with type 'a result = 'a
-                  and type error = Schematic_http.Error.never
-                  and module Future = Future) =
+    (Handler : Schematic_http.HANDLER with module Future = Future) =
 struct
   let ( let* ) v f = Future.bind v ~f
   let ( let+ ) v f = Future.map v ~f
 
   type server = { port : int }
 
-  module Client =
-    Schematic_http.Make
-      (Schematic_http.Map_error
-         (Schematic_http.Check_status (Schematic_http.Status_success) (Handler))
-            (struct
-              type t = Cohttp.Code.status_code
-
-              let map = function
-                | Schematic_http.Error.Unexpected_status status -> status
-                | Valid_status (_ : Schematic_http.Error.never) -> .
-            end))
+  module Client = Schematic_http.Make (Handler)
 
   module Requests = struct
     let get_empty { port } client =
@@ -207,10 +211,41 @@ struct
       in
       Alcotest.(check ~here:[%here] (result payload error))
         "request succeded" (Result.Ok post_payload) result
+
+    let not_found { port } client =
+      let uri =
+        Uri.make ~scheme:"http"
+          ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
+          ~port ~path:"/404" ()
+      in
+      let+ result =
+        Client.(get (with_protocol client Protocol.(optional)))
+          (Schema payload_schema) uri
+      in
+      Alcotest.(check ~here:[%here] (result (option payload) error))
+        "request succeded" (Result.Ok None) result
+
+    let unexpected_status { port } client =
+      let uri =
+        Uri.make ~scheme:"http"
+          ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
+          ~port ~path:"/404" ()
+      in
+      let+ result = Client.get client (Schema payload_schema) uri in
+      Alcotest.(check ~here:[%here] (result payload error))
+        "request succeded"
+        (Result.Error
+           {
+             method_ = `GET;
+             reason = `Unexpected_status `Not_found;
+             status = Some `Not_found;
+             uri;
+           })
+        result
   end
 
   module Timeout = struct
-    let _timeout { port } client timeout should_complete chunk_received =
+    let _timeout { port } client timeout should_complete status chunk_received =
       Future.Scope.run ~name:"read stream" @@ fun scope ->
       let uri =
         Uri.make ~scheme:"http"
@@ -247,7 +282,7 @@ struct
               {
                 Schematic_http.Error.method_ = `GET;
                 reason = `Networking;
-                status = None;
+                status;
                 uri;
               } )
       in
@@ -255,21 +290,22 @@ struct
         ("request " ^ name) expected result
 
     let headers server client =
-      _timeout server client (Timmy.Span.seconds 1) false (fun () ->
+      _timeout server client (Timmy.Span.seconds 1) false None (fun () ->
           Alcotest.fail ~here:[%here] "body chunk was received")
 
     let body server client =
       let chunk_received = ref false in
       let+ () =
-        _timeout server client (Timmy.Span.seconds 3) false (fun () ->
-            chunk_received := true)
+        _timeout server client (Timmy.Span.seconds 3) false (Some `OK)
+          (fun () -> chunk_received := true)
       in
       Alcotest.(check ~here:[%here] bool)
         "body was partially received" true !chunk_received
 
     let complete mono_clock server client =
       let+ () =
-        _timeout server client (Timmy.Span.seconds 20) true (fun () -> ())
+        _timeout server client (Timmy.Span.seconds 20) true (Some `OK)
+          (fun () -> ())
       in
       sleep_and_advance ~flush:true mono_clock 20.
   end
@@ -302,12 +338,20 @@ struct
       { port }
     in
     let test_case name speed f =
-      test_case name speed @@ fun client ->
-      let+ () = f client in
+      test_case name speed @@ fun handler ->
+      let+ () =
+        f
+          (Client.make_protocol handler
+             Client.Protocol.
+               [
+                 check_status (function
+                   | #Http.Status.success -> `Ok
+                   | status -> `Error (`Unexpected_status status));
+               ])
+      in
       let (_ : bool) = Eio_mock.Clock.Mono.try_advance mono_clock in
       ()
     in
-
     run clock mono_clock net
       [
         ( "success",
@@ -318,6 +362,12 @@ struct
             test_case "GET stream" `Quick (Requests.get_stream server);
             test_case "GET slow stream" `Quick (Requests.get_stream_slow server);
             test_case "POST json" `Quick (Requests.post server);
+          ] );
+        ( "errors",
+          [
+            (* test_case "404" `Quick (Requests.not_found server); *)
+            test_case "unexpected status" `Quick
+              (Requests.unexpected_status server);
           ] );
         ( "timeout",
           [
