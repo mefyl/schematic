@@ -8,7 +8,7 @@ module Tests =
 
 let () =
   let test_suite clock mono_clock net tests =
-    let client = Schematic_cohttp_eio.make ~clock ~mono_clock ~net in
+    let client = Schematic_cohttp_eio.make ~clock ~mono_clock ~net () in
     Alcotest.(
       run_with_args "schematic-cohttp-eio" (Cmdliner.Term.const client) tests)
   and test_case = Alcotest.test_case in

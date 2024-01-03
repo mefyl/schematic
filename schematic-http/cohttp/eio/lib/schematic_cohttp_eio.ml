@@ -7,9 +7,9 @@ type t = {
   mono_clock : Eio.Time.Mono.ty Eio.Time.Mono.t;
 }
 
-let make ~clock ~mono_clock ~net =
+let make ?https ~clock ~mono_clock ~net () =
   {
-    client = Cohttp_eio.Client.make ~https:None net;
+    client = Cohttp_eio.Client.make ~https net;
     clock : [> float Eio.Time.clock_ty ] Eio.Time.clock
     :> float Eio.Time.clock_ty Eio.Time.clock;
     mono_clock : [> Eio.Time.Mono.ty ] Eio.Time.Mono.t
