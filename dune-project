@@ -124,10 +124,12 @@
  (name schematic-http)
  (synopsis "HTTP client with schematic encoding")
  (depends
+  (eio_main :with-test)
   (http
    (and
-    (>= 6.0.0~beta3)
+    (>= 6.0.0~beta2)
     (< 7.0.0)))
+  nofuture
   (timmy
    (and
     (>= 1.0.0)
@@ -145,15 +147,17 @@
     :with-test))
   (cohttp-lwt
    (and
-    (>= 6.0.0~beta3)
+    (>= 6.0.0~beta2)
     (< 7.0.0)))
   (cohttp-lwt-unix
    (and
     :with-test
-    (>= 6.0.0~beta3)
+    (>= 6.0.0~beta2)
     (< 7.0.0)))
+  (lwt_eio :with-test)
   (lwt
    (>= 5.6.0))
+  nofuture-lwt
   (schematic-http
    (= :version))
   (timmy-lwt
@@ -176,9 +180,10 @@
     :with-test))
   (cohttp-eio
    (and
-    (>= 6.0.0~beta3)
+    (>= 6.0.0~beta2)
     (< 7.0.0)))
   eio
+  nofuture-eio
   (schematic-http
    (= :version))))
 

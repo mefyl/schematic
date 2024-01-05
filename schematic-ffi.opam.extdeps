@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic-ffi"
-version: "0.19.0"
+version: "0.19.1"
 synopsis: "Generate FFI types and converters based on schemas"
 maintainer: "mefyl <mefyl@gruntech.org>"
 authors: "Yohaï-Eliel BERREBY <yberreby@pm.me>"
@@ -12,9 +12,11 @@ depends: [
   "opam-file-format"
   "sexplib"
   "angstrom" {= "0.16.0"}
-  "base" {= "v0.15.1"}
+  "base" {= "v0.16.3"}
   "base-bigarray" {= "base"}
   "base-bytes" {= "base"}
+  "base-domains" {= "base"}
+  "base-nnp" {= "base"}
   "base-threads" {= "base"}
   "base-unix" {= "base"}
   "base64" {= "3.5.1"}
@@ -42,28 +44,28 @@ depends: [
   "menhirLib" {= "20230608"}
   "menhirSdk" {= "20230608"}
   "metapp" {= "0.4.4" & with-test}
-  "ocaml" {= "4.14.1"}
-  "ocaml-base-compiler" {= "4.14.1"}
+  "ocaml" {= "5.1.1"}
+  "ocaml-base-compiler" {= "5.1.1"}
   "ocaml-compiler-libs" {= "v0.12.4"}
-  "ocaml-config" {= "2"}
+  "ocaml-config" {= "3"}
   "ocaml-options-vanilla" {= "1"}
   "ocaml-syntax-shims" {= "1.0.0"}
-  "ocamlbuild" {= "0.14.2"}
+  "ocamlbuild" {= "0.14.3"}
   "ocamlfind" {= "1.9.6"}
   "ocplib-endian" {= "1.2"}
-  "ppx_compare" {= "v0.15.0"}
+  "ppx_compare" {= "v0.16.0"}
   "ppx_derivers" {= "1.2.1"}
   "ppx_deriving" {= "5.2.1"}
-  "ppx_hash" {= "v0.15.0"}
-  "ppx_here" {= "v0.15.0"}
-  "ppx_sexp_conv" {= "v0.15.1"}
+  "ppx_hash" {= "v0.16.0"}
+  "ppx_here" {= "v0.16.0"}
+  "ppx_sexp_conv" {= "v0.16.0"}
   "ppxlib" {= "0.31.0"}
   "ptime" {= "1.1.0"}
   "result" {= "1.5"}
   "sedlex" {= "3.2"}
   "semver2" {= "1.2.0"}
   "seq" {= "base"}
-  "sexplib0" {= "v0.15.1"}
+  "sexplib0" {= "v0.16.0"}
   "stdcompat" {= "19"}
   "stdlib-shims" {= "0.3.0"}
   "stringext" {= "1.6.0"}
