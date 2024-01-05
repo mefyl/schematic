@@ -126,7 +126,7 @@
  (depends
   (http
    (and
-    (>= 6.0.0~beta2)
+    (>= 6.0.0~beta3)
     (< 7.0.0)))
   (timmy
    (and
@@ -145,16 +145,26 @@
     :with-test))
   (cohttp-lwt
    (and
-    (>= 6.0.0~beta2)
+    (>= 6.0.0~beta3)
+    (< 7.0.0)))
+  (cohttp-lwt-unix
+   (and
+    :with-test
+    (>= 6.0.0~beta3)
     (< 7.0.0)))
   (lwt
    (>= 5.6.0))
+  (schematic-http
+   (= :version))
   (timmy-lwt
    (and
     (>= 1.0.0)
     (< 2.0.0)))
-  (schematic-http
-   (= :version))))
+  (timmy-unix
+   (and
+    :with-test
+    (>= 1.0.0)
+    (< 2.0.0)))))
 
 (package
  (name schematic-cohttp-eio)
@@ -166,7 +176,7 @@
     :with-test))
   (cohttp-eio
    (and
-    (>= 6.0.0~beta2)
+    (>= 6.0.0~beta3)
     (< 7.0.0)))
   eio
   (schematic-http

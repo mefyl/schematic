@@ -156,7 +156,7 @@ module Sexp_coding : Coding.IMPL with type t = t = struct
   let to_time_ = function
     | Sexp.Atom s ->
       let error (`RFC3339 (_, e)) =
-        Some (Caml.Format.asprintf "%a" Ptime.pp_rfc3339_error e)
+        Some (Stdlib.Format.asprintf "%a" Ptime.pp_rfc3339_error e)
       in
       Ptime.of_rfc3339 ~strict:true s |> Result.map_error ~f:error
     | _ -> Result.fail None

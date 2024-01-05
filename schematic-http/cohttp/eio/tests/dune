@@ -7,7 +7,6 @@
   eio_main
   logs.fmt
   schematic_cohttp_eio
-  schematic_http_tests
-  timmy-unix.clock)
+  schematic_http_tests)
  (preprocess
   (pps ppx_here)))

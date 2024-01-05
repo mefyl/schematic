@@ -10,10 +10,10 @@ end
 module Pretty_print = struct
   let check ~here name json repr =
     let buffer = Buffer.create 1024 in
-    let fmt = Caml.Format.formatter_of_buffer buffer in
-    let () = Caml.Format.pp_set_margin fmt 20 in
+    let fmt = Stdlib.Format.formatter_of_buffer buffer in
+    let () = Stdlib.Format.pp_set_margin fmt 20 in
     let () = Fmt.pf fmt "%a" Schematic.Json.pp json in
-    let () = Caml.Format.pp_print_flush fmt () in
+    let () = Stdlib.Format.pp_print_flush fmt () in
     Alcotest.(check ~here string name repr (Buffer.contents buffer))
 
   let null () = check ~here:[%here] "null" `Null "null"
