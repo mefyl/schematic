@@ -26,7 +26,7 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
   module Coding = Coding
   module Monad = Result
 
-  let error_of_exn id method_ uri = function
+  let error_of_exn id uri = function
     | Eio.Time.Timeout ->
       let () =
         Logs.info (fun m ->
@@ -35,7 +35,7 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
               id Uri.pp uri)
       in
       `Networking
-    | exn -> Schematic_http.Private.error_of_exception id method_ uri exn
+    | exn -> Schematic_http.Private.error_of_exception id uri exn
 
   module Body = struct
     type nonrec t = {
@@ -91,8 +91,7 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
         raise
           (Schematic_http.Channel
              (Schematic_http.Error.make ~method_
-                ~reason:(error_of_exn id method_ uri exn)
-                ?status uri))
+                ~reason:(error_of_exn id uri exn) ?status uri))
 
     let drain _ =
       (* AFAICT cohttp-eio does not support keepalive and draining so far *) ()
@@ -118,8 +117,7 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
               raise
                 (Schematic_http.Channel
                    (Schematic_http.Error.make ~method_ ?status
-                      ~reason:(error_of_exn id method_ uri exn)
-                      uri))
+                      ~reason:(error_of_exn id uri exn) uri))
 
           let read_methods = []
         end in
@@ -166,5 +164,5 @@ module Make (Coding : Schematic.Coding.STR with type t = string) = struct
               status = Some status;
               uri;
             } )
-    with exn -> Result.Error (error_of_exn (Some id) method_ uri exn)
+    with exn -> Result.Error (error_of_exn (Some id) uri exn)
 end

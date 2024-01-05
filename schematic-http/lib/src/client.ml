@@ -5,7 +5,7 @@ let src = Logs.Src.create ~doc:"schematic HTTP client" "schematic-http"
 module Logs = (val Logs.src_log src)
 
 module Private = struct
-  let error_of_exception id method_ uri = function
+  let error_of_exception id uri = function
     | Unix.Unix_error ((Unix.EBADF as e), _, _)
     | Unix.Unix_error ((Unix.ENOTCONN as e), _, _)
     | Unix.Unix_error ((Unix.EADDRNOTAVAIL (* Seen on iOS *) as e), _, _) ->
@@ -101,11 +101,11 @@ module Make (Handler : HANDLER) = struct
     let optional protocol =
       {
         f =
-          (fun url retry ((_, body) as v) f ->
+          (fun url retry v f ->
             protocol.f url retry v @@ fun (response, body) ->
             match Http.Response.status response with
             | `Not_found ->
-              (* let* () = Body.drain body in *)
+              let* () = Body.drain body in
               Future.return (Result.Ok None)
             | _ ->
               let*! result = f (response, body) in
@@ -171,9 +171,6 @@ module Make (Handler : HANDLER) = struct
           ('value, 'next, 'result, 'error) rule
           * ('next, 'final, 'result, 'error) t
           -> ('value, 'final, 'result, 'error) t
-
-    (* let x = [ check_status (fun _ -> `Error `Oops); optional ] *)
-    let x = [ optional ]
 
     let rec apply :
           'value 'next 'result 'error.

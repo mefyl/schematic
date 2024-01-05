@@ -17,8 +17,6 @@ type payload = {
 let const_payload = { x = 26; y = "105" }
 let payload = Alcotest.testable pp_payload equal_payload
 
-type server = { port : int }
-
 let sleep_and_advance ?(flush = false) clock seconds =
   Eio.Switch.run @@ fun sw ->
   let sleep =
@@ -36,7 +34,7 @@ let sleep_and_advance ?(flush = false) clock seconds =
 
 let server mono_clock net sw =
   let server =
-    let callback connection request body =
+    let callback _connection request body =
       let path = Cohttp.Request.uri request |> Uri.path in
       let () = Logs.info (fun m -> m "receive request %S" path) in
       match path with
@@ -103,7 +101,7 @@ let server mono_clock net sw =
   in
   let () =
     Eio.Fiber.fork ~sw @@ fun () ->
-    let rec serve () =
+    let serve () =
       Cohttp_eio.Server.run
         ~on_error:(function
           | exn -> Alcotest.failf "server crashed: %s" @@ Printexc.to_string exn)
@@ -146,7 +144,8 @@ struct
   module Client = Schematic_http.Make (Handler)
 
   module Requests = struct
-    let get_empty { port } client =
+    let get_empty { port } handler =
+      let client = Client.make handler in
       let+ result =
         Client.get client Empty
         @@ Uri.make ~scheme:"http"
@@ -156,7 +155,8 @@ struct
       Alcotest.(check ~here:[%here] (result unit error))
         "request succeded" (Result.Ok ()) result
 
-    let get_json { port } client =
+    let get_json { port } handler =
+      let client = Client.make handler in
       let+ result =
         Client.get client (Schema payload_schema)
         @@ Uri.make ~scheme:"http"
@@ -166,7 +166,8 @@ struct
       Alcotest.(check ~here:[%here] (result payload error))
         "request succeded" (Result.Ok const_payload) result
 
-    let get_string { port } client =
+    let get_string { port } handler =
+      let client = Client.make handler in
       let+ result =
         Client.get client String
         @@ Uri.make ~scheme:"http"
@@ -178,7 +179,8 @@ struct
         (Result.Ok (Schematic.Json.String.encode payload_schema const_payload))
         result
 
-    let _get_stream port client path =
+    let _get_stream port handler path =
+      let client = Client.make handler in
       Future.Scope.run ~name:"read stream" @@ fun scope ->
       let* result =
         Client.get client (Channel scope)
@@ -196,10 +198,11 @@ struct
       Alcotest.(check ~here:[%here] (result string error))
         "request succeded" (Result.Ok Data.v) result
 
-    let get_stream { port } client = _get_stream port client "/big"
-    let get_stream_slow { port } client = _get_stream port client "/big-slow"
+    let get_stream { port } handler = _get_stream port handler "/big"
+    let get_stream_slow { port } handler = _get_stream port handler "/big-slow"
 
-    let post { port } client =
+    let post { port } handler =
+      let client = Client.make handler in
       let post_payload = { x = 107; y = "44" } in
       let+ result =
         Client.post client
@@ -212,20 +215,36 @@ struct
       Alcotest.(check ~here:[%here] (result payload error))
         "request succeded" (Result.Ok post_payload) result
 
-    let not_found { port } client =
+    let not_found { port } handler =
+      let client =
+        Client.make_protocol handler
+          Client.Protocol.
+            [
+              check_status (function
+                | #Http.Status.success -> `Ok
+                | status -> `Error (`Unexpected_status status));
+              optional;
+            ]
+      in
       let uri =
         Uri.make ~scheme:"http"
           ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
           ~port ~path:"/404" ()
       in
-      let+ result =
-        Client.(get (with_protocol client Protocol.(optional)))
-          (Schema payload_schema) uri
-      in
+      let+ result = Client.get client (Schema payload_schema) uri in
       Alcotest.(check ~here:[%here] (result (option payload) error))
         "request succeded" (Result.Ok None) result
 
-    let unexpected_status { port } client =
+    let unexpected_status { port } handler =
+      let client =
+        Client.make_protocol handler
+          Client.Protocol.
+            [
+              check_status (function
+                | #Http.Status.success -> `Ok
+                | status -> `Error (`Unexpected_status status));
+            ]
+      in
       let uri =
         Uri.make ~scheme:"http"
           ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
@@ -245,7 +264,9 @@ struct
   end
 
   module Timeout = struct
-    let _timeout { port } client timeout should_complete status chunk_received =
+    let _timeout { port } handler timeout should_complete status chunk_received
+        =
+      let client = Client.make handler in
       Future.Scope.run ~name:"read stream" @@ fun scope ->
       let uri =
         Uri.make ~scheme:"http"
@@ -289,22 +310,22 @@ struct
       Alcotest.(check ~here:[%here] (result string error))
         ("request " ^ name) expected result
 
-    let headers server client =
-      _timeout server client (Timmy.Span.seconds 1) false None (fun () ->
+    let headers server handler =
+      _timeout server handler (Timmy.Span.seconds 1) false None (fun () ->
           Alcotest.fail ~here:[%here] "body chunk was received")
 
-    let body server client =
+    let body server handler =
       let chunk_received = ref false in
       let+ () =
-        _timeout server client (Timmy.Span.seconds 3) false (Some `OK)
+        _timeout server handler (Timmy.Span.seconds 3) false (Some `OK)
           (fun () -> chunk_received := true)
       in
       Alcotest.(check ~here:[%here] bool)
         "body was partially received" true !chunk_received
 
-    let complete mono_clock server client =
+    let complete mono_clock server handler =
       let+ () =
-        _timeout server client (Timmy.Span.seconds 20) true (Some `OK)
+        _timeout server handler (Timmy.Span.seconds 20) true (Some `OK)
           (fun () -> ())
       in
       sleep_and_advance ~flush:true mono_clock 20.
@@ -339,16 +360,7 @@ struct
     in
     let test_case name speed f =
       test_case name speed @@ fun handler ->
-      let+ () =
-        f
-          (Client.make_protocol handler
-             Client.Protocol.
-               [
-                 check_status (function
-                   | #Http.Status.success -> `Ok
-                   | status -> `Error (`Unexpected_status status));
-               ])
-      in
+      let+ () = f handler in
       let (_ : bool) = Eio_mock.Clock.Mono.try_advance mono_clock in
       ()
     in
@@ -365,7 +377,7 @@ struct
           ] );
         ( "errors",
           [
-            (* test_case "404" `Quick (Requests.not_found server); *)
+            test_case "404" `Quick (Requests.not_found server);
             test_case "unexpected status" `Quick
               (Requests.unexpected_status server);
           ] );
