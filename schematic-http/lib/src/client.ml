@@ -285,7 +285,7 @@ module Make (Handler : HANDLER) = struct
       let id = Id.make () in
       let () =
         Logs.info (fun m ->
-            m "%a%s %a" Id.pp id (Http.Method.to_string method_) Uri.pp uri)
+            m "%a%a %a" Id.pp id Http.Method.pp method_ Uri.pp uri)
       in
       let () =
         let f name value =
