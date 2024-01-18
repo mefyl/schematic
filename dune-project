@@ -124,7 +124,10 @@
  (name schematic-http)
  (synopsis "HTTP client with schematic encoding")
  (depends
-  (eio_main :with-test)
+  (eio_main
+   (and
+    :with-test
+    (= 0.14)))
   (http
    (and
     (>= 6.0.0~beta2)
@@ -182,7 +185,8 @@
    (and
     (>= 6.0.0~beta2)
     (< 7.0.0)))
-  eio
+  (eio
+   (= 0.14))
   nofuture-eio
   (schematic-http
    (= :version))))
