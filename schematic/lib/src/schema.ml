@@ -156,8 +156,6 @@ let field_ignored : type req t. (t, req) field -> bool = function
   | { schema = Inline_try { descriptor = Ignore; _ }; _ } -> true
   | { omit; _ } -> omit
 
-(* FIXME: Also flatten single-case unions. *)
-(* FIXME:? Offer to flatten single field objects, tuples, ... *)
 let rec flatten : type t. t descriptor -> t flatten =
   let open Result in
   function
@@ -168,6 +166,17 @@ let rec flatten : type t. t descriptor -> t flatten =
     in
     let decode v = d_decode v >>= decode
     and encode v = encode v |> d_encode in
+    Flatten { descriptor; decode; encode }
+  | Union { cases = [ Case { decoder; encoder; schema; _ } ]; _ } ->
+    let (Flatten { descriptor; decode = d_decode; encode = d_encode }) =
+      flatten schema.descriptor
+    in
+    let decode v = d_decode v >>| decoder
+    and encode v =
+      encoder v
+      |> Option.value_exn ~here:[%here] ~message:"no union cased matched"
+      |> d_encode
+    in
     Flatten { descriptor; decode; encode }
   | descriptor -> Flatten { descriptor; decode = Result.return; encode = Fn.id }
 
