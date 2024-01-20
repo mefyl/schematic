@@ -185,7 +185,7 @@ module Make (Handler : HANDLER) = struct
       | head :: tail -> head @@ apply tail base
   end
 
-  type ('value, 'result, 'error) t = {
+  type (-'value, +'result, !'error) t = {
     handler : Handler.t;
     headers : Http.Header.t;
     protocol : ('value, 'result, 'error) Protocol.protocol;

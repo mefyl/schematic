@@ -147,7 +147,7 @@ module type HANDLER = sig
 end
 
 module type S = sig
-  type ('value, 'result, 'error) t
+  type (-'value, +'result, !'error) t
 
   module Handler : HANDLER
 

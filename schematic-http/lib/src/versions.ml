@@ -1,4 +1,4 @@
-module V0_19_0 = struct
+module V0_20_0 = struct
   include Client
 
   module Id : sig
@@ -10,5 +10,3 @@ module V0_19_0 = struct
 
   module Error = Error
 end
-
-module V0_19_1 = V0_19_0
