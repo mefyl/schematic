@@ -135,7 +135,7 @@
   nofuture
   (timmy
    (and
-    (>= 1.0.0)
+    (>= 1.1.3)
     (< 2.0.0)))
   (schematic
    (= :version))))
@@ -165,12 +165,12 @@
    (= :version))
   (timmy-lwt
    (and
-    (>= 1.0.0)
+    (>= 1.1.3)
     (< 2.0.0)))
   (timmy-unix
    (and
     :with-test
-    (>= 1.0.0)
+    (>= 1.1.3)
     (< 2.0.0)))))
 
 (package
