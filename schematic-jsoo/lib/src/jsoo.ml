@@ -84,10 +84,10 @@ module Impl : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
 
   let to_fields o =
     match Js_of_ocaml.Js.object_keys o with
-    | keys ->
+    | keys when Js_of_ocaml.Js.typeof o == Js.string "object" ->
       let f key = (Js.to_string key, Js_of_ocaml.Js.Unsafe.get o key) in
       Option.return @@ List.map ~f @@ Array.to_list @@ Js.to_array keys
-    | exception _ -> None
+    | _ | (exception _) -> None
 
   let to_float v =
     if Js.typeof v == Js.string "number" then

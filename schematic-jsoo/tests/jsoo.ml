@@ -38,7 +38,29 @@ module Errors = struct
       (Result.Ok { v = None })
       res
 
-  let tests = Alcotest.[ test_case "undefined" `Quick undefined ]
+  type recurse =
+    | Object of (string * recurse) list
+    | String of string
+  [@@deriving schema]
+
+  (* This used to recurse infinitely because strings where considered valid
+     objects because [Object.keys('test')] returns [[ '0', '1', '2', '3' ]] *)
+  let object_keys () =
+    let res =
+      Schematic_jsoo.Jsoo.decode recurse_schema
+        (Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.string "test"))
+    in
+    Alcotest.(
+      check ~here:[%here] (result pass reject)
+        "undefined in JSON does not choke")
+      (Ok (String "test")) res
+
+  let tests =
+    Alcotest.
+      [
+        test_case "undefined" `Quick undefined;
+        test_case "object_keys" `Quick object_keys;
+      ]
 end
 
 let () =
