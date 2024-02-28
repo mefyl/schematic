@@ -176,10 +176,10 @@ include Make_mark_converter (struct
 end)
 
 let of_descriptor d = Of.descriptor ~id:None d Marks.empty |> fst
-let break sp id fmt _ = Caml.Format.pp_print_break fmt sp id
+let break sp id fmt _ = Stdlib.Format.pp_print_break fmt sp id
 
 let custom_break fits breaks fmt _ =
-  Caml.Format.pp_print_custom_break fmt ~fits:(fits, 0, "")
+  Stdlib.Format.pp_print_custom_break fmt ~fits:(fits, 0, "")
     ~breaks:(breaks, 0, "")
 
 module Precedence = struct

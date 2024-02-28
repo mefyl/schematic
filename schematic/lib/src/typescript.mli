@@ -15,7 +15,7 @@ val of_schemas :
   ?exclude:Schema.pack list -> Schema.pack list -> (string * t) list
 
 (** [name t] is the typescript name of the type mapping to the type named [t] in
-    OCaml. *)
+    OStdlib. *)
 val name : string -> string
 
 (** [pp fmt t] outputs typescript types declaration for [t] to [fmt]. *)

@@ -62,13 +62,13 @@ module Make (Entropy : Entropy.S) = struct
       Char.to_int @@ Bytes.get byte 0
     and int16 =
       let+! bytes = bytes 2 in
-      Caml.Bytes.get_int16_ne bytes 0
+      Stdlib.Bytes.get_int16_ne bytes 0
     and int32 =
       let+! bytes = bytes 4 in
-      Caml.Bytes.get_int32_ne bytes 0
+      Stdlib.Bytes.get_int32_ne bytes 0
     and int64 =
       let+! bytes = bytes 8 in
-      Caml.Bytes.get_int64_ne bytes 0
+      Stdlib.Bytes.get_int64_ne bytes 0
     in
     let bool =
       let+! byte in
@@ -133,7 +133,7 @@ module Make (Entropy : Entropy.S) = struct
       | Int -> int
       | Int64 ->
         let+! bytes = bytes 8 in
-        Caml.Bytes.get_int64_ne bytes 0
+        Stdlib.Bytes.get_int64_ne bytes 0
       | Json -> of_descriptor size json_schema.descriptor
       | List d ->
         let*! len = range 0 size in

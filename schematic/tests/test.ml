@@ -1,5 +1,5 @@
 let dollar = Base.String.Search_pattern.create "$"
-let root = Caml.Filename.dirname @@ Caml.Sys.executable_name
+let root = Stdlib.Filename.dirname @@ Stdlib.Sys.executable_name
 
 module Tests = Test_utils.Tests.Make (struct
   include Schematic.Json
@@ -21,7 +21,7 @@ module Tests = Test_utils.Tests.Make (struct
            ~with_:"\\$")
         (Base.String.escaped @@ Schematic.Json.to_string @@ encoded)
     in
-    if Caml.Sys.command cmd <> 0 then
+    if Stdlib.Sys.command cmd <> 0 then
       Alcotest.check ~here t
         (Fmt.str "%s: schema validation" name)
         schema encoded

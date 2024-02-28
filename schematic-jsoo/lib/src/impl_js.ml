@@ -1,7 +1,7 @@
 open Base
 open Js_of_ocaml
 
-let ( == ) = Caml.( == )
+let ( == ) = Stdlib.( == )
 let _Array = Js.Unsafe.global##._Array
 
 let[@landmark "Schematic_jsoo.Json.of_js"] rec of_js (o : Js.Unsafe.any) =
