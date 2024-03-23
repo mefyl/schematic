@@ -11,7 +11,10 @@
 (env
  (dev
   (flags
-   (:standard -warn-error -A))))
+   (:standard -warn-error -A -warn-error +partial-match)))
+ (release
+  (flags
+   (:standard -warn-error +A))))
 
 (alias
  (name default)
