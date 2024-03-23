@@ -152,6 +152,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | Any (module Any) ->
           Any.of_any (Coding.to_any v) |> type_error Any.name
         | Bool -> Coding.to_bool v |> type_error "boolean"
+        | Coding f -> decode_descriptor context (f (Some Coding.coding)) v
         | Date -> (
           match Coding.to_date with
           | `Generic -> decode_schema context date_tuple_schema v
@@ -368,6 +369,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
             | None ->
               Fmt.failwith "%s encoder cannot encode %s" Coding.name Any.name)
         | Bool -> Coding.of_bool
+        | Coding f -> encode_descriptor context (f (Some Coding.coding))
         | Date -> (
           match Coding.of_date with
           | `Generic -> encode_schema context date_tuple_schema
