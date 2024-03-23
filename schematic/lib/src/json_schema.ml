@@ -46,34 +46,35 @@ let of_schema schema =
       ({ schema with core = { schema.core with id = Some (id_name id) } }, marks)
   and of_descriptor : type u. ids -> u Schema.descriptor -> t * ids =
    fun marks -> function
-    | Schema.Any _ -> (make (), marks)
-    | Schema.Bool ->
+    | Any _ -> (make (), marks)
+    | Bool ->
       let validation = make_validation ~type_:[ Boolean ] () in
       (make ~validation (), marks)
-    | Schema.Date -> of_descriptor marks date_tuple_schema.descriptor
+    | Coding f -> of_descriptor marks (f None)
+    | Date -> of_descriptor marks date_tuple_schema.descriptor
     | Fixpoint s -> of_descriptor marks (Lazy.force s)
-    | Schema.Float ->
+    | Float ->
       let validation = make_validation ~type_:[ Number ] () in
       (make ~validation (), marks)
-    | Schema.Ignore -> (make (), marks)
-    | Schema.Int | Schema.Int64 ->
+    | Ignore -> (make (), marks)
+    | Int | Int64 ->
       let validation = make_validation ~type_:[ Integer ] () in
       (make ~validation (), marks)
-    | Schema.Json -> (make (), marks)
-    | Schema.List schema ->
+    | Json -> (make (), marks)
+    | List schema ->
       let schema, marks = of_schema marks schema in
       let applicator = make_applicator ~items:(Items_schema schema) ()
       and validation = make_validation ~type_:[ Array ] () in
       (make ~applicator ~validation (), marks)
-    | Schema.Map { descriptor; _ } -> of_descriptor marks descriptor
-    | Schema.Mapping schema ->
+    | Map { descriptor; _ } -> of_descriptor marks descriptor
+    | Mapping schema ->
       let schema, marks = of_schema marks schema in
       let applicator =
         make_applicator ~additionalProperties:(Properties_schema schema) ()
       and validation = make_validation ~type_:[ Object ] () in
       (make ~applicator ~validation (), marks)
-    | Schema.Null -> (null, marks)
-    | Schema.Nullable s ->
+    | Null -> (null, marks)
+    | Nullable s ->
       let t, marks = of_descriptor marks s.descriptor in
       let type_ =
         Null :: t.validation.type_ |> List.dedup_and_sort ~compare:Poly.compare
@@ -86,19 +87,19 @@ let of_schema schema =
           validation = { t.validation with type_ };
         },
         marks )
-    | Schema.String ->
+    | String ->
       let validation = make_validation ~type_:[ String ] () in
       (make ~validation (), marks)
-    | Schema.String_const v ->
+    | String_const v ->
       let validation = string_const_validation v in
       (make ~validation (), marks)
-    | Schema.Time ->
+    | Time ->
       let validation = make_validation ~type_:[ String ] () in
       (make ~validation (), marks)
-    | Schema.Time_local ->
+    | Time_local ->
       let validation = make_validation ~type_:[ String ] () in
       (make ~validation (), marks)
-    | Schema.Object _ as o -> (
+    | Object _ as o -> (
       let properties, marks =
         let f =
           Result.ok_or_failwith

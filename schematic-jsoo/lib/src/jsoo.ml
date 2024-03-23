@@ -19,6 +19,8 @@ let ( let+ ) = Option.( >>| )
 type Schematic.Coding.any += Jsoo of Js.Unsafe.any
 
 module Impl : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
+  let coding = Coding
+
   type t = Js.Unsafe.any
 
   let name = "javascript"

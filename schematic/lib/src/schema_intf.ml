@@ -56,6 +56,7 @@ and _ tuple =
 and _ descriptor =
   | Any : (module Coding_intf.IMPL with type t = 't) -> 't descriptor
   | Bool : bool descriptor
+  | Coding : (Coding_intf.t option -> 'a descriptor) -> 'a descriptor
   | Date : Ptime.date descriptor
   | Fixpoint : 'a descriptor Lazy.t -> 'a descriptor
   | Float : float descriptor
