@@ -4,9 +4,12 @@ module Sexp = Sexplib.Sexp
 include Sexp
 include Schematic_sexp_intf
 
+type Coding.t += Coding
 type Coding.any += Sexp of t
 
 module Sexp_coding : Coding.IMPL with type t = t = struct
+  let coding = Coding
+
   type nonrec t = t
 
   let name = "s-expression"

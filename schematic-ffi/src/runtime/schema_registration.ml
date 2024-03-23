@@ -22,6 +22,7 @@ let rec traverse_descriptor :
   | Null | String | Time | Bool | Float | Int | Ignore | Int64 | Time_local
   | String_const _ | Date | Any _ | Json ->
     ()
+  | Coding f -> traverse_descriptor id (f None)
   | Fixpoint d -> traverse_descriptor id (Lazy.force d)
   | List s -> traverse_schema s
   | Map { descriptor = serialized_d; encode; decode } as map_d ->

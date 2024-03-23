@@ -35,6 +35,8 @@ let rec pp f json =
 type Coding.any += Json of Ezjsonm.value
 
 module Impl : Coding.IMPL with type t = Ezjsonm.value = struct
+  let coding = Coding
+
   type t = Ezjsonm.value
 
   let name = "JSON"

@@ -16,9 +16,12 @@ let js_of_ptime t = new%js Js.date_fromTimeValue (Ptime.to_float_s t *. 1000.)
 let ( == ) = Base.phys_equal
 let ( let+ ) = Option.( >>| )
 
+type Schematic.Coding.t += Coding
 type Schematic.Coding.any += Jsoo of Js.Unsafe.any
 
 module Impl : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
+  let coding = Coding
+
   type t = Js.Unsafe.any
 
   let name = "javascript"
