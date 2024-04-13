@@ -8,6 +8,7 @@
 
 (test
  (name json)
+ (package schematic-jsoo)
  (modes js)
  (modules json)
  (libraries alcotest js_of_ocaml schematic-jsoo test_utils)
@@ -16,6 +17,7 @@
 
 (test
  (name jsoo)
+ (package schematic-jsoo)
  (modes js)
  (modules jsoo)
  (libraries alcotest js_of_ocaml schematic-jsoo test_utils)
