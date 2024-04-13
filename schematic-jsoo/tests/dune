@@ -6,10 +6,20 @@
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
  (libraries alcotest schematic schematic_jsoo))
 
-(tests
- (names json jsoo)
+(test
+ (name json)
+ (package schematic-jsoo)
  (modes js)
- (modules json jsoo)
+ (modules json)
+ (libraries alcotest js_of_ocaml schematic-jsoo test_utils)
+ (preprocess
+  (pps js_of_ocaml-ppx ppx_here schematic.ppx)))
+
+(test
+ (name jsoo)
+ (package schematic-jsoo)
+ (modes js)
+ (modules jsoo)
  (libraries alcotest js_of_ocaml schematic-jsoo test_utils)
  (preprocess
   (pps js_of_ocaml-ppx ppx_here schematic.ppx)))
