@@ -217,4 +217,5 @@ let add ~inside ~jsoo ~version =
     Deriving.Generator.V2.make arg (fun ~ctxt (recursive, types) fixpoint ->
         expand ~context:(context ~ctxt ~fixpoint recursive types) types)
   in
-  Deriving.add ~sig_type_decl ~str_type_decl "schema"
+  let _deriver = Deriving.add ~sig_type_decl ~str_type_decl "schema" in
+  ()
