@@ -196,26 +196,63 @@ let add ~inside ~jsoo ~version =
       recursive;
     }
   in
-  let sig_type_decl =
-    let arg =
-      let open Deriving.Args in
-      let fixpoint = flag "fixpoint"
-      and jsoo = arg "jsoo" __ in
-      empty +> fixpoint +> jsoo
+  let () =
+    let sig_type_decl =
+      let arg =
+        let open Deriving.Args in
+        let fixpoint = flag "fixpoint"
+        and jsoo = arg "jsoo" __ in
+        empty +> fixpoint +> jsoo
+      in
+      Deriving.Generator.V2.make arg (fun ~ctxt (recursive, types) fixpoint ->
+          expand_sig ~context:(context ~ctxt ~fixpoint recursive types) types)
+    and str_type_decl =
+      let arg =
+        let open Deriving.Args in
+        let fixpoint = flag "fixpoint"
+        and gadt = arg "gadt" (elist (pexp_ident (lident __)))
+        and jsoo = arg "jsoo" __
+        and sqml = arg "sqml" (estring __) in
+        empty +> fixpoint +> gadt +> jsoo +> sqml
+      in
+      Deriving.Generator.V2.make arg (fun ~ctxt (recursive, types) fixpoint ->
+          expand ~context:(context ~ctxt ~fixpoint recursive types) types)
     in
-    Deriving.Generator.V2.make arg (fun ~ctxt (recursive, types) fixpoint ->
-        expand_sig ~context:(context ~ctxt ~fixpoint recursive types) types)
-  and str_type_decl =
-    let arg =
-      let open Deriving.Args in
-      let fixpoint = flag "fixpoint"
-      and gadt = arg "gadt" (elist (pexp_ident (lident __)))
-      and jsoo = arg "jsoo" __
-      and sqml = arg "sqml" (estring __) in
-      empty +> fixpoint +> gadt +> jsoo +> sqml
+    let _deriver = Deriving.add ~sig_type_decl ~str_type_decl "schema" in
+    ()
+  and () =
+    let extension =
+      let extracter = Ast_pattern.(ptyp __)
+      and expand ~ctxt type' =
+        let loc = Ppxlib.Expansion_context.Extension.extension_point_loc ctxt in
+        let schema =
+          let context =
+            let code_path = Ppxlib.Expansion_context.Extension.code_path ctxt in
+            {
+              code_path;
+              fixpoint = false;
+              gadt_variant = None;
+              global = Lazy.force global;
+              loc;
+              types = [];
+              recursive = false;
+            }
+          in
+          Schema.expand_abstract_type ~context
+            ~type_context:
+              { attributes = Attributes.empty; loc; name = ""; params = [] }
+            type'
+          |> Schema.schema_of_expanded ~loc
+        in
+        [%expr
+          let __schematic_version _ = None in
+          [%e schema]]
+      in
+      Extension.V3.declare "schema" Extension.Context.expression extracter
+        expand
     in
-    Deriving.Generator.V2.make arg (fun ~ctxt (recursive, types) fixpoint ->
-        expand ~context:(context ~ctxt ~fixpoint recursive types) types)
+    Driver.register_transformation
+      ~rules:[ Context_free.Rule.extension extension ]
+      "schematic"
   in
-  let _deriver = Deriving.add ~sig_type_decl ~str_type_decl "schema" in
   ()
