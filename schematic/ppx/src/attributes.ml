@@ -19,15 +19,22 @@ let requirement { computed; loc; specs = { default; _ }; type_; _ } =
     | None, Some _ -> (Computed, t)
     | None, None -> (Required, t))
 
+(** Schematic specific attributes that may be attached to types. *)
 type t = {
-  alias : string versioned; [@default []]
+  alias : string versioned; [@default []]  (** [@schematic.alias] attribute. *)
   aliases : string list versioned; [@default []]
+      (** [[@schematic.aliases]] attribute. *)
   computed : (string, expression * core_type, String.comparator_witness) Map.t;
-  gadt_variant : string option;
-  name : expression option;
-  schema : expression option;
-  union_key : string option;
+      [@default Map.empty (module String)]
+      (** [@schematic.computed] attribute *)
+  gadt_variant : string option;  (** [[@schematic.gadt]] attribute. *)
+  name : expression option;  (** [[@schematic.name]] attribute. *)
+  schema : expression option;  (** [@schematic.schema] attribute *)
+  union_key : string option;  (** [@schematic.union_key] attribute*)
 }
+[@@deriving make]
+
+let empty = make ()
 
 let field_of_computed ~loc (name, (value, type_)) =
   make_field ~loc:value.pexp_loc ~type_ ~computed:[%expr Some [%e value]] name
