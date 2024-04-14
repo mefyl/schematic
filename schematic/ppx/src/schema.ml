@@ -6,13 +6,19 @@ open Intf
 type closed = value_binding * value_binding
 type configuration = unit
 
+(** An AST expression evaluating to a schema. *)
 type expanded =
   | Components of {
       descriptor : expression;
       id : expression;
       parametric : expression;
     }
+      (** Chunks of AST that evaluate to the corresponding fields of a
+          [Schema.t]. Equilavent to the [Expression] constructor if combined in
+          such a way (see the [schema_of_expanded] helper), but enables the
+          caller to manipulate the individual fields if needed. *)
   | Expression of expression
+      (** Arbitrary expression evaluating to a schema. *)
 
 let schema_name s = name "schema" s
 let schema_name_versioned s = name "schema_versioned" s
