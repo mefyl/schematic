@@ -1363,6 +1363,18 @@ struct
           (Buffer.contents buffer))
   end
 
+  (* An example of what a %schema extension would enable. *)
+  (* module Extension = struct *)
+  (*   let atomic () = *)
+  (* test ~here:[%here] "integer" Alcotest.int [%schema: int] 42 [%ezjsonm
+     42] *)
+
+  (*   let composite () = *)
+  (*     test ~here:[%here] "pair" *)
+  (*       Alcotest.(pair int string) *)
+  (* [%schema: int * string] (42, "forty two") [%ezjsonm [ 42; "forty two" ]] *)
+  (* end *)
+
   (* Driver *)
 
   let tests =
@@ -1438,5 +1450,10 @@ struct
           test_case "parametric schemas names" `Quick Names.parametric;
         ] );
       ("pp", [ test_case "pp" `Quick Pp.pp ]);
+      (* ( "extension", *)
+      (*   [ *)
+      (*     test_case "atomic" `Quick Extension.atomic; *)
+      (*     test_case "composite" `Quick Extension.composite; *)
+      (*   ] ); *)
     ]
 end
