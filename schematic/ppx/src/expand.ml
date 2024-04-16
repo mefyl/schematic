@@ -165,6 +165,8 @@ let expand_sig ~(context : context) types jsoo =
     [%sig: open Schemas [@@warning "-unused-open"]] @ contents
   else [%sig: open Schematic.Schemas [@@warning "-unused-open"]] @ contents
 
+let expand_type ~ctxt types = (assert false)
+
 let add ~inside ~jsoo ~version =
   let global =
     lazy
@@ -218,4 +220,14 @@ let add ~inside ~jsoo ~version =
         expand ~context:(context ~ctxt ~fixpoint recursive types) types)
   in
   let _deriver = Deriving.add ~sig_type_decl ~str_type_decl "schema" in
+  let _extension =
+    let extender = Extension.V3.declare
+                     "schema"
+                     Extension.Context.core_type
+                     Ast_pattern.(ptyp (ptyp_tuple __))
+                     expand_type in
+    let rule = Context_free.Rule.extension extender in
+    Driver.register_transformation
+      ~rules:[ rule ] "schema_extension" in
   ()
+
