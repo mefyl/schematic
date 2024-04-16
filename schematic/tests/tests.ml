@@ -1364,16 +1364,15 @@ struct
   end
 
   (* An example of what a %schema extension would enable. *)
-  (* module Extension = struct *)
-  (*   let atomic () = *)
-  (* test ~here:[%here] "integer" Alcotest.int [%schema: int] 42 [%ezjsonm
-     42] *)
+  module Extension = struct
+    let atomic () =
+      test ~here:[%here] "integer" Alcotest.int [%schema: int] 42 [%ezjsonm 42]
 
-  (*   let composite () = *)
-  (*     test ~here:[%here] "pair" *)
-  (*       Alcotest.(pair int string) *)
-  (* [%schema: int * string] (42, "forty two") [%ezjsonm [ 42; "forty two" ]] *)
-  (* end *)
+    let composite () =
+      test ~here:[%here] "pair"
+        Alcotest.(pair int string)
+        [%schema: int * string] (42, "forty two") [%ezjsonm [ 42; "forty two" ]]
+  end
 
   (* Driver *)
 
