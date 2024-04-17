@@ -165,7 +165,35 @@ let expand_sig ~(context : context) types jsoo =
     [%sig: open Schemas [@@warning "-unused-open"]] @ contents
   else [%sig: open Schematic.Schemas [@@warning "-unused-open"]] @ contents
 
-let expand_type ~ctxt types = (assert false)
+let expand_type global ~ctxt core_type =
+  let loc = Expansion_context.Extension.extension_point_loc ctxt in
+  let context =
+    let code_path = Expansion_context.Extension.code_path ctxt in
+    {
+      code_path;
+      fixpoint = false;
+      gadt_variant = None;
+      global = Lazy.force global;
+      loc;
+      types = [];
+      recursive = false;
+    }
+  and ty_ctx =
+    {
+      attributes = Attributes.empty;
+      loc = core_type.ptyp_loc;
+      name = "dummy";
+      params = [];
+    }
+  in
+  let module Ast = (val Ast_builder.make loc) in
+  let schema =
+    Schema.schema_of_expanded ~loc:context.loc
+    @@ Schema.expand_abstract_type ~context ~type_context:ty_ctx core_type
+  in
+  [%expr
+    let __schematic_version _ = None in
+    [%e schema]]
 
 let add ~inside ~jsoo ~version =
   let global =
@@ -221,13 +249,12 @@ let add ~inside ~jsoo ~version =
   in
   let _deriver = Deriving.add ~sig_type_decl ~str_type_decl "schema" in
   let _extension =
-    let extender = Extension.V3.declare
-                     "schema"
-                     Extension.Context.core_type
-                     Ast_pattern.(ptyp (ptyp_tuple __))
-                     expand_type in
+    let extender =
+      Extension.V3.declare "schema" Extension.Context.expression
+        Ast_pattern.(ptyp __)
+        (expand_type global)
+    in
     let rule = Context_free.Rule.extension extender in
-    Driver.register_transformation
-      ~rules:[ rule ] "schema_extension" in
+    Driver.register_transformation ~rules:[ rule ] "schema_extension"
+  in
   ()
-
