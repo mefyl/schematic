@@ -38,7 +38,27 @@ module Errors = struct
       (Result.Ok { v = None })
       res
 
-  let tests = Alcotest.[ test_case "undefined" `Quick undefined ]
+  type recurse =
+    | Object of (string * recurse) list
+    | String of string
+  [@@deriving schema]
+
+  let strange_bug () =
+    let res =
+      Schematic_jsoo.Jsoo.decode recurse_schema
+        (Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.string "test"))
+    in
+    Alcotest.(
+      check ~here:[%here] (result pass reject)
+        "undefined in JSON does not choke")
+      (Ok (String "test")) res
+
+  let tests =
+    Alcotest.
+      [
+        test_case "undefined" `Quick undefined;
+        (* test_case "strange bug" `Quick strange_bug; *)
+      ]
 end
 
 let () =
