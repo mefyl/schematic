@@ -1,15 +1,9 @@
 module Json = Test_utils.Tests.Make (struct
-  include Schematic_jsoo.Json.String
+  include Schematic_jsoo.Json
 
-  let to_string s = s
   let local_time_support = true
-
-  let t =
-    Alcotest.testable
-      (fun fmt js -> Fmt.string fmt @@ to_string js)
-      (fun l r -> String.equal (to_string l) (to_string r))
-
-  let of_json _ = None
+  let t = Alcotest.testable Schematic_jsoo.Json.pp Schematic_jsoo.Json.equal
+  let of_json json = Some json
   let extra_test ~here:_ _ _ = ()
 end)
 
