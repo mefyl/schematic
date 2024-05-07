@@ -50,7 +50,7 @@ let of_schema schema =
     | Bool ->
       let validation = make_validation ~type_:[ Boolean ] () in
       (make ~validation (), marks)
-    | Coding f -> of_descriptor marks (f None)
+    | Coding { f } -> of_descriptor marks (f None)
     | Date -> of_descriptor marks date_tuple_schema.descriptor
     | Fixpoint s -> of_descriptor marks (Lazy.force s)
     | Float ->

@@ -4,7 +4,7 @@ module Sexp = Sexplib.Sexp
 include Sexp
 include Schematic_sexp_intf
 
-type Coding.t += Coding
+type _ Coding.coding += Coding : t Coding.coding
 type Coding.any += Sexp of t
 
 module Sexp_coding : Coding.IMPL with type t = t = struct

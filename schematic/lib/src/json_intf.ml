@@ -1,5 +1,5 @@
 type t = Ezjsonm.value
-type Coding.t += Coding
+type _ Coding.coding += Coding : t Coding.coding
 
 module type S = sig
   include Coding.STR with type t = t

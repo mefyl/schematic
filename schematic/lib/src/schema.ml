@@ -32,7 +32,7 @@ let rec pp_descriptor : type u. u descriptor Fmt.t =
     match d with
     | Any _ -> const string "Any"
     | Bool -> const string "Bool"
-    | Coding f -> const pp_descriptor (f None)
+    | Coding { f } -> const pp_descriptor (f None)
     | Date -> const string "Date"
     | Fixpoint s -> const pp_descriptor (Lazy.force s)
     | Float -> const string "Float"
@@ -470,7 +470,7 @@ module Walk (W : WALK) = struct
    fun ~id -> function
     | Any _ -> W.any
     | Bool -> W.bool
-    | Coding f -> descriptor ~id (f None)
+    | Coding { f } -> descriptor ~id (f None)
     | Float -> W.float
     | Date -> W.date
     | Fixpoint s -> descriptor ~id (Lazy.force s)
@@ -612,7 +612,7 @@ let compare schema =
   let rec compare : type u. u descriptor -> u -> u -> int = function
     | Any (module Coding) -> Coding.compare
     | Bool -> Base.Bool.compare
-    | Coding f -> compare (f None)
+    | Coding { f } -> compare (f None)
     | Date -> Base.Poly.compare
     | Fixpoint s -> compare (Lazy.force s)
     | Float -> Base.Poly.compare
@@ -703,7 +703,7 @@ module Name = struct
       ->
       Some (Id "any")
     | { descriptor = Bool; _ } -> Some (Id "bool")
-    | { descriptor = Coding f; _ } as schema ->
+    | { descriptor = Coding { f }; _ } as schema ->
       of_schema { schema with descriptor = f None }
     | { descriptor = Date; _ } -> Some (Id "date")
     | { descriptor = Fixpoint f; _ } as schema ->
@@ -795,7 +795,7 @@ and descriptor_to_sexp : type a. a descriptor -> Sexp.t = function
   | Any (module Impl : Coding_intf.IMPL with type t = a) ->
     List [ Atom "Any"; Atom Impl.name ]
   | Bool -> Atom "Bool"
-  | Coding f -> descriptor_to_sexp (f None)
+  | Coding { f } -> descriptor_to_sexp (f None)
   | Date -> Atom "Date"
   | Fixpoint f -> descriptor_to_sexp (Lazy.force f)
   | Float -> Atom "Float"
