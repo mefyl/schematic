@@ -1331,6 +1331,19 @@ struct
   end
 
   module Pp = struct
+    module T = struct
+      type t = List of t list
+      [@@schematic.name "graph-result"]
+      [@@deriving eq, ord, schema, show { with_path = false }]
+    end
+
+    let pp_schema () =
+      Alcotest.(check ~here:[%here] string)
+        "schema pretty print"
+        {|<graph-result> = Union [ { name: "list", schema: [ <graph-result> ] } ]|}
+      @@ Fmt.str "%a" Schematic.Schema.pp
+      @@ T.schema_versioned (fun _ -> None)
+
     let pp_version = Schematic.Pp.of_schema version_schema
     let pp_range = Schematic.Pp.of_schema range_schema
 
@@ -1447,7 +1460,10 @@ struct
           test_case "deduced names" `Quick Names.deduced;
           test_case "parametric schemas names" `Quick Names.parametric;
         ] );
-      ("pp", [ test_case "pp" `Quick Pp.pp ]);
+      ( "pp",
+        [
+          test_case "pp" `Quick Pp.pp; test_case "pp schema" `Quick Pp.pp_schema;
+        ] );
       ( "extension",
         [
           test_case "atomic" `Quick Extension.atomic;
