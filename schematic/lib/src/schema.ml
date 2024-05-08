@@ -95,11 +95,7 @@ and pp_tuple : type t. Marks.t -> t tuple Fmt.t =
  fun marks fmt -> function
   | ItemEnd -> ()
   | Item { schema; rest } ->
-    Fmt.(
-      const (pp_descriptor marks) schema.descriptor
-      ++ comma
-      ++ const (pp_tuple marks) rest)
-      fmt ()
+    Fmt.(const (pp marks) schema ++ comma ++ const (pp_tuple marks) rest) fmt ()
 
 and pp : type u. Marks.t -> u t Fmt.t =
  fun marks f { descriptor; id; _ } ->

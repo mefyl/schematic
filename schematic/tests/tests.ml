@@ -1340,17 +1340,24 @@ struct
         | List of t list
         | Nullable of t option
         | Object of { value : t }
+        | Tuple of (t * t)
       [@@schematic.name "graph-result"]
       [@@deriving eq, ord, schema, show { with_path = false }]
     end
 
+    let text = Alcotest.testable (Fmt.fmt "{|%s|}") String.equal
+
     let pp_schema () =
-      Alcotest.(check ~here:[%here] string)
+      Alcotest.(check ~here:[%here] text)
         "schema pretty print"
         {|<graph-result> = Union [
                    { name: "list", schema: [ <graph-result> ] },
                    { name: "nullable", schema: Nullable (<graph-result>) },
-                   { name: "object", schema: { value: <graph-result>,  } }
+                   { name: "object", schema: { value: <graph-result>,  } },
+                   {
+                   name: "tuple",
+                   schema: [ <graph-result>, <graph-result>,  ]
+                   }
                  ]|}
       @@ Fmt.str "%a" Schematic.Schema.pp
       @@ T.schema_versioned (fun _ -> None)
