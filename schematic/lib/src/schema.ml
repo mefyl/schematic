@@ -51,9 +51,7 @@ let rec pp_descriptor : type u. Marks.t -> u descriptor Fmt.t =
     | Mapping schema -> const (pp marks) schema
     | Null -> const string "Null"
     | Nullable s ->
-      const string "Nullable ("
-      ++ const (pp_descriptor marks) s.descriptor
-      ++ const string ")"
+      const string "Nullable (" ++ const (pp marks) s ++ const string ")"
     | String -> const string "String"
     | String_const v -> escape v
     | Time -> const string "Time"
