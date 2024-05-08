@@ -88,7 +88,7 @@ and pp_fields : type t. Marks.t -> t fields Fmt.t =
     let schema = field_schema schema in
     Fmt.(
       const string name ++ const string ": "
-      ++ const (pp_descriptor marks) schema.descriptor
+      ++ const (pp marks) schema
       ++ comma
       ++ const (pp_fields marks) rest)
       fmt ()

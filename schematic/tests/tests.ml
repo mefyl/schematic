@@ -1336,7 +1336,9 @@ struct
 
   module Pp = struct
     module T = struct
-      type t = List of t list
+      type t =
+        | List of t list
+        | Object of { value : t }
       [@@schematic.name "graph-result"]
       [@@deriving eq, ord, schema, show { with_path = false }]
     end
@@ -1344,7 +1346,10 @@ struct
     let pp_schema () =
       Alcotest.(check ~here:[%here] string)
         "schema pretty print"
-        {|<graph-result> = Union [ { name: "list", schema: [ <graph-result> ] } ]|}
+        {|<graph-result> = Union [
+                   { name: "list", schema: [ <graph-result> ] },
+                   { name: "object", schema: { value: <graph-result>,  } }
+                 ]|}
       @@ Fmt.str "%a" Schematic.Schema.pp
       @@ T.schema_versioned (fun _ -> None)
 
