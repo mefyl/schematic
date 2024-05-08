@@ -870,6 +870,7 @@ struct
         content : string;
         level : int;
       }
+    | Separator
   [@@schematic.name "keyed"] (* Check multiple attributes work *)
   [@@schematic.union_key "typ"]
   [@@deriving eq, schema, show]
@@ -884,6 +885,9 @@ struct
       test ~here:[%here] "header" tester keyed_schema
         (Header { content = "text"; level = 411 })
         [%ezjsonm { content = "text"; level = 411; typ = "header" }]
+    and () =
+      test ~here:[%here] "header" tester keyed_schema Separator
+        [%ezjsonm { typ = "separator" }]
     and () =
       let json = [%ezjsonm { content = "text"; level = 411 }] in
       Alcotest.(
