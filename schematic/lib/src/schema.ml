@@ -24,17 +24,19 @@ let field_schema = function
 
 (* Pretty printer *)
 
-let rec pp_descriptor : type u. u descriptor Fmt.t =
- fun f d ->
+module Marks = Stdlib.Set.Make (String)
+
+let rec pp_descriptor : type u. Marks.t -> u descriptor Fmt.t =
+ fun marks f d ->
   let fmt =
     let open Fmt in
     let indent = 2 in
     match d with
     | Any _ -> const string "Any"
     | Bool -> const string "Bool"
-    | Coding f -> const pp_descriptor (f None)
+    | Coding { f } -> const (pp_descriptor marks) (f None)
     | Date -> const string "Date"
-    | Fixpoint s -> const pp_descriptor (Lazy.force s)
+    | Fixpoint s -> const (pp_descriptor marks) (Lazy.force s)
     | Float -> const string "Float"
     | Ignore -> const string "Ignore"
     | Int -> const string "Int"
@@ -43,15 +45,13 @@ let rec pp_descriptor : type u. u descriptor Fmt.t =
     | List schema ->
       box ~indent
       @@ const string "[" ++ sp
-         ++ (box @@ const pp schema)
+         ++ (box @@ const (pp marks) schema)
          ++ sp ++ const string "]"
-    | Map { descriptor; _ } -> const pp_descriptor descriptor
-    | Mapping schema -> const pp schema
+    | Map { descriptor; _ } -> const (pp_descriptor marks) descriptor
+    | Mapping schema -> const (pp marks) schema
     | Null -> const string "Null"
     | Nullable s ->
-      const string "Nullable ("
-      ++ const pp_descriptor s.descriptor
-      ++ const string ")"
+      const string "Nullable (" ++ const (pp marks) s ++ const string ")"
     | String -> const string "String"
     | String_const v -> escape v
     | Time -> const string "Time"
@@ -59,49 +59,55 @@ let rec pp_descriptor : type u. u descriptor Fmt.t =
     | Object { fields; _ } ->
       box
       @@ (hvbox ~indent
-         @@ (const string "{" ++ sp ++ const (hvbox pp_fields) fields))
+         @@ (const string "{" ++ sp ++ const (hvbox (pp_fields marks)) fields))
          ++ sp ++ const string "}"
     | Tuple { items; _ } ->
       box
       @@ (hvbox ~indent
-         @@ (const string "[" ++ sp ++ const (hvbox pp_tuple) items))
+         @@ (const string "[" ++ sp ++ const (hvbox (pp_tuple marks)) items))
          ++ sp ++ const string "]"
     | Union { cases; _ } ->
       box
       @@ hvbox ~indent
            (const string "Union [" ++ sp
-           ++ (hvbox @@ const (hvbox (list ~sep:comma pp_case)) cases))
+           ++ (hvbox @@ const (hvbox (list ~sep:comma (pp_case marks))) cases))
          ++ sp ++ const string "]"
   in
   fmt f ()
 
-and pp_case : type u. u case Fmt.t =
- fun f (Case { name; schema; _ }) ->
-  Fmt.pf f "@[@[<hv>{@ name: %S,@ schema: %a@ @]}@]" name pp schema
+and pp_case : type u. Marks.t -> u case Fmt.t =
+ fun marks f (Case { name; schema; _ }) ->
+  Fmt.pf f "@[@[<hv>{@ name: %S,@ schema: %a@ @]}@]" name (pp marks) schema
 
-and pp_fields : type t. t fields Fmt.t =
- fun fmt -> function
+and pp_fields : type t. Marks.t -> t fields Fmt.t =
+ fun marks fmt -> function
   | FieldEnd -> ()
   | Field { field = { name; schema; _ }; rest; _ } ->
     let schema = field_schema schema in
     Fmt.(
       const string name ++ const string ": "
-      ++ const pp_descriptor schema.descriptor
-      ++ comma ++ const pp_fields rest)
+      ++ const (pp marks) schema
+      ++ comma
+      ++ const (pp_fields marks) rest)
       fmt ()
 
-and pp_tuple : type t. t tuple Fmt.t =
- fun fmt -> function
+and pp_tuple : type t. Marks.t -> t tuple Fmt.t =
+ fun marks fmt -> function
   | ItemEnd -> ()
   | Item { schema; rest } ->
-    Fmt.(const pp_descriptor schema.descriptor ++ comma ++ const pp_tuple rest)
-      fmt ()
+    Fmt.(const (pp marks) schema ++ comma ++ const (pp_tuple marks) rest) fmt ()
 
-and pp : type u. u t Fmt.t =
- fun f { descriptor; id = sch_id; parametric = _ } ->
-  match sch_id with
-  | Some sch_id -> Fmt.(fmt "%s = %a" f sch_id pp_descriptor descriptor)
-  | None -> pp_descriptor f descriptor
+and pp : type u. Marks.t -> u t Fmt.t =
+ fun marks f { descriptor; id; _ } ->
+  match id with
+  | Some id when Marks.mem id marks -> Fmt.fmt "<%s>" f id
+  | Some id ->
+    let marks = Marks.add id marks in
+    Fmt.fmt "<%s> = %a" f id (pp_descriptor marks) descriptor
+  | None -> (pp_descriptor marks) f descriptor
+
+let pp schema = pp Marks.empty schema
+let pp_descriptor descriptor = pp_descriptor Marks.empty descriptor
 
 (* Inline helpers *)
 
@@ -157,6 +163,8 @@ let field_ignored : type req t. (t, req) field -> bool = function
   | { schema = Inline_try { descriptor = Ignore; _ }; _ } -> true
   | { omit; _ } -> omit
 
+(* FIXME: Also flatten single-case unions. *)
+(* FIXME:? Offer to flatten single field objects, tuples, ... *)
 let rec flatten : type t. t descriptor -> t flatten =
   let open Result in
   function
@@ -167,17 +175,6 @@ let rec flatten : type t. t descriptor -> t flatten =
     in
     let decode v = d_decode v >>= decode
     and encode v = encode v |> d_encode in
-    Flatten { descriptor; decode; encode }
-  | Union { cases = [ Case { decoder; encoder; schema; _ } ]; _ } ->
-    let (Flatten { descriptor; decode = d_decode; encode = d_encode }) =
-      flatten schema.descriptor
-    in
-    let decode v = d_decode v >>| decoder
-    and encode v =
-      encoder v
-      |> Option.value_exn ~here:[%here] ~message:"no union cased matched"
-      |> d_encode
-    in
     Flatten { descriptor; decode; encode }
   | descriptor -> Flatten { descriptor; decode = Result.return; encode = Fn.id }
 
@@ -479,7 +476,7 @@ module Walk (W : WALK) = struct
    fun ~id -> function
     | Any _ -> W.any
     | Bool -> W.bool
-    | Coding f -> descriptor ~id (f None)
+    | Coding { f } -> descriptor ~id (f None)
     | Float -> W.float
     | Date -> W.date
     | Fixpoint s -> descriptor ~id (Lazy.force s)
@@ -621,7 +618,7 @@ let compare schema =
   let rec compare : type u. u descriptor -> u -> u -> int = function
     | Any (module Coding) -> Coding.compare
     | Bool -> Base.Bool.compare
-    | Coding f -> compare (f None)
+    | Coding { f } -> compare (f None)
     | Date -> Base.Poly.compare
     | Fixpoint s -> compare (Lazy.force s)
     | Float -> Base.Poly.compare
@@ -712,7 +709,7 @@ module Name = struct
       ->
       Some (Id "any")
     | { descriptor = Bool; _ } -> Some (Id "bool")
-    | { descriptor = Coding f; _ } as schema ->
+    | { descriptor = Coding { f }; _ } as schema ->
       of_schema { schema with descriptor = f None }
     | { descriptor = Date; _ } -> Some (Id "date")
     | { descriptor = Fixpoint f; _ } as schema ->
@@ -804,7 +801,7 @@ and descriptor_to_sexp : type a. a descriptor -> Sexp.t = function
   | Any (module Impl : Coding_intf.IMPL with type t = a) ->
     List [ Atom "Any"; Atom Impl.name ]
   | Bool -> Atom "Bool"
-  | Coding f -> descriptor_to_sexp (f None)
+  | Coding { f } -> descriptor_to_sexp (f None)
   | Date -> Atom "Date"
   | Fixpoint f -> descriptor_to_sexp (Lazy.force f)
   | Float -> Atom "Float"

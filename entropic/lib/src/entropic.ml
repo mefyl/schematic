@@ -120,7 +120,7 @@ module Make (Entropy : Entropy.S) = struct
         Entropy.t * (t, string) Result.t =
      fun size -> function
       | Bool -> bool
-      | Coding f -> of_descriptor size @@ f None
+      | Coding { f } -> of_descriptor size (f None)
       | Date ->
         let+! days = range 0 (365 * 60) in
         Ptime.(

@@ -1,11 +1,11 @@
 type t = Ezjsonm.value
-type Coding.t += Coding
+type _ Coding.coding += Coding : t Coding.coding
 
 module type S = sig
   include Coding.STR with type t = t
 
-  val from_channel : In_channel.t -> (t, Error.parsing) Base.Result.t
-  val to_channel : Out_channel.t -> t -> unit
+  val from_channel : Stdlib.in_channel -> (t, Error.parsing) Base.Result.t
+  val to_channel : Stdlib.out_channel -> t -> unit
   val compare : t -> t -> int
   val equal : t -> t -> bool
   val pp : Base.Formatter.t -> t -> unit

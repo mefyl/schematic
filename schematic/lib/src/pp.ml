@@ -25,7 +25,7 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
   function
   | Any (module Coding) -> Coding.pp
   | Bool -> bool
-  | Coding f -> of_descriptor (f None)
+  | Coding { f } -> of_descriptor (f None)
   | Date -> fun f (year, month, day) -> pf f "%04d-%02d-%02d" year month day
   | Fixpoint d ->
     (* Break infinite recursion. Would be better to have a fixpoint here too. *)

@@ -14,8 +14,8 @@ let rec atomic_type_of_descriptor :
   match descriptor with
   | Any _ -> fail "Any"
   | Bool -> Bool
+  | Coding { f } -> atomic_type_of_descriptor ?id (f None)
   | Float -> Float
-  | Coding f -> atomic_type_of_descriptor ?id (f None)
   | Date ->
     let decode = Fn.compose Result.return Timmy.Date.to_tuple
     and encode = Timmy.Date.of_tuple_exn ~here:[%here] in
@@ -89,7 +89,7 @@ let rec type_of_descriptor :
   | Mapping _ | Null | Nullable _ | String | Time | Time_local | String_const _
   | Tuple _ | Union _ ->
     Atomic (atomic_type_of_descriptor descriptor)
-  | Coding f -> type_of_descriptor ?id (f None)
+  | Coding { f } -> type_of_descriptor ?id (f None)
   | Fixpoint s -> type_of_descriptor ?id (Lazy.force s)
   | Object { decode; encode; fields } ->
     let columns = types_of_fields fields

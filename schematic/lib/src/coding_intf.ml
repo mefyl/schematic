@@ -1,4 +1,5 @@
-type t = ..
+type _ coding = ..
+type 'a t = 'a coding
 type any = ..
 
 type 'a customizable =
@@ -10,10 +11,9 @@ type 't key_get = ('t -> string -> ('t option, string) Result.t) customizable
 type 't key_set = ('t -> string -> 't -> ('t, string) Result.t) customizable
 
 module type IMPL = sig
-  val coding : t
-
   type t
 
+  val coding : t coding
   val name : string
   val compare : t -> t -> int
   val pp : t Fmt.t

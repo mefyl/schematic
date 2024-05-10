@@ -870,6 +870,7 @@ struct
         content : string;
         level : int;
       }
+    | Separator
   [@@schematic.name "keyed"] (* Check multiple attributes work *)
   [@@schematic.union_key "typ"]
   [@@deriving eq, schema, show]
@@ -884,6 +885,9 @@ struct
       test ~here:[%here] "header" tester keyed_schema
         (Header { content = "text"; level = 411 })
         [%ezjsonm { content = "text"; level = 411; typ = "header" }]
+    and () =
+      test ~here:[%here] "header" tester keyed_schema Separator
+        [%ezjsonm { typ = "separator" }]
     and () =
       let json = [%ezjsonm { content = "text"; level = 411 }] in
       Alcotest.(
@@ -1331,6 +1335,33 @@ struct
   end
 
   module Pp = struct
+    module T = struct
+      type t =
+        | List of t list
+        | Nullable of t option
+        | Object of { value : t }
+        | Tuple of (t * t)
+      [@@schematic.name "graph-result"]
+      [@@deriving eq, ord, schema, show { with_path = false }]
+    end
+
+    let text = Alcotest.testable (Fmt.fmt "{|%s|}") String.equal
+
+    let pp_schema () =
+      Alcotest.(check ~here:[%here] text)
+        "schema pretty print"
+        {|<graph-result> = Union [
+                   { name: "list", schema: [ <graph-result> ] },
+                   { name: "nullable", schema: Nullable (<graph-result>) },
+                   { name: "object", schema: { value: <graph-result>,  } },
+                   {
+                   name: "tuple",
+                   schema: [ <graph-result>, <graph-result>,  ]
+                   }
+                 ]|}
+      @@ Fmt.str "%a" Schematic.Schema.pp
+      @@ T.schema_versioned (fun _ -> None)
+
     let pp_version = Schematic.Pp.of_schema version_schema
     let pp_range = Schematic.Pp.of_schema range_schema
 
@@ -1447,7 +1478,10 @@ struct
           test_case "deduced names" `Quick Names.deduced;
           test_case "parametric schemas names" `Quick Names.parametric;
         ] );
-      ("pp", [ test_case "pp" `Quick Pp.pp ]);
+      ( "pp",
+        [
+          test_case "pp" `Quick Pp.pp; test_case "pp schema" `Quick Pp.pp_schema;
+        ] );
       ( "extension",
         [
           test_case "atomic" `Quick Extension.atomic;
