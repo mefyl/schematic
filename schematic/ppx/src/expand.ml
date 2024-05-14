@@ -242,9 +242,10 @@ let add ~inside ~jsoo ~version =
             ~type_context:
               { attributes = Attributes.empty; loc; name = ""; params = [] }
             type'
-          |> Schema.schema_of_expanded ~loc
+          |> Schema.schema_of_expanded ~context ~loc
         in
         [%expr
+          let open Schematic.Schemas [@warning "-unused-open"] in
           let __schematic_version _ = None in
           [%e schema]]
       in

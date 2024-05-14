@@ -49,7 +49,7 @@ let expand_record ~context ~type_context (fields : Attributes.field list) =
           Schematic_sqml.type_of_schema
             [%e
               Schema.(
-                schema_of_expanded ~loc:field.loc
+                schema_of_expanded ~context ~loc:field.loc
                 @@ encode_type ~context ~type_context field.type_)]]
     and fk =
       match field.sqml_foreign with
