@@ -126,7 +126,7 @@ module Result = struct
                 {
                   name = "t";
                   raw_name = "Ok";
-                  schema = t;
+                  schema = Schema.object_wrap "value" t;
                   inline = false;
                   encoder = (function Ok x -> Some x | Error _ -> None);
                   decoder = Result.return;
@@ -135,7 +135,7 @@ module Result = struct
                 {
                   name = "error";
                   raw_name = "Error";
-                  schema = error;
+                  schema = Schema.object_wrap "error" error;
                   inline = false;
                   encoder =
                     (function Result.Error x -> Some x | Result.Ok _ -> None);

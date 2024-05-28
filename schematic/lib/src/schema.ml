@@ -840,3 +840,32 @@ and fields_to_sexp : type f. f fields -> Sexp.t list = function
 and items_to_sexp : type f. f tuple -> Sexp.t list = function
   | ItemEnd -> []
   | Item { schema; rest } -> to_sexp schema :: items_to_sexp rest
+
+let object_wrap name schema =
+  {
+    descriptor =
+      Object
+        {
+          decode = (fun [ ok ] -> ok);
+          encode = (fun ok -> [ ok ]);
+          fields =
+            Field
+              {
+                field =
+                  {
+                    description = None;
+                    examples = [];
+                    maximum = None;
+                    minimum = None;
+                    name;
+                    omit = false;
+                    requirement = Required;
+                    schema = Outline schema;
+                    title = None;
+                  };
+                rest = FieldEnd;
+              };
+        };
+    id = None;
+    parametric = None;
+  }
