@@ -77,3 +77,16 @@ module Name : sig
   val of_parametric : _ Schema_intf.parametric -> t option
   val combine : _ Schema_intf.t -> string -> string option
 end
+
+(** [object_wrap field_name schema] is a schema that codes values like [schema]
+    but wrapped in an object with a single field named [field_name].
+
+    It is helpful to discriminate coded values that can conflict in dynamic
+    codings, eg. with a naive schema [(string, string)
+    Result.t] will always
+    yield [Ok] values since both will be coded as strings.
+
+    Wrapping each case will serialize values as [{ value = _ }] and
+    [{
+    error = _ }] objects respectively, preventing such collisions. *)
+val object_wrap : string -> 't t -> 't t
