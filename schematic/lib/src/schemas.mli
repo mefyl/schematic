@@ -11,6 +11,8 @@ val equal_ignore : ignore -> ignore -> bool
 val compare_ignore : ignore -> ignore -> int
 val bool_schema : bool Schema.t
 val bool_schema_versioned : Schema.version -> bool Schema.t
+val char_schema : char Schema.t
+val char_schema_versioned : Schema.version -> char Schema.t
 val float_schema : float Schema.t
 val float_schema_versioned : Schema.version -> float Schema.t
 val ignore_schema : ignore Schema.t
@@ -38,6 +40,13 @@ val unit_schema_versioned : Schema.version -> unit Schema.t
 
 module Bool : sig
   include module type of Bool
+
+  val schema : t Schema.t
+  val schema_versioned : Schema.version -> t Schema.t
+end
+
+module Char : sig
+  include module type of Char
 
   val schema : t Schema.t
   val schema_versioned : Schema.version -> t Schema.t

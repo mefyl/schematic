@@ -54,11 +54,28 @@ let array_schema schema =
 
 let array_schema_versioned _ = array_schema
 
+let char_schema =
+  Schema.map
+    ~decode:(fun s ->
+      match String.length s with
+      | 1 -> Result.Ok s.[0]
+      | _ -> Result.failf "invalid character: %S" s)
+    ~encode:Char.to_string string_schema
+
+let char_schema_versioned (_ : Schema.version) = char_schema
+
 module Bool = struct
   include Bool
 
   let schema = bool_schema
   let schema_versioned = bool_schema_versioned
+end
+
+module Char = struct
+  include Char
+
+  let schema = char_schema
+  let schema_versioned = char_schema_versioned
 end
 
 module Either = struct
