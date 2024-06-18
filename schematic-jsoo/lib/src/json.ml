@@ -41,3 +41,6 @@ module String = Schematic.Coding.Make_string (struct
     Js_of_ocaml.Js.Unsafe.global##._JSON##stringify v
     |> Js_of_ocaml.Js.to_string
 end)
+
+let of_js = Impl_js.of_js
+let to_js = Impl_js.to_js
