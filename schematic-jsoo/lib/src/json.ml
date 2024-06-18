@@ -44,3 +44,4 @@ end)
 
 let of_js = Impl_js.of_js
 let to_js = Impl_js.to_js
+let schema = Schematic.Json.schema

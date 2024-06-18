@@ -1,4 +1,7 @@
 include Schematic.Json.S
+
+val schema : t Schematic.Schema.t
+
 module String : Schematic.Coding.STR with type t = string
 
 val of_js : Js_of_ocaml.Js.Unsafe.any -> t
