@@ -20,6 +20,22 @@
    (progn (cat %{opam})
     (echo
      "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:entropic}\" }")))))
+(rule (target entropic-macos.opam)
+ (action
+  (with-stdout-to %{target}
+   (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-macos --input
+    %{dep:entropic.opam} --cross
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
+    --cross-both
+    bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
+    --cross-exclude ""))))
+(rule (target entropic-macos.%{version:entropic}.opam)
+ (deps (:opam entropic-macos.opam))
+ (action
+  (with-stdout-to %{target}
+   (progn (cat %{opam})
+    (echo
+     "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:entropic}\" }")))))
 (rule (deps (universe)) (target entropic.opam.locked)
  (action (run %{bin:opam} lock entropic)))
 (rule (alias extdeps) (mode (promote (until-clean)))
@@ -47,6 +63,22 @@
     --cross-exclude ""))))
 (rule (target schematic-ios.%{version:schematic}.opam)
  (deps (:opam schematic-ios.opam))
+ (action
+  (with-stdout-to %{target}
+   (progn (cat %{opam})
+    (echo
+     "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic}\" }")))))
+(rule (target schematic-macos.opam)
+ (action
+  (with-stdout-to %{target}
+   (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-macos --input
+    %{dep:schematic.opam} --cross
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
+    --cross-both
+    bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
+    --cross-exclude ""))))
+(rule (target schematic-macos.%{version:schematic}.opam)
+ (deps (:opam schematic-macos.opam))
  (action
   (with-stdout-to %{target}
    (progn (cat %{opam})
@@ -84,6 +116,22 @@
    (progn (cat %{opam})
     (echo
      "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-cli}\" }")))))
+(rule (target schematic-cli-macos.opam)
+ (action
+  (with-stdout-to %{target}
+   (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-macos --input
+    %{dep:schematic-cli.opam} --cross
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
+    --cross-both
+    bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
+    --cross-exclude ""))))
+(rule (target schematic-cli-macos.%{version:schematic-cli}.opam)
+ (deps (:opam schematic-cli-macos.opam))
+ (action
+  (with-stdout-to %{target}
+   (progn (cat %{opam})
+    (echo
+     "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-cli}\" }")))))
 (rule (deps (universe)) (target schematic-cli.opam.locked)
  (action (run %{bin:opam} lock schematic-cli)))
 (rule (alias extdeps) (mode (promote (until-clean)))
@@ -111,6 +159,22 @@
     --cross-exclude ""))))
 (rule (target schematic-ffi-ios.%{version:schematic-ffi}.opam)
  (deps (:opam schematic-ffi-ios.opam))
+ (action
+  (with-stdout-to %{target}
+   (progn (cat %{opam})
+    (echo
+     "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-ffi}\" }")))))
+(rule (target schematic-ffi-macos.opam)
+ (action
+  (with-stdout-to %{target}
+   (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-macos --input
+    %{dep:schematic-ffi.opam} --cross
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
+    --cross-both
+    bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
+    --cross-exclude ""))))
+(rule (target schematic-ffi-macos.%{version:schematic-ffi}.opam)
+ (deps (:opam schematic-ffi-macos.opam))
  (action
   (with-stdout-to %{target}
    (progn (cat %{opam})
@@ -148,6 +212,22 @@
    (progn (cat %{opam})
     (echo
      "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-http}\" }")))))
+(rule (target schematic-http-macos.opam)
+ (action
+  (with-stdout-to %{target}
+   (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-macos --input
+    %{dep:schematic-http.opam} --cross
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
+    --cross-both
+    bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
+    --cross-exclude ""))))
+(rule (target schematic-http-macos.%{version:schematic-http}.opam)
+ (deps (:opam schematic-http-macos.opam))
+ (action
+  (with-stdout-to %{target}
+   (progn (cat %{opam})
+    (echo
+     "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-http}\" }")))))
 (rule (deps (universe)) (target schematic-http.opam.locked)
  (action (run %{bin:opam} lock schematic-http)))
 (rule (alias extdeps) (mode (promote (until-clean)))
@@ -175,6 +255,22 @@
     --cross-exclude ""))))
 (rule (target schematic-jsoo-ios.%{version:schematic-jsoo}.opam)
  (deps (:opam schematic-jsoo-ios.opam))
+ (action
+  (with-stdout-to %{target}
+   (progn (cat %{opam})
+    (echo
+     "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-jsoo}\" }")))))
+(rule (target schematic-jsoo-macos.opam)
+ (action
+  (with-stdout-to %{target}
+   (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-macos --input
+    %{dep:schematic-jsoo.opam} --cross
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
+    --cross-both
+    bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
+    --cross-exclude ""))))
+(rule (target schematic-jsoo-macos.%{version:schematic-jsoo}.opam)
+ (deps (:opam schematic-jsoo-macos.opam))
  (action
   (with-stdout-to %{target}
    (progn (cat %{opam})
@@ -212,6 +308,22 @@
    (progn (cat %{opam})
     (echo
      "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-sexp}\" }")))))
+(rule (target schematic-sexp-macos.opam)
+ (action
+  (with-stdout-to %{target}
+   (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-macos --input
+    %{dep:schematic-sexp.opam} --cross
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
+    --cross-both
+    bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
+    --cross-exclude ""))))
+(rule (target schematic-sexp-macos.%{version:schematic-sexp}.opam)
+ (deps (:opam schematic-sexp-macos.opam))
+ (action
+  (with-stdout-to %{target}
+   (progn (cat %{opam})
+    (echo
+     "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-sexp}\" }")))))
 (rule (deps (universe)) (target schematic-sexp.opam.locked)
  (action (run %{bin:opam} lock schematic-sexp)))
 (rule (alias extdeps) (mode (promote (until-clean)))
@@ -239,6 +351,22 @@
     --cross-exclude ""))))
 (rule (target schematic-sqml-ios.%{version:schematic-sqml}.opam)
  (deps (:opam schematic-sqml-ios.opam))
+ (action
+  (with-stdout-to %{target}
+   (progn (cat %{opam})
+    (echo
+     "url { src: \"git://git@gitlab.routine.co:routine/schematic#%{version:schematic-sqml}\" }")))))
+(rule (target schematic-sqml-macos.opam)
+ (action
+  (with-stdout-to %{target}
+   (run %{dep:.logistic/dune/extdeps/extdeps.exe} rewrite-macos --input
+    %{dep:schematic-sqml.opam} --cross
+    entropic,schematic,schematic-cli,schematic-ffi,schematic-http,schematic-jsoo,schematic-sexp,schematic-sqml,acid,bake,hlist,sqml,timmy,timmy-lwt,base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
+    --cross-both
+    bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
+    --cross-exclude ""))))
+(rule (target schematic-sqml-macos.%{version:schematic-sqml}.opam)
+ (deps (:opam schematic-sqml-macos.opam))
  (action
   (with-stdout-to %{target}
    (progn (cat %{opam})
