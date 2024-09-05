@@ -127,7 +127,7 @@
   (eio_main
    (and
     :with-test
-    (= 0.14)))
+    (= 0.15)))
   (http
    (and
     (>= 6.0.0~beta2)
@@ -186,7 +186,7 @@
     (>= 6.0.0~beta2)
     (< 7.0.0)))
   (eio
-   (= 0.14))
+   (= 0.15))
   nofuture-eio
   (schematic-http
    (= :version))))
@@ -199,7 +199,6 @@
   bake
   logs
   ppx_hash
-  stdio
   (schematic
    (= :version))
   (metapp :with-test)))
