@@ -8,7 +8,6 @@
   schematic
   schematic_ffi
   ffi_test_utils
-  stdio
   logs
   logs.fmt))
 

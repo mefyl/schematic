@@ -35,6 +35,10 @@ let roundtrip_src name =
 let roundtrips_of_ctypes ctypes =
   ctypes |> List.map ~f:fst |> List.map ~f:roundtrip_src |> String.concat
 
+let write_all filename ~data =
+  Stdlib.Out_channel.(
+    with_open_text filename @@ fun chan -> output_string chan data)
+
 let () =
   Logs.set_level (Some Logs.Info);
   Logs.set_reporter (Logs_fmt.reporter ());
@@ -46,6 +50,5 @@ let () =
       ctypes
   in
   let roundtrip_impls = roundtrips_of_ctypes ctypes in
-  let open Stdio.Out_channel in
   write_all h_filename ~data:h_contents;
   write_all c_filename ~data:(c_contents ^ roundtrip_impls)
