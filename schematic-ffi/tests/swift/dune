@@ -3,13 +3,7 @@
 (executable
  (name gen_swift_rt_stubs)
  (modules gen_swift_rt_stubs)
- (libraries
-  alcotest
-  schematic
-  schematic_ffi
-  ffi_test_utils
-  logs
-  logs.fmt))
+ (libraries alcotest schematic schematic_ffi ffi_test_utils logs logs.fmt))
 
 (rule
  (targets Schemas.swift)
