@@ -1406,7 +1406,6 @@ struct
     (* Not really a runtime test, just making sure that this doesn't raise an
        `unused-open` warning *)
     let _ = [%schema: t]
-      
   end
 
   (* Driver *)
