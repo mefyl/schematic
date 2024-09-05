@@ -1402,6 +1402,11 @@ struct
       test ~here:[%here] "pair"
         Alcotest.(pair int string)
         [%schema: int * string] (42, "forty two") [%ezjsonm [ 42; "forty two" ]]
+
+    (* Not really a runtime test, just making sure that this doesn't raise an
+       `unused-open` warning *)
+    let _ = [%schema: t]
+      
   end
 
   (* Driver *)
