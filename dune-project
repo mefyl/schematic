@@ -199,6 +199,7 @@
   bake
   logs
   ppx_hash
+  stdio
   (schematic
    (= :version))
   (metapp :with-test)))
