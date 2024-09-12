@@ -1,4 +1,5 @@
 open Base
+module Entropy = Entropy
 
 module Schemas_library = struct
   type Schematic.Schema.library += V
