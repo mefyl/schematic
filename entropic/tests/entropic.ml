@@ -49,6 +49,19 @@ let obj () =
     (Result.Ok { x = 0; y = 0 })
   @@ Entropic.generate entropy o_schema
 
+type o_composite = { y : y }
+
+and y =
+  | Foo of int list
+  | Bar
+[@@deriving schema]
+
+let small_size () =
+  Alcotest.(check ~here:[%here] (result pass string))
+    "object"
+    (Result.Ok { y = Bar })
+  @@ Entropic.generate ~size:0 entropy o_composite_schema
+
 type nested_list = Foo of nested_list list [@@deriving schema]
 
 let nested_list () =
@@ -68,6 +81,7 @@ let () =
           test "int64" int64;
           test "string" string;
         ] );
-      ("composite", [ test "list" list; test "object" obj ]);
+      ( "composite",
+        [ test "list" list; test "object" obj; test "small_size" small_size ] );
       ("recursive", [ test "nested lists" nested_list ]);
     ]
