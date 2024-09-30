@@ -16,6 +16,35 @@ type json =
   ]
 [@@deriving schema]
 
+module Size : sig
+  (** A type representing an integer size.
+
+      It is guaranted to always be positive, any operation that should end-up
+      negative round-up to zero *)
+  type t
+
+  include Comparable.S with type t := t
+
+  val ( - ) : t -> t -> t
+  val ( + ) : t -> t -> t
+  val ( / ) : t -> int -> t
+  val ( * ) : t -> int -> t
+  val ( = ) : t -> t -> bool
+  val ( % ) : t -> t -> t
+  val of_int : int -> t
+  val to_int : t -> int
+  val decr : t -> t
+  val incr : t -> t
+end = struct
+  include Int
+
+  let ( - ) a b = max 0 (a - b)
+  let decr x = x - 1
+  let incr x = x + 1
+  let of_int x = max 0 x
+  let to_int x = x
+end
+
 module Make (Entropy : Entropy.S) = struct
   module Monad = struct
     type 'a t = Entropy.t -> Entropy.t * 'a
@@ -114,7 +143,7 @@ module Make (Entropy : Entropy.S) = struct
     in
     let rec of_descriptor :
         type t.
-        int ->
+        Size.t ->
         t Schematic.Schema.descriptor ->
         Entropy.t ->
         Entropy.t * (t, string) Result.t =
@@ -137,22 +166,23 @@ module Make (Entropy : Entropy.S) = struct
         Stdlib.Bytes.get_int64_ne bytes 0
       | Json -> of_descriptor size json_schema.descriptor
       | List d ->
-        let*! len = range 0 size in
-        List.init len ~f:(fun _ -> of_descriptor (size / len) d.descriptor)
+        let*! len = range 0 (Size.to_int size) in
+        List.init len ~f:(fun _ -> of_descriptor Size.(size / len) d.descriptor)
         |> all >>| Result.all
       | Map { decode; descriptor; _ } ->
         of_descriptor size descriptor >>=! fun v -> return (decode v)
       | Mapping d ->
-        let*! len = range 0 size in
+        let*! len = range 0 (Size.to_int size) in
         List.init len ~f:(fun _ ->
             let+! key = string
-            and+! data = of_descriptor (size / len) d.descriptor in
+            and+! data = of_descriptor Size.(size / len) d.descriptor in
             (key, data))
         |> all >>| Result.all
       | Null -> return (Result.return ())
       | Nullable d ->
         let*! some = bool in
-        if some then of_descriptor (size - 1) d.descriptor >>|! Option.return
+        if some then
+          of_descriptor (Size.decr size) d.descriptor >>|! Option.return
         else return (Result.return None)
       | Object { decode; fields; _ } ->
         let size =
@@ -161,7 +191,7 @@ module Make (Entropy : Entropy.S) = struct
             | FieldEnd -> 0
             | Field { rest; _ } -> 1 + fields_length rest
           in
-          size / fields_length fields
+          Size.(size / fields_length fields)
         in
         let+! fields =
           let rec decode_fields :
@@ -212,7 +242,7 @@ module Make (Entropy : Entropy.S) = struct
             | ItemEnd -> 0
             | Item { rest; _ } -> 1 + items_length rest
           in
-          size / items_length items
+          Size.(size / items_length items)
         in
         let+! items =
           let rec decode_items :
@@ -231,11 +261,12 @@ module Make (Entropy : Entropy.S) = struct
       | Union { cases; _ } ->
         let*! pick = range 0 List.(length cases) in
         let (Case { schema; decoder; _ }) = List.nth_exn cases pick in
-        let+! value = of_descriptor (size - 1) schema.descriptor in
+        let+! value = of_descriptor (Size.decr size) schema.descriptor in
         decoder value
       | Any (module Coding) ->
         (* FIXME *) return (Result.return (Coding.null ()))
     in
 
-    of_descriptor size schema.Schematic.Schema.descriptor entropy |> snd
+    of_descriptor (Size.of_int size) schema.Schematic.Schema.descriptor entropy
+    |> snd
 end
