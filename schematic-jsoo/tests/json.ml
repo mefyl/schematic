@@ -4,7 +4,7 @@ module Json = Test_utils.Tests.Make (struct
   let local_time_support = true
   let t = Alcotest.testable Schematic_jsoo.Json.pp Schematic_jsoo.Json.equal
   let of_json json = Some json
-  let extra_test ~here:_ _ _ = ()
+  let extra_test _ _ = ()
 end)
 
 let () = Alcotest.run "Schematic_jsoo.Json" Json.tests

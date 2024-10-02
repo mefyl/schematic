@@ -27,16 +27,43 @@ type t = int [@@deriving schema]
 
 let root_schema = schema
 
+type test_description =
+  | Test : {
+      here : Lexing.position;
+      decoded : 'a option;
+      name : string;
+      value_testable : 'a Alcotest.testable;
+      schema : 'a Schema.t;
+      value : 'a;
+      expected : Ezjsonm.value;
+      kotlin_class_name : string option;
+          (** TODO Remove this field when Kotlin support is complete *)
+      is_kotlin_roundtrip_enabled : bool;
+    }
+      -> test_description
+
+type test_case = {
+  name : string;
+  tests : test_description list;
+  speed : Alcotest.speed_level;
+  additional_test : (unit -> unit) option;
+}
+
+type test_group = {
+  name : string;
+  test_cases : test_case list;
+}
+
 module Make (Coding : sig
   include Schematic.Coding.S
 
   val t : t Alcotest.testable
-  val extra_test : here:Lexing.position -> 'a Schematic.Schema.t -> t -> unit
+  val extra_test : test_description -> t -> unit
   val of_json : json -> t option
   val local_time_support : bool
 end) =
 struct
-  let test ~here ?decoded name test schema value expected =
+  let test ~here ?decoded name value_testable schema value expected =
     let encoded = Coding.encode schema value in
     let () =
       match Coding.of_json expected with
@@ -46,19 +73,36 @@ struct
           expected encoded
       | None -> ()
     in
+    match Coding.decode schema encoded with
+    | Result.Ok d ->
+      Alcotest.check ~here value_testable
+        (Fmt.str "%s: decoded value (encoded JSON: %a)" name
+           (Alcotest.pp Coding.t) encoded)
+        (Option.value ~default:value decoded)
+        d
+    | Result.Error e ->
+      Alcotest.fail
+        (Fmt.str "JSON decode error: %a" Schematic.Error.pp_decoding e)
+
+  let test2
+      (Test
+         {
+           here;
+           decoded;
+           name;
+           value_testable;
+           schema;
+           value;
+           expected;
+           kotlin_class_name = _;
+           is_kotlin_roundtrip_enabled = _;
+         } as test_descripton) =
+    let encoded = Coding.encode schema value in
     let () =
-      match Coding.decode schema encoded with
-      | Result.Ok d ->
-        Alcotest.check ~here test
-          (Fmt.str "%s: decoded value (encoded JSON: %a)" name
-             (Alcotest.pp Coding.t) encoded)
-          (Option.value ~default:value decoded)
-          d
-      | Result.Error e ->
-        Alcotest.fail
-          (Fmt.str "JSON decode error: %a" Schematic.Error.pp_decoding e)
+      Fmt.epr "Running test2 for schema %a@." Schematic.Schema.pp schema
     in
-    Coding.extra_test ~here schema encoded
+    let () = test ~here ?decoded name value_testable schema value expected in
+    Coding.extra_test test_descripton encoded
 
   module Option = struct
     include Option
@@ -82,27 +126,78 @@ struct
 
   (* Atoms *)
 
-  let atom_int () =
-    test ~here:[%here] "int atom" Alcotest.int int_schema 28 [%ezjsonm 28]
+  let atom_int =
+    {
+      name = "int";
+      speed = `Quick;
+      additional_test = None;
+      tests =
+        [
+          Test
+            {
+              name = "int atom";
+              here = [%here];
+              decoded = None;
+              value_testable = Alcotest.int;
+              schema = int_schema;
+              value = 28;
+              expected = [%ezjsonm 28];
+              kotlin_class_name = Some "java.lang.Integer";
+              is_kotlin_roundtrip_enabled = true;
+            };
+        ];
+    }
 
-  let atom_string () =
-    test ~here:[%here] "string atom" Alcotest.string string_schema
-      "trente trois" [%ezjsonm "trente trois"]
+  let atom_string =
+    {
+      name = "string";
+      speed = `Quick;
+      additional_test = None;
+      tests =
+        [
+          Test
+            {
+              name = "string atom";
+              here = [%here];
+              decoded = None;
+              value_testable = Alcotest.string;
+              schema = string_schema;
+              value = "trente trois";
+              expected = [%ezjsonm "trente trois"];
+              kotlin_class_name = Some "java.lang.String";
+              is_kotlin_roundtrip_enabled = true;
+            };
+        ];
+    }
 
   (* Optionals *)
 
   module Optionals = struct
-    let options () =
-      let () =
-        test ~here:[%here] "some int"
-          Alcotest.(option int)
-          (option_schema int_schema) (Some 28) [%ezjsonm 28]
-      and () =
-        test ~here:[%here] "none int"
-          Alcotest.(option int)
-          (option_schema int_schema) None [%ezjsonm None]
+    let options =
+      let mk_test name value expected is_kotlin_roundtrip_enabled =
+        Test
+          {
+            name;
+            here = [%here];
+            decoded = None;
+            value_testable = Alcotest.(option int);
+            schema = option_schema int_schema;
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled;
+          }
       in
-      ()
+      {
+        name = "option";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            mk_test "some int" (Some 28) [%ezjsonm 28] false;
+            mk_test "none int" None [%ezjsonm None] false;
+          ];
+      }
 
     (* Nullable option *)
 
@@ -112,18 +207,33 @@ struct
     let nullable_option =
       Alcotest.testable pp_nullable_option equal_nullable_option
 
-    let nullable_option () =
-      let () =
-        test ~here:[%here] "omitted" nullable_option nullable_option_schema
-          { no = None } (`O [])
-      and () =
-        test ~here:[%here] "null" nullable_option nullable_option_schema
-          { no = Some None } [%ezjsonm { no = None }]
-      and () =
-        test ~here:[%here] "specified" nullable_option nullable_option_schema
-          { no = Some (Some 74) } [%ezjsonm { no = 74 }]
+    let nullable_option =
+      let mk_test name value expected is_kotlin_roundtrip_enabled =
+        Test
+          {
+            name;
+            here = [%here];
+            decoded = None;
+            value_testable = nullable_option;
+            schema = nullable_option_schema;
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled;
+          }
       in
-      ()
+      {
+        name = "nullable option";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            mk_test "omitted" { no = None } (`O []) false;
+            mk_test "null" { no = Some None } [%ezjsonm { no = None }] true;
+            mk_test "specified" { no = Some (Some 74) } [%ezjsonm { no = 74 }]
+              true;
+          ];
+      }
 
     (* Default option*)
 
@@ -133,18 +243,33 @@ struct
     let default_option =
       Alcotest.(testable pp_default_option equal_default_option)
 
-    let default_option () =
-      let () =
-        test ~here:[%here] "none" default_option default_option_schema
-          { oo = None } (`O [])
-      and () =
-        test ~here:[%here] "some none" default_option default_option_schema
-          { oo = Some None } [%ezjsonm { oo = None }]
-      and () =
-        test ~here:[%here] "some some" default_option default_option_schema
-          { oo = Some (Some 877) } [%ezjsonm { oo = 877 }]
+    let default_option =
+      let mk_test name value expected is_kotlin_roundtrip_enabled =
+        Test
+          {
+            name;
+            here = [%here];
+            decoded = None;
+            value_testable = default_option;
+            schema = default_option_schema;
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled;
+          }
       in
-      ()
+      {
+        name = "default option";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            mk_test "none" { oo = None } (`O []) false;
+            mk_test "some none" { oo = Some None } [%ezjsonm { oo = None }] true;
+            mk_test "some some" { oo = Some (Some 877) } [%ezjsonm { oo = 877 }]
+              true;
+          ];
+      }
 
     (* Disabled optionals *)
 
@@ -154,13 +279,30 @@ struct
     }
     [@@deriving eq, schema, show]
 
-    let disabled_optionals () =
+    let disabled_optionals =
       let disabled_optionals =
         Alcotest.testable pp_disabled_optionals equal_disabled_optionals
       in
-      test ~here:[%here] "disabled optionals" disabled_optionals
-        disabled_optionals_schema { a = None; b = [] }
-        [%ezjsonm { a = None; b = [] }]
+      {
+        name = "disabled optionals";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            Test
+              {
+                name = "disabled optionals";
+                here = [%here];
+                decoded = None;
+                value_testable = disabled_optionals;
+                schema = disabled_optionals_schema;
+                value = { a = None; b = [] };
+                expected = [%ezjsonm { a = None; b = [] }];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled = false;
+              };
+          ];
+      }
   end
 
   (* Record *)
@@ -181,9 +323,27 @@ struct
   and v2 = { major = 3; minor = 4; subminor = 5 }
   and v3 = { major = 6; minor = 7; subminor = 8 }
 
-  let record () =
-    test ~here:[%here] "record" test_version version_schema v1
-      [%ezjsonm { major = 0; minor = 1; subminor = 2 }]
+  let record =
+    {
+      name = "record";
+      speed = `Quick;
+      additional_test = None;
+      tests =
+        [
+          Test
+            {
+              name = "record";
+              here = [%here];
+              decoded = None;
+              value_testable = test_version;
+              schema = version_schema;
+              value = v1;
+              expected = [%ezjsonm { major = 0; minor = 1; subminor = 2 }];
+              kotlin_class_name = None;
+              is_kotlin_roundtrip_enabled = true;
+            };
+        ];
+    }
 
   (* Alias *)
 
@@ -1354,7 +1514,10 @@ struct
         {|<graph-result> = Union [
                    { name: "list", schema: [ <graph-result> ] },
                    { name: "nullable", schema: Nullable (<graph-result>) },
-                   { name: "object", schema: { value: <graph-result>,  } },
+                   {
+                   name: "object",
+                   schema: { value (Required): <graph-result>,  }
+                   },
                    {
                    name: "tuple",
                    schema: [ <graph-result>, <graph-result>,  ]
@@ -1411,18 +1574,46 @@ struct
 
   (* Driver *)
 
-  let tests =
+  let test_descriptions : test_group list =
+    [
+      {
+        name = "coding2";
+        test_cases =
+          [
+            atom_int;
+            atom_string;
+            Optionals.options;
+            Optionals.nullable_option;
+            Optionals.default_option;
+            Optionals.disabled_optionals;
+            record;
+          ];
+      };
+    ]
+
+  let tests2 : (string * unit Alcotest.test_case list) list =
+    let test_case_to_alcotest_test_case { name; tests; speed; additional_test }
+        =
+      let alcotest_test () =
+        let () = Base.List.iter ~f:test2 tests in
+        match additional_test with
+        | None -> ()
+        | Some additional_test -> additional_test ()
+      in
+      Alcotest.test_case name speed alcotest_test
+    in
+    let test_group_to_alcotest_group { name; test_cases } =
+      (name, Base.List.map ~f:test_case_to_alcotest_test_case test_cases)
+    in
+    Base.List.map ~f:test_group_to_alcotest_group test_descriptions
+
+  (* TODO Migrate everything to [test_descriptions], remove this and rename
+     [tests2]. *)
+  let tests : (string * unit Alcotest.test_case list) list =
     let open Alcotest in
     [
       ( "coding",
         [
-          test_case "int" `Quick atom_int;
-          test_case "string" `Quick atom_string;
-          test_case "option" `Quick Optionals.options;
-          test_case "nullable option" `Quick Optionals.nullable_option;
-          test_case "default option" `Quick Optionals.default_option;
-          test_case "disabled optionals" `Quick Optionals.disabled_optionals;
-          test_case "record" `Quick record;
           test_case "tuple" `Quick tuple;
           test_case "variant" `Quick Variant.variant;
           test_case "singleton variant" `Quick Variant.singleton;
@@ -1494,13 +1685,3 @@ struct
         ] );
     ]
 end
-
-(** In a later MR we will remove this one and instead expose all schemas of this
-    file to be reused by roundtrip tests. *)
-type foo =
-  | A of int
-  | B of {
-      bar : string;
-      baz : bool;
-    }
-[@@deriving schema, show, eq]

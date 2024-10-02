@@ -79,17 +79,21 @@ and pp_case : type u. Marks.t -> u case Fmt.t =
  fun marks f (Case { name; schema; _ }) ->
   Fmt.pf f "@[@[<hv>{@ name: %S,@ schema: %a@ @]}@]" name (pp marks) schema
 
+and pp_requirement : type t req. (t, req) requirement Fmt.t =
+ fun f -> function
+  | Computed -> Fmt.string f "Computed"
+  | Computed_optional -> Fmt.string f "Computed_optional"
+  | Default _ -> Fmt.string f "Default"
+  | Required -> Fmt.string f "Required"
+  | Optional -> Fmt.string f "Optional"
+
 and pp_fields : type t. Marks.t -> t fields Fmt.t =
  fun marks fmt -> function
   | FieldEnd -> ()
-  | Field { field = { name; schema; _ }; rest; _ } ->
+  | Field { field = { name; schema; requirement; _ }; rest; _ } ->
     let schema = field_schema schema in
-    Fmt.(
-      const string name ++ const string ": "
-      ++ const (pp marks) schema
-      ++ comma
-      ++ const (pp_fields marks) rest)
-      fmt ()
+    Fmt.pf fmt "%s (%a): %a,@ %a" name pp_requirement requirement (pp marks)
+      schema (pp_fields marks) rest
 
 and pp_tuple : type t. Marks.t -> t tuple Fmt.t =
  fun marks fmt -> function
