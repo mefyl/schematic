@@ -1,3 +1,4 @@
+.PHONY: opam
 MAKEFILE=$(abspath $(firstword $(MAKEFILE_LIST)))
 DIR=$(patsubst %/,%,$(dir $(MAKEFILE)))
 OCAML_VERSION ?= $(shell ocamlc --version)
@@ -41,26 +42,43 @@ package:
 package/clean:
 	docker rmi "$(IMAGE):$$(git describe --always)" "$(IMAGE):$$SLUG"
 
-ci/image:
+toolchain/%:
+	$(eval SUFFIX = $(if $(filter $*,default),,.$*))
 	if test -n "$(CI_ID_RSA)"; then cp "$(CI_ID_RSA)" $(DOCKER_DIR)/id_rsa; fi
 	if test -n "$(CI_ID_RSA_PUB)"; then cp "$(CI_ID_RSA_PUB)" $(DOCKER_DIR)/id_rsa.pub; fi
-	if test -z "$$FROM_SCRATCH" && ! test -z "$(IMAGE_CI)"; then \
-		CACHE='--cache-from "$(IMAGE_CI)$(VARIANT)" --cache-from "$(IMAGE_CI_MASTER)$(VARIANT)" --cache-from "$(IMAGE_CI_MASTER)"'; \
-	else \
-		echo "building from scratch"; \
-		CACHE='--no-cache'; \
+	set -x; \
+	if ! test -z "$(IMAGE_CI)"; then \
+		if docker buildx inspect builder; then \
+			CACHE="--builder=builder --cache-to type=inline --push "; \
+		fi; \
+		if test -z "$$FROM_SCRATCH"; then \
+			for image in "$(IMAGE_CI)$(VARIANT)$(SUFFIX)" "$(IMAGE_CI_MASTER)$(VARIANT)$(SUFFIX)" "$(IMAGE_CI_MASTER)$(SUFFIX)"; do \
+				CACHE="$$CACHE--cache-from type=registry,ref=$$image "; \
+			done; \
+		else \
+			echo "building from scratch"; \
+			CACHE="$$CACHE--no-cache"; \
+		fi; \
 	fi; \
 	if ! test -z "$$SSH_AUTH_SOCK"; then \
 	        DOCKER_SSH="--ssh default"; \
 	fi ; \
 	if test -n "$(DOCKER_TARGET)"; then DOCKER_TARGET="--target $(DOCKER_TARGET)"; fi; \
-	docker buildx build $$DOCKER_SSH --cache-to type=inline -f "$(DOCKER_FILE)" "$(DOCKER_DIR)" $$DOCKER_TARGET --tag "$(or $(IMAGE_CI)$(VARIANT),ci)" --build-arg OCAML_VERSION=$(OCAML_VERSION) --build-arg PACKAGES="$(PACKAGES)" --build-arg OPAM_PACKAGES="$(OPAM_PACKAGES)" --build-arg OPAM_WITHOUT_PACKAGES="$(OPAM_WITHOUT_PACKAGES)" --build-arg AWS_SECRET_ACCESS_KEY="$(AWS_SECRET_ACCESS_KEY)" --build-arg CI_VARIANT=$(subst -,,$(VARIANT)) $$CACHE
+	docker buildx build $$DOCKER_SSH -f "$(DOCKER_FILE)$(SUFFIX)" "$(DOCKER_DIR)" $$DOCKER_TARGET --tag "$(or $(IMAGE_CI)$(VARIANT)$(SUFFIX),ci)" --build-arg OCAML_VERSION=$(OCAML_VERSION) --build-arg PACKAGES="$(PACKAGES)" --build-arg OPAM_PACKAGES="$(OPAM_PACKAGES)" --build-arg OPAM_WITHOUT_PACKAGES="$(OPAM_WITHOUT_PACKAGES)" --build-arg AWS_SECRET_ACCESS_KEY="$(AWS_SECRET_ACCESS_KEY)" --build-arg CI_VARIANT=$(subst -,,$(VARIANT)) --build-arg CI_IMAGE="$(CI_IMAGE)" --build-arg ARCH=$(ARCH) $$CACHE
+
+toolchain: toolchain/default
+
+# Backward compatibility
+ci/image: toolchain
 
 image/%:
-	if test -n "$(FROM_SCRATCH)"; then CACHE="--no-cache"; \
-	else if docker pull "$(IMAGE)/$*"; then CACHE="--cache-from $(IMAGE)/$*"; fi; \
+	if docker buildx inspect builder; then \
+		CACHE="--builder=builder --cache-to type=inline --push "; \
 	fi; \
-	docker buildx build --cache-to type=inline -f "Dockerfile.$*" . --tag "$(IMAGE)/$*" $$CACHE --build-arg PACKAGES="$(PACKAGES)"
+	if test -n "$(FROM_SCRATCH)"; then CACHE="--no-cache"; \
+	else CACHE="$$CACHE--cache-from type=registry,ref=$(IMAGE)/$*"; \
+	fi; \
+	docker buildx build -f "Dockerfile.$*" . --tag "$(IMAGE)/$*" $$CACHE --build-arg PACKAGES="$(PACKAGES)"
 
 opam:
 	$(DIR)/opam-publish
