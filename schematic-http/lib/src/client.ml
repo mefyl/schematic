@@ -360,6 +360,7 @@ struct
       match Cohttp.Response.status resp with
       | `Code 0 as status ->
         (* CORS or connectivity issue *)
+        let* () = Cohttp_lwt.Body.drain_body body in
         Lwt_result.fail Error.(make ~method_ ~status ~reason:`Networking uri)
       | status ->
         let* () =
