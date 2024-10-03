@@ -165,11 +165,15 @@ let () =
                     ];
                 ];
             ]
-        and ios_rule =
+        and cross_rule toolchain =
           List
             [
               Atom "rule";
-              List [ Atom "target"; Atom (package ^ "-ios.opam") ];
+              List
+                [
+                  Atom "target";
+                  Atom (String.concat [ package; "-"; toolchain; ".opam" ]);
+                ];
               List
                 [
                   Atom "action";
@@ -181,7 +185,7 @@ let () =
                         [
                           Atom "run";
                           Atom "%{dep:.logistic/dune/extdeps/extdeps.exe}";
-                          Atom "rewrite-ios";
+                          Atom ("rewrite-" ^ toolchain);
                           Atom "--input";
                           Atom ("%{dep:" ^ package ^ ".opam}");
                           Atom "--cross";
@@ -197,7 +201,15 @@ let () =
                 ];
             ]
         in
-        [ opam_rule ""; ios_rule; opam_rule "-ios"; locked_rule; extdeps_rule ]
+        [
+          opam_rule "";
+          cross_rule "ios";
+          opam_rule "-ios";
+          cross_rule "macos";
+          opam_rule "-macos";
+          locked_rule;
+          extdeps_rule;
+        ]
       in
       List.map ~f:generate packages
       |> List.concat
@@ -299,7 +311,7 @@ let () =
     in
     Term.(const rewrite $ Arg.value local $ Arg.required input)
     |> Cmd.(v (info "rewrite"))
-  and rewrite_ios =
+  and rewrite_toolchain toolchain =
     let open OpamParserTypes.FullPos in
     let pos f ({ pelem; _ } as pos) =
       match f pelem with
@@ -363,11 +375,11 @@ let () =
                 Some
                   [
                     { item with pelem = String dep };
-                    { item with pelem = String (dep ^ "-ios") };
+                    { item with pelem = String (dep ^ "-" ^ toolchain) };
                   ]
               | String dep
                 when List.mem ~equal:String.equal ("ocaml" :: cross) dep ->
-                Some [ { item with pelem = String (dep ^ "-ios") } ]
+                Some [ { item with pelem = String (dep ^ "-" ^ toolchain) } ]
               | Option (value, options) ->
                 let+ values = rewrite value in
                 List.map values ~f:(fun value ->
@@ -395,7 +407,7 @@ let () =
              } as command) ->
           let tail =
             { pelem = String "-x"; pos = dune_command.pos }
-            :: { pelem = String "ios"; pos = dune_command.pos }
+            :: { pelem = String toolchain; pos = dune_command.pos }
             :: List.filter_map
                  ~f:(function
                    | { pelem = Ident "name"; _ } as item ->
@@ -427,8 +439,12 @@ let () =
     Term.(
       const rewrite $ Arg.required input $ Arg.value cross_only
       $ Arg.value cross_both $ Arg.value cross_exclude)
-    |> Cmd.(v (info "rewrite-ios"))
+    |> Cmd.(v (info ("rewrite-" ^ toolchain)))
   in
   Cmdliner.Cmd.(
-    eval_result (group (info "extdeps") [ generate; rewrite; rewrite_ios ]))
+    eval_result
+      (group (info "extdeps")
+         [
+           generate; rewrite; rewrite_toolchain "ios"; rewrite_toolchain "macos";
+         ]))
   |> Stdlib.exit

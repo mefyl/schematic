@@ -165,6 +165,7 @@ struct
       match Cohttp.Response.status resp with
       | `Code 0 ->
         (* CORS or connectivity issue *)
+        let* () = Cohttp_lwt.Body.drain_body body in
         Lwt_result.fail `Networking
       | status ->
         Lwt_result.return

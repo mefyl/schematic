@@ -26,7 +26,7 @@ let[@landmark "Schematic_jsoo.Json.to_js"] rec to_js x =
   | `String s -> Js.string s |> Js.Unsafe.coerce
   | `Float n -> Js.number_of_float n |> Js.Unsafe.coerce
   | `Bool n -> Js.bool n |> Js.Unsafe.coerce
-  | `A a -> List.map ~f:to_js a |> List.to_array |> Js.array
+  | `A a -> List.map ~f:to_js a |> List.to_array |> Js.array |> Js.Unsafe.coerce
   | `O o ->
     let res = object%js end in
     let f (k, v) = Js.Unsafe.set res (Js.string k) (to_js v) in
