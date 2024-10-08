@@ -464,11 +464,13 @@ module Optional (Handler : HANDLER) = struct
   type 'a response = 'a option Handler.response
 
   let raw ?timeout ?headers ?body method_ uri =
-    Handler.Monad.map (Handler.raw ?timeout ?headers ?body method_ uri)
-      ~f:(fun ((resp, _) as r) ->
+    Handler.Monad.bind (Handler.raw ?timeout ?headers ?body method_ uri)
+      ~f:(fun ((resp, body) as r) ->
         match Cohttp_.Response.status resp with
-        | `Not_found -> None
-        | _ -> Some r)
+        | `Not_found ->
+          let* () = Handler.Body.drain body in
+          Handler.Monad.return None
+        | _ -> Handler.Monad.return (Some r))
 end
 
 module Check_status (Status : STATUS) (Handler : HANDLER) = struct
