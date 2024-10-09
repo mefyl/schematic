@@ -366,14 +366,34 @@ struct
 
   let test_range = Alcotest.testable pp_range ( = )
 
-  let tuple () =
-    test ~here:[%here] "tuple" test_range range_schema (v1, v2, 83)
-      [%ezjsonm
+  let tuple =
+    {
+      name = "tuple";
+      speed = `Quick;
+      additional_test = None;
+      tests =
         [
-          { major = 0; minor = 1; subminor = 2 };
-          { major = 3; minor = 4; subminor = 5 };
-          83;
-        ]]
+          Test
+            {
+              name = "tuple";
+              here = [%here];
+              decoded = None;
+              value_testable = test_range;
+              schema = range_schema;
+              value = (v1, v2, 83);
+              expected =
+                [%ezjsonm
+                  [
+                    { major = 0; minor = 1; subminor = 2 };
+                    { major = 3; minor = 4; subminor = 5 };
+                    83;
+                  ]];
+              kotlin_class_name = None;
+              (* Type aliases are not supported for reflection *)
+              is_kotlin_roundtrip_enabled = false;
+            };
+        ];
+    }
 
   (* Variant *)
 
@@ -387,36 +407,81 @@ struct
   let test_expectation = Alcotest.testable pp_expectation ( = )
 
   module Variant = struct
-    let variant () =
-      test ~here:[%here] "variant" test_expectation expectation_schema
-        (Exact { major = 1; minor = 2; subminor = 3 })
-        [%ezjsonm { major = 1; minor = 2; subminor = 3 }];
-      test ~here:[%here] "variant" test_expectation expectation_schema
-        (Range
-           ( { major = 1; minor = 2; subminor = 3 },
-             { major = 4; minor = 5; subminor = 6 },
-             108 ))
-        [%ezjsonm
+    (** Kotlin roundtrip disabled because *)
+    let variant =
+      let mk_test name value expected =
+        Test
+          {
+            name;
+            here = [%here];
+            decoded = None;
+            value_testable = test_expectation;
+            schema = expectation_schema;
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled = false;
+            (* Nested unions (sealed interfaces) not yet supported. The
+               [aktually] variant is itself a union of ["aktually"] and
+               ["mrmask"]. *)
+          }
+      in
+      {
+        name = "variant";
+        speed = `Quick;
+        tests =
           [
-            { major = 1; minor = 2; subminor = 3 };
-            { major = 4; minor = 5; subminor = 6 };
-            108;
-          ]];
-      test ~here:[%here] "variant" test_expectation expectation_schema Nothing
-        [%ezjsonm "nothing"];
-      test ~here:[%here] "variant" test_expectation expectation_schema Aliased
-        [%ezjsonm "aktually"];
-      Alcotest.(check ~here:[%here] (result test_expectation decoding_error))
-        "aliased variant field" (Result.Ok Aliased)
-      @@ Schematic.Json.decode expectation_schema [%ezjsonm "mrmask"]
+            mk_test "variant"
+              (Exact { major = 1; minor = 2; subminor = 3 })
+              [%ezjsonm { major = 1; minor = 2; subminor = 3 }];
+            mk_test "variant"
+              (Range
+                 ( { major = 1; minor = 2; subminor = 3 },
+                   { major = 4; minor = 5; subminor = 6 },
+                   108 ))
+              [%ezjsonm
+                [
+                  { major = 1; minor = 2; subminor = 3 };
+                  { major = 4; minor = 5; subminor = 6 };
+                  108;
+                ]];
+            mk_test "variant" Nothing [%ezjsonm "nothing"];
+            mk_test "variant" Aliased [%ezjsonm "aktually"];
+          ];
+        additional_test =
+          Some
+            (fun () ->
+              Alcotest.(
+                check ~here:[%here] (result test_expectation decoding_error))
+                "aliased variant field" (Result.Ok Aliased)
+              @@ Schematic.Json.decode expectation_schema [%ezjsonm "mrmask"]);
+      }
 
     type singleton = Single [@@deriving eq, schema, show]
 
     let singleton = Alcotest.testable pp_singleton equal_singleton
 
-    let singleton () =
-      test ~here:[%here] "singleton variant" singleton singleton_schema Single
-        [%ezjsonm "single"]
+    let singleton =
+      {
+        name = "singleton variant";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            Test
+              {
+                name = "singleton variant";
+                here = [%here];
+                decoded = None;
+                value_testable = singleton;
+                schema = singleton_schema;
+                value = Single;
+                expected = [%ezjsonm "single"];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled = true;
+              };
+          ];
+      }
 
     type computed_payload =
       | Computed of {
@@ -1587,6 +1652,9 @@ struct
             Optionals.default_option;
             Optionals.disabled_optionals;
             record;
+            tuple;
+            Variant.variant;
+            Variant.singleton;
           ];
       };
     ]
@@ -1614,9 +1682,6 @@ struct
     [
       ( "coding",
         [
-          test_case "tuple" `Quick tuple;
-          test_case "variant" `Quick Variant.variant;
-          test_case "singleton variant" `Quick Variant.singleton;
           test_case "computed variant field" `Quick Variant.computed;
           test_case "unmatched variant" `Quick Variant.no_match;
           test_case "null object" `Quick Variant.null_object;
