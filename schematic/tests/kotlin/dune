@@ -1,0 +1,62 @@
+(include_subdirs no)
+
+(tests
+ (names kotlin)
+ (package schematic)
+ (modules kotlin)
+ (preprocess
+  (pps
+   ppx_deriving.eq
+   ppx_deriving.show
+   ppx_deriving.ord
+   ppx_here
+   schematic_ppx
+   --
+   --cookie
+   "schematic-version=\"0.15.0\""))
+ (libraries alcotest schematic test_utils))
+
+(rule
+ ; - Build the Kotlin roundtrip test app
+ ; - Unzip the built artifact
+ ; - Move the binary (and its libs) in a directory accessible from the OCaml test
+ (alias build-kotlin-test-app)
+ (target
+  (dir kotlin-app))
+ (mode
+  (promote (until-clean)))
+ (deps
+  (alias_rec generate-kotlin-test-controller)
+  (source_tree kotlin-roundtrip))
+ (action
+  (progn
+   (chdir
+    kotlin-roundtrip
+    (progn
+     (run gradle distZip --no-daemon)))
+   (chdir
+    kotlin-roundtrip/app/build/distributions
+    (progn
+     (run rm --recursive --force app)
+     (run unzip app.zip)))
+   (run
+    cp
+    --recursive
+    kotlin-roundtrip/app/build/distributions/app/
+    %{target}))))
+
+(test
+ (name kotlin_roundtrip)
+ (modules kotlin_roundtrip)
+ (libraries alcotest schematic test_utils)
+ (deps
+  (alias build-kotlin-test-app))
+ (preprocess
+  (pps ppx_here schematic.ppx ppx_deriving.show)))
+
+(executable
+ (name kotlin_test_controller_generator)
+ (modules kotlin_test_controller_generator)
+ (libraries schematic test_utils)
+ (preprocess
+  (pps ppx_here schematic.ppx ppx_deriving.show)))
