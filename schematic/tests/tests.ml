@@ -948,10 +948,27 @@ struct
 
     let test_recursive = Alcotest.testable pp_recursive ( = )
 
-    let plain () =
-      test ~here:[%here] "recursive" test_recursive schema
-        { value = 0; next = Some { value = 1; next = None } }
-        [%ezjsonm { value = 0; next = { value = 1 } }]
+    let plain =
+      {
+        name = "recursive";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            Test
+              {
+                name = "recursive";
+                here = [%here];
+                decoded = None;
+                value_testable = test_recursive;
+                schema;
+                value = { value = 0; next = Some { value = 1; next = None } };
+                expected = [%ezjsonm { value = 0; next = { value = 1 } }];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled = false (* TODO bug *);
+              };
+          ];
+      }
 
     (* Used to check the lazy fixpoint schema is evaluated only once *)
     type count = unit [@@deriving eq, show]
@@ -975,22 +992,36 @@ struct
         (pp_parametric (Alcotest.pp t))
         (equal_parametric (Alcotest.equal t))
 
-    let parametric () =
-      let () = Alcotest.(check ~here:[%here] int "first count" 0 !count) in
-      let schema = parametric_schema int_schema in
-      let () = Alcotest.(check ~here:[%here] int "second count" 1 !count) in
-      let _schema = parametric_schema int_schema in
-      let () = Alcotest.(check ~here:[%here] int "third count" 1 !count) in
-      let () =
-        test ~here:[%here] "recursive" (parametric Alcotest.int) schema
-          {
-            count = ();
-            value = 0;
-            next = Some { count = (); value = 1; next = None };
-          }
-          [%ezjsonm { value = 0; next = { value = 1 } }]
-      in
-      Alcotest.(check ~here:[%here] int "fourth count" 1 !count)
+    let parametric =
+      {
+        name = "recursive_parametric";
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some
+            (fun () ->
+              let () =
+                Alcotest.(check ~here:[%here] int "first count" 0 !count)
+              in
+              let schema = parametric_schema int_schema in
+              let () =
+                Alcotest.(check ~here:[%here] int "second count" 1 !count)
+              in
+              let _schema = parametric_schema int_schema in
+              let () =
+                Alcotest.(check ~here:[%here] int "third count" 1 !count)
+              in
+              let () =
+                test ~here:[%here] "recursive" (parametric Alcotest.int) schema
+                  {
+                    count = ();
+                    value = 0;
+                    next = Some { count = (); value = 1; next = None };
+                  }
+                  [%ezjsonm { value = 0; next = { value = 1 } }]
+              in
+              Alcotest.(check ~here:[%here] int "fourth count" 1 !count));
+      }
   end
 
   type mutually_a = { next_b : mutually_b option }
@@ -1897,6 +1928,8 @@ struct
             Gadt.simple;
             Gadt.complex;
             escape;
+            Recursive.plain;
+            Recursive.parametric;
           ];
       };
     ]
@@ -1924,8 +1957,6 @@ struct
     [
       ( "coding",
         [
-          test_case "recursive" `Quick Recursive.plain;
-          test_case "recursive_parametric" `Quick Recursive.parametric;
           test_case "mutually recursive" `Quick mutually;
           test_case "ignored" `Quick ignored;
           test_case "inline-record" `Quick Inline.record;
