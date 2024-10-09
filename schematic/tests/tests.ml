@@ -1151,49 +1151,106 @@ struct
       | Result.Ok sets -> sets
       | Result.Error e -> Alcotest.fail e
 
-    let record () =
-      let () =
-        Alcotest.(
-          check ~here:[%here]
-            (list @@ list string)
-            "the list of mandatory fields"
-            [ [ "a"; "b"; "c"; "d" ] ]
-          @@ descriptor_fields inline_schema.descriptor)
-      in
-      test ~here:[%here] "coding" inline inline_schema
-        { a = 0; coin = { b = 1; c = 2 }; d = 3; ignored = () }
-        [%ezjsonm { a = 0; b = 1; c = 2; d = 3 }]
+    let record =
+      {
+        name = "inline-record";
+        speed = `Quick;
+        tests =
+          [
+            Test
+              {
+                name = "coding";
+                here = [%here];
+                decoded = None;
+                value_testable = inline;
+                schema = inline_schema;
+                value = { a = 0; coin = { b = 1; c = 2 }; d = 3; ignored = () };
+                expected = [%ezjsonm { a = 0; b = 1; c = 2; d = 3 }];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled = true;
+              };
+          ];
+        additional_test =
+          Some
+            (fun () ->
+              Alcotest.(
+                check ~here:[%here]
+                  (list @@ list string)
+                  "the list of mandatory fields"
+                  [ [ "a"; "b"; "c"; "d" ] ]
+                @@ descriptor_fields inline_schema.descriptor));
+      }
 
-    let variant_payload () =
-      let () =
-        Alcotest.(
-          check ~here:[%here]
-            (list @@ list string)
-            "the list of mandatory fields"
-            [ [ "a"; "b"; "c"; "d" ]; [ "dummy" ] ]
-          @@ descriptor_fields variant_inline_schema.descriptor)
-      in
-      test ~here:[%here] "coding" variant_inline variant_inline_schema
-        (Ctor { a = 0; coin = { b = 1; c = 2 }; d = 3; ignored = () })
-        [%ezjsonm { a = 0; b = 1; c = 2; d = 3 }]
+    let variant_payload =
+      {
+        name = "inline-variant-payload";
+        speed = `Quick;
+        tests =
+          [
+            Test
+              {
+                name = "coding";
+                here = [%here];
+                decoded = None;
+                value_testable = variant_inline;
+                schema = variant_inline_schema;
+                value =
+                  Ctor { a = 0; coin = { b = 1; c = 2 }; d = 3; ignored = () };
+                expected = [%ezjsonm { a = 0; b = 1; c = 2; d = 3 }];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled = true;
+              };
+          ];
+        additional_test =
+          Some
+            (fun () ->
+              Alcotest.(
+                check ~here:[%here]
+                  (list @@ list string)
+                  "the list of mandatory fields"
+                  [ [ "a"; "b"; "c"; "d" ]; [ "dummy" ] ]
+                @@ descriptor_fields variant_inline_schema.descriptor));
+      }
 
-    let inline_variant () =
-      let () =
-        Alcotest.(
-          check ~here:[%here]
-            (list @@ list string)
-            "the list of mandatory fields"
-            [ [ "x"; "b"; "c" ]; [ "x"; "d"; "e" ] ]
-          @@ descriptor_fields inline_variant_schema.descriptor)
+    let inline_variant =
+      let mk_test name value expected is_kotlin_roundtrip_enabled =
+        Test
+          {
+            name;
+            here = [%here];
+            decoded = None;
+            value_testable = inline_variant;
+            schema = inline_variant_schema;
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled;
+          }
       in
-      let () =
-        test ~here:[%here] "coding of Foo" inline_variant inline_variant_schema
-          { x = 362; pan = Foo { b = 363; c = 364 } }
-          [%ezjsonm { x = 362; b = 363; c = 364 }]
-      in
-      test ~here:[%here] "coding of Bar" inline_variant inline_variant_schema
-        { x = 369; pan = Bar { d = 370; e = 371 } }
-        [%ezjsonm { x = 369; d = 370; e = 371 }]
+      {
+        name = "inline-variant";
+        speed = `Quick;
+        additional_test =
+          Some
+            (fun () ->
+              Alcotest.(
+                check ~here:[%here]
+                  (list @@ list string)
+                  "the list of mandatory fields"
+                  [ [ "x"; "b"; "c" ]; [ "x"; "d"; "e" ] ]
+                @@ descriptor_fields inline_variant_schema.descriptor));
+        tests =
+          [
+            mk_test "coding of Foo"
+              { x = 362; pan = Foo { b = 363; c = 364 } }
+              [%ezjsonm { x = 362; b = 363; c = 364 }]
+              true;
+            mk_test "coding of Bar"
+              { x = 369; pan = Bar { d = 370; e = 371 } }
+              [%ezjsonm { x = 369; d = 370; e = 371 }]
+              true;
+          ];
+      }
 
     let inline_try () =
       let () =
@@ -1963,6 +2020,9 @@ struct
             Recursive.parametric;
             mutually;
             ignored;
+            Inline.record;
+            Inline.variant_payload;
+            Inline.inline_variant;
           ];
       };
     ]
@@ -1990,9 +2050,6 @@ struct
     [
       ( "coding",
         [
-          test_case "inline-record" `Quick Inline.record;
-          test_case "inline-variant-payload" `Quick Inline.variant_payload;
-          test_case "inline-variant" `Quick Inline.inline_variant;
           test_case "inline-try" `Quick Inline.inline_try;
           test_case "inline-parametric" `Quick Inline.inline_parametric;
           test_case "inline-nested-optional" `Quick
