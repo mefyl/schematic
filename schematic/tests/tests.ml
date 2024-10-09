@@ -589,17 +589,35 @@ struct
 
     let test_day = Alcotest.testable pp_day equal_day
 
-    let payload () =
-      test ~here:[%here] "polymorphic variant" test_day day_schema `Mon
-        [%ezjsonm "mon"];
-      test ~here:[%here] "polymorphic variant alias" test_day day_schema `Tue
-        [%ezjsonm "tuesday"];
-      test ~here:[%here] "polymorphic variant payload" test_day day_schema
-        (`Wed 160) [%ezjsonm 160];
-      test ~here:[%here] "polymorphic variant composite payload" test_day
-        day_schema
-        (`Thu (true, false))
-        [%ezjsonm [ true; false ]]
+    let payload =
+      let mk_test name value expected is_kotlin_roundtrip_enabled =
+        Test
+          {
+            name;
+            here = [%here];
+            decoded = None;
+            value_testable = test_day;
+            schema = day_schema;
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled;
+          }
+      in
+      {
+        name = "polymorphic variant";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            mk_test "polymorphic variant" `Mon [%ezjsonm "mon"] true;
+            mk_test "polymorphic variant alias" `Tue [%ezjsonm "tuesday"] true;
+            mk_test "polymorphic variant payload" (`Wed 160) [%ezjsonm 160] true;
+            mk_test "polymorphic variant composite payload"
+              (`Thu (true, false))
+              [%ezjsonm [ true; false ]] true;
+          ];
+      }
 
     type keyed =
       [ `Left
@@ -612,12 +630,35 @@ struct
 
     let test_keyed = Alcotest.testable pp_keyed equal_keyed
 
-    let keyed () =
-      test ~here:[%here] "keyed polymorphic variant" test_keyed keyed_schema
-        `Left [%ezjsonm { position = "left" }];
-      test ~here:[%here] "keyed polymorphic variant" test_keyed keyed_schema
-        (`Center { stable = false })
-        [%ezjsonm { position = "center"; stable = false }]
+    let keyed =
+      let mk_test name value expected is_kotlin_roundtrip_enabled =
+        Test
+          {
+            name;
+            here = [%here];
+            decoded = None;
+            value_testable = test_keyed;
+            schema = keyed_schema;
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled;
+          }
+      in
+      {
+        name = "keyed polymorphic variant";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            mk_test "keyed polymorphic variant" `Left
+              [%ezjsonm { position = "left" }] true;
+            mk_test "keyed polymorphic variant"
+              (`Center { stable = false })
+              [%ezjsonm { position = "center"; stable = false }]
+              true;
+          ];
+      }
   end
 
   (* List *)
@@ -1699,6 +1740,8 @@ struct
             Variant.computed;
             Variant.no_match;
             Variant.null_object;
+            Polymorphic_variant.payload;
+            Polymorphic_variant.keyed;
           ];
       };
     ]
@@ -1726,8 +1769,6 @@ struct
     [
       ( "coding",
         [
-          test_case "polymorphic variant" `Quick Polymorphic_variant.payload;
-          test_case "keyed polymorphic variant" `Quick Polymorphic_variant.keyed;
           test_case "alias" `Quick alias;
           test_case "list" `Quick List.objects;
           test_case "option list" `Quick List.option;
