@@ -493,26 +493,52 @@ struct
     let computed_payload =
       Alcotest.testable pp_computed_payload equal_computed_payload
 
-    let computed () =
-      test ~here:[%here] "variant payload with computed field" computed_payload
-        computed_payload_schema
-        (Computed { x = 239; y = 114 })
-        [%ezjsonm { x = 239; y = 114; z = 353 }]
+    let computed =
+      {
+        name = "computed variant field";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            Test
+              {
+                name = "variant payload with computed field";
+                here = [%here];
+                decoded = None;
+                value_testable = computed_payload;
+                schema = computed_payload_schema;
+                value = Computed { x = 239; y = 114 };
+                expected = [%ezjsonm { x = 239; y = 114; z = 353 }];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled = true;
+              };
+          ];
+      }
 
-    let no_match () =
+    let no_match =
       let error =
         Schematic.Json.decode expectation_schema
           [%ezjsonm { invalid = "payload" }]
       in
-      Alcotest.(check ~here:[%here] (result test_expectation decoding_error))
-        "invalid variant decoding"
-        (Error
-           {
-             path = [];
-             schema = Some "expectation";
-             reason = {|no union case was matched for {"invalid": "payload"}|};
-           })
-        error
+      {
+        name = "unmatched variant";
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some
+            (fun () ->
+              Alcotest.(
+                check ~here:[%here] (result test_expectation decoding_error))
+                "invalid variant decoding"
+                (Error
+                   {
+                     path = [];
+                     schema = Some "expectation";
+                     reason =
+                       {|no union case was matched for {"invalid": "payload"}|};
+                   })
+                error);
+      }
 
     type null_object =
       | Object of { x : int }
@@ -522,10 +548,29 @@ struct
     (* Used to fail on Jsoo with:
 
        TypeError: Cannot convert undefined or null to object *)
-    let null_object () =
-      test ~here:[%here] "null object"
-        (Alcotest.testable pp_null_object equal_null_object)
-        null_object_schema (Null ()) [%ezjsonm None]
+    let null_object =
+      {
+        name = "null object";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            Test
+              {
+                name = "null object";
+                here = [%here];
+                decoded = None;
+                value_testable =
+                  Alcotest.testable pp_null_object equal_null_object;
+                schema = null_object_schema;
+                value = Null ();
+                expected = [%ezjsonm None];
+                kotlin_class_name = None;
+                (* TODO fix this bug *)
+                is_kotlin_roundtrip_enabled = false;
+              };
+          ];
+      }
   end
 
   (* Polymorphic variant *)
@@ -1655,6 +1700,9 @@ struct
             tuple;
             Variant.variant;
             Variant.singleton;
+            Variant.computed;
+            Variant.no_match;
+            Variant.null_object;
           ];
       };
     ]
@@ -1682,9 +1730,6 @@ struct
     [
       ( "coding",
         [
-          test_case "computed variant field" `Quick Variant.computed;
-          test_case "unmatched variant" `Quick Variant.no_match;
-          test_case "null object" `Quick Variant.null_object;
           test_case "polymorphic variant" `Quick Polymorphic_variant.payload;
           test_case "keyed polymorphic variant" `Quick Polymorphic_variant.keyed;
           test_case "alias" `Quick alias;
