@@ -50,7 +50,8 @@ struct
       match Coding.decode schema encoded with
       | Result.Ok d ->
         Alcotest.check ~here test
-          (Fmt.str "%s: decoded value" name)
+          (Fmt.str "%s: decoded value (encoded JSON: %a)" name
+             (Alcotest.pp Coding.t) encoded)
           (Option.value ~default:value decoded)
           d
       | Result.Error e ->
@@ -1493,3 +1494,13 @@ struct
         ] );
     ]
 end
+
+(** In a later MR we will remove this one and instead expose all schemas of this
+    file to be reused by roundtrip tests. *)
+type foo =
+  | A of int
+  | B of {
+      bar : string;
+      baz : bool;
+    }
+[@@deriving schema, show, eq]
