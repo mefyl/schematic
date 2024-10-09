@@ -1032,10 +1032,28 @@ struct
 
   let test_mutually_a = Alcotest.testable pp_mutually_a ( = )
 
-  let mutually () =
-    test ~here:[%here] "mutually recursive" test_mutually_a mutually_a_schema
-      { next_b = Some { next_a = Some { next_b = None } } }
-      [%ezjsonm { next_b = { next_a = [%aq `O []] } }]
+  let mutually =
+    {
+      name = "mutually recursive";
+      speed = `Quick;
+      additional_test = None;
+      tests =
+        [
+          Test
+            {
+              name = "mutually recursive";
+              here = [%here];
+              decoded = None;
+              value_testable = test_mutually_a;
+              schema = mutually_a_schema;
+              value = { next_b = Some { next_a = Some { next_b = None } } };
+              expected = [%ezjsonm { next_b = { next_a = [%aq `O []] } }];
+              kotlin_class_name = None;
+              is_kotlin_roundtrip_enabled =
+                false (* TODO another occurrence of the bug with [Optional] *);
+            };
+        ];
+    }
 
   (* Ignored *)
 
@@ -1045,12 +1063,29 @@ struct
   }
   [@@deriving eq, schema, show]
 
-  let ignored () =
+  let ignored =
     let ignored = Alcotest.(testable pp_ignored equal_ignored) in
-    test ~here:[%here] "missing ignored fields are accepted" ignored
-      ignored_schema
-      { ignored = (); not_ignored = () }
-      [%ezjsonm { not_ignored = None }]
+
+    {
+      name = "ignored";
+      speed = `Quick;
+      additional_test = None;
+      tests =
+        [
+          Test
+            {
+              name = "missing ignored fields are accepted";
+              here = [%here];
+              decoded = None;
+              value_testable = ignored;
+              schema = ignored_schema;
+              value = { ignored = (); not_ignored = () };
+              expected = [%ezjsonm { not_ignored = None }];
+              kotlin_class_name = None;
+              is_kotlin_roundtrip_enabled = true;
+            };
+        ];
+    }
 
   module Inline = struct
     type inlined = {
@@ -1930,6 +1965,8 @@ struct
             escape;
             Recursive.plain;
             Recursive.parametric;
+            mutually;
+            ignored;
           ];
       };
     ]
@@ -1957,8 +1994,6 @@ struct
     [
       ( "coding",
         [
-          test_case "mutually recursive" `Quick mutually;
-          test_case "ignored" `Quick ignored;
           test_case "inline-record" `Quick Inline.record;
           test_case "inline-variant-payload" `Quick Inline.variant_payload;
           test_case "inline-variant" `Quick Inline.inline_variant;
