@@ -37,7 +37,7 @@ let pp_debug_descriptor : type a. a Schema.descriptor Fmt.t =
   | Union _ -> "Union"
 
 let to_pascal_case s =
-  String.split_on_chars ~on:[ '_'; '-'; '.'; '\'' ] s
+  String.split_on_chars ~on:[ '_'; '-'; '.'; '\''; '$' ] s
   |> List.map ~f:String.capitalize
   |> String.concat ~sep:""
 

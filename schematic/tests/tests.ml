@@ -911,10 +911,28 @@ struct
 
   let test_escape = Alcotest.testable pp_escape ( = )
 
-  let escape () =
-    test ~here:[%here] "escape" test_escape escape_schema
-      { special_char = 128; keyword = "coin" }
-      (`O [ ("'char$", `Float 128.); ("type", `String "coin") ])
+  let escape =
+    {
+      name = "escape";
+      speed = `Quick;
+      additional_test = None;
+      tests =
+        [
+          Test
+            {
+              name = "escape";
+              here = [%here];
+              decoded = None;
+              value_testable = test_escape;
+              schema = escape_schema;
+              value = { special_char = 128; keyword = "coin" };
+              expected =
+                `O [ ("'char$", `Float 128.); ("type", `String "coin") ];
+              kotlin_class_name = None;
+              is_kotlin_roundtrip_enabled = true;
+            };
+        ];
+    }
 
   (* Recursive *)
 
@@ -1874,6 +1892,7 @@ struct
             Parametric.anonymous;
             Gadt.simple;
             Gadt.complex;
+            escape;
           ];
       };
     ]
@@ -1901,7 +1920,6 @@ struct
     [
       ( "coding",
         [
-          test_case "escape" `Quick escape;
           test_case "recursive" `Quick Recursive.plain;
           test_case "recursive_parametric" `Quick Recursive.parametric;
           test_case "mutually recursive" `Quick mutually;
