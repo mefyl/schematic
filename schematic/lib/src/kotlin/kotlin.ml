@@ -197,6 +197,7 @@ module Parser = struct
   let rec schema_to_kotlin_marks :
       type a. Marks.t -> a Schema.t -> string option * kotlin * Marks.t =
    fun marks ({ id; descriptor; parametric } as schema) ->
+    let () = Logs.debug (fun m -> m "Parsing schema %a" Schema.pp schema) in
     try
       let kotlin_type_name = Option.map ~f:to_pascal_case id in
       let _generics, marks =

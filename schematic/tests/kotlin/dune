@@ -67,6 +67,6 @@
 (executable
  (name kotlin_test_controller_generator)
  (modules kotlin_test_controller_generator)
- (libraries schematic kotlin_utils)
+ (libraries schematic kotlin_utils logs.fmt)
  (preprocess
   (pps ppx_here schematic.ppx ppx_deriving.show)))
