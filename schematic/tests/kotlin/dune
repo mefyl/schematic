@@ -15,7 +15,7 @@
    --
    --cookie
    "schematic-version=\"0.15.0\""))
- (libraries alcotest schematic base fmt test_utils))
+ (libraries alcotest schematic base fmt logs.fmt test_utils))
 
 (tests
  (names kotlin)

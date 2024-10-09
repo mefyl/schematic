@@ -434,6 +434,7 @@ module Parser = struct
         {
           field =
             {
+              name;
               schema =
                 ( Outline { descriptor = Ignore; _ }
                 | Inline { descriptor = Ignore; _ }
@@ -442,6 +443,7 @@ module Parser = struct
             };
           rest;
         } ->
+      let () = Logs.debug (fun m -> m "Ignoring field %s" name) in
       object_fields_to_kotlin_marks marks rest
     | Field { field; rest } ->
       let kotlin_field, marks = object_field_to_kotlin_marks marks field in
@@ -636,7 +638,15 @@ end
 module Json = struct
   module Encode = struct
     let rec encode : type t. t Schema.t -> t -> Ezjsonm.value =
-     fun { descriptor; _ } -> encode_descriptor descriptor
+     fun { descriptor; id; _ } t ->
+      let json = encode_descriptor descriptor t in
+      let () =
+        Logs.debug (fun m ->
+            m "Encoded value for schema %a: %a"
+              Fmt.(option string)
+              id Json.pp json)
+      in
+      json
 
     and encode_descriptor : type t. t Schema.descriptor -> t -> Ezjsonm.value =
      fun descriptor ->
@@ -661,7 +671,7 @@ module Json = struct
         fun v ->
           let pairs = List.map ~f:(fun (k, v) -> (k, encode v)) v in
           `O pairs
-      | Null -> Fn.const `Null
+      | Null -> Fn.const (`O [])
       | Nullable schema ->
         let f = encode schema in
         fun v -> Option.map ~f v |> Option.value ~default:`Null
@@ -743,7 +753,27 @@ module Json = struct
         t Hlist.t Schema.fields -> t Hlist.t -> (string * Ezjsonm.value) list =
      fun fields fields_hlist ->
       match (fields, fields_hlist) with
-      | FieldEnd, [] -> [] (* TODO [Ignore] special case *)
+      | FieldEnd, [] -> []
+      | ( (Field
+             {
+               field =
+                 {
+                   name;
+                   schema =
+                     ( Outline { descriptor = Ignore; _ }
+                     | Inline { descriptor = Ignore; _ }
+                     | Inline_try { descriptor = Ignore; _ } );
+                   _;
+                 };
+               rest;
+             } :
+            t Hlist.t Schema.fields),
+          _ :: fields_hlist_rest ) ->
+        let () =
+          Logs.debug (fun m -> m "Ignoring field %s while encoding" name)
+        in
+        let encoded_tail = encode_fields rest fields_hlist_rest in
+        encoded_tail
       | ( (Field { field; rest } : t Hlist.t Schema.fields),
           field_hlist_head :: fields_hlist_rest ) -> (
         let encoded_head = encode_field field field_hlist_head in
@@ -775,6 +805,16 @@ module Json = struct
   module Decode = struct
     let ( let+ ) = Result.( >>| )
     let ( let* ) = Result.( >>= )
+
+    let requirement_return : type a req. (a, req) Schema.requirement -> a -> req
+        =
+     fun req v ->
+      match req with
+      | Computed -> Some v
+      | Computed_optional -> Some (Some v)
+      | Default _ -> v
+      | Optional -> Some v
+      | Required -> v
 
     let rec decode :
         type t.
@@ -848,7 +888,7 @@ module Json = struct
               (key, decoded_value))
             fields
           |> Result.all
-      | Null -> ( function `Null -> Ok () | json -> type_error "null" json)
+      | Null -> ( function `O [] -> Ok () | json -> type_error "null" json)
       | Nullable schema -> (
         function
         | `Null -> Ok None
@@ -1013,27 +1053,20 @@ module Json = struct
         (t Hlist.t, E.decoding) Result.t =
      fun context fields json_fields ->
       match fields with
-      (* TODO [Ignore] *)
-      (* | Field *)
-      (*     { *)
-      (*       field = *)
-      (*         { *)
-      (*           schema = *)
-      (*             ( Outline { descriptor = Ignore; _ } *)
-      (*             | Inline { descriptor = Ignore; _ } *)
-      (*             | Inline_try { descriptor = Ignore; _ } ); *)
-      (*           requirement; *)
-      (*           _; *)
-      (*         }; *)
-      (*       rest; *)
-      (*     } -> *)
-      (*   let* rest = decode_fields context rest json_fields in *)
-      (*   Result.Ok Hlist.(requirement_return requirement () :: rest) *)
       | FieldEnd -> Ok []
-      | Field { field; rest = rest_fields } ->
-        let* decoded_head = decode_field context field json_fields in
-        let* decoded_rest = decode_fields context rest_fields json_fields in
-        Ok Hlist.(decoded_head :: decoded_rest)
+      | Field { field; rest = rest_fields } -> (
+        match Schema.field_schema field.schema with
+        | { descriptor = Ignore; _ } ->
+          let () =
+            Logs.debug (fun m ->
+                m "Ignoring field %s while decoding" field.name)
+          in
+          let* decoded_rest = decode_fields context rest_fields json_fields in
+          Ok Hlist.(requirement_return field.requirement () :: decoded_rest)
+        | _ ->
+          let* decoded_head = decode_field context field json_fields in
+          let* decoded_rest = decode_fields context rest_fields json_fields in
+          Ok Hlist.(decoded_head :: decoded_rest))
 
     and decode_field :
         type t req.

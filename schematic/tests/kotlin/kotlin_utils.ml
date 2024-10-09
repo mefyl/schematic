@@ -1,5 +1,8 @@
 open Base
 
+let () = Logs.set_reporter (Logs_fmt.reporter ())
+let () = Logs.set_level (Some Logs.Info)
+
 let schematic_error_decoding_testable =
   Alcotest.testable Schematic.Error.pp_decoding Schematic.Error.equal_decoding
 
