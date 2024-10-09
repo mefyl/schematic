@@ -349,9 +349,27 @@ struct
 
   type version_alias = version [@@deriving schema]
 
-  let alias () =
-    test ~here:[%here] "record" test_version version_alias_schema v2
-      [%ezjsonm { major = 3; minor = 4; subminor = 5 }]
+  let alias =
+    {
+      name = "alias";
+      speed = `Quick;
+      additional_test = None;
+      tests =
+        [
+          Test
+            {
+              name = "record";
+              here = [%here];
+              decoded = None;
+              value_testable = test_version;
+              schema = version_alias_schema;
+              value = v2;
+              expected = [%ezjsonm { major = 3; minor = 4; subminor = 5 }];
+              kotlin_class_name = None;
+              is_kotlin_roundtrip_enabled = true;
+            };
+        ];
+    }
 
   (* Tuple *)
 
@@ -664,48 +682,77 @@ struct
   (* List *)
 
   module List = struct
-    let objects () =
-      test ~here:[%here] "list"
-        (Alcotest.list test_version)
-        (list_schema version_schema)
-        [] [%ezjsonm []];
-      test ~here:[%here] "list"
-        (Alcotest.list test_version)
-        (list_schema version_schema)
-        [ { major = 0; minor = 1; subminor = 2 } ]
-        [%ezjsonm [ { major = 0; minor = 1; subminor = 2 } ]];
-      test ~here:[%here] "list"
-        (Alcotest.list test_version)
-        (list_schema version_schema)
-        [
-          { major = 0; minor = 1; subminor = 2 };
-          { major = 3; minor = 4; subminor = 5 };
-          { major = 6; minor = 7; subminor = 8 };
-        ]
-        [%ezjsonm
+    let objects =
+      let mk_test name value expected =
+        Test
+          {
+            name;
+            here = [%here];
+            decoded = None;
+            value_testable = Alcotest.list test_version;
+            schema = list_schema version_schema;
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled =
+              false
+              (* Cannot find by reflection the class name for a list of X *);
+          }
+      in
+      {
+        name = "list";
+        speed = `Quick;
+        additional_test = None;
+        tests =
           [
-            { major = 0; minor = 1; subminor = 2 };
-            { major = 3; minor = 4; subminor = 5 };
-            { major = 6; minor = 7; subminor = 8 };
-          ]]
+            mk_test "list" [] [%ezjsonm []];
+            mk_test "list"
+              [ { major = 0; minor = 1; subminor = 2 } ]
+              [%ezjsonm [ { major = 0; minor = 1; subminor = 2 } ]];
+            mk_test "list"
+              [
+                { major = 0; minor = 1; subminor = 2 };
+                { major = 3; minor = 4; subminor = 5 };
+                { major = 6; minor = 7; subminor = 8 };
+              ]
+              [%ezjsonm
+                [
+                  { major = 0; minor = 1; subminor = 2 };
+                  { major = 3; minor = 4; subminor = 5 };
+                  { major = 6; minor = 7; subminor = 8 };
+                ]];
+          ];
+      }
 
-    let option () =
-      test ~here:[%here] "list"
-        Alcotest.(list (option int))
-        (list_schema (option_schema int_schema))
-        [] [%ezjsonm []];
-      test ~here:[%here] "list"
-        Alcotest.(list (option int))
-        (list_schema (option_schema int_schema))
-        [ Some 1; Some 2; Some 3 ] [%ezjsonm [ 1; 2; 3 ]];
-      test ~here:[%here] "list"
-        Alcotest.(list (option int))
-        (list_schema (option_schema int_schema))
-        [ None; None; None ] [%ezjsonm [ None; None; None ]];
-      test ~here:[%here] "list"
-        Alcotest.(list (option int))
-        (list_schema (option_schema int_schema))
-        [ Some 1; None; Some 3 ] [%ezjsonm [ 1; None; 3 ]]
+    let option =
+      let mk_test name value expected =
+        Test
+          {
+            name;
+            here = [%here];
+            decoded = None;
+            value_testable = Alcotest.(list (option int));
+            schema = list_schema (option_schema int_schema);
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled =
+              false
+              (* Cannot find by reflection the class name for a list of X *);
+          }
+      in
+      {
+        name = "option list";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            mk_test "list" [] [%ezjsonm []];
+            mk_test "list" [ Some 1; Some 2; Some 3 ] [%ezjsonm [ 1; 2; 3 ]];
+            mk_test "list" [ None; None; None ] [%ezjsonm [ None; None; None ]];
+            mk_test "list" [ Some 1; None; Some 3 ] [%ezjsonm [ 1; None; 3 ]];
+          ];
+      }
   end
 
   (* Parametric *)
@@ -1742,6 +1789,9 @@ struct
             Variant.null_object;
             Polymorphic_variant.payload;
             Polymorphic_variant.keyed;
+            alias;
+            List.objects;
+            List.option;
           ];
       };
     ]
@@ -1769,9 +1819,6 @@ struct
     [
       ( "coding",
         [
-          test_case "alias" `Quick alias;
-          test_case "list" `Quick List.objects;
-          test_case "option list" `Quick List.option;
           test_case "parametric_type" `Quick Parametric.simple;
           test_case "anonymous_parameter" `Quick Parametric.anonymous;
           test_case "simple GADT" `Quick Gadt.simple;
