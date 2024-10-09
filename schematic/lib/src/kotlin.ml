@@ -1,8 +1,11 @@
 module E = Error
 open Base
 
+let src = Logs.Src.create ~doc:"schematic Kotlin" "schematic"
+
+module Logs = (val Logs.src_log src)
+
 exception NotYetImplemented of string
-exception Panic of string
 
 (** Convenience for hacking because Schematic does not provide it. *)
 let pp_debug_descriptor : type a. a Schema.descriptor Fmt.t =
@@ -34,9 +37,7 @@ let pp_debug_descriptor : type a. a Schema.descriptor Fmt.t =
   | Union _ -> "Union"
 
 let to_pascal_case s =
-  let ( >>= ) = List.( >>= ) in
-  String.split ~on:'_' s >>= String.split ~on:'-' >>= String.split ~on:'.'
-  >>= String.split ~on:'\''
+  String.split_on_chars ~on:[ '_'; '-'; '.'; '\'' ] s
   |> List.map ~f:String.capitalize
   |> String.concat ~sep:""
 
@@ -45,36 +46,38 @@ let to_camel_case s = to_pascal_case s |> String.uncapitalize
 (** Reserved keywords in Kotlin. See
     https://kotlinlang.org/docs/keyword-reference.html *)
 let kotlin_reserved_words =
-  [
-    "as";
-    "break";
-    "class";
-    "continue";
-    "do";
-    "else";
-    "false";
-    "for";
-    "fun";
-    "if";
-    "in";
-    "interface";
-    "is";
-    "null";
-    "object";
-    "package";
-    "return";
-    "super";
-    "this";
-    "throw";
-    "true";
-    "try";
-    "typealias";
-    "typeof";
-    "val";
-    "var";
-    "when";
-    "while";
-  ]
+  Set.of_list
+    (module String)
+    [
+      "as";
+      "break";
+      "class";
+      "continue";
+      "do";
+      "else";
+      "false";
+      "for";
+      "fun";
+      "if";
+      "in";
+      "interface";
+      "is";
+      "null";
+      "object";
+      "package";
+      "return";
+      "super";
+      "this";
+      "throw";
+      "true";
+      "try";
+      "typealias";
+      "typeof";
+      "val";
+      "var";
+      "when";
+      "while";
+    ]
 
 (** The JSON object field storing the data type for [Union]s. *)
 let union_type_discriminator = "#type"
@@ -85,7 +88,7 @@ let union_type_value = "value"
 (** Transform the given string into a valid Kotlin object field name. *)
 let to_object_field_name s =
   let s = to_camel_case s in
-  if List.exists ~f:(String.equal s) kotlin_reserved_words then s ^ "_" else s
+  if Set.mem kotlin_reserved_words s then s ^ "_" else s
 
 (** Kotlin has special handling of nullability. Unlike decent programming
     languages, it does not use a type (e.g. [option]), instead it marks types
@@ -183,9 +186,8 @@ module Parser = struct
     | Some type_name, _ -> Simple (type_name, NotNullable)
     | None, Atom kotlin_type -> kotlin_type
     | _ ->
-      Fmt.epr "I don't know how to extract a Kotlin type from: %a\n" pp_kotlin
-        kotlin;
-      raise (Panic "PANIC")
+      Fmt.failwith "I don't know how to extract a Kotlin type from: %a\n"
+        pp_kotlin kotlin
 
   (** [schema_to_kotlin_marks marks schema] returns:
       - the Kotlin type name of the schema (if any, and without generics)
@@ -499,12 +501,9 @@ module Parser = struct
         in
         (Simple (Option.value_exn kotlin_type_name, nullable), marks)
       | _ ->
-        raise
-          (Panic
-             (Fmt.str
-                "Hopefully unreachable: the object field %S has no type name: \
-                 %a"
-                name pp_kotlin kotlin))
+        Fmt.failwith
+          "Hopefully unreachable: the object field %S has no type name: %a" name
+          pp_kotlin kotlin
     in
     ((to_object_field_name name, kotlin_type, required), marks)
 
@@ -538,12 +537,9 @@ module Generator = struct
    fun f (name, kotlin) ->
     match kotlin with
     | InProgress ->
-      raise
-        (Panic
-           (Fmt.str
-              "Parsing is complete but we still have In Progress parsing for \
-               type %s"
-              name))
+      Fmt.failwith
+        "Parsing is complete but we still have In Progress parsing for type %s"
+        name
     | Done (Atom alias) ->
       Fmt.pf f "typealias %s = %a" name pp_kotlin_type alias
     | Done Data_object ->
@@ -1052,9 +1048,10 @@ module Json = struct
       match requirement with
       | Optional -> (
         let () =
-          Fmt.epr "Decode.decode: Optional for optional JSON %a@."
-            Fmt.(option ~none:(fun fmt () -> Fmt.pf fmt "None") Json.pp)
-            m_value
+          Logs.debug (fun m ->
+              m "Decode.decode: Optional for optional JSON %a@."
+                Fmt.(option ~none:(fun fmt () -> Fmt.pf fmt "None") Json.pp)
+                m_value)
         in
         match m_value with
         | None -> Ok None
@@ -1083,9 +1080,10 @@ module Json = struct
           Ok (Some (Some decoded_value)))
       | Default default_value -> (
         let () =
-          Fmt.epr "Decode.decode: Default for optional JSON %a@."
-            Fmt.(option ~none:(fun fmt () -> Fmt.pf fmt "None") Json.pp)
-            m_value
+          Logs.debug (fun m ->
+              m "Decode.decode: Default for optional JSON %a@."
+                Fmt.(option ~none:(fun fmt () -> Fmt.pf fmt "None") Json.pp)
+                m_value)
         in
         match (m_value, schema.descriptor) with
         | None, _ -> Ok default_value
