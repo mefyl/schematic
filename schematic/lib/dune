@@ -3,7 +3,7 @@
 (library
  (name schematic)
  (public_name schematic)
- (libraries base base64 ezjsonm fmt hlist landmarks ptime semver2 uri)
+ (libraries base base64 ezjsonm fmt hlist landmarks logs ptime semver2 uri)
  (preprocess
   (pps
    landmarks-ppx
