@@ -1252,38 +1252,58 @@ struct
           ];
       }
 
-    let inline_try () =
-      let () =
-        Alcotest.(
-          check ~here:[%here]
-            (list @@ list string)
-            "mandatory fields when inlinable"
-            [ [ "maybe"; "b"; "c" ] ]
-          @@ descriptor_fields (inline_maybe_schema inlined_schema).descriptor)
-      and () =
-        test ~here:[%here] "inlinable" (inline_maybe inlined)
-          (inline_maybe_schema inlined_schema)
-          { maybe = true; inline = { b = 411; c = 412 } }
-          [%ezjsonm { maybe = true; b = 411; c = 412 }]
-      and () =
-        let schema = inline_maybe_schema int_schema in
-        let () =
-          Alcotest.(
-            check ~here:[%here]
-              (list @@ list string)
-              "mandatory fields when not inlinable"
-              [ [ "maybe"; "inline" ] ]
-            @@ descriptor_fields schema.descriptor)
-        and () =
-          test ~here:[%here] "not inlinable"
-            (inline_maybe Alcotest.int)
-            schema
-            { maybe = true; inline = 416 }
-            [%ezjsonm { maybe = true; inline = 416 }]
-        in
-        ()
-      in
-      ()
+    let inline_try =
+      let schema = inline_maybe_schema int_schema in
+
+      {
+        name = "inline-try";
+        speed = `Quick;
+        additional_test =
+          Some
+            (fun () ->
+              let () =
+                Alcotest.(
+                  check ~here:[%here]
+                    (list @@ list string)
+                    "mandatory fields when inlinable"
+                    [ [ "maybe"; "b"; "c" ] ]
+                  @@ descriptor_fields
+                       (inline_maybe_schema inlined_schema).descriptor)
+              in
+              Alcotest.(
+                check ~here:[%here]
+                  (list @@ list string)
+                  "mandatory fields when not inlinable"
+                  [ [ "maybe"; "inline" ] ]
+                @@ descriptor_fields schema.descriptor));
+        tests =
+          [
+            Test
+              {
+                name = "inlinable";
+                here = [%here];
+                decoded = None;
+                value_testable = inline_maybe inlined;
+                schema = inline_maybe_schema inlined_schema;
+                value = { maybe = true; inline = { b = 411; c = 412 } };
+                expected = [%ezjsonm { maybe = true; b = 411; c = 412 }];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled = true;
+              };
+            Test
+              {
+                name = "not inlinable";
+                here = [%here];
+                decoded = None;
+                value_testable = inline_maybe Alcotest.int;
+                schema;
+                value = { maybe = true; inline = 416 };
+                expected = [%ezjsonm { maybe = true; inline = 416 }];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled = true;
+              };
+          ];
+      }
 
     type 'a inline_parametric =
       | A of {
@@ -1304,10 +1324,27 @@ struct
 
     let parametric = Alcotest.testable pp_parametric equal_parametric
 
-    let inline_parametric () =
-      test ~here:[%here] "parametric inlinable" parametric parametric_schema
-        { inlined = A { value = 457; param = () } }
-        [%ezjsonm { value = 457 }]
+    let inline_parametric =
+      {
+        name = "inline-parametric";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            Test
+              {
+                name = "parametric inlinable";
+                here = [%here];
+                decoded = None;
+                value_testable = parametric;
+                schema = parametric_schema;
+                value = { inlined = A { value = 457; param = () } };
+                expected = [%ezjsonm { value = 457 }];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled = true;
+              };
+          ];
+      }
 
     type 'a hide = 'a [@@deriving eq, schema, show]
 
@@ -1328,31 +1365,72 @@ struct
     }
     [@@deriving eq, schema, show]
 
-    let inline_nested_optional () =
+    let inline_nested_optional =
       let inline_nested_optional =
         Alcotest.testable pp_inline_nested_optional equal_inline_nested_optional
       in
-      test ~here:[%here] "optional inline filled" inline_nested_optional
-        inline_nested_optional_schema
-        { inline_nested = { inlined = Some { b = 665; c = 666 } } }
-        [%ezjsonm { b = 665; c = 666 }];
-      test ~here:[%here] "optional inline empty" inline_nested_optional
-        inline_nested_optional_schema
-        { inline_nested = { inlined = None } }
-        (`O [])
+      let mk_test name value expected is_kotlin_roundtrip_enabled =
+        Test
+          {
+            name;
+            here = [%here];
+            decoded = None;
+            value_testable = inline_nested_optional;
+            schema = inline_nested_optional_schema;
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled;
+          }
+      in
+      {
+        name = "inline-nested-optional";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            mk_test "optional inline filled"
+              { inline_nested = { inlined = Some { b = 665; c = 666 } } }
+              [%ezjsonm { b = 665; c = 666 }] true;
+            mk_test "optional inline empty"
+              { inline_nested = { inlined = None } }
+              (`O []) false (* TODO *);
+          ];
+      }
 
-    let inline_nested_default () =
+    let inline_nested_default =
       let inline_nested_default =
         Alcotest.testable pp_inline_nested_default equal_inline_nested_default
       in
-      test ~here:[%here] "default inline filled" inline_nested_default
-        inline_nested_default_schema
-        { inline_nested = { inlined = Some { b = 665; c = 666 } } }
-        [%ezjsonm { b = 665; c = 666 }];
-      test ~here:[%here] "default inline empty" inline_nested_default
-        inline_nested_default_schema
-        { inline_nested = { inlined = None } }
-        (`O [])
+
+      let mk_test name value expected is_kotlin_roundtrip_enabled =
+        Test
+          {
+            name;
+            here = [%here];
+            decoded = None;
+            value_testable = inline_nested_default;
+            schema = inline_nested_default_schema;
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled;
+          }
+      in
+      {
+        name = "inline-nested-default";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            mk_test "default inline filled"
+              { inline_nested = { inlined = Some { b = 665; c = 666 } } }
+              [%ezjsonm { b = 665; c = 666 }] true;
+            mk_test "default inline empty"
+              { inline_nested = { inlined = None } }
+              (`O []) true;
+          ];
+      }
   end
 
   (* Time *)
@@ -2027,6 +2105,10 @@ struct
             Inline.record;
             Inline.variant_payload;
             Inline.inline_variant;
+            Inline.inline_try;
+            Inline.inline_parametric;
+            Inline.inline_nested_optional;
+            Inline.inline_nested_default;
           ];
       };
     ]
@@ -2054,11 +2136,6 @@ struct
     [
       ( "coding",
         [
-          test_case "inline-try" `Quick Inline.inline_try;
-          test_case "inline-parametric" `Quick Inline.inline_parametric;
-          test_case "inline-nested-optional" `Quick
-            Inline.inline_nested_optional;
-          test_case "inline-nested-default" `Quick Inline.inline_nested_default;
           test_case "time" `Quick time;
           test_case "json-schema-metadata-description" `Quick
             Metadata.description;
