@@ -1,5 +1,6 @@
 (dirs
  entropic
+ opam
  schematic
  schematic-ffi
  schematic-http
