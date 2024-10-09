@@ -825,10 +825,27 @@ struct
 
     let simple = Alcotest.testable pp_simple equal_simple
 
-    let simple () =
-      test ~here:[%here] "simple GADT" simple
-        (simple_schema version_schema)
-        Int [%ezjsonm "int"]
+    let simple =
+      {
+        name = "simple GADT";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            Test
+              {
+                name = "simple GADT";
+                here = [%here];
+                decoded = None;
+                value_testable = simple;
+                schema = simple_schema version_schema;
+                value = Int;
+                expected = [%ezjsonm "int"];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled = true;
+              };
+          ];
+      }
 
     type _ complex =
       | Int : int complex [@schematic.gadt int]
@@ -846,17 +863,39 @@ struct
       | String l, String r -> String.equal l r
       | _ -> false
 
-    let complex () = Alcotest.testable pp_complex equal_complex
-
-    let complex () =
-      let () =
-        test ~here:[%here] "complex GADT" (complex ())
-          (int_complex_schema int_schema)
-          Int [%ezjsonm "int"]
-      in
-      test ~here:[%here] "complex GADT" (complex ())
-        (string_complex_schema string_schema)
-        (String "386") [%ezjsonm "386"]
+    let complex =
+      {
+        name = "complex GADT";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            Test
+              {
+                name = "complex GADT";
+                here = [%here];
+                decoded = None;
+                value_testable = Alcotest.testable pp_complex equal_complex;
+                schema = int_complex_schema int_schema;
+                value = Int;
+                expected = [%ezjsonm "int"];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled = true;
+              };
+            Test
+              {
+                name = "complex GADT";
+                here = [%here];
+                decoded = None;
+                value_testable = Alcotest.testable pp_complex equal_complex;
+                schema = string_complex_schema string_schema;
+                value = String "386";
+                expected = [%ezjsonm "386"];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled = true;
+              };
+          ];
+      }
   end
 
   (* Escape *)
@@ -1837,6 +1876,8 @@ struct
             List.option;
             Parametric.simple;
             Parametric.anonymous;
+            Gadt.simple;
+            Gadt.complex;
           ];
       };
     ]
@@ -1864,8 +1905,6 @@ struct
     [
       ( "coding",
         [
-          test_case "simple GADT" `Quick Gadt.simple;
-          test_case "complex GADT" `Quick Gadt.complex;
           test_case "escape" `Quick escape;
           test_case "recursive" `Quick Recursive.plain;
           test_case "recursive_parametric" `Quick Recursive.parametric;
