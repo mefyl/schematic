@@ -760,23 +760,62 @@ struct
   module Parametric = struct
     type 'a pair = 'a * 'a [@@deriving schema]
 
-    let simple () =
-      test ~here:[%here] "parametric_type"
-        (Alcotest.pair test_version test_version)
-        (pair_schema version_schema)
-        (v1, v3)
-        [%ezjsonm
+    let simple =
+      {
+        name = "parametric_type";
+        speed = `Quick;
+        additional_test = None;
+        tests =
           [
-            { major = 0; minor = 1; subminor = 2 };
-            { major = 6; minor = 7; subminor = 8 };
-          ]]
+            Test
+              {
+                name = "parametric_type";
+                here = [%here];
+                decoded = None;
+                value_testable = Alcotest.pair test_version test_version;
+                schema = pair_schema version_schema;
+                value = (v1, v3);
+                expected =
+                  [%ezjsonm
+                    [
+                      { major = 0; minor = 1; subminor = 2 };
+                      { major = 6; minor = 7; subminor = 8 };
+                    ]];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled =
+                  false
+                  (* Cannot find by reflection the class name for a
+                     [typealias] *);
+              };
+          ];
+      }
 
     type _ anonymous = int [@@deriving schema]
 
-    let anonymous () =
-      test ~here:[%here] "anonymous parameter" Alcotest.int
-        (anonymous_schema version_schema)
-        345 [%ezjsonm 345]
+    let anonymous =
+      {
+        name = "anonymous_parameter";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            Test
+              {
+                name = "anonymous parameter";
+                here = [%here];
+                decoded = None;
+                value_testable = Alcotest.int;
+                schema = anonymous_schema version_schema;
+                value = 345;
+                expected = [%ezjsonm 345];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled =
+                  false
+                  (* Cannot find by reflection the class name for a
+                     [typealias] *);
+              };
+          ];
+      }
   end
 
   (* GADT *)
@@ -1792,6 +1831,8 @@ struct
             alias;
             List.objects;
             List.option;
+            Parametric.simple;
+            Parametric.anonymous;
           ];
       };
     ]
@@ -1819,8 +1860,6 @@ struct
     [
       ( "coding",
         [
-          test_case "parametric_type" `Quick Parametric.simple;
-          test_case "anonymous_parameter" `Quick Parametric.anonymous;
           test_case "simple GADT" `Quick Gadt.simple;
           test_case "complex GADT" `Quick Gadt.complex;
           test_case "escape" `Quick escape;
