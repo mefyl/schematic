@@ -1,6 +1,6 @@
 {
   "name": "schematic",
-  "version": "0.11.3",
+  "version": "0.19.3",
   "description": "![Master build status](https://gitlab.routine.co/routine/schematic/badges/master/pipeline.svg)",
   "main": "index.js",
   "directories": {
