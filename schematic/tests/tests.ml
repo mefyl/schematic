@@ -1976,33 +1976,52 @@ struct
     type foo = int [@@deriving schema]
     type t = int [@@deriving schema]
 
-    let deduced () =
-      Alcotest.(
-        check ~here:[%here] (option string)
-          "schema name is deduced from type name" (Some "foo") foo_schema.id);
-      Alcotest.(
-        check ~here:[%here] (option string)
-          "schema name is deduced from type module name when type is \"t\""
-          (Some "names") schema.id);
-      Alcotest.(
-        check ~here:[%here] (option string)
-          "schema name is deduced from file name when type is \"t\""
-          (Some "tests") root_schema.id)
+    let deduced =
+      {
+        name = "deduced names";
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some
+            (fun () ->
+              Alcotest.(
+                check ~here:[%here] (option string)
+                  "schema name is deduced from type name" (Some "foo")
+                  foo_schema.id);
+              Alcotest.(
+                check ~here:[%here] (option string)
+                  "schema name is deduced from type module name when type is \
+                   \"t\""
+                  (Some "names") schema.id);
+              Alcotest.(
+                check ~here:[%here] (option string)
+                  "schema name is deduced from file name when type is \"t\""
+                  (Some "tests") root_schema.id));
+      }
 
     type 'a result =
       | Ok of 'a
       | Error
     [@@deriving schema]
 
-    let parametric () =
-      Alcotest.(
-        check ~here:[%here] (option string)
-          "schema name is deduced from type name" (Some "foo-result")
-          (result_schema foo_schema).id);
-      Alcotest.(
-        check ~here:[%here] (option string)
-          "schema name is deduced from type module name when type is \"t\""
-          (Some "names-result") (result_schema schema).id)
+    let parametric =
+      {
+        name = "parametric schemas names";
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some
+            (fun () ->
+              Alcotest.(
+                check ~here:[%here] (option string)
+                  "schema name is deduced from type name" (Some "foo-result")
+                  (result_schema foo_schema).id);
+              Alcotest.(
+                check ~here:[%here] (option string)
+                  "schema name is deduced from type module name when type is \
+                   \"t\""
+                  (Some "names-result") (result_schema schema).id));
+      }
   end
 
   [@@@warning "-30"]
@@ -2428,6 +2447,7 @@ struct
         name = "error-messages";
         test_cases = [ Error_messages.missing; Error_messages.type_error ];
       };
+      { name = "names"; test_cases = [ Names.deduced; Names.parametric ] };
     ]
 
   let tests2 : (string * unit Alcotest.test_case list) list =
@@ -2451,11 +2471,6 @@ struct
   let tests : (string * unit Alcotest.test_case list) list =
     let open Alcotest in
     [
-      ( "names",
-        [
-          test_case "deduced names" `Quick Names.deduced;
-          test_case "parametric schemas names" `Quick Names.parametric;
-        ] );
       ( "pp",
         [
           test_case "pp" `Quick Pp.pp; test_case "pp schema" `Quick Pp.pp_schema;
