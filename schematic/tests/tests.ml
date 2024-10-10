@@ -1625,13 +1625,21 @@ struct
   (* JSON Schema metadata *)
 
   module Metadata = struct
-    let test_schema schema expected =
+    let test_schema name schema expected =
       let expected =
         match Schematic.Json.of_string expected with
         | Result.Ok json -> json
         | Result.Error _ -> Alcotest.fail "invalid literal JSON"
       and effective = json_schema schema in
-      Alcotest.check ~here:[%here] json "json-schema" expected effective
+      {
+        name;
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some
+            (fun () ->
+              Alcotest.check ~here:[%here] json "json-schema" expected effective);
+      }
 
     type description = {
       field_a : int; [@schematic.properties { description = "Describe A" }]
@@ -1639,8 +1647,8 @@ struct
     }
     [@@deriving schema]
 
-    let description () =
-      test_schema description_schema
+    let description =
+      test_schema "json-schema-metadata-description" description_schema
         {|{
           "additionalProperties" : false,
           "properties" :
@@ -1673,9 +1681,10 @@ struct
 
     let pp_default fmt { a; b } = Fmt.pf fmt "(%i, %s)" a b
 
-    let default () =
-      test_schema default_schema
-        {|{
+    let default =
+      let test_description =
+        test_schema "json-schema-metadata-default" default_schema
+          {|{
           "additionalProperties" : false,
           "properties" :
           {
@@ -1697,16 +1706,38 @@ struct
           "$id" : "#default",
           "$schema" : "https://json-schema.org/draft/2019-09/schema",
           "type" : "object"
-       }|};
-      let tester = Alcotest.(testable pp_default ( = )) in
-      test ~here:[%here] "default-int" tester default_schema
-        { a = 358; b = "---" } [%ezjsonm { b = "---" }];
-      test ~here:[%here] "default-string" tester default_schema
-        { a = 359; b = "359" } [%ezjsonm { a = 359 }];
-      test ~here:[%here] "default-both" tester default_schema
-        { a = 358; b = "359" } (`O []);
-      test ~here:[%here] "default-none" tester default_schema
-        { a = 359; b = "---" } [%ezjsonm { a = 359; b = "---" }]
+       }|}
+      in
+      let mk_test name value expected =
+        Test
+          {
+            name;
+            here = [%here];
+            decoded = None;
+            value_testable = Alcotest.(testable pp_default ( = ));
+            schema = default_schema;
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled =
+              false
+              (* Default values are not supported by the Kotlin generator *);
+          }
+      in
+
+      {
+        test_description with
+        tests =
+          [
+            mk_test "default-int" { a = 358; b = "---" }
+              [%ezjsonm { b = "---" }];
+            mk_test "default-string" { a = 359; b = "359" }
+              [%ezjsonm { a = 359 }];
+            mk_test "default-both" { a = 358; b = "359" } (`O []);
+            mk_test "default-none" { a = 359; b = "---" }
+              [%ezjsonm { a = 359; b = "---" }];
+          ];
+      }
   end
 
   module Comparison = struct
@@ -2144,6 +2175,8 @@ struct
             Inline.inline_nested_optional;
             Inline.inline_nested_default;
             time;
+            Metadata.description;
+            Metadata.default;
           ];
       };
     ]
@@ -2171,9 +2204,6 @@ struct
     [
       ( "coding",
         [
-          test_case "json-schema-metadata-description" `Quick
-            Metadata.description;
-          test_case "json-schema-metadata-default" `Quick Metadata.default;
           test_case "failure" `Quick failure;
           test_case "optional-inline" `Quick optional_inline;
           test_case "keyed" `Quick keyed;
