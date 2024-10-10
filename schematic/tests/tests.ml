@@ -973,7 +973,10 @@ struct
                 value = { value = 0; next = Some { value = 1; next = None } };
                 expected = [%ezjsonm { value = 0; next = { value = 1 } }];
                 kotlin_class_name = None;
-                is_kotlin_roundtrip_enabled = false (* TODO bug *);
+                is_kotlin_roundtrip_enabled =
+                  false
+                  (* TODO Currently Kotlin does not differentiate absent field
+                     from null field *);
               };
           ];
       }
@@ -1058,7 +1061,8 @@ struct
               expected = [%ezjsonm { next_b = { next_a = [%aq `O []] } }];
               kotlin_class_name = None;
               is_kotlin_roundtrip_enabled =
-                false (* TODO another occurrence of the bug with [Optional] *);
+                false
+                (* TODO another occurrence of the limitation with [Optional] *);
             };
         ];
     }
@@ -1402,7 +1406,9 @@ struct
               [%ezjsonm { b = 665; c = 666 }] true;
             mk_test "optional inline empty"
               { inline_nested = { inlined = None } }
-              (`O []) false (* TODO *);
+              (`O []) false
+            (* TODO Another limitation of Kotlin not differentiating absent
+               field from null *);
           ];
       }
 
