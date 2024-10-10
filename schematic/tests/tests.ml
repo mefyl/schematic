@@ -2383,13 +2383,52 @@ struct
   end
 
   module Extension = struct
-    let atomic () =
-      test ~here:[%here] "integer" Alcotest.int [%schema: int] 42 [%ezjsonm 42]
+    let atomic =
+      {
+        name = "atomic";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            Test
+              {
+                name = "integer";
+                here = [%here];
+                decoded = None;
+                value_testable = Alcotest.int;
+                schema = [%schema: int];
+                value = 42;
+                expected = [%ezjsonm 42];
+                kotlin_class_name = Some "java.lang.Integer";
+                is_kotlin_roundtrip_enabled = true;
+              };
+          ];
+      }
 
-    let composite () =
-      test ~here:[%here] "pair"
-        Alcotest.(pair int string)
-        [%schema: int * string] (42, "forty two") [%ezjsonm [ 42; "forty two" ]]
+    let composite =
+      {
+        name = "composite";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            Test
+              {
+                name = "pair";
+                here = [%here];
+                decoded = None;
+                value_testable = Alcotest.(pair int string);
+                schema = [%schema: int * string];
+                value = (42, "forty two");
+                expected = [%ezjsonm [ 42; "forty two" ]];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled =
+                  false
+                  (* Kotlin [Class.forName] does not support generics like
+                     [Pair<Integer, String>] *);
+              };
+          ];
+      }
 
     (* Not really a runtime test, just making sure that this doesn't raise an
        `unused-open` warning *)
@@ -2469,9 +2508,13 @@ struct
       };
       { name = "names"; test_cases = [ Names.deduced; Names.parametric ] };
       { name = "pp"; test_cases = [ Pp.pp; Pp.pp_schema ] };
+      {
+        name = "extension";
+        test_cases = [ Extension.atomic; Extension.composite ];
+      };
     ]
 
-  let tests2 : (string * unit Alcotest.test_case list) list =
+  let tests : (string * unit Alcotest.test_case list) list =
     let test_case_to_alcotest_test_case { name; tests; speed; additional_test }
         =
       let alcotest_test () =
@@ -2486,16 +2529,4 @@ struct
       (name, Base.List.map ~f:test_case_to_alcotest_test_case test_cases)
     in
     Base.List.map ~f:test_group_to_alcotest_group test_descriptions
-
-  (* TODO Migrate everything to [test_descriptions], remove this and rename
-     [tests2]. *)
-  let tests : (string * unit Alcotest.test_case list) list =
-    let open Alcotest in
-    [
-      ( "extension",
-        [
-          test_case "atomic" `Quick Extension.atomic;
-          test_case "composite" `Quick Extension.composite;
-        ] );
-    ]
 end

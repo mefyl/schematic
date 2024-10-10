@@ -27,4 +27,4 @@ module Tests = Test_utils.Tests.Make (struct
         schema encoded
 end)
 
-let () = Alcotest.run "Schematic.Schema" (Tests.tests @ Tests.tests2)
+let () = Alcotest.run "Schematic.Schema" Tests.tests
