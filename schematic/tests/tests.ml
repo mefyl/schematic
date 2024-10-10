@@ -2316,10 +2316,17 @@ struct
 
     let text = Alcotest.testable (Fmt.fmt "{|%s|}") String.equal
 
-    let pp_schema () =
-      Alcotest.(check ~here:[%here] text)
-        "schema pretty print"
-        {|<graph-result> = Union [
+    let pp_schema =
+      {
+        name = "pp schema";
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some
+            (fun () ->
+              Alcotest.(check ~here:[%here] text)
+                "schema pretty print"
+                {|<graph-result> = Union [
                    { name: "list", schema: [ <graph-result> ] },
                    { name: "nullable", schema: Nullable (<graph-result>) },
                    {
@@ -2331,39 +2338,48 @@ struct
                    schema: [ <graph-result>, <graph-result>,  ]
                    }
                  ]|}
-      @@ Fmt.str "%a" Schematic.Schema.pp
-      @@ T.schema_versioned (fun _ -> None)
+              @@ Fmt.str "%a" Schematic.Schema.pp
+              @@ T.schema_versioned (fun _ -> None));
+      }
 
     let pp_version = Schematic.Pp.of_schema version_schema
     let pp_range = Schematic.Pp.of_schema range_schema
 
-    let pp () =
-      let version = { major = 1242; minor = 1243; subminor = 1244 } in
-      Alcotest.(
-        check ~here:[%here] string "version"
-          {|{major: 1242; minor: 1243; subminor: 1244;}|}
-          (Fmt.str "@[%a@]" pp_version version));
-      Alcotest.(
-        check ~here:[%here] string "range"
-          {|(
+    let pp =
+      {
+        name = "pp";
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some
+            (fun () ->
+              let version = { major = 1242; minor = 1243; subminor = 1244 } in
+              Alcotest.(
+                check ~here:[%here] string "version"
+                  {|{major: 1242; minor: 1243; subminor: 1244;}|}
+                  (Fmt.str "@[%a@]" pp_version version));
+              Alcotest.(
+                check ~here:[%here] string "range"
+                  {|(
   {major: 1242; minor: 1243; subminor: 1244;},
   {major: 1242; minor: 1243; subminor: 1244;},
   1245
 )|}
-          (Fmt.str "@[%a@]" pp_range (version, version, 1245)));
-      let buffer = Buffer.create 1024 in
-      let fmt = Stdlib.Format.formatter_of_buffer buffer in
-      let () = Stdlib.Format.pp_set_margin fmt 20 in
-      let () = Fmt.pf fmt "@[%a@]" pp_version version in
-      let () = Stdlib.Format.pp_print_flush fmt () in
-      Alcotest.(
-        check ~here:[%here] string "version-narrow"
-          {|{
+                  (Fmt.str "@[%a@]" pp_range (version, version, 1245)));
+              let buffer = Buffer.create 1024 in
+              let fmt = Stdlib.Format.formatter_of_buffer buffer in
+              let () = Stdlib.Format.pp_set_margin fmt 20 in
+              let () = Fmt.pf fmt "@[%a@]" pp_version version in
+              let () = Stdlib.Format.pp_print_flush fmt () in
+              Alcotest.(
+                check ~here:[%here] string "version-narrow"
+                  {|{
   major: 1242;
   minor: 1243;
   subminor: 1244;
 }|}
-          (Buffer.contents buffer))
+                  (Buffer.contents buffer)));
+      }
   end
 
   module Extension = struct
@@ -2448,6 +2464,7 @@ struct
         test_cases = [ Error_messages.missing; Error_messages.type_error ];
       };
       { name = "names"; test_cases = [ Names.deduced; Names.parametric ] };
+      { name = "pp"; test_cases = [ Pp.pp; Pp.pp_schema ] };
     ]
 
   let tests2 : (string * unit Alcotest.test_case list) list =
@@ -2471,10 +2488,6 @@ struct
   let tests : (string * unit Alcotest.test_case list) list =
     let open Alcotest in
     [
-      ( "pp",
-        [
-          test_case "pp" `Quick Pp.pp; test_case "pp schema" `Quick Pp.pp_schema;
-        ] );
       ( "extension",
         [
           test_case "atomic" `Quick Extension.atomic;
