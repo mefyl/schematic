@@ -593,8 +593,7 @@ struct
                 value = Null ();
                 expected = [%ezjsonm None];
                 kotlin_class_name = None;
-                (* TODO fix this bug *)
-                is_kotlin_roundtrip_enabled = false;
+                is_kotlin_roundtrip_enabled = true;
               };
           ];
       }
