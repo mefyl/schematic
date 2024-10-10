@@ -1813,29 +1813,53 @@ struct
     let check ~here name schema e l r =
       check ~here int name e (Schematic.Schema.compare schema l r)
 
-    let bool () =
+    let bool =
       let check = check "bool" bool_schema in
-      let () = check ~here:[%here] 0 true true in
-      let () = check ~here:[%here] 0 false false in
-      let () = check ~here:[%here] 1 true false in
-      let () = check ~here:[%here] (-1) false true in
-      ()
+      {
+        name = "bool";
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some
+            (fun () ->
+              let () = check ~here:[%here] 0 true true in
+              let () = check ~here:[%here] 0 false false in
+              let () = check ~here:[%here] 1 true false in
+              let () = check ~here:[%here] (-1) false true in
+              ());
+      }
 
-    let int () =
+    let int =
       let check = check "int" int_schema in
-      let () = check ~here:[%here] 0 0 0 in
-      let () = check ~here:[%here] (-1) 0 1 in
-      let () = check ~here:[%here] 1 1 0 in
-      ()
+      {
+        name = "int";
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some
+            (fun () ->
+              let () = check ~here:[%here] 0 0 0 in
+              let () = check ~here:[%here] (-1) 0 1 in
+              let () = check ~here:[%here] 1 1 0 in
+              ());
+      }
 
-    let string () =
+    let string =
       let check = check "string" string_schema in
-      let () = check ~here:[%here] 0 "a" "a" in
-      let () = check ~here:[%here] (-1) "a" "b" in
-      let () = check ~here:[%here] 1 "b" "a" in
-      let () = check ~here:[%here] 1 "aa" "a" in
-      let () = check ~here:[%here] (-1) "a" "aa" in
-      ()
+      {
+        name = "string";
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some
+            (fun () ->
+              let () = check ~here:[%here] 0 "a" "a" in
+              let () = check ~here:[%here] (-1) "a" "b" in
+              let () = check ~here:[%here] 1 "b" "a" in
+              let () = check ~here:[%here] 1 "aa" "a" in
+              let () = check ~here:[%here] (-1) "a" "aa" in
+              ());
+      }
 
     let versions check f =
       let v012 = (0, 1, 2)
@@ -1852,21 +1876,40 @@ struct
       in
       Base.List.iter ~f:(fun (exp, l, r) -> check exp (f l) (f r)) tests
 
-    let record () =
+    let record =
       let check = check "version" version_schema in
-      versions (check ~here:[%here]) version
+      {
+        name = "record";
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some (fun () -> versions (check ~here:[%here]) version);
+      }
 
-    let tuple () =
+    let tuple =
       let check = check "version" version_tuple_schema in
-      versions (check ~here:[%here]) Fn.id
+      {
+        name = "tuple";
+        speed = `Quick;
+        tests = [];
+        additional_test = Some (fun () -> versions (check ~here:[%here]) Fn.id);
+      }
 
-    let variant () =
+    let variant =
       let check = check "variant" expectation_schema
       and v = { major = 1; minor = 2; subminor = 3 } in
-      let () = check ~here:[%here] 0 (Exact v) (Exact v)
-      and () = check ~here:[%here] (-1) (Exact v) Nothing
-      and () = check ~here:[%here] 1 Nothing (Exact v) in
-      ()
+      {
+        name = "variant";
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some
+            (fun () ->
+              let () = check ~here:[%here] 0 (Exact v) (Exact v)
+              and () = check ~here:[%here] (-1) (Exact v) Nothing
+              and () = check ~here:[%here] 1 Nothing (Exact v) in
+              ());
+      }
   end
 
   module Error_messages = struct
@@ -2353,6 +2396,18 @@ struct
             VersionCascade.test;
           ];
       };
+      {
+        name = "comparison";
+        test_cases =
+          [
+            Comparison.bool;
+            Comparison.int;
+            Comparison.string;
+            Comparison.record;
+            Comparison.tuple;
+            Comparison.variant;
+          ];
+      };
     ]
 
   let tests2 : (string * unit Alcotest.test_case list) list =
@@ -2376,15 +2431,6 @@ struct
   let tests : (string * unit Alcotest.test_case list) list =
     let open Alcotest in
     [
-      ( "comparison",
-        [
-          test_case "bool" `Quick Comparison.bool;
-          test_case "int" `Quick Comparison.int;
-          test_case "string" `Quick Comparison.string;
-          test_case "record" `Quick Comparison.record;
-          test_case "tuple" `Quick Comparison.tuple;
-          test_case "variant" `Quick Comparison.variant;
-        ] );
       ( "error-messages",
         [
           test_case "missing" `Quick Error_messages.missing;
