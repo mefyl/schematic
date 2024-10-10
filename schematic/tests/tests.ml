@@ -1929,21 +1929,37 @@ struct
         check ~here (result unit string) name (Result.Error e)
           (Result.map_error ~f:Schematic.Error.to_string res))
 
-    let missing () =
-      let () =
-        test ~here:[%here] "missing fields are reported" Recursive.schema
-          {|{"value":0,"next":{"value":1,"next":{}}}|}
-          {|path next.next: schema recursive: missing required field "value"|}
-      and () =
-        test ~here:[%here] "root error display no path" Recursive.schema {|{}|}
-          {|schema recursive: missing required field "value"|}
-      in
-      ()
+    let missing =
+      {
+        name = "missing";
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some
+            (fun () ->
+              let () =
+                test ~here:[%here] "missing fields are reported"
+                  Recursive.schema {|{"value":0,"next":{"value":1,"next":{}}}|}
+                  {|path next.next: schema recursive: missing required field "value"|}
+              and () =
+                test ~here:[%here] "root error display no path" Recursive.schema
+                  {|{}|} {|schema recursive: missing required field "value"|}
+              in
+              ());
+      }
 
-    let type_error () =
-      test ~here:[%here] "missing" Recursive.schema
-        {|{"value":0,"next":{"value":1,"next":{"value":"nope"}}}|}
-        {|path next.next.value: expected integer, got string|}
+    let type_error =
+      {
+        name = "type error";
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some
+            (fun () ->
+              test ~here:[%here] "missing" Recursive.schema
+                {|{"value":0,"next":{"value":1,"next":{"value":"nope"}}}|}
+                {|path next.next.value: expected integer, got string|});
+      }
   end
 
   (* Phantom types *)
@@ -2412,6 +2428,10 @@ struct
             Comparison.variant;
           ];
       };
+      {
+        name = "error-messages";
+        test_cases = [ Error_messages.missing; Error_messages.type_error ];
+      };
     ]
 
   let tests2 : (string * unit Alcotest.test_case list) list =
@@ -2435,11 +2455,6 @@ struct
   let tests : (string * unit Alcotest.test_case list) list =
     let open Alcotest in
     [
-      ( "error-messages",
-        [
-          test_case "missing" `Quick Error_messages.missing;
-          test_case "type error" `Quick Error_messages.type_error;
-        ] );
       ( "names",
         [
           test_case "deduced names" `Quick Names.deduced;
