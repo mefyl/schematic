@@ -570,10 +570,6 @@ module Generator = struct
 
   and pp_kotlin_type : kotlin_type Fmt.t =
    fun f kotlin_type ->
-    let s, nullable =
-      match kotlin_type with
-      | Simple (s, nullable) | Generic (s, _, nullable) -> (s, nullable)
-    in
     let () =
       Logs.debug (fun m ->
           m "pp_kotlin_type: Pretty-printing kotlin typee %a"
