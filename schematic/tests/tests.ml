@@ -115,14 +115,23 @@ struct
 
   (* Failure *)
 
-  let failure () =
-    if Option.is_some (Coding.of_json [%ezjsonm 29]) then
-      if
-        try
-          test ~here:[%here] "int atom" Alcotest.int int_schema 28 [%ezjsonm 29];
-          true
-        with _ -> false
-      then Alcotest.fail "failure test failed"
+  let failure =
+    {
+      name = "failure";
+      speed = `Quick;
+      additional_test =
+        Some
+          (fun () ->
+            if Option.is_some (Coding.of_json [%ezjsonm 29]) then
+              if
+                try
+                  test ~here:[%here] "int atom" Alcotest.int int_schema 28
+                    [%ezjsonm 29];
+                  true
+                with _ -> false
+              then Alcotest.fail "failure test failed");
+      tests = [];
+    }
 
   (* Atoms *)
 
@@ -1541,69 +1550,119 @@ struct
   }
   [@@deriving schema, show]
 
-  let optional_inline () =
+  let optional_inline =
     let t = Alcotest.testable pp_optional_inline_wrapper ( = ) in
-    test ~here:[%here] "missing optional inline" t
-      optional_inline_wrapper_schema { inline = None; c = 377 }
-      [%ezjsonm { c = 377 }];
-    test ~here:[%here] "filled optional inline" t optional_inline_wrapper_schema
-      {
-        inline =
-          Some { a = 375; b = 376; inline2 = { d = 378 }; missing = None };
-        c = 377;
-      }
-      [%ezjsonm { a = 375; b = 376; d = 378; c = 377 }]
 
-  type keyed =
+    let mk_test name value expected =
+      Test
+        {
+          name;
+          here = [%here];
+          decoded = None;
+          value_testable = t;
+          schema = optional_inline_wrapper_schema;
+          value;
+          expected;
+          kotlin_class_name = None;
+          is_kotlin_roundtrip_enabled =
+            false (* TODO full support for optional values *);
+        }
+    in
+    {
+      name = "optional-inline";
+      speed = `Quick;
+      additional_test = None;
+      tests =
+        [
+          mk_test "missing optional inline" { inline = None; c = 377 }
+            [%ezjsonm { c = 377 }];
+          mk_test "filled optional inline"
+            {
+              inline =
+                Some { a = 375; b = 376; inline2 = { d = 378 }; missing = None };
+              c = 377;
+            }
+            [%ezjsonm { a = 375; b = 376; d = 378; c = 377 }];
+        ];
+    }
+
+  type keyedd =
     | Paragraph_ of { content : string } [@schematic.as "paragraph"]
     | Header of {
         content : string;
         level : int;
       }
     | Separator
-  [@@schematic.name "keyed"] (* Check multiple attributes work *)
+  [@@schematic.name "keyedd"] (* Check multiple attributes work *)
   [@@schematic.union_key "typ"]
   [@@deriving eq, schema, show]
 
-  let keyed () =
-    let tester = Alcotest.(testable pp_keyed equal_keyed) in
-    let () =
-      test ~here:[%here] "paragraph" tester keyed_schema
-        (Paragraph_ { content = "text" })
-        [%ezjsonm { content = "text"; typ = "paragraph" }]
-    and () =
-      test ~here:[%here] "header" tester keyed_schema
-        (Header { content = "text"; level = 411 })
-        [%ezjsonm { content = "text"; level = 411; typ = "header" }]
-    and () =
-      test ~here:[%here] "header" tester keyed_schema Separator
-        [%ezjsonm { typ = "separator" }]
-    and () =
-      let json = [%ezjsonm { content = "text"; level = 411 }] in
-      Alcotest.(
-        check ~here:[%here]
-          (result tester decoding_error)
-          "values are rejected if the key is missing"
-          (make_error ~schema:"keyed" {|missing key field "typ"|})
-          (Schematic.Json.decode keyed_schema json))
-    and () =
-      let json = [%ezjsonm { content = "text"; level = 411; typ = "fumble" }] in
-      Alcotest.(
-        check ~here:[%here]
-          (result tester decoding_error)
-          "values are rejected if the key not recognized"
-          (make_error ~schema:"keyed" {|invalid key field "typ" = "fumble"|})
-          (Schematic.Json.decode keyed_schema json))
-    and () =
-      let json = [%ezjsonm { typ = "header"; content = "text" }] in
-      Alcotest.(
-        check ~here:[%here]
-          (result tester decoding_error)
-          "errors are specific to the matched case schema"
-          (make_error ~schema:"keyed" {|missing required field "level"|})
-          (Schematic.Json.decode keyed_schema json))
+  let keyed =
+    let tester = Alcotest.(testable pp_keyedd equal_keyedd) in
+
+    let mk_test name value expected is_kotlin_roundtrip_enabled =
+      Test
+        {
+          name;
+          here = [%here];
+          decoded = None;
+          value_testable = tester;
+          schema = keyedd_schema;
+          value;
+          expected;
+          kotlin_class_name = None;
+          is_kotlin_roundtrip_enabled;
+        }
     in
-    ()
+    {
+      name = "keyed";
+      speed = `Quick;
+      tests =
+        [
+          mk_test "paragraph"
+            (Paragraph_ { content = "text" })
+            [%ezjsonm { content = "text"; typ = "paragraph" }]
+            true;
+          mk_test "header"
+            (Header { content = "text"; level = 411 })
+            [%ezjsonm { content = "text"; level = 411; typ = "header" }]
+            true;
+          mk_test "header" Separator [%ezjsonm { typ = "separator" }] true;
+        ];
+      additional_test =
+        Some
+          (fun () ->
+            let () =
+              let json = [%ezjsonm { content = "text"; level = 411 }] in
+              Alcotest.(
+                check ~here:[%here]
+                  (result tester decoding_error)
+                  "values are rejected if the key is missing"
+                  (make_error ~schema:"keyedd" {|missing key field "typ"|})
+                  (Schematic.Json.decode keyedd_schema json))
+            and () =
+              let json =
+                [%ezjsonm { content = "text"; level = 411; typ = "fumble" }]
+              in
+              Alcotest.(
+                check ~here:[%here]
+                  (result tester decoding_error)
+                  "values are rejected if the key not recognized"
+                  (make_error ~schema:"keyedd"
+                     {|invalid key field "typ" = "fumble"|})
+                  (Schematic.Json.decode keyedd_schema json))
+            and () =
+              let json = [%ezjsonm { typ = "header"; content = "text" }] in
+              Alcotest.(
+                check ~here:[%here]
+                  (result tester decoding_error)
+                  "errors are specific to the matched case schema"
+                  (make_error ~schema:"keyedd"
+                     {|missing required field "level"|})
+                  (Schematic.Json.decode keyedd_schema json))
+            in
+            ());
+    }
 
   let map_error () =
     let schema =
@@ -2173,6 +2232,9 @@ struct
             time;
             Metadata.description;
             Metadata.default;
+            failure;
+            optional_inline;
+            keyed;
           ];
       };
     ]
@@ -2200,9 +2262,6 @@ struct
     [
       ( "coding",
         [
-          test_case "failure" `Quick failure;
-          test_case "optional-inline" `Quick optional_inline;
-          test_case "keyed" `Quick keyed;
           test_case "map-error" `Quick map_error;
           test_case "collisions" `Quick collision;
           test_case "computed" `Quick Computed.computed;
