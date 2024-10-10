@@ -1467,28 +1467,62 @@ struct
     |> Option.value_exn ?here:None ?error:None ?message:None
     |> fun (t, tz, _) -> (t, Option.value_exn tz)
 
-  let time () =
-    test ~here:[%here] "time" test_time event_schema
-      {
-        start = make_time "2020-05-08T23:48:34+02:00";
-        endd_ = make_time "2020-05-08T23:48:47+02:00";
-      }
-      [%ezjsonm
-        {
-          start = "2020-05-08T21:48:34-00:00";
-          endd = "2020-05-08T21:48:47-00:00";
-        }];
-    if Coding.local_time_support then
-      test ~here:[%here] "time-local" test_time_local event_local_schema
-        {
-          start_local = make_time_local "2020-05-08T23:48:34+02:00";
-          end_local = make_time_local "2020-05-08T23:48:47+02:00";
-        }
-        [%ezjsonm
-          {
-            start_local = "2020-05-08T23:48:34+02:00";
-            end_local = "2020-05-08T23:48:47+02:00";
-          }]
+  let time =
+    {
+      name = "time";
+      speed = `Quick;
+      additional_test = None;
+      tests =
+        ([
+           Test
+             {
+               name = "time";
+               here = [%here];
+               decoded = None;
+               value_testable = test_time;
+               schema = event_schema;
+               value =
+                 {
+                   start = make_time "2020-05-08T23:48:34+02:00";
+                   endd_ = make_time "2020-05-08T23:48:47+02:00";
+                 };
+               expected =
+                 [%ezjsonm
+                   {
+                     start = "2020-05-08T21:48:34-00:00";
+                     endd = "2020-05-08T21:48:47-00:00";
+                   }];
+               kotlin_class_name = None;
+               is_kotlin_roundtrip_enabled = true;
+             };
+         ]
+        @
+        if Coding.local_time_support then
+          [
+            Test
+              {
+                name = "time-local";
+                here = [%here];
+                decoded = None;
+                value_testable = test_time_local;
+                schema = event_local_schema;
+                value =
+                  {
+                    start_local = make_time_local "2020-05-08T23:48:34+02:00";
+                    end_local = make_time_local "2020-05-08T23:48:47+02:00";
+                  };
+                expected =
+                  [%ezjsonm
+                    {
+                      start_local = "2020-05-08T23:48:34+02:00";
+                      end_local = "2020-05-08T23:48:47+02:00";
+                    }];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled = true;
+              };
+          ]
+        else []);
+    }
 
   (* Optional inline *)
 
@@ -2109,6 +2143,7 @@ struct
             Inline.inline_parametric;
             Inline.inline_nested_optional;
             Inline.inline_nested_default;
+            time;
           ];
       };
     ]
@@ -2136,7 +2171,6 @@ struct
     [
       ( "coding",
         [
-          test_case "time" `Quick time;
           test_case "json-schema-metadata-description" `Quick
             Metadata.description;
           test_case "json-schema-metadata-default" `Quick Metadata.default;

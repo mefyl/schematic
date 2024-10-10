@@ -307,7 +307,7 @@ module Parser = struct
     | String -> (Atom (Simple ("String", NotNullable)), marks)
     | String_const _ -> (Data_object, marks)
     | Time -> (Atom (Simple ("Instant", NotNullable)), marks)
-    | Time_local -> (Atom (Simple ("LocalDateTime", NotNullable)), marks)
+    | Time_local -> (Atom (Simple ("OffsetDateTime", NotNullable)), marks)
     | Tuple { items; _ } ->
       let kotlin_type, marks = tuple_to_kotlin_marks marks items in
       (Atom kotlin_type, marks)
@@ -1155,16 +1155,44 @@ module Public_api = struct
 
   let pp_file ?package fmt marks =
     Fmt.pf fmt
-      {|%a@.
+      {|@file:UseSerializers(KOffsetDateTimeSerializer::class)@.
 
+%a@.
+
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 import kotlinx.datetime.Instant
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalDateTime
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonClassDiscriminator
-import kotlinx.serialization.json.JsonElement
+
+/**
+ * Kotlin serialization does not provide serializers for OffsetDateTime. So we manually provide one
+ * and enable it in the file with the @file annotation at the top of this file.
+ *
+ * See https://github.com/Kotlin/kotlinx-datetime/issues/90
+ * See https://stackoverflow.com/a/65077862
+ */
+object KOffsetDateTimeSerializer : KSerializer<OffsetDateTime> {
+  override val descriptor: SerialDescriptor =
+      PrimitiveSerialDescriptor("OffsetDateTime", PrimitiveKind.STRING)
+
+  override fun serialize(encoder: Encoder, value: OffsetDateTime) {
+    val format = DateTimeFormatter.ISO_OFFSET_DATE_TIME
+
+    val string = format.format(value)
+    encoder.encodeString(string)
+  }
+
+  override fun deserialize(decoder: Decoder): OffsetDateTime {
+    val string = decoder.decodeString()
+    return OffsetDateTime.parse(string)
+  }
+}
 
 @[<hv 0>@[<v 2>%a@]@]@.
 |}
