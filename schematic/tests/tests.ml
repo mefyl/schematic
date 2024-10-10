@@ -1664,7 +1664,7 @@ struct
             ());
     }
 
-  let map_error () =
+  let map_error =
     let schema =
       Schematic.Schema.make
         (Map
@@ -1674,12 +1674,20 @@ struct
              descriptor = String;
            })
     in
-    Alcotest.(
-      check ~here:[%here]
-        (result string decoding_error)
-        "errors from Map descriptor decoding are forwarded properly"
-        (make_error "whatever")
-        (Schematic.Json.decode schema (`String "whatever")))
+    {
+      name = "map-error";
+      speed = `Quick;
+      tests = [];
+      additional_test =
+        Some
+          (fun () ->
+            Alcotest.(
+              check ~here:[%here]
+                (result string decoding_error)
+                "errors from Map descriptor decoding are forwarded properly"
+                (make_error "whatever")
+                (Schematic.Json.decode schema (`String "whatever"))));
+    }
 
   (* JSON Schema metadata *)
 
@@ -1960,18 +1968,41 @@ struct
       (pp_collision_2 Fmt.string)
       (equal_collision_2 String.equal)
 
-  let collision () =
-    let () =
-      test ~here:[%here] "collision_1" collision_1 collision_1_schema
-        ({ collision_a = 725; collision_b = "725" } : collision_1)
-        [%ezjsonm { collision_a = 725; collision_b = "725" }]
-    and () =
-      test ~here:[%here] "collision_2" collision_2
-        (collision_2_schema Schematic.Schemas.string_schema)
-        ({ collision_a = 725; collision_b = "725" } : string collision_2)
-        [%ezjsonm { collision_a = 725; collision_b = "725" }]
-    in
-    ()
+  let collision =
+    {
+      name = "collisions";
+      speed = `Quick;
+      additional_test = None;
+      tests =
+        [
+          Test
+            {
+              name = "collision_1";
+              here = [%here];
+              decoded = None;
+              value_testable = collision_1;
+              schema = collision_1_schema;
+              value = ({ collision_a = 725; collision_b = "725" } : collision_1);
+              expected = [%ezjsonm { collision_a = 725; collision_b = "725" }];
+              kotlin_class_name = None;
+              is_kotlin_roundtrip_enabled = true;
+            };
+          Test
+            {
+              name = "collision_2";
+              here = [%here];
+              decoded = None;
+              value_testable = collision_2;
+              schema = collision_2_schema Schematic.Schemas.string_schema;
+              value =
+                ({ collision_a = 725; collision_b = "725" }
+                  : string collision_2);
+              expected = [%ezjsonm { collision_a = 725; collision_b = "725" }];
+              kotlin_class_name = None;
+              is_kotlin_roundtrip_enabled = true;
+            };
+        ];
+    }
 
   (* Computed *)
 
@@ -1989,21 +2020,46 @@ struct
 
     let t = Alcotest.testable pp equal
 
-    let computed () =
-      test ~here:[%here] "computed" t schema { x = 1; y = 2 }
-        [%ezjsonm { x = 1; y = 2; sum = 3; opposite = -1 }];
-      test ~here:[%here] "computed optional" t schema { x = 0; y = 0 }
-        [%ezjsonm { x = 0; sum = 0 }];
-      (* This used to fail because the computed field was expected *)
-      Alcotest.(check ~here:[%here] (result t decoding_error))
-        "variant containing records with missing computed field"
-        (Result.Ok { x = 1198; y = 33 })
-      @@ Schematic.Json.decode schema [%ezjsonm { x = 1198; y = 33 }]
+    let computed =
+      let mk_test name value expected is_kotlin_roundtrip_enabled =
+        Test
+          {
+            name;
+            here = [%here];
+            decoded = None;
+            value_testable = t;
+            schema;
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled;
+          }
+      in
+      {
+        name = "computed";
+        speed = `Quick;
+        tests =
+          [
+            mk_test "computed" { x = 1; y = 2 }
+              [%ezjsonm { x = 1; y = 2; sum = 3; opposite = -1 }]
+              true;
+            mk_test "computed optional" { x = 0; y = 0 }
+              [%ezjsonm { x = 0; sum = 0 }] false;
+          ];
+        additional_test =
+          Some
+            (fun () ->
+              (* This used to fail because the computed field was expected *)
+              Alcotest.(check ~here:[%here] (result t decoding_error))
+                "variant containing records with missing computed field"
+                (Result.Ok { x = 1198; y = 33 })
+              @@ Schematic.Json.decode schema [%ezjsonm { x = 1198; y = 33 }]);
+      }
   end
 
   (* Version *)
 
-  module Version = struct
+  module Versionn = struct
     type v =
       | Int of int
       | String of string
@@ -2034,22 +2090,48 @@ struct
       | Schemas_library.V -> Some (Schematic.Version.make 0 6 0)
       | _ -> None
 
-    let test () =
-      test ~here:[%here] "latest none" t schema { v = None }
-        [%ezjsonm { v = None }];
-      test ~here:[%here] "latest int" t schema { v = Some (Int 3) }
-        [%ezjsonm { v = 3 }];
-      test ~here:[%here] "latest string" t schema { v = Some (String "3") }
-        [%ezjsonm { v = "3" }];
-      test ~here:[%here] "old none" t
-        (schema_versioned schema_versions)
-        { v = None } [%ezjsonm { w = None }];
-      test ~here:[%here] "old int" t
-        (schema_versioned schema_versions)
-        { v = Some (Int 3) } [%ezjsonm { w = 3 }];
-      test ~here:[%here] "old string" t
-        (schema_versioned schema_versions)
-        { v = Some (String "3") } ~decoded:{ v = None } [%ezjsonm { w = None }]
+    let test =
+      let mk_test ?decoded name schema value expected
+          is_kotlin_roundtrip_enabled =
+        Test
+          {
+            name;
+            here = [%here];
+            decoded;
+            value_testable = t;
+            schema;
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled;
+          }
+      in
+      {
+        name = "version";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            mk_test "latest none" schema { v = None } [%ezjsonm { v = None }]
+              true;
+            mk_test "latest int" schema { v = Some (Int 3) }
+              [%ezjsonm { v = 3 }] true;
+            mk_test "latest string" schema { v = Some (String "3") }
+              [%ezjsonm { v = "3" }] true;
+            (* Kotlin roundtrip tests disabled for the old ones, since the data
+               type uses the latest one *)
+            mk_test "old none"
+              (schema_versioned schema_versions)
+              { v = None } [%ezjsonm { w = None }] false;
+            mk_test "old int"
+              (schema_versioned schema_versions)
+              { v = Some (Int 3) } [%ezjsonm { w = 3 }] false;
+            mk_test "old string"
+              (schema_versioned schema_versions)
+              { v = Some (String "3") } [%ezjsonm { w = None }] false
+              ~decoded:{ v = None };
+          ];
+      }
   end
 
   module VersionCascade = struct
@@ -2086,16 +2168,27 @@ struct
 
     let testable = Alcotest.testable pp equal
 
-    let test () =
-      let () =
+    let test =
+      let test_latest =
         let value = { id = "glouglou"; content = { content = "foo" } } in
         let value = { t_ = value } in
         let json =
           [%ezjsonm { id = "glouglou"; content = { content_new = "foo" } }]
         in
-        test ~here:[%here] "latest" testable schema value json
+        Test
+          {
+            name = "latest";
+            here = [%here];
+            decoded = None;
+            value_testable = testable;
+            schema;
+            value;
+            expected = json;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled = true;
+          }
       in
-      let () =
+      let test_legacy =
         let schema_versions = function
           | Schemas_library.V -> Some (Schematic.Version.make 0 9 0)
           | _ -> None
@@ -2104,9 +2197,27 @@ struct
         let value = { t_ = value } in
         let json = [%ezjsonm { content_old = "foo" }] in
         let schema = schema_versioned schema_versions in
-        test ~here:[%here] "legacy" testable schema value json
+        Test
+          {
+            name = "legacy";
+            here = [%here];
+            decoded = None;
+            value_testable = testable;
+            schema;
+            value;
+            expected = json;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled =
+              false
+              (* Disabled since the Kotlin data type uses the latest schema *);
+          }
       in
-      ()
+      {
+        name = "version_cascade";
+        speed = `Quick;
+        additional_test = None;
+        tests = [ test_latest; test_legacy ];
+      }
   end
 
   module Compile_check = struct
@@ -2196,7 +2307,7 @@ struct
   let test_descriptions : test_group list =
     [
       {
-        name = "coding2";
+        name = "coding";
         test_cases =
           [
             atom_int;
@@ -2239,6 +2350,11 @@ struct
             failure;
             optional_inline;
             keyed;
+            map_error;
+            collision;
+            Computed.computed;
+            Versionn.test;
+            VersionCascade.test;
           ];
       };
     ]
@@ -2264,14 +2380,6 @@ struct
   let tests : (string * unit Alcotest.test_case list) list =
     let open Alcotest in
     [
-      ( "coding",
-        [
-          test_case "map-error" `Quick map_error;
-          test_case "collisions" `Quick collision;
-          test_case "computed" `Quick Computed.computed;
-          test_case "version" `Quick Version.test;
-          test_case "version_cascade" `Quick VersionCascade.test;
-        ] );
       ( "comparison",
         [
           test_case "bool" `Quick Comparison.bool;
