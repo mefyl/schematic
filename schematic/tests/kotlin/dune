@@ -1,9 +1,28 @@
 (include_subdirs no)
 
+(library
+ (name kotlin_utils)
+ (modules kotlin_utils)
+ (preprocess
+  (pps
+   ppx_deriving.eq
+   ppx_deriving.make
+   ppx_deriving.show
+   ppx_deriving.ord
+   ppx_here
+   ppx_yojson
+   schematic_ppx
+   --
+   --cookie
+   "schematic-version=\"0.15.0\""))
+ (libraries alcotest schematic base fmt logs.fmt test_utils))
+
 (tests
  (names kotlin)
  (package schematic)
  (modules kotlin)
+ (deps
+  (alias build-kotlin-test-app))
  (preprocess
   (pps
    ppx_deriving.eq
@@ -14,7 +33,7 @@
    --
    --cookie
    "schematic-version=\"0.15.0\""))
- (libraries alcotest schematic test_utils))
+ (libraries alcotest schematic kotlin_utils))
 
 (rule
  ; - Build the Kotlin roundtrip test app
@@ -24,7 +43,9 @@
  (target
   (dir kotlin-app))
  (mode
-  (promote (until-clean)))
+  (promote
+   (until-clean)
+   (only kotlin-app)))
  (deps
   (alias_rec generate-kotlin-test-controller)
   (source_tree kotlin-roundtrip))
@@ -45,18 +66,25 @@
     kotlin-roundtrip/app/build/distributions/app/
     %{target}))))
 
-(test
- (name kotlin_roundtrip)
- (modules kotlin_roundtrip)
- (libraries alcotest schematic test_utils)
- (deps
-  (alias build-kotlin-test-app))
- (preprocess
-  (pps ppx_here schematic.ppx ppx_deriving.show)))
-
 (executable
  (name kotlin_test_controller_generator)
  (modules kotlin_test_controller_generator)
- (libraries schematic test_utils)
+ (libraries schematic kotlin_utils logs.fmt)
  (preprocess
   (pps ppx_here schematic.ppx ppx_deriving.show)))
+
+(subdir
+ kotlin-roundtrip/app/src/main/kotlin/co/routine
+ (rule
+  (alias generate-kotlin-test-controller)
+  (target GeneratedTestController.kt)
+  (mode
+   (promote
+    (until-clean)
+    (only GeneratedTestController.kt)))
+  (action
+   (progn
+    (with-stdout-to
+     "%{target}"
+     (run "%{dep:../../../../../../../kotlin_test_controller_generator.exe}"))
+    (run ktfmt %{target})))))

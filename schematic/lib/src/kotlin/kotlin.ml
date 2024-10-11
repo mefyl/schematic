@@ -37,7 +37,7 @@ let pp_debug_descriptor : type a. a Schema.descriptor Fmt.t =
   | Union _ -> "Union"
 
 let to_pascal_case s =
-  String.split_on_chars ~on:[ '_'; '-'; '.'; '\'' ] s
+  String.split_on_chars ~on:[ '_'; '-'; '.'; '\''; '$' ] s
   |> List.map ~f:String.capitalize
   |> String.concat ~sep:""
 
@@ -99,22 +99,17 @@ type kotlin_nullable =
   | NotNullable
 [@@deriving show]
 
-type kotlin_required =
-  | Required
-  | NotRequired
-[@@deriving show]
-
 type kotlin_type =
   | Simple of string * kotlin_nullable  (** E.g. [Foo], [String?], etc. *)
   | Generic of string * kotlin_type list * kotlin_nullable
       (** E.g.
-          [Generic ("Bar", [Generic ("List", ["Boolean"], Nullable); Simple ("String", NotNullable)], NotNullable)]
-          is [Bar<List<Boolean?>, String>] *)
+          [Generic ("Bar", [Generic ("List", [Simple ("Boolean", NotNullable)], Nullable); Simple ("String", NotNullable)], NotNullable)]
+          is [Bar<List<Boolean>?, String>] *)
 [@@deriving show]
 
 type kotlin_data_class = {
   generics : kotlin_type list;
-  fields : (string * kotlin_type * kotlin_required) list;
+  fields : (string * kotlin_type) list;
 }
 [@@deriving show]
 
@@ -197,6 +192,10 @@ module Parser = struct
   let rec schema_to_kotlin_marks :
       type a. Marks.t -> a Schema.t -> string option * kotlin * Marks.t =
    fun marks ({ id; descriptor; parametric } as schema) ->
+    let () =
+      Logs.debug (fun m ->
+          m "schema_to_kotlin_marks: Parsing schema %a" Schema.pp schema)
+    in
     try
       let kotlin_type_name = Option.map ~f:to_pascal_case id in
       let _generics, marks =
@@ -208,6 +207,10 @@ module Parser = struct
       match Option.map ~f:(Map.find marks) kotlin_type_name with
       | None ->
         (* No Kotlin type name: parse *)
+        let () =
+          Logs.debug (fun m ->
+              m "schema_to_kotlin_marks: Start parsing unnamed schema")
+        in
         let kotlin, marks = descriptor_to_kotlin_marks marks descriptor in
         (kotlin_type_name, kotlin, marks)
       | Some None ->
@@ -215,6 +218,10 @@ module Parser = struct
            case we recursively try to parse the same schema while parsing it,
            and parse. *)
         let kotlin_type_name = Option.value_exn kotlin_type_name in
+        let () =
+          Logs.debug (fun m ->
+              m "schema_to_kotlin_marks: Start parsing %s" kotlin_type_name)
+        in
         let marks = Map.add_exn ~key:kotlin_type_name ~data:InProgress marks in
         let kotlin, marks = descriptor_to_kotlin_marks marks descriptor in
         let marks = Map.set ~key:kotlin_type_name ~data:(Done kotlin) marks in
@@ -223,10 +230,21 @@ module Parser = struct
         (* Kotlin type name and parsing in progress: return the type name but
            don't parse *)
         let kotlin_type_name = Option.value_exn kotlin_type_name in
+        let () =
+          Logs.debug (fun m ->
+              m "schema_to_kotlin_marks: InProgress, returning %s"
+                kotlin_type_name)
+        in
         ( Some kotlin_type_name,
           Atom (Simple (kotlin_type_name (* TODO generics *), NotNullable)),
           marks )
       | Some (Some (Done kotlin)) ->
+        let () =
+          Logs.debug (fun m ->
+              m "schema_to_kotlin_marks: Done, returning %a"
+                Fmt.(pair (option string) pp_kotlin)
+                (kotlin_type_name, kotlin))
+        in
         (* Kotlin type name and parsing is done: return the parsing result *)
         (kotlin_type_name, kotlin, marks)
     with NotYetImplemented s ->
@@ -273,22 +291,37 @@ module Parser = struct
       in
       (kotlin, marks)
     | Null -> (Atom (Simple ("Unit", NotNullable)), marks)
-    | Nullable schema -> (
+    | Nullable schema ->
       let type_name, kotlin, marks = schema_to_kotlin_marks marks schema in
-      match (type_name, kotlin) with
-      | None, Atom (Simple (type_name, _nullable)) ->
-        (Atom (Simple (type_name, Nullable)), marks)
-      | None, Atom (Generic (type_name, generics, _nullable)) ->
-        (Atom (Generic (type_name, generics, Nullable)), marks)
-      | None, _kotlin ->
-        raise
-          (NotYetImplemented
-             (Fmt.str
-                "We are trying to mark as nullable a type without name and \
-                 that is not an Atom: %a"
-                pp_kotlin kotlin))
-      | Some type_name, _kotlin -> (Atom (Simple (type_name, Nullable)), marks)
-      (* TODO Generics *))
+      let () =
+        Logs.debug (fun m ->
+            m "descriptor_to_kotlin_marks: Parsing Nullable for type_name %a"
+              Fmt.(option string)
+              type_name)
+      in
+      let res =
+        match (type_name, kotlin) with
+        | None, Atom (Simple (type_name, _nullable)) ->
+          (Atom (Simple (type_name, Nullable)), marks)
+        | None, Atom (Generic (type_name, generics, _nullable)) ->
+          (Atom (Generic (type_name, generics, Nullable)), marks)
+        | None, _kotlin ->
+          raise
+            (NotYetImplemented
+               (Fmt.str
+                  "We are trying to mark as nullable a type without name and \
+                   that is not an Atom: %a"
+                  pp_kotlin kotlin))
+        | Some type_name, _kotlin -> (Atom (Simple (type_name, Nullable)), marks)
+      in
+      let () =
+        Logs.debug (fun m ->
+            m "descriptor_to_kotlin_marks: Nullable result: %a"
+              Fmt.(pair pp_kotlin nop)
+              res)
+      in
+      res
+      (* TODO Generics *)
     | Object { fields = FieldEnd; _ } ->
       (Data_object, marks)
       (* Objects with 0 field have to be handled differently in Kotlin as [data
@@ -306,7 +339,7 @@ module Parser = struct
     | String -> (Atom (Simple ("String", NotNullable)), marks)
     | String_const _ -> (Data_object, marks)
     | Time -> (Atom (Simple ("Instant", NotNullable)), marks)
-    | Time_local -> (Atom (Simple ("LocalDateTime", NotNullable)), marks)
+    | Time_local -> (Atom (Simple ("OffsetDateTime", NotNullable)), marks)
     | Tuple { items; _ } ->
       let kotlin_type, marks = tuple_to_kotlin_marks marks items in
       (Atom kotlin_type, marks)
@@ -406,18 +439,6 @@ module Parser = struct
       in
       let other_types, marks =
         parametric_to_kotlin_marks marks (next parameter)
-        (* (next *)
-        (*    { *)
-        (*      id = None; *)
-        (*      parametric = None; *)
-        (*      descriptor = *)
-        (*        Map *)
-        (*          { *)
-        (*            decode = (fun _ -> failwith "unreachable"); *)
-        (*            encode = (fun _ -> failwith "unreachable"); *)
-        (*            descriptor = Int; *)
-        (*          }; *)
-        (*    }) *)
       in
       (Simple (name, NotNullable) :: other_types, marks)
 
@@ -425,7 +446,7 @@ module Parser = struct
       type a.
       Marks.t ->
       a Hlist.t Schema.fields ->
-      (string * kotlin_type * kotlin_required) list * Marks.t =
+      (string * kotlin_type) list * Marks.t =
    fun marks fields ->
     match fields with
     | FieldEnd -> ([], marks)
@@ -433,6 +454,7 @@ module Parser = struct
         {
           field =
             {
+              name;
               schema =
                 ( Outline { descriptor = Ignore; _ }
                 | Inline { descriptor = Ignore; _ }
@@ -441,6 +463,10 @@ module Parser = struct
             };
           rest;
         } ->
+      let () =
+        Logs.debug (fun m ->
+            m "object_fields_to_kotlin_marks: Ignoring field %s" name)
+      in
       object_fields_to_kotlin_marks marks rest
     | Field { field; rest } ->
       let kotlin_field, marks = object_field_to_kotlin_marks marks field in
@@ -449,9 +475,7 @@ module Parser = struct
 
   and object_field_to_kotlin_marks :
       type t req.
-      Marks.t ->
-      (t, req) Schema.field ->
-      (string * kotlin_type * kotlin_required) * Marks.t =
+      Marks.t -> (t, req) Schema.field -> (string * kotlin_type) * Marks.t =
    fun marks
        {
          name;
@@ -461,31 +485,38 @@ module Parser = struct
          schema = Outline schema | Inline schema | Inline_try schema;
          _;
        } ->
-    let required =
+    let nullable =
       match requirement with
-      | Optional -> NotRequired
-      | Required -> Required
-      | Computed -> Required
-      | Computed_optional -> NotRequired
+      | Optional -> Nullable
+      | Required -> NotNullable
+      | Computed -> NotNullable
+      | Computed_optional -> Nullable
       (* Default means "Optional and if it's absent, take this default value",
          but encoding the default value in Kotlin may not be simple. So, as a
          first approximation, we will treat it as optional, and see how things
          go. Note that Kotlin seems to support default values for data class
          fields, e.g. `val name: String = "my default value"` *)
-      | Default _ -> NotRequired
+      | Default _ -> Nullable
     in
     let kotlin_type_name, kotlin, marks = schema_to_kotlin_marks marks schema in
-    (* If the field is [NotRequired], we also mark it as [Nullable]. *)
-    let nullable =
-      match required with Required -> NotNullable | NotRequired -> Nullable
+    let () =
+      Logs.debug (fun m ->
+          m "object_field_to_kotlin_marks: kotlin_type_name: %a"
+            Fmt.(option string)
+            kotlin_type_name)
+    in
+    let either_is_nullable other_nullable =
+      match (nullable, other_nullable) with
+      | Nullable, _ | _, Nullable -> Nullable
+      | _ -> NotNullable
     in
     let kotlin_type, marks =
       match (kotlin_type_name, kotlin) with
       | Some kotlin_type_name, _ -> (Simple (kotlin_type_name, nullable), marks)
-      | None, Atom (Simple (type_name, _nullable)) ->
-        (Simple (type_name, nullable), marks)
-      | None, Atom (Generic (type_name, generics, _nullable)) ->
-        (Generic (type_name, generics, nullable), marks)
+      | None, Atom (Simple (type_name, other_nullable)) ->
+        (Simple (type_name, either_is_nullable other_nullable), marks)
+      | None, Atom (Generic (type_name, generics, other_nullable)) ->
+        (Generic (type_name, generics, either_is_nullable other_nullable), marks)
       | None, Sealed_interface { nested_data_classes; _ } ->
         (* Corner case: there is one (1) occurrence in the whole RPC type
            hierarchy where an object field refers to an anonymous schema:
@@ -505,7 +536,12 @@ module Parser = struct
           "Hopefully unreachable: the object field %S has no type name: %a" name
           pp_kotlin kotlin
     in
-    ((to_object_field_name name, kotlin_type, required), marks)
+    let () =
+      Logs.debug (fun m ->
+          m "object_field_to_kotlin_marks: Result: %a" pp_kotlin_type
+            kotlin_type)
+    in
+    ((to_object_field_name name, kotlin_type), marks)
 
   let packed_schema_to_kotlin_marks marks packed_schema =
     Schema.unpack
@@ -515,19 +551,30 @@ end
 
 (** Module responsible for generating actual Kotlin code from the parser result. *)
 module Generator = struct
+  let original_pp_kotlin_type = pp_kotlin_type
+
   let pp_kotlin_nullable : kotlin_nullable Fmt.t =
    fun f nullable ->
     match nullable with
     | NotNullable -> Fmt.nop f ()
     | Nullable -> Fmt.char f '?'
 
-  let rec pp_field : (string * kotlin_type * kotlin_required) Fmt.t =
-   fun f (field_name, field_type, required) ->
+  let rec pp_field : (string * kotlin_type) Fmt.t =
+   fun f (field_name, field_type) ->
+    let nullable =
+      match field_type with
+      | Simple (_, nullable) | Generic (_, _, nullable) -> nullable
+    in
     Fmt.pf f "val %s: %a%s" field_name pp_kotlin_type field_type
-      (match required with Required -> "" | NotRequired -> " = null")
+      (match nullable with NotNullable -> "" | Nullable -> " = null")
 
   and pp_kotlin_type : kotlin_type Fmt.t =
    fun f kotlin_type ->
+    let () =
+      Logs.debug (fun m ->
+          m "pp_kotlin_type: Pretty-printing kotlin typee %a"
+            original_pp_kotlin_type kotlin_type)
+    in
     match kotlin_type with
     | Simple (s, nullable) -> Fmt.pf f "%s%a" s pp_kotlin_nullable nullable
     | Generic (s, generics, nullable) ->
@@ -635,7 +682,15 @@ end
 module Json = struct
   module Encode = struct
     let rec encode : type t. t Schema.t -> t -> Ezjsonm.value =
-     fun { descriptor; _ } -> encode_descriptor descriptor
+     fun { descriptor; id; _ } t ->
+      let json = encode_descriptor descriptor t in
+      let () =
+        Logs.debug (fun m ->
+            m "encode: Encoded value for schema %a: %a"
+              Fmt.(option string)
+              id Json.pp json)
+      in
+      json
 
     and encode_descriptor : type t. t Schema.descriptor -> t -> Ezjsonm.value =
      fun descriptor ->
@@ -660,7 +715,7 @@ module Json = struct
         fun v ->
           let pairs = List.map ~f:(fun (k, v) -> (k, encode v)) v in
           `O pairs
-      | Null -> Fn.const `Null
+      | Null -> Fn.const (`O [])
       | Nullable schema ->
         let f = encode schema in
         fun v -> Option.map ~f v |> Option.value ~default:`Null
@@ -742,7 +797,28 @@ module Json = struct
         t Hlist.t Schema.fields -> t Hlist.t -> (string * Ezjsonm.value) list =
      fun fields fields_hlist ->
       match (fields, fields_hlist) with
-      | FieldEnd, [] -> [] (* TODO [Ignore] special case *)
+      | FieldEnd, [] -> []
+      | ( (Field
+             {
+               field =
+                 {
+                   name;
+                   schema =
+                     ( Outline { descriptor = Ignore; _ }
+                     | Inline { descriptor = Ignore; _ }
+                     | Inline_try { descriptor = Ignore; _ } );
+                   _;
+                 };
+               rest;
+             } :
+            t Hlist.t Schema.fields),
+          _ :: fields_hlist_rest ) ->
+        let () =
+          Logs.debug (fun m ->
+              m "encode_fields: Ignoring field %s while encoding" name)
+        in
+        let encoded_tail = encode_fields rest fields_hlist_rest in
+        encoded_tail
       | ( (Field { field; rest } : t Hlist.t Schema.fields),
           field_hlist_head :: fields_hlist_rest ) -> (
         let encoded_head = encode_field field field_hlist_head in
@@ -774,6 +850,16 @@ module Json = struct
   module Decode = struct
     let ( let+ ) = Result.( >>| )
     let ( let* ) = Result.( >>= )
+
+    let requirement_return : type a req. (a, req) Schema.requirement -> a -> req
+        =
+     fun req v ->
+      match req with
+      | Computed -> Some v
+      | Computed_optional -> Some (Some v)
+      | Default _ -> v
+      | Optional -> Some v
+      | Required -> v
 
     let rec decode :
         type t.
@@ -847,7 +933,7 @@ module Json = struct
               (key, decoded_value))
             fields
           |> Result.all
-      | Null -> ( function `Null -> Ok () | json -> type_error "null" json)
+      | Null -> ( function `O [] -> Ok () | json -> type_error "null" json)
       | Nullable schema -> (
         function
         | `Null -> Ok None
@@ -1012,27 +1098,20 @@ module Json = struct
         (t Hlist.t, E.decoding) Result.t =
      fun context fields json_fields ->
       match fields with
-      (* TODO [Ignore] *)
-      (* | Field *)
-      (*     { *)
-      (*       field = *)
-      (*         { *)
-      (*           schema = *)
-      (*             ( Outline { descriptor = Ignore; _ } *)
-      (*             | Inline { descriptor = Ignore; _ } *)
-      (*             | Inline_try { descriptor = Ignore; _ } ); *)
-      (*           requirement; *)
-      (*           _; *)
-      (*         }; *)
-      (*       rest; *)
-      (*     } -> *)
-      (*   let* rest = decode_fields context rest json_fields in *)
-      (*   Result.Ok Hlist.(requirement_return requirement () :: rest) *)
       | FieldEnd -> Ok []
-      | Field { field; rest = rest_fields } ->
-        let* decoded_head = decode_field context field json_fields in
-        let* decoded_rest = decode_fields context rest_fields json_fields in
-        Ok Hlist.(decoded_head :: decoded_rest)
+      | Field { field; rest = rest_fields } -> (
+        match Schema.field_schema field.schema with
+        | { descriptor = Ignore; _ } ->
+          let () =
+            Logs.debug (fun m ->
+                m "decode_fields: Ignoring field %s while decoding" field.name)
+          in
+          let* decoded_rest = decode_fields context rest_fields json_fields in
+          Ok Hlist.(requirement_return field.requirement () :: decoded_rest)
+        | _ ->
+          let* decoded_head = decode_field context field json_fields in
+          let* decoded_rest = decode_fields context rest_fields json_fields in
+          Ok Hlist.(decoded_head :: decoded_rest))
 
     and decode_field :
         type t req.
@@ -1049,7 +1128,7 @@ module Json = struct
       | Optional -> (
         let () =
           Logs.debug (fun m ->
-              m "Decode.decode: Optional for optional JSON %a@."
+              m "decode_field: Optional for optional JSON %a@."
                 Fmt.(option ~none:(fun fmt () -> Fmt.pf fmt "None") Json.pp)
                 m_value)
         in
@@ -1081,7 +1160,7 @@ module Json = struct
       | Default default_value -> (
         let () =
           Logs.debug (fun m ->
-              m "Decode.decode: Default for optional JSON %a@."
+              m "decode_field: Default for optional JSON %a@."
                 Fmt.(option ~none:(fun fmt () -> Fmt.pf fmt "None") Json.pp)
                 m_value)
         in
@@ -1121,16 +1200,44 @@ module Public_api = struct
 
   let pp_file ?package fmt marks =
     Fmt.pf fmt
-      {|%a@.
+      {|@file:UseSerializers(KOffsetDateTimeSerializer::class)@.
 
+%a@.
+
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 import kotlinx.datetime.Instant
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalDateTime
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonClassDiscriminator
-import kotlinx.serialization.json.JsonElement
+
+/**
+ * Kotlin serialization does not provide serializers for OffsetDateTime. So we manually provide one
+ * and enable it in the file with the @file annotation at the top of this file.
+ *
+ * See https://github.com/Kotlin/kotlinx-datetime/issues/90
+ * See https://stackoverflow.com/a/65077862
+ */
+object KOffsetDateTimeSerializer : KSerializer<OffsetDateTime> {
+  override val descriptor: SerialDescriptor =
+      PrimitiveSerialDescriptor("OffsetDateTime", PrimitiveKind.STRING)
+
+  override fun serialize(encoder: Encoder, value: OffsetDateTime) {
+    val format = DateTimeFormatter.ISO_OFFSET_DATE_TIME
+
+    val string = format.format(value)
+    encoder.encodeString(string)
+  }
+
+  override fun deserialize(decoder: Decoder): OffsetDateTime {
+    val string = decoder.decodeString()
+    return OffsetDateTime.parse(string)
+  }
+}
 
 @[<hv 0>@[<v 2>%a@]@]@.
 |}
