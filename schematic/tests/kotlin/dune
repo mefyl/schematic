@@ -43,7 +43,9 @@
  (target
   (dir kotlin-app))
  (mode
-  (promote (until-clean)))
+  (promote
+   (until-clean)
+   (only kotlin-app)))
  (deps
   (alias_rec generate-kotlin-test-controller)
   (source_tree kotlin-roundtrip))
@@ -70,3 +72,19 @@
  (libraries schematic kotlin_utils logs.fmt)
  (preprocess
   (pps ppx_here schematic.ppx ppx_deriving.show)))
+
+(subdir
+ kotlin-roundtrip/app/src/main/kotlin/co/routine
+ (rule
+  (alias generate-kotlin-test-controller)
+  (target GeneratedTestController.kt)
+  (mode
+   (promote
+    (until-clean)
+    (only GeneratedTestController.kt)))
+  (action
+   (progn
+    (with-stdout-to
+     "%{target}"
+     (run "%{dep:../../../../../../../kotlin_test_controller_generator.exe}"))
+    (run ktfmt %{target})))))
