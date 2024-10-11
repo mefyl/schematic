@@ -183,7 +183,7 @@ struct
 
   module Optionals = struct
     let options =
-      let mk_test name value expected is_kotlin_roundtrip_enabled =
+      let mk_test name value expected =
         Test
           {
             name;
@@ -194,7 +194,10 @@ struct
             value;
             expected;
             kotlin_class_name = None;
-            is_kotlin_roundtrip_enabled;
+            is_kotlin_roundtrip_enabled =
+              false
+              (* Kotlin's [Class.forName] does not support generics/nullable
+                 types *);
           }
       in
       {
@@ -203,8 +206,8 @@ struct
         additional_test = None;
         tests =
           [
-            mk_test "some int" (Some 28) [%ezjsonm 28] false;
-            mk_test "none int" None [%ezjsonm None] false;
+            mk_test "some int" (Some 28) [%ezjsonm 28];
+            mk_test "none int" None [%ezjsonm None];
           ];
       }
 
