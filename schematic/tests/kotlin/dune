@@ -19,6 +19,7 @@
 
 (tests
  (names kotlin)
+ (enabled_if %{bin-available:gradle})
  (package schematic)
  (modules kotlin)
  (deps
@@ -40,6 +41,7 @@
  ; - Unzip the built artifact
  ; - Move the binary (and its libs) in a directory accessible from the OCaml test
  (alias build-kotlin-test-app)
+ (enabled_if %{bin-available:gradle})
  (target
   (dir kotlin-app))
  (mode
@@ -77,6 +79,7 @@
  kotlin-roundtrip/app/src/main/kotlin/co/routine
  (rule
   (alias generate-kotlin-test-controller)
+  (enabled_if %{bin-available:ktfmt})
   (target GeneratedTestController.kt)
   (mode
    (promote
