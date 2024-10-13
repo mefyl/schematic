@@ -167,6 +167,12 @@ module type S = sig
       }
     end
 
+    val rewrite :
+      (Http.Response.t ->
+      Handler.Body.t ->
+      (Http.Response.t * Handler.Body.t, 'a) Result.t Handler.Future.t) ->
+      'a Error.rule
+
     val check_status :
       (Http.Status.t ->
       [< `Body_decoder of

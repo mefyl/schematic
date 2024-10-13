@@ -35,6 +35,7 @@ module Make (Handler : HANDLER) = struct
   include Handler
 
   let ( let* ) v f = Handler.Future.bind v ~f
+  let ( >>= ) = ( let* )
 
   let ( let*! ) v f =
     Handler.Future.bind v ~f:(function
@@ -64,6 +65,19 @@ module Make (Handler : HANDLER) = struct
         rule : 'result 'value. ('value, 'value, 'result, 'error) rule;
       }
     end
+
+    let rewrite rewrite =
+      let rule protocol =
+        {
+          f =
+            (fun url retry v f ->
+              protocol.f url retry v @@ fun (response, body) ->
+              rewrite response body >>= function
+              | Result.Ok (response, body) -> f (response, body)
+              | Result.Error _ as error -> Handler.Future.return error);
+        }
+      in
+      { Error.rule }
 
     let check_status check =
       let rule protocol =
