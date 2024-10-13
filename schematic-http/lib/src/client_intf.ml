@@ -147,7 +147,7 @@ module type HANDLER = sig
 end
 
 module type S = sig
-  type (-'value, +'result, !'error) t
+  type ('value, 'result, !'error) t
 
   module Handler : HANDLER
 
@@ -161,6 +161,12 @@ module type S = sig
           * ('next, 'final, 'result, 'error) t
           -> ('value, 'final, 'result, 'error) t
 
+    module Error : sig
+      type nonrec 'error rule = {
+        rule : 'result 'value. ('value, 'value, 'result, 'error) rule;
+      }
+    end
+
     val check_status :
       (Http.Status.t ->
       [< `Body_decoder of
@@ -170,7 +176,7 @@ module type S = sig
       | `Error of 'error
       | `Ok
       ]) ->
-      ('value, 'value, 'result, 'error) rule
+      'error Error.rule
 
     val optional : ('value, 'value option, 'result, 'error) rule
 
@@ -178,7 +184,7 @@ module type S = sig
       backoff:(int -> int) ->
       rate_limited:(Http.Response.t -> bool) ->
       sleep:(float -> unit Handler.Future.t) ->
-      ('value, 'value, 'result, 'error) rule
+      'error Error.rule
   end
 
   val make :
@@ -186,6 +192,18 @@ module type S = sig
     ?timeout:Timmy.Span.t ->
     Handler.t ->
     ('value, 'value, [> Error.reason ]) t
+
+  module Make (Protocol : sig
+    type error
+    type 'a t
+
+    val headers : Http.Header.t
+    val timeout : Timmy.Span.t option
+    val handler : Handler.t
+    val protocol : ('value, 'value t, 'value t, error) Protocol.t
+  end) : sig
+    val v : ('value, 'value Protocol.t, Protocol.error) t
+  end
 
   val make_protocol :
     ?headers:Http.Header.t ->

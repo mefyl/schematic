@@ -59,44 +59,53 @@ module Make (Handler : HANDLER) = struct
 
     let id = { f = (fun _ _ v f -> f v) }
 
-    let check_status check protocol =
-      {
-        f =
-          (fun url retry v f ->
-            protocol.f url retry v @@ fun (response, body) ->
-            let status = Http.Response.status response in
-            let report () =
-              Logs.warn (fun m ->
-                  m "unexpected status %a querying %a" Http.Status.pp status
-                    Uri.pp url)
-            in
-            let decode_body schema decode =
-              let () = report () in
-              let*! body = Body.to_string body in
-              match Handler.Coding.decode schema body with
-              | Result.Ok error -> Future.return (Result.Error (decode error))
-              | Result.Error e ->
-                let e =
-                  {
-                    e with
-                    reason = Fmt.str "while decoding error body: %s" e.reason;
-                  }
-                in
-                Future.return (Result.Error (`Decoding e))
-            in
-            match check status with
-            | `Ok -> f (response, body)
-            | `Error error ->
-              let () = report () in
-              let* () = Body.drain body in
-              Future.return (Result.Error error)
-            | `Body schema ->
-              let () = report () in
-              decode_body schema Base.Fn.id
-            | `Body_decoder (Body_decoder { schema; decode }) ->
-              let () = report () in
-              decode_body schema decode);
+    module Error = struct
+      type nonrec 'error rule = {
+        rule : 'result 'value. ('value, 'value, 'result, 'error) rule;
       }
+    end
+
+    let check_status check =
+      let rule protocol =
+        {
+          f =
+            (fun url retry v f ->
+              protocol.f url retry v @@ fun (response, body) ->
+              let status = Http.Response.status response in
+              let report () =
+                Logs.warn (fun m ->
+                    m "unexpected status %a querying %a" Http.Status.pp status
+                      Uri.pp url)
+              in
+              let decode_body schema decode =
+                let () = report () in
+                let*! body = Body.to_string body in
+                match Handler.Coding.decode schema body with
+                | Result.Ok error -> Future.return (Result.Error (decode error))
+                | Result.Error e ->
+                  let e =
+                    {
+                      e with
+                      reason = Fmt.str "while decoding error body: %s" e.reason;
+                    }
+                  in
+                  Future.return (Result.Error (`Decoding e))
+              in
+              match check status with
+              | `Ok -> f (response, body)
+              | `Error error ->
+                let () = report () in
+                let* () = Body.drain body in
+                Future.return (Result.Error error)
+              | `Body schema ->
+                let () = report () in
+                decode_body schema Base.Fn.id
+              | `Body_decoder (Body_decoder { schema; decode }) ->
+                let () = report () in
+                decode_body schema decode);
+        }
+      in
+      { Error.rule }
 
     let optional protocol =
       {
@@ -112,58 +121,61 @@ module Make (Handler : HANDLER) = struct
               Future.return (Result.Ok (Some result)));
       }
 
-    let rate_limit ~backoff ~rate_limited ~sleep protocol =
-      let pp_retry =
-        let open Fmt in
-        using (fun i -> if i <= 1 then None else Some i)
-        @@ option ~none:nop @@ fmt " (%i retries)"
-      and retry_after = "retry-after" in
-      let backoff errors uri resp =
-        let log pv v =
-          Logs.warn (fun m ->
-              m "429 Too Many Requests querying %a%a, backing off %a" Uri.pp uri
-                pp_retry errors pv v)
-        in
-        let default () =
-          let v = backoff errors in
-          let () = log Fmt.(fmt "for %i seconds") v in
-          v
-        in
-        match Http.Header.get Http.Response.(headers resp) retry_after with
-        | None -> default ()
-        | Some value -> (
-          (* FIXME: handle dates *)
-          try
-            let v = Base.Int.of_string value in
-            let () =
-              log
-                Fmt.(
-                  fmt "for %i seconds (from "
-                  ++ const string (str "%S" retry_after)
-                  ++ const string " header)")
-                v
-            in
+    let rate_limit ~backoff ~rate_limited ~sleep =
+      let rule protocol =
+        let pp_retry =
+          let open Fmt in
+          using (fun i -> if i <= 1 then None else Some i)
+          @@ option ~none:nop @@ fmt " (%i retries)"
+        and retry_after = "retry-after" in
+        let backoff errors uri resp =
+          let log pv v =
+            Logs.warn (fun m ->
+                m "429 Too Many Requests querying %a%a, backing off %a" Uri.pp
+                  uri pp_retry errors pv v)
+          in
+          let default () =
+            let v = backoff errors in
+            let () = log Fmt.(fmt "for %i seconds") v in
             v
-          with _ ->
-            let () =
-              Logs.warn (fun m ->
-                  m "unrecognized %S header value %S" retry_after value)
-            in
-            default ())
-      in
-      let f url retry v f =
-        protocol.f url retry v @@ fun v ->
-        let rec rate_limit errors (response, body) =
-          if rate_limited response then
-            let backoff = backoff errors url response in
-            let* () = sleep (Float.of_int backoff) in
-            let*! v = retry () in
-            rate_limit (errors + 1) v
-          else f (response, body)
+          in
+          match Http.Header.get Http.Response.(headers resp) retry_after with
+          | None -> default ()
+          | Some value -> (
+            (* FIXME: handle dates *)
+            try
+              let v = Base.Int.of_string value in
+              let () =
+                log
+                  Fmt.(
+                    fmt "for %i seconds (from "
+                    ++ const string (str "%S" retry_after)
+                    ++ const string " header)")
+                  v
+              in
+              v
+            with _ ->
+              let () =
+                Logs.warn (fun m ->
+                    m "unrecognized %S header value %S" retry_after value)
+              in
+              default ())
         in
-        rate_limit 0 v
+        let f url retry v f =
+          protocol.f url retry v @@ fun v ->
+          let rec rate_limit errors (response, body) =
+            if rate_limited response then
+              let backoff = backoff errors url response in
+              let* () = sleep (Float.of_int backoff) in
+              let*! v = retry () in
+              rate_limit (errors + 1) v
+            else f (response, body)
+          in
+          rate_limit 0 v
+        in
+        { f }
       in
-      { f }
+      { Error.rule }
 
     type ('value, 'next, 'result, 'error) t =
       | [] : ('value, 'value, 'result, 'error) t
@@ -175,7 +187,8 @@ module Make (Handler : HANDLER) = struct
     let rec apply :
           'value 'next 'result 'error.
           ('value, 'next, 'result, 'error) t ->
-          ('value, 'next, 'result, 'error) rule =
+          ('next, 'result, 'error) protocol ->
+          ('value, 'result, 'error) protocol =
      fun (type value next result error)
          (protocols : (value, next, result, error) t)
          (base : (next, result, error) protocol) :
@@ -185,25 +198,39 @@ module Make (Handler : HANDLER) = struct
       | head :: tail -> head @@ apply tail base
   end
 
-  type (-'value, +'result, !'error) t = {
+  type ('value, 'result, 'error) t = {
     handler : Handler.t;
     headers : Http.Header.t;
-    protocol : ('value, 'result, 'error) Protocol.protocol;
+    protocol : ('value, 'result, 'result, 'error) Protocol.t;
     timeout : Timmy.Span.t option;
   }
 
+  module Make (P : sig
+    type error
+    type 'a t
+
+    val headers : Http.Header.t
+    val timeout : Timmy.Span.t option
+    val handler : Handler.t
+    val protocol : ('value, 'value t, 'value t, error) Protocol.t
+  end) =
+  struct
+    let v =
+      {
+        handler = P.handler;
+        headers = P.headers;
+        protocol = P.protocol;
+        timeout = P.timeout;
+      }
+  end
+
   let make_protocol ?(headers = Http.Header.init ()) ?timeout handler protocol =
-    {
-      handler;
-      headers;
-      protocol = Protocol.apply protocol Protocol.id;
-      timeout;
-    }
+    { handler; headers; protocol; timeout }
 
   let make ?headers ?timeout handler =
     make_protocol ?headers ?timeout handler []
 
-  let with_protocol t rule = { t with protocol = rule t.protocol }
+  let with_protocol t rule = { t with protocol = rule :: t.protocol }
 
   type 'a body =
     | Empty : unit body
@@ -305,7 +332,8 @@ module Make (Handler : HANDLER) = struct
             m "%a%s" Id.pp id @@ Http.Status.to_string resp.status)
       in
       let* result =
-        t.protocol.f uri raw (resp, body) @@ fun (resp, body) ->
+        let protocol = Protocol.apply t.protocol Protocol.id in
+        protocol.f uri raw (resp, body) @@ fun (resp, body) ->
         let*! body =
           match response with
           | Empty ->

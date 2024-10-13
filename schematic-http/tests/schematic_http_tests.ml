@@ -143,51 +143,38 @@ struct
 
   module Client = Schematic_http.Make (Handler)
 
+  let uri { port } path =
+    Uri.make ~scheme:"http"
+      ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
+      ~port ~path ()
+
   module Requests = struct
-    let get_empty { port } handler =
+    let get_empty server handler =
       let client = Client.make handler in
-      let+ result =
-        Client.get client Empty
-        @@ Uri.make ~scheme:"http"
-             ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
-             ~port ~path:"/empty" ()
-      in
+      let+ result = Client.get client Empty @@ uri server "/empty" in
       Alcotest.(check ~here:[%here] (result unit error))
         "request succeded" (Result.Ok ()) result
 
-    let get_json { port } handler =
+    let get_json server handler =
       let client = Client.make handler in
       let+ result =
-        Client.get client (Schema payload_schema)
-        @@ Uri.make ~scheme:"http"
-             ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
-             ~port ~path:"/const" ()
+        Client.get client (Schema payload_schema) @@ uri server "/const"
       in
       Alcotest.(check ~here:[%here] (result payload error))
         "request succeded" (Result.Ok const_payload) result
 
-    let get_string { port } handler =
+    let get_string server handler =
       let client = Client.make handler in
-      let+ result =
-        Client.get client String
-        @@ Uri.make ~scheme:"http"
-             ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
-             ~port ~path:"/const" ()
-      in
+      let+ result = Client.get client String @@ uri server "/const" in
       Alcotest.(check ~here:[%here] (result string error))
         "request succeded"
         (Result.Ok (Schematic.Json.String.encode payload_schema const_payload))
         result
 
-    let _get_stream port handler path =
+    let _get_stream server handler path =
       let client = Client.make handler in
       Future.Scope.run ~name:"read stream" @@ fun scope ->
-      let* result =
-        Client.get client (Channel scope)
-        @@ Uri.make ~scheme:"http"
-             ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
-             ~port ~path ()
-      in
+      let* result = Client.get client (Channel scope) @@ uri server path in
       let+ result =
         match result with
         | Result.Error _ as error -> Future.return error
@@ -198,81 +185,81 @@ struct
       Alcotest.(check ~here:[%here] (result string error))
         "request succeded" (Result.Ok Data.v) result
 
-    let get_stream { port } handler = _get_stream port handler "/big"
-    let get_stream_slow { port } handler = _get_stream port handler "/big-slow"
+    let get_stream server handler = _get_stream server handler "/big"
+    let get_stream_slow server handler = _get_stream server handler "/big-slow"
 
-    let post { port } handler =
+    let post server handler =
       let client = Client.make handler in
       let post_payload = { x = 107; y = "44" } in
       let+ result =
         Client.post client
           ~body:(Schema payload_schema, post_payload)
           (Schema payload_schema)
-        @@ Uri.make ~scheme:"http"
-             ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
-             ~port ~path:"/cat" ()
+        @@ uri server "/cat"
       in
       Alcotest.(check ~here:[%here] (result payload error))
         "request succeded" (Result.Ok post_payload) result
+  end
 
-    let not_found { port } handler =
+  module Protocol = struct
+    let status =
+      Client.Protocol.check_status (function
+        | #Http.Status.success -> `Ok
+        | status -> `Error (`Unexpected_status status))
+
+    let status = status.rule
+
+    let not_found server handler =
       let client =
-        Client.make_protocol handler
-          Client.Protocol.
-            [
-              check_status (function
-                | #Http.Status.success -> `Ok
-                | status -> `Error (`Unexpected_status status));
-              optional;
-            ]
+        Client.make_protocol handler Client.Protocol.[ status; optional ]
       in
-      let uri =
-        Uri.make ~scheme:"http"
-          ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
-          ~port ~path:"/404" ()
-      in
+      let uri = uri server "/404" in
       let+ result = Client.get client (Schema payload_schema) uri in
       Alcotest.(check ~here:[%here] (result (option payload) error))
         "request succeded" (Result.Ok None) result
 
-    let unexpected_status { port } handler =
-      let client =
-        Client.make_protocol handler
-          Client.Protocol.
-            [
-              check_status (function
-                | #Http.Status.success -> `Ok
-                | status -> `Error (`Unexpected_status status));
-            ]
+    let unexpected_status server handler =
+      let module C = Client.Make (struct
+        type error =
+          [ `Decoding of Schematic.Error.decoding
+          | `Networking
+          | `Unexpected_status of Http.Status.t
+          ]
+
+        type 'a t = 'a
+
+        let handler = handler
+        let headers = Http.Header.init ()
+        let timeout = None
+
+        let protocol : ('value, 'value t, 'value t, error) Client.Protocol.t =
+          [ status ]
+      end) in
+      let client = C.v in
+      let* () =
+        let uri = uri server "/404" in
+        let+ result = Client.get client (Schema payload_schema) uri in
+        Alcotest.(check ~here:[%here] (result payload error))
+          "request failed"
+          (Result.Error
+             {
+               method_ = `GET;
+               reason = `Unexpected_status `Not_found;
+               status = Some `Not_found;
+               uri;
+             })
+          result
       in
-      let uri =
-        Uri.make ~scheme:"http"
-          ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
-          ~port ~path:"/404" ()
-      in
-      let+ result = Client.get client (Schema payload_schema) uri in
-      Alcotest.(check ~here:[%here] (result payload error))
-        "request succeded"
-        (Result.Error
-           {
-             method_ = `GET;
-             reason = `Unexpected_status `Not_found;
-             status = Some `Not_found;
-             uri;
-           })
-        result
+      let+ result = Client.get client Empty @@ uri server "/empty" in
+      Alcotest.(check ~here:[%here] (result unit error))
+        "request failed" (Result.Ok ()) result
   end
 
   module Timeout = struct
-    let _timeout { port } handler timeout should_complete status chunk_received
-        =
+    let _timeout server handler timeout should_complete status chunk_received =
       let client = Client.make handler in
       Future.Scope.run ~name:"read stream" @@ fun scope ->
-      let uri =
-        Uri.make ~scheme:"http"
-          ~host:Eio.Net.Ipaddr.(Fmt.str "%a" pp V4.loopback)
-          ~port ~path:"/big-slow" ()
-      in
+      let uri = uri server "/big-slow" in
       let* result = Client.get ~timeout client (Channel scope) uri in
       let () = Logs.info (fun m -> m "headers received") in
       let+ result =
@@ -375,11 +362,11 @@ struct
             test_case "GET slow stream" `Quick (Requests.get_stream_slow server);
             test_case "POST json" `Quick (Requests.post server);
           ] );
-        ( "errors",
+        ( "protocol",
           [
-            test_case "404" `Quick (Requests.not_found server);
+            test_case "404" `Quick (Protocol.not_found server);
             test_case "unexpected status" `Quick
-              (Requests.unexpected_status server);
+              (Protocol.unexpected_status server);
           ] );
         ( "timeout",
           [
