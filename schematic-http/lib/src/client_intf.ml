@@ -161,6 +161,12 @@ module type S = sig
           * ('next, 'final, 'result, 'error) t
           -> ('value, 'final, 'result, 'error) t
 
+    module Retry : sig
+      type nonrec 'error rule = {
+        rule : 'value. ('value, 'value, 'value, 'error) rule;
+      }
+    end
+
     module Error : sig
       type nonrec 'error rule = {
         rule : 'result 'value. ('value, 'value, 'result, 'error) rule;
@@ -190,7 +196,7 @@ module type S = sig
       backoff:(int -> int) ->
       rate_limited:(Http.Response.t -> bool) ->
       sleep:(float -> unit Handler.Future.t) ->
-      'error Error.rule
+      'error Retry.rule
   end
 
   val make :

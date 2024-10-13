@@ -60,6 +60,12 @@ module Make (Handler : HANDLER) = struct
 
     let id = { f = (fun _ _ v f -> f v) }
 
+    module Retry = struct
+      type nonrec 'error rule = {
+        rule : 'value. ('value, 'value, 'value, 'error) rule;
+      }
+    end
+
     module Error = struct
       type nonrec 'error rule = {
         rule : 'result 'value. ('value, 'value, 'result, 'error) rule;
@@ -176,20 +182,20 @@ module Make (Handler : HANDLER) = struct
               default ())
         in
         let f url retry v f =
-          protocol.f url retry v @@ fun v ->
           let rec rate_limit errors (response, body) =
             if rate_limited response then
               let backoff = backoff errors url response in
               let* () = sleep (Float.of_int backoff) in
               let*! v = retry () in
-              rate_limit (errors + 1) v
+              protocol.f url retry v (rate_limit (errors + 1))
+              (* rate_limit (errors + 1) v *)
             else f (response, body)
           in
-          rate_limit 0 v
+          protocol.f url retry v @@ rate_limit 0
         in
         { f }
       in
-      { Error.rule }
+      { Retry.rule }
 
     type ('value, 'next, 'result, 'error) t =
       | [] : ('value, 'value, 'result, 'error) t
