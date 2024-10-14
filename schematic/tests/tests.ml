@@ -37,7 +37,6 @@ type test_description =
       value : 'a;
       expected : Ezjsonm.value;
       kotlin_class_name : string option;
-          (** TODO Remove this field when Kotlin support is complete *)
       is_kotlin_roundtrip_enabled : bool;
     }
       -> test_description
@@ -183,7 +182,7 @@ struct
 
   module Optionals = struct
     let options =
-      let mk_test name value expected is_kotlin_roundtrip_enabled =
+      let mk_test name value expected =
         Test
           {
             name;
@@ -194,7 +193,10 @@ struct
             value;
             expected;
             kotlin_class_name = None;
-            is_kotlin_roundtrip_enabled;
+            is_kotlin_roundtrip_enabled =
+              false
+              (* Kotlin's [Class.forName] does not support generics/nullable
+                 types *);
           }
       in
       {
@@ -203,8 +205,8 @@ struct
         additional_test = None;
         tests =
           [
-            mk_test "some int" (Some 28) [%ezjsonm 28] false;
-            mk_test "none int" None [%ezjsonm None] false;
+            mk_test "some int" (Some 28) [%ezjsonm 28];
+            mk_test "none int" None [%ezjsonm None];
           ];
       }
 
@@ -217,7 +219,7 @@ struct
       Alcotest.testable pp_nullable_option equal_nullable_option
 
     let nullable_option =
-      let mk_test name value expected is_kotlin_roundtrip_enabled =
+      let mk_test name value expected =
         Test
           {
             name;
@@ -228,7 +230,7 @@ struct
             value;
             expected;
             kotlin_class_name = None;
-            is_kotlin_roundtrip_enabled;
+            is_kotlin_roundtrip_enabled = true;
           }
       in
       {
@@ -237,10 +239,9 @@ struct
         additional_test = None;
         tests =
           [
-            mk_test "omitted" { no = None } (`O []) false;
-            mk_test "null" { no = Some None } [%ezjsonm { no = None }] true;
-            mk_test "specified" { no = Some (Some 74) } [%ezjsonm { no = 74 }]
-              true;
+            mk_test "omitted" { no = None } (`O []);
+            mk_test "null" { no = Some None } [%ezjsonm { no = None }];
+            mk_test "specified" { no = Some (Some 74) } [%ezjsonm { no = 74 }];
           ];
       }
 
@@ -253,7 +254,7 @@ struct
       Alcotest.(testable pp_default_option equal_default_option)
 
     let default_option =
-      let mk_test name value expected is_kotlin_roundtrip_enabled =
+      let mk_test name value expected =
         Test
           {
             name;
@@ -264,7 +265,7 @@ struct
             value;
             expected;
             kotlin_class_name = None;
-            is_kotlin_roundtrip_enabled;
+            is_kotlin_roundtrip_enabled = true;
           }
       in
       {
@@ -273,10 +274,9 @@ struct
         additional_test = None;
         tests =
           [
-            mk_test "none" { oo = None } (`O []) false;
-            mk_test "some none" { oo = Some None } [%ezjsonm { oo = None }] true;
-            mk_test "some some" { oo = Some (Some 877) } [%ezjsonm { oo = 877 }]
-              true;
+            mk_test "none" { oo = None } (`O []);
+            mk_test "some none" { oo = Some None } [%ezjsonm { oo = None }];
+            mk_test "some some" { oo = Some (Some 877) } [%ezjsonm { oo = 877 }];
           ];
       }
 
@@ -308,7 +308,7 @@ struct
                 value = { a = None; b = [] };
                 expected = [%ezjsonm { a = None; b = [] }];
                 kotlin_class_name = None;
-                is_kotlin_roundtrip_enabled = false;
+                is_kotlin_roundtrip_enabled = true;
               };
           ];
       }
@@ -616,7 +616,7 @@ struct
     let test_day = Alcotest.testable pp_day equal_day
 
     let payload =
-      let mk_test name value expected is_kotlin_roundtrip_enabled =
+      let mk_test name value expected =
         Test
           {
             name;
@@ -627,7 +627,7 @@ struct
             value;
             expected;
             kotlin_class_name = None;
-            is_kotlin_roundtrip_enabled;
+            is_kotlin_roundtrip_enabled = true;
           }
       in
       {
@@ -636,12 +636,12 @@ struct
         additional_test = None;
         tests =
           [
-            mk_test "polymorphic variant" `Mon [%ezjsonm "mon"] true;
-            mk_test "polymorphic variant alias" `Tue [%ezjsonm "tuesday"] true;
-            mk_test "polymorphic variant payload" (`Wed 160) [%ezjsonm 160] true;
+            mk_test "polymorphic variant" `Mon [%ezjsonm "mon"];
+            mk_test "polymorphic variant alias" `Tue [%ezjsonm "tuesday"];
+            mk_test "polymorphic variant payload" (`Wed 160) [%ezjsonm 160];
             mk_test "polymorphic variant composite payload"
               (`Thu (true, false))
-              [%ezjsonm [ true; false ]] true;
+              [%ezjsonm [ true; false ]];
           ];
       }
 
@@ -657,7 +657,7 @@ struct
     let test_keyed = Alcotest.testable pp_keyed equal_keyed
 
     let keyed =
-      let mk_test name value expected is_kotlin_roundtrip_enabled =
+      let mk_test name value expected =
         Test
           {
             name;
@@ -668,7 +668,7 @@ struct
             value;
             expected;
             kotlin_class_name = None;
-            is_kotlin_roundtrip_enabled;
+            is_kotlin_roundtrip_enabled = true;
           }
       in
       {
@@ -678,11 +678,10 @@ struct
         tests =
           [
             mk_test "keyed polymorphic variant" `Left
-              [%ezjsonm { position = "left" }] true;
+              [%ezjsonm { position = "left" }];
             mk_test "keyed polymorphic variant"
               (`Center { stable = false })
-              [%ezjsonm { position = "center"; stable = false }]
-              true;
+              [%ezjsonm { position = "center"; stable = false }];
           ];
       }
   end
@@ -973,10 +972,7 @@ struct
                 value = { value = 0; next = Some { value = 1; next = None } };
                 expected = [%ezjsonm { value = 0; next = { value = 1 } }];
                 kotlin_class_name = None;
-                is_kotlin_roundtrip_enabled =
-                  false
-                  (* TODO Currently Kotlin does not differentiate absent field
-                     from null field *);
+                is_kotlin_roundtrip_enabled = true;
               };
           ];
       }
@@ -1060,9 +1056,7 @@ struct
               value = { next_b = Some { next_a = Some { next_b = None } } };
               expected = [%ezjsonm { next_b = { next_a = [%aq `O []] } }];
               kotlin_class_name = None;
-              is_kotlin_roundtrip_enabled =
-                false
-                (* TODO another occurrence of the limitation with [Optional] *);
+              is_kotlin_roundtrip_enabled = true;
             };
         ];
     }
@@ -1225,7 +1219,7 @@ struct
       }
 
     let inline_variant =
-      let mk_test name value expected is_kotlin_roundtrip_enabled =
+      let mk_test name value expected =
         Test
           {
             name;
@@ -1236,7 +1230,7 @@ struct
             value;
             expected;
             kotlin_class_name = None;
-            is_kotlin_roundtrip_enabled;
+            is_kotlin_roundtrip_enabled = true;
           }
       in
       {
@@ -1255,12 +1249,10 @@ struct
           [
             mk_test "coding of Foo"
               { x = 362; pan = Foo { b = 363; c = 364 } }
-              [%ezjsonm { x = 362; b = 363; c = 364 }]
-              true;
+              [%ezjsonm { x = 362; b = 363; c = 364 }];
             mk_test "coding of Bar"
               { x = 369; pan = Bar { d = 370; e = 371 } }
-              [%ezjsonm { x = 369; d = 370; e = 371 }]
-              true;
+              [%ezjsonm { x = 369; d = 370; e = 371 }];
           ];
       }
 
@@ -1381,7 +1373,7 @@ struct
       let inline_nested_optional =
         Alcotest.testable pp_inline_nested_optional equal_inline_nested_optional
       in
-      let mk_test name value expected is_kotlin_roundtrip_enabled =
+      let mk_test name value expected =
         Test
           {
             name;
@@ -1392,7 +1384,7 @@ struct
             value;
             expected;
             kotlin_class_name = None;
-            is_kotlin_roundtrip_enabled;
+            is_kotlin_roundtrip_enabled = true;
           }
       in
       {
@@ -1403,12 +1395,10 @@ struct
           [
             mk_test "optional inline filled"
               { inline_nested = { inlined = Some { b = 665; c = 666 } } }
-              [%ezjsonm { b = 665; c = 666 }] true;
+              [%ezjsonm { b = 665; c = 666 }];
             mk_test "optional inline empty"
               { inline_nested = { inlined = None } }
-              (`O []) false
-            (* TODO Another limitation of Kotlin not differentiating absent
-               field from null *);
+              (`O []);
           ];
       }
 
@@ -1417,7 +1407,7 @@ struct
         Alcotest.testable pp_inline_nested_default equal_inline_nested_default
       in
 
-      let mk_test name value expected is_kotlin_roundtrip_enabled =
+      let mk_test name value expected =
         Test
           {
             name;
@@ -1428,7 +1418,7 @@ struct
             value;
             expected;
             kotlin_class_name = None;
-            is_kotlin_roundtrip_enabled;
+            is_kotlin_roundtrip_enabled = true;
           }
       in
       {
@@ -1439,10 +1429,10 @@ struct
           [
             mk_test "default inline filled"
               { inline_nested = { inlined = Some { b = 665; c = 666 } } }
-              [%ezjsonm { b = 665; c = 666 }] true;
+              [%ezjsonm { b = 665; c = 666 }];
             mk_test "default inline empty"
               { inline_nested = { inlined = None } }
-              (`O []) true;
+              (`O []);
           ];
       }
   end
@@ -1569,8 +1559,7 @@ struct
           value;
           expected;
           kotlin_class_name = None;
-          is_kotlin_roundtrip_enabled =
-            false (* TODO full support for optional values *);
+          is_kotlin_roundtrip_enabled = true;
         }
     in
     {
@@ -1605,7 +1594,7 @@ struct
   let keyed =
     let tester = Alcotest.(testable pp_keyedd equal_keyedd) in
 
-    let mk_test name value expected is_kotlin_roundtrip_enabled =
+    let mk_test name value expected =
       Test
         {
           name;
@@ -1616,7 +1605,7 @@ struct
           value;
           expected;
           kotlin_class_name = None;
-          is_kotlin_roundtrip_enabled;
+          is_kotlin_roundtrip_enabled = true;
         }
     in
     {
@@ -1626,13 +1615,11 @@ struct
         [
           mk_test "paragraph"
             (Paragraph_ { content = "text" })
-            [%ezjsonm { content = "text"; typ = "paragraph" }]
-            true;
+            [%ezjsonm { content = "text"; typ = "paragraph" }];
           mk_test "header"
             (Header { content = "text"; level = 411 })
-            [%ezjsonm { content = "text"; level = 411; typ = "header" }]
-            true;
-          mk_test "header" Separator [%ezjsonm { typ = "separator" }] true;
+            [%ezjsonm { content = "text"; level = 411; typ = "header" }];
+          mk_test "header" Separator [%ezjsonm { typ = "separator" }];
         ];
       additional_test =
         Some
@@ -1791,9 +1778,7 @@ struct
             value;
             expected;
             kotlin_class_name = None;
-            is_kotlin_roundtrip_enabled =
-              false
-              (* Default values are not supported by the Kotlin generator *);
+            is_kotlin_roundtrip_enabled = true;
           }
       in
 
@@ -2104,7 +2089,7 @@ struct
     let t = Alcotest.testable pp equal
 
     let computed =
-      let mk_test name value expected is_kotlin_roundtrip_enabled =
+      let mk_test name value expected =
         Test
           {
             name;
@@ -2115,7 +2100,7 @@ struct
             value;
             expected;
             kotlin_class_name = None;
-            is_kotlin_roundtrip_enabled;
+            is_kotlin_roundtrip_enabled = true;
           }
       in
       {
@@ -2124,10 +2109,9 @@ struct
         tests =
           [
             mk_test "computed" { x = 1; y = 2 }
-              [%ezjsonm { x = 1; y = 2; sum = 3; opposite = -1 }]
-              true;
+              [%ezjsonm { x = 1; y = 2; sum = 3; opposite = -1 }];
             mk_test "computed optional" { x = 0; y = 0 }
-              [%ezjsonm { x = 0; sum = 0 }] false;
+              [%ezjsonm { x = 0; sum = 0 }];
           ];
         additional_test =
           Some
