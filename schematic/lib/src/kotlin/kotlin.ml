@@ -164,6 +164,9 @@ module Parser = struct
     type nonrec t = kotlin with_parsing_status t
   end
 
+  let wrap_in_option : kotlin_type -> kotlin_type =
+   fun kotlin_type -> Generic ("Option", [ kotlin_type ])
+
   (** Try to find an adequate Kotlin type name. *)
   let type_name_and_kotlin_to_kotlin_type_exn :
       string option -> kotlin -> kotlin_type =
@@ -286,8 +289,7 @@ module Parser = struct
       in
       let res =
         match (type_name, kotlin) with
-        | None, Atom kotlin_type ->
-          (Atom (Generic ("Option", [ kotlin_type ])), marks)
+        | None, Atom kotlin_type -> (Atom (wrap_in_option kotlin_type), marks)
         | None, _kotlin ->
           raise
             (NotYetImplemented
@@ -296,7 +298,7 @@ module Parser = struct
                    that is not an Atom: %a"
                   pp_kotlin kotlin))
         | Some type_name, _kotlin ->
-          (Atom (Generic ("Option", [ Simple type_name ])), marks)
+          (Atom (wrap_in_option (Simple type_name)), marks)
       in
       let () =
         Logs.debug (fun m ->
@@ -468,9 +470,8 @@ module Parser = struct
     let wrap_in_options kotlin_type =
       match requirement with
       | Required | Default _ -> kotlin_type
-      | Computed | Optional -> Generic ("Option", [ kotlin_type ])
-      | Computed_optional ->
-        Generic ("Option", [ Generic ("Option", [ kotlin_type ]) ])
+      | Computed | Optional -> wrap_in_option kotlin_type
+      | Computed_optional -> wrap_in_option (wrap_in_option kotlin_type)
     in
     let kotlin_type_name, kotlin, marks = schema_to_kotlin_marks marks schema in
     let () =
