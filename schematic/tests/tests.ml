@@ -240,7 +240,7 @@ struct
         additional_test = None;
         tests =
           [
-            mk_test "omitted" { no = None } (`O []) false;
+            mk_test "omitted" { no = None } (`O []) true;
             mk_test "null" { no = Some None } [%ezjsonm { no = None }] true;
             mk_test "specified" { no = Some (Some 74) } [%ezjsonm { no = 74 }]
               true;

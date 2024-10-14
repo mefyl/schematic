@@ -90,21 +90,12 @@ let to_object_field_name s =
   let s = to_camel_case s in
   if Set.mem kotlin_reserved_words s then s ^ "_" else s
 
-(** Kotlin has special handling of nullability. Unlike decent programming
-    languages, it does not use a type (e.g. [option]), instead it marks types
-    with [?] and provides special syntax everywhere to support those. So we need
-    this special marker. *)
-type kotlin_nullable =
-  | Nullable
-  | NotNullable
-[@@deriving show]
-
 type kotlin_type =
-  | Simple of string * kotlin_nullable  (** E.g. [Foo], [String?], etc. *)
-  | Generic of string * kotlin_type list * kotlin_nullable
+  | Simple of string  (** E.g. [Foo] *)
+  | Generic of string * kotlin_type list
       (** E.g.
-          [Generic ("Bar", [Generic ("List", [Simple ("Boolean", NotNullable)], Nullable); Simple ("String", NotNullable)], NotNullable)]
-          is [Bar<List<Boolean>?, String>] *)
+          [Generic ("Bar", [Generic ("List", [Simple "Boolean"]); Simple "String"])]
+          is [Bar<List<Boolean>, String>] *)
 [@@deriving show]
 
 type kotlin_data_class = {
@@ -178,7 +169,7 @@ module Parser = struct
       string option -> kotlin -> kotlin_type =
    fun type_name kotlin ->
     match (type_name, kotlin) with
-    | Some type_name, _ -> Simple (type_name, NotNullable)
+    | Some type_name, _ -> Simple type_name
     | None, Atom kotlin_type -> kotlin_type
     | _ ->
       Fmt.failwith "I don't know how to extract a Kotlin type from: %a\n"
@@ -236,7 +227,7 @@ module Parser = struct
                 kotlin_type_name)
         in
         ( Some kotlin_type_name,
-          Atom (Simple (kotlin_type_name (* TODO generics *), NotNullable)),
+          Atom (Simple kotlin_type_name (* TODO generics *)),
           marks )
       | Some (Some (Done kotlin)) ->
         let () =
@@ -255,23 +246,23 @@ module Parser = struct
       type a. Marks.t -> a Schema.descriptor -> kotlin * Marks.t =
    fun marks descriptor ->
     match descriptor with
-    | Bool -> (Atom (Simple ("Boolean", NotNullable)), marks)
-    | Date -> (Atom (Simple ("LocalDate", NotNullable)), marks)
+    | Bool -> (Atom (Simple "Boolean"), marks)
+    | Date -> (Atom (Simple "LocalDate"), marks)
     | Fixpoint lazy_descriptor ->
       descriptor_to_kotlin_marks marks (Lazy.force lazy_descriptor)
     | Ignore ->
       (Data_object, marks)
       (* Treat [Ignore] fields as an empty object that will be removed in a
          later pass *)
-    | Int -> (Atom (Simple ("Int", NotNullable)), marks)
-    | Json -> (Atom (Simple ("JsonElement", NotNullable)), marks)
+    | Int -> (Atom (Simple "Int"), marks)
+    | Json -> (Atom (Simple "JsonElement"), marks)
     | List sub_schema ->
       (* TODO We will probably need [kotlin] to support generics *)
       let type_name, kotlin, marks = schema_to_kotlin_marks marks sub_schema in
       let kotlin_type =
         type_name_and_kotlin_to_kotlin_type_exn type_name kotlin
       in
-      let kotlin = Atom (Generic ("List", [ kotlin_type ], NotNullable)) in
+      let kotlin = Atom (Generic ("List", [ kotlin_type ])) in
       (kotlin, marks)
     | Map { descriptor; _ } -> descriptor_to_kotlin_marks marks descriptor
     | Mapping value_schema ->
@@ -282,15 +273,9 @@ module Parser = struct
       let kotlin_type =
         type_name_and_kotlin_to_kotlin_type_exn type_name kotlin
       in
-      let kotlin =
-        Atom
-          (Generic
-             ( "Map",
-               [ Simple ("String", NotNullable); kotlin_type ],
-               NotNullable ))
-      in
+      let kotlin = Atom (Generic ("Map", [ Simple "String"; kotlin_type ])) in
       (kotlin, marks)
-    | Null -> (Atom (Simple ("Unit", NotNullable)), marks)
+    | Null -> (Atom (Simple "Unit"), marks)
     | Nullable schema ->
       let type_name, kotlin, marks = schema_to_kotlin_marks marks schema in
       let () =
@@ -301,10 +286,8 @@ module Parser = struct
       in
       let res =
         match (type_name, kotlin) with
-        | None, Atom (Simple (type_name, _nullable)) ->
-          (Atom (Simple (type_name, Nullable)), marks)
-        | None, Atom (Generic (type_name, generics, _nullable)) ->
-          (Atom (Generic (type_name, generics, Nullable)), marks)
+        | None, Atom kotlin_type ->
+          (Atom (Generic ("Option", [ kotlin_type ])), marks)
         | None, _kotlin ->
           raise
             (NotYetImplemented
@@ -312,7 +295,8 @@ module Parser = struct
                   "We are trying to mark as nullable a type without name and \
                    that is not an Atom: %a"
                   pp_kotlin kotlin))
-        | Some type_name, _kotlin -> (Atom (Simple (type_name, Nullable)), marks)
+        | Some type_name, _kotlin ->
+          (Atom (Generic ("Option", [ Simple type_name ])), marks)
       in
       let () =
         Logs.debug (fun m ->
@@ -336,10 +320,10 @@ module Parser = struct
            previous case). *)
       | kotlin_fields ->
         (Data_class { fields = kotlin_fields; generics = [] }, marks))
-    | String -> (Atom (Simple ("String", NotNullable)), marks)
+    | String -> (Atom (Simple "String"), marks)
     | String_const _ -> (Data_object, marks)
-    | Time -> (Atom (Simple ("Instant", NotNullable)), marks)
-    | Time_local -> (Atom (Simple ("OffsetDateTime", NotNullable)), marks)
+    | Time -> (Atom (Simple "Instant"), marks)
+    | Time_local -> (Atom (Simple "OffsetDateTime"), marks)
     | Tuple { items; _ } ->
       let kotlin_type, marks = tuple_to_kotlin_marks marks items in
       (Atom kotlin_type, marks)
@@ -357,8 +341,7 @@ module Parser = struct
             in
             let nested_type =
               match (type_name, kotlin) with
-              | Some type_name, _kotlin ->
-                (case_name, Wrap (Simple (type_name, NotNullable)))
+              | Some type_name, _kotlin -> (case_name, Wrap (Simple type_name))
               | None, Atom kotlin_type -> (case_name, Wrap kotlin_type)
               | None, _ -> (case_name, Inline kotlin)
               (* TODO Need to add generics *)
@@ -396,7 +379,7 @@ module Parser = struct
         let kotlin_type_2, marks =
           tuple_element_to_kotlin_type marks schema_2
         in
-        (Generic ("Pair", [ kotlin_type_1; kotlin_type_2 ], NotNullable), marks)
+        (Generic ("Pair", [ kotlin_type_1; kotlin_type_2 ]), marks)
       | Item
           {
             schema = schema_1;
@@ -416,10 +399,7 @@ module Parser = struct
         let kotlin_type_3, marks =
           tuple_element_to_kotlin_type marks schema_3
         in
-        ( Generic
-            ( "Triple",
-              [ kotlin_type_1; kotlin_type_2; kotlin_type_3 ],
-              NotNullable ),
+        ( Generic ("Triple", [ kotlin_type_1; kotlin_type_2; kotlin_type_3 ]),
           marks )
       | _ ->
         raise (NotYetImplemented "Only tuples of 2 or 3 elements are supported")
@@ -431,7 +411,7 @@ module Parser = struct
     | Plain { name; descriptor } ->
       let _kotlin, marks = descriptor_to_kotlin_marks marks descriptor in
       (* TODO do we need this [kotlin] type? *)
-      ([ Simple (name, NotNullable) ], marks)
+      ([ Simple name ], marks)
     | Parametric { name; parameter; next } ->
       (* TODO do we need this parameter type and kotlin? *)
       let _parameter_type_name, _kotlin, marks =
@@ -440,7 +420,7 @@ module Parser = struct
       let other_types, marks =
         parametric_to_kotlin_marks marks (next parameter)
       in
-      (Simple (name, NotNullable) :: other_types, marks)
+      (Simple name :: other_types, marks)
 
   and object_fields_to_kotlin_marks :
       type a.
@@ -485,18 +465,12 @@ module Parser = struct
          schema = Outline schema | Inline schema | Inline_try schema;
          _;
        } ->
-    let nullable =
+    let wrap_in_options kotlin_type =
       match requirement with
-      | Optional -> Nullable
-      | Required -> NotNullable
-      | Computed -> NotNullable
-      | Computed_optional -> Nullable
-      (* Default means "Optional and if it's absent, take this default value",
-         but encoding the default value in Kotlin may not be simple. So, as a
-         first approximation, we will treat it as optional, and see how things
-         go. Note that Kotlin seems to support default values for data class
-         fields, e.g. `val name: String = "my default value"` *)
-      | Default _ -> Nullable
+      | Required | Default _ -> kotlin_type
+      | Computed | Optional -> Generic ("Option", [ kotlin_type ])
+      | Computed_optional ->
+        Generic ("Option", [ Generic ("Option", [ kotlin_type ]) ])
     in
     let kotlin_type_name, kotlin, marks = schema_to_kotlin_marks marks schema in
     let () =
@@ -505,18 +479,12 @@ module Parser = struct
             Fmt.(option string)
             kotlin_type_name)
     in
-    let either_is_nullable other_nullable =
-      match (nullable, other_nullable) with
-      | Nullable, _ | _, Nullable -> Nullable
-      | _ -> NotNullable
-    in
     let kotlin_type, marks =
       match (kotlin_type_name, kotlin) with
-      | Some kotlin_type_name, _ -> (Simple (kotlin_type_name, nullable), marks)
-      | None, Atom (Simple (type_name, other_nullable)) ->
-        (Simple (type_name, either_is_nullable other_nullable), marks)
-      | None, Atom (Generic (type_name, generics, other_nullable)) ->
-        (Generic (type_name, generics, either_is_nullable other_nullable), marks)
+      | Some kotlin_type_name, _ -> (Simple kotlin_type_name, marks)
+      | None, Atom (Simple type_name) -> (Simple type_name, marks)
+      | None, Atom (Generic (type_name, generics)) ->
+        (Generic (type_name, generics), marks)
       | None, Sealed_interface { nested_data_classes; _ } ->
         (* Corner case: there is one (1) occurrence in the whole RPC type
            hierarchy where an object field refers to an anonymous schema:
@@ -530,12 +498,13 @@ module Parser = struct
         let kotlin_type_name, _kotlin, marks =
           schema_to_kotlin_marks marks { schema with id = Some id }
         in
-        (Simple (Option.value_exn kotlin_type_name, nullable), marks)
+        (Simple (Option.value_exn kotlin_type_name), marks)
       | _ ->
         Fmt.failwith
           "Hopefully unreachable: the object field %S has no type name: %a" name
           pp_kotlin kotlin
     in
+    let kotlin_type = wrap_in_options kotlin_type in
     let () =
       Logs.debug (fun m ->
           m "object_field_to_kotlin_marks: Result: %a" pp_kotlin_type
@@ -553,20 +522,9 @@ end
 module Generator = struct
   let original_pp_kotlin_type = pp_kotlin_type
 
-  let pp_kotlin_nullable : kotlin_nullable Fmt.t =
-   fun f nullable ->
-    match nullable with
-    | NotNullable -> Fmt.nop f ()
-    | Nullable -> Fmt.char f '?'
-
   let rec pp_field : (string * kotlin_type) Fmt.t =
    fun f (field_name, field_type) ->
-    let nullable =
-      match field_type with
-      | Simple (_, nullable) | Generic (_, _, nullable) -> nullable
-    in
-    Fmt.pf f "val %s: %a%s" field_name pp_kotlin_type field_type
-      (match nullable with NotNullable -> "" | Nullable -> " = null")
+    Fmt.pf f "val %s: %a" field_name pp_kotlin_type field_type
 
   and pp_kotlin_type : kotlin_type Fmt.t =
    fun f kotlin_type ->
@@ -576,9 +534,8 @@ module Generator = struct
             original_pp_kotlin_type kotlin_type)
     in
     match kotlin_type with
-    | Simple (s, nullable) -> Fmt.pf f "%s%a" s pp_kotlin_nullable nullable
-    | Generic (s, generics, nullable) ->
-      Fmt.pf f "%s%a%a" s pp_generics generics pp_kotlin_nullable nullable
+    | Simple s -> Fmt.pf f "%s" s
+    | Generic (s, generics) -> Fmt.pf f "%s%a" s pp_generics generics
 
   and pp : (string * kotlin Parser.Marks.with_parsing_status) Fmt.t =
    fun f (name, kotlin) ->
@@ -640,7 +597,7 @@ module Generator = struct
          all cases of a [Union] have the same structure, and then create a
          wrapper. *)
       let inner_kotlin_type_name = type_name ^ "Inner" in
-      let inner_kotlin_type = Simple (inner_kotlin_type_name, NotNullable) in
+      let inner_kotlin_type = Simple inner_kotlin_type_name in
       let pp_inner_kotlin f kotlin =
         match kotlin with
         | Data_class { fields; generics } ->
@@ -718,7 +675,8 @@ module Json = struct
       | Null -> Fn.const (`O [])
       | Nullable schema ->
         let f = encode schema in
-        fun v -> Option.map ~f v |> Option.value ~default:`Null
+        fun v ->
+          `O [ ("value", Option.map ~f v |> Option.value ~default:`Null) ]
       | Object { encode; fields; _ } ->
         fun v ->
           let fields_hlist = encode v in
@@ -820,31 +778,33 @@ module Json = struct
         let encoded_tail = encode_fields rest fields_hlist_rest in
         encoded_tail
       | ( (Field { field; rest } : t Hlist.t Schema.fields),
-          field_hlist_head :: fields_hlist_rest ) -> (
+          field_hlist_head :: fields_hlist_rest ) ->
         let encoded_head = encode_field field field_hlist_head in
         let encoded_tail = encode_fields rest fields_hlist_rest in
-        match encoded_head with
-        | None -> encoded_tail
-        | Some encoded_head -> encoded_head :: encoded_tail)
+        encoded_head :: encoded_tail
 
     and encode_field :
-        type t req.
-        (t, req) Schema.field -> req -> (string * Ezjsonm.value) option =
+        type t req. (t, req) Schema.field -> req -> string * Ezjsonm.value =
      fun { name; requirement; schema; _ } ->
       let name = to_object_field_name name in
       let encode = encode (Schema.field_schema schema) in
       let optional v =
-        match v with None -> None | Some v -> Some (name, encode v)
+        match v with
+        | None -> (name, `O [ ("value", `Null) ])
+        | Some v -> (name, `O [ ("value", encode v) ])
       in
       match requirement with
       | Optional -> optional
-      | Required -> fun v -> Some (name, encode v)
+      | Required -> fun v -> (name, encode v)
       | Computed -> optional
       | Computed_optional -> (
-        fun v -> match v with None -> None | Some v -> optional v)
-      | Default default ->
-        let compare = Schema.(compare (field_schema schema)) in
-        fun v -> if compare v default = 0 then None else Some (name, encode v)
+        fun v ->
+          match v with
+          | None -> (name, `O [ ("value", `Null) ])
+          | Some None -> (name, `O [ ("value", `O [ ("value", `Null) ]) ])
+          | Some (Some v) -> (name, `O [ ("value", `O [ ("value", encode v) ]) ])
+        )
+      | Default _default -> fun v -> (name, encode v)
   end
 
   module Decode = struct
@@ -936,10 +896,11 @@ module Json = struct
       | Null -> ( function `O [] -> Ok () | json -> type_error "null" json)
       | Nullable schema -> (
         function
-        | `Null -> Ok None
-        | json ->
+        | `O [ ("value", `Null) ] -> Ok None
+        | `O [ ("value", json) ] ->
           let+ decoded = decode context schema json in
-          Some decoded)
+          Some decoded
+        | json -> type_error "object" json)
       | Object { decode = cons; fields; _ } ->
         fun json ->
           let* json_fields =
@@ -1124,58 +1085,64 @@ module Json = struct
       let schema = Schema.field_schema schema in
       let context = { context with path = context.path @ [ name ] } in
       let m_value = List.Assoc.find ~equal:String.equal json_fields name in
-      match requirement with
-      | Optional -> (
-        let () =
-          Logs.debug (fun m ->
-              m "decode_field: Optional for optional JSON %a@."
-                Fmt.(option ~none:(fun fmt () -> Fmt.pf fmt "None") Json.pp)
-                m_value)
-        in
-        match m_value with
-        | None -> Ok None
-        | Some value ->
-          let* decoded_value = decode context schema value in
-          Ok (Some decoded_value))
-      | Computed -> (
-        match m_value with
-        | None -> Ok None
-        | Some value ->
-          let* decoded_value = decode context schema value in
-          Ok (Some decoded_value))
-      | Required -> (
+      let* value =
         match m_value with
         | None ->
           Error
-            { context with reason = Fmt.str "Required field %s is absent" name }
-        | Some value ->
+            { context with reason = Fmt.str "Object field %s is absent" name }
+        | Some value -> Ok value
+      in
+      let type_error expected json =
+        Error
+          {
+            context with
+            reason = Fmt.str "Expected a %s but got %a" expected Json.pp json;
+          }
+      in
+      (* Silly extracted variable because OCaml GADT type inference is bad. *)
+      let res : (req, E.decoding) Result.t =
+        match requirement with
+        | Required ->
           let* decoded_value = decode context schema value in
-          Ok decoded_value)
-      | Computed_optional -> (
-        match m_value with
-        | None -> Ok None
-        | Some value ->
-          let* decoded_value = decode context schema value in
-          Ok (Some (Some decoded_value)))
-      | Default default_value -> (
-        let () =
-          Logs.debug (fun m ->
-              m "decode_field: Default for optional JSON %a@."
-                Fmt.(option ~none:(fun fmt () -> Fmt.pf fmt "None") Json.pp)
-                m_value)
-        in
-        match (m_value, schema.descriptor) with
-        | None, _ -> Ok default_value
-        | Some value, Nullable nullable -> (
-          (* We have to handle in a special way an optional (with default) field
-             whose sub-descriptor is also [Nullable] (i.e. a field ['a option
-             option [@default None]]) *)
-          match decode context nullable value with
-          | Result.Ok value -> Result.return (Some value)
-          | Result.Error _ -> decode context schema value)
-        | Some value, _ ->
-          let* decoded_value = decode context schema value in
-          Ok decoded_value)
+          Ok decoded_value
+        | Optional -> (
+          let () =
+            Logs.debug (fun m ->
+                m "decode_field: Optional for optional JSON %a@."
+                  Fmt.(option ~none:(fun fmt () -> Fmt.pf fmt "None") Json.pp)
+                  m_value)
+          in
+          match value with
+          | `O [ ("value", `Null) ] -> Ok None
+          | `O [ ("value", json) ] ->
+            let* decoded_value = decode context schema json in
+            Ok (Some decoded_value)
+          | json -> type_error "object with single field 'value'" json)
+        | Computed -> (
+          match value with
+          | `O [ ("value", `Null) ] -> Ok None
+          | `O [ ("value", json) ] ->
+            let* decoded_value = decode context schema json in
+            Ok (Some decoded_value)
+          | json -> type_error "object with single field 'value'" json)
+        | Computed_optional -> (
+          match value with
+          | `O [ ("value", `Null) ] -> Ok None
+          | `O [ ("value", `O [ ("value", `Null) ]) ] -> Ok (Some None)
+          | `O [ ("value", `O [ ("value", value) ]) ] ->
+            let* decoded_value = decode context schema value in
+            Ok (Some (Some decoded_value))
+          | json -> type_error "object with single field 'value'" json)
+        | Default _default_value ->
+          let () =
+            Logs.debug (fun m ->
+                m "decode_field: Default for optional JSON %a@."
+                  Fmt.(option ~none:(fun fmt () -> Fmt.pf fmt "None") Json.pp)
+                  m_value)
+          in
+          decode context schema value
+      in
+      res
 
     let decode : type t. t Schema.t -> Ezjsonm.value -> (t, E.decoding) Result.t
         =
@@ -1200,19 +1167,18 @@ module Public_api = struct
 
   let pp_file ?package fmt marks =
     Fmt.pf fmt
-      {|@file:UseSerializers(KOffsetDateTimeSerializer::class)@.
+      {|@file:UseSerializers(KOffsetDateTimeSerializer::class, CustomOptionSerializer::class)@.
 
 %a@.
 
+import arrow.core.Option
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import kotlinx.datetime.Instant
 import kotlinx.serialization.*
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.builtins.nullable
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
 import kotlinx.serialization.json.JsonClassDiscriminator
 
 /**
@@ -1238,6 +1204,50 @@ object KOffsetDateTimeSerializer : KSerializer<OffsetDateTime> {
     return OffsetDateTime.parse(string)
   }
 }
+
+/**
+ * The Arrow-kt serializer for Option directly encodes as nullable, which is no more desirable for us than
+ * Kotlin's default serialization of nullable values.
+ * Indeed, encoding directly as null prevents serializing nested options, like Option<Option<String>>.
+ * You cannot differentiate None from Some(None).
+ * So we provide instead a custom serializer that wraps in a JSON object with a single, nullable field called "value".
+ * Now, None becomes {"value": null} while Some(None) becomes {"value": {"value": null}}.
+ * The extra verbosity is a small price to pay for this much-needed flexibility.
+ */
+class CustomOptionSerializer<T>(private val dataSerializer: KSerializer<T>) :
+    KSerializer<Option<T>> {
+
+  private val nullableDataSerializer: KSerializer<T?> = dataSerializer.nullable
+
+  override val descriptor: SerialDescriptor =
+      buildClassSerialDescriptor("arrow.core.Option") {
+        element("value", nullableDataSerializer.descriptor)
+      }
+
+  override fun serialize(encoder: Encoder, value: Option<T>) =
+      encoder.encodeStructure(descriptor) {
+        encodeSerializableElement(descriptor, 0, nullableDataSerializer, value.getOrNull())
+      }
+
+  override fun deserialize(decoder: Decoder) =
+      decoder.decodeStructure(descriptor) {
+        var value : T? = null
+        while (true) {
+          when (val index = decodeElementIndex(descriptor)) {
+            0 -> value = nullableDataSerializer.deserialize(decoder)
+            CompositeDecoder.DECODE_DONE -> break
+            else -> error("Unexpected index: $index")
+          }
+        }
+        Option.fromNullable(value)
+      }
+}
+
+@OptIn(ExperimentalSerializationApi::class)
+private val <T> KSerializer<T>.nullable get() =
+  @Suppress("UNCHECKED_CAST")
+  if (descriptor.isNullable) (this as KSerializer<T?>)
+  else (this as KSerializer<T & Any>).nullable
 
 @[<hv 0>@[<v 2>%a@]@]@.
 |}
