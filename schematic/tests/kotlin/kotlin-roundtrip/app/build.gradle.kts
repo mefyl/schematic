@@ -28,6 +28,8 @@ dependencies {
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.kotlinx.serialization.datetime)
 
+  implementation(libs.arrow.kt.core)
+
   implementation(kotlin("reflect"))
 }
 
