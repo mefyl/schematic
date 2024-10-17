@@ -42,23 +42,46 @@ module Make (Handler : HANDLER) = struct
       | Result.Error _ as error -> Future.return error
       | Result.Ok v -> f v)
 
+  let ( >>=! ) = ( let*! )
   let ( let+ ) v f = Handler.Future.map v ~f
   let ( >>| ) = ( let+ )
+
+  type request = {
+    handler : t;
+    scope : Future.Scope.t;
+    timeout : Timmy.Span.t option;
+    headers : Http.Header.t;
+    body : Body.t option;
+    id : Id.t;
+    method' : Http.Method.t;
+    url : Uri.t;
+  }
+
+  let error_context ?response request reason =
+    Error.make ~method_:request.method'
+      ?status:(Option.map Http.Response.status response)
+      ~reason request.url
 
   module Protocol = struct
     type ('value, 'result, 'error) protocol = {
       f :
-        Uri.t ->
-        (unit -> (Http.Response.t * Body.t, 'error) Result.t Future.t) ->
-        Http.Response.t * Body.t ->
-        (Http.Response.t * Body.t -> ('value, 'error) Result.t Future.t) ->
-        ('result, 'error) Result.t Future.t;
+        request ->
+        (Http.Response.t * Body.t -> ('value, 'error Error.t) Result.t Future.t) ->
+        ('result, 'error Error.t) Result.t Future.t;
     }
 
     type ('value, 'next, 'result, 'error) rule =
       ('next, 'result, 'error) protocol -> ('value, 'result, 'error) protocol
 
-    let id = { f = (fun _ _ v f -> f v) }
+    let id =
+      {
+        f =
+          (fun ({ handler; scope; timeout; headers; body; id; method'; url } as
+                request) f ->
+            raw handler ~scope ?timeout ~headers ?body id method' url
+            >>| Result.map_error (error_context request)
+            >>=! f);
+      }
 
     module Retry = struct
       type nonrec 'error rule = {
@@ -76,11 +99,13 @@ module Make (Handler : HANDLER) = struct
       let rule protocol =
         {
           f =
-            (fun url retry v f ->
-              protocol.f url retry v @@ fun (response, body) ->
+            (fun request f ->
+              protocol.f request @@ fun (response, body) ->
               rewrite response body >>= function
               | Result.Ok (response, body) -> f (response, body)
-              | Result.Error _ as error -> Handler.Future.return error);
+              | Result.Error error ->
+                Handler.Future.return
+                  (Result.Error (error_context ~response request error)));
         }
       in
       { Error.rule }
@@ -89,19 +114,23 @@ module Make (Handler : HANDLER) = struct
       let rule protocol =
         {
           f =
-            (fun url retry v f ->
-              protocol.f url retry v @@ fun (response, body) ->
-              let status = Http.Response.status response in
+            (fun request f ->
+              protocol.f request @@ fun (response, body) ->
+              let status = Http.Response.status response
+              and error_context = error_context ~response request in
               let report () =
                 Logs.warn (fun m ->
                     m "unexpected status %a querying %a" Http.Status.pp status
-                      Uri.pp url)
+                      Uri.pp request.url)
               in
               let decode_body schema decode =
                 let () = report () in
-                let*! body = Body.to_string body in
+                let*! body =
+                  Body.to_string body >>| Result.map_error error_context
+                in
                 match Handler.Coding.decode schema body with
-                | Result.Ok error -> Future.return (Result.Error (decode error))
+                | Result.Ok error ->
+                  Future.return (Result.Error (error_context (decode error)))
                 | Result.Error e ->
                   let e =
                     {
@@ -109,14 +138,14 @@ module Make (Handler : HANDLER) = struct
                       reason = Fmt.str "while decoding error body: %s" e.reason;
                     }
                   in
-                  Future.return (Result.Error (`Decoding e))
+                  Future.return (Result.Error (error_context (`Decoding e)))
               in
               match check status with
               | `Ok -> f (response, body)
               | `Error error ->
                 let () = report () in
                 let* () = Body.drain body in
-                Future.return (Result.Error error)
+                Future.return (Result.Error (error_context error))
               | `Body schema ->
                 let () = report () in
                 decode_body schema Base.Fn.id
@@ -130,8 +159,8 @@ module Make (Handler : HANDLER) = struct
     let optional protocol =
       {
         f =
-          (fun url retry v f ->
-            protocol.f url retry v @@ fun (response, body) ->
+          (fun request f ->
+            protocol.f request @@ fun (response, body) ->
             match Http.Response.status response with
             | `Not_found ->
               let* () = Body.drain body in
@@ -181,17 +210,15 @@ module Make (Handler : HANDLER) = struct
               in
               default ())
         in
-        let f url retry v f =
+        let f request f =
           let rec rate_limit errors (response, body) =
             if rate_limited response then
-              let backoff = backoff errors url response in
+              let backoff = backoff errors request.url response in
               let* () = sleep (Float.of_int backoff) in
-              let*! v = retry () in
-              protocol.f url retry v (rate_limit (errors + 1))
-              (* rate_limit (errors + 1) v *)
+              protocol.f request (rate_limit (errors + 1))
             else f (response, body)
           in
-          protocol.f url retry v @@ rate_limit 0
+          protocol.f request @@ rate_limit 0
         in
         { f }
       in
@@ -340,47 +367,49 @@ module Make (Handler : HANDLER) = struct
         in
         Http.Header.iter f headers
       in
-      let raw () =
-        raw t.handler ~scope ?timeout ~headers ?body id method_ uri
+      let request =
+        {
+          handler = t.handler;
+          scope;
+          timeout;
+          headers;
+          body;
+          id;
+          method' = method_;
+          url = uri;
+        }
       in
-      let*! resp, body =
-        raw ()
-        >>| Result.map_error (fun reason -> Error.make ~method_ ~reason uri)
-      in
+      let protocol = Protocol.apply t.protocol Protocol.id in
+      protocol.f request @@ fun (resp, body) ->
       let () =
         Logs.info (fun m ->
             m "%a%s" Id.pp id @@ Http.Status.to_string resp.status)
+      and error reason =
+        Error.make ~method_ ~status:(Http.Response.status resp) ~reason uri
       in
-      let* result =
-        let protocol = Protocol.apply t.protocol Protocol.id in
-        protocol.f uri raw (resp, body) @@ fun (resp, body) ->
-        let*! body =
-          match response with
-          | Empty ->
-            let* () = Body.drain body in
-            Future.return (Result.Ok (() : response))
-          | Channel _ -> Future.return (Result.Ok (Body.to_channel body))
-          | String -> (
-            let* body = Body.to_string body in
-            match body with
-            | Result.Error _ as error -> Future.return error
-            | Result.Ok body ->
-              let () = Logs.debug (fun m -> m "response body:\n%s" body) in
-              Future.return (Result.Ok body))
-          | Schema response -> (
-            let*! body = Body.to_string body in
+      let*! body =
+        match response with
+        | Empty ->
+          let* () = Body.drain body in
+          Future.return (Result.Ok (() : response))
+        | Channel _ -> Future.return (Result.Ok (Body.to_channel body))
+        | String -> (
+          let* body = Body.to_string body >>| Result.map_error error in
+
+          match body with
+          | Result.Error _ as error -> Future.return error
+          | Result.Ok body ->
             let () = Logs.debug (fun m -> m "response body:\n%s" body) in
-            match Coding.decode response body with
-            | Result.Ok body -> Future.return (Result.Ok body)
-            | Result.Error e -> Future.return (Result.Error (`Decoding e)))
-        in
-        Future.return (Result.Ok (result (body, resp)))
+            Future.return (Result.Ok body))
+        | Schema response -> (
+          let*! body = Body.to_string body >>| Result.map_error error in
+          let () = Logs.debug (fun m -> m "response body:\n%s" body) in
+          match Coding.decode response body with
+          | Result.Ok body -> Future.return (Result.Ok body)
+          | Result.Error e -> Future.return (Result.Error (error (`Decoding e)))
+          )
       in
-      Result.map_error
-        (fun reason ->
-          Error.make ~method_ ~status:(Http.Response.status resp) ~reason uri)
-        result
-      |> Future.return
+      Future.return (Result.Ok (result (body, resp)))
     in
     match response with
     | Channel scope -> call scope
