@@ -179,7 +179,7 @@ struct
         match result with
         | Result.Error _ as error -> Future.return error
         | Result.Ok stream ->
-          let+ content = Future.In_channel.read_all_string stream in
+          let+ content = Future.In_channel.read_all stream in
           Result.Ok content
       in
       Alcotest.(check ~here:[%here] (result string error))
@@ -268,10 +268,10 @@ struct
         | Result.Ok stream ->
           Future.catch
             (fun () ->
-              let* first_chunk = Future.In_channel.read_string stream in
+              let* first_chunk = Future.In_channel.read stream in
               let () = Logs.info (fun m -> m "first body chunk received") in
               let () = chunk_received () in
-              let+ content = Future.In_channel.read_all_string stream in
+              let+ content = Future.In_channel.read_all stream in
               Result.Ok (first_chunk ^ content))
             (function
               | Schematic_http.Channel error ->

@@ -65,10 +65,7 @@ struct
       }
 
     let of_channel method_ uri s =
-      let stream =
-        Lwt_stream.from @@ fun () ->
-        Lwt_io.read s >|= function "" -> None | chunk -> Some chunk
-      in
+      let stream = Nofuture_lwt.In_channel.to_stream s in
       {
         cohttp = Cohttp_lwt.Body.of_stream stream;
         id = None;
@@ -101,48 +98,26 @@ struct
 
     let to_channel ({ cohttp; method_; status; timeout; id; uri } as body) =
       let stream =
-        Cohttp_lwt.Body.to_stream cohttp
-        |> Lwt_stream.wrap_exn
-        |> Lwt_stream.map_s (function
-             | Result.Ok _ as ok -> Lwt.return ok
-             | Result.Error e -> error_of_exception id uri e)
-      and pending = ref None in
-      Lwt_io.make ~close:(fun () -> drain body) ~mode:Lwt_io.input
-      @@ fun buffer pos size ->
-      match !pending with
-      | Some (chunk, chunk_pos) ->
-        let length = String.length chunk - chunk_pos in
-        if length <= size then
-          let () = Lwt_bytes.blit_from_string chunk chunk_pos buffer pos length
-          and () = pending := None in
-          Lwt.return length
-        else
-          let () = Lwt_bytes.blit_from_string chunk chunk_pos buffer pos size
-          and () = pending := Some (chunk, chunk_pos + size) in
-          Lwt.return size
-      | None -> (
-        with_timeout ~method_ ~f:Base.Option.return "reading body" id uri
-          timeout (Lwt_stream.get stream)
+        let stream = Cohttp_lwt.Body.to_stream cohttp in
+        Lwt_stream.from @@ fun () ->
+        with_timeout ~method_ ~f:Base.Fn.id "reading body" id uri timeout
+          (Lwt.catch
+             (fun () -> Lwt_stream.get stream >|= Base.Result.return)
+             (error_of_exception id uri))
         >>= function
-        | Some (Result.Ok chunk) ->
-          let length = String.length chunk in
-          if length <= size then
-            let () = Lwt_bytes.blit_from_string chunk 0 buffer pos length in
-            Lwt.return length
-          else
-            let () = Lwt_bytes.blit_from_string chunk 0 buffer pos size
-            and () = pending := Some (chunk, size) in
-            Lwt.return size
-        | Some (Result.Error reason) ->
-          raise
-            (Schematic_http.Channel
-               (Schematic_http.Error.make ~method_ ?status ~reason uri))
-        | None ->
+        | Result.Ok (Some chunk) -> Some chunk |> Lwt.return
+        | Result.Ok None ->
           let+ () =
             Logs.info (fun m ->
                 m "%a done streaming body" (Fmt.option Schematic_http.Id.pp) id)
           in
-          0)
+          None
+        | Result.Error reason ->
+          raise
+            (Schematic_http.Channel
+               (Schematic_http.Error.make ~method_ ?status ~reason uri))
+      in
+      Nofuture_lwt.In_channel.of_stream ~close:(fun () -> drain body) stream
   end
 
   let raw () ~scope:_ ?timeout ~headers ?body id method_ uri =
