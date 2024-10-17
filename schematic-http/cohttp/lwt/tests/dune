@@ -8,6 +8,7 @@
   eio_main
   logs.fmt
   lwt_eio
+  nofuture-lwt-unix
   schematic_cohttp_lwt
   schematic_http_tests
   timmy-lwt.unix

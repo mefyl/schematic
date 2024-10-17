@@ -133,7 +133,7 @@ let error =
     (Schematic_http.Error.equal equal_reason)
 
 module Make
-    (Future : Nofuture.S)
+    (Future : Nofuture.S_IO_TIME)
     (Handler : Schematic_http.HANDLER with module Future = Future) =
 struct
   let ( let* ) v f = Future.bind v ~f

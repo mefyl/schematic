@@ -33,12 +33,16 @@ let error_of_exception id uri exn =
   Lwt_result.fail (Schematic_http.Private.error_of_exception id uri exn)
 
 module Make
+    (Future : sig
+      include Nofuture_lwt.S
+      include Nofuture.TIME with module Blocking = Blocking
+    end)
     (Client : Cohttp_lwt.S.Client)
     (Coding : Schematic.Coding.STR with type t = string) =
 struct
   type nonrec t = t
 
-  module Future = Nofuture_lwt
+  module Future = Future
 
   let send_content_length = true
 
@@ -65,7 +69,7 @@ struct
       }
 
     let of_channel method_ uri s =
-      let stream = Nofuture_lwt.In_channel.to_stream s in
+      let stream = Future.In_channel.to_stream s in
       {
         cohttp = Cohttp_lwt.Body.of_stream stream;
         id = None;
@@ -117,7 +121,7 @@ struct
             (Schematic_http.Channel
                (Schematic_http.Error.make ~method_ ?status ~reason uri))
       in
-      Nofuture_lwt.In_channel.of_stream ~close:(fun () -> drain body) stream
+      Future.In_channel.of_stream ~close:(fun () -> drain body) stream
   end
 
   let raw () ~scope:_ ?timeout ~headers ?body id method_ uri =

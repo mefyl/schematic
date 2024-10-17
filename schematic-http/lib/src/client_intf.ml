@@ -9,7 +9,7 @@ type exn += Channel of [ `Networking ] Error.t
 module type REQUESTS = sig
   type ('a, 'body, 'response, 'result, 'error) t
 
-  module Future : Nofuture.S
+  module Future : Nofuture.S_IO_TIME
 
   val call :
     ( Http.Method.t ->
@@ -114,7 +114,7 @@ type 'error body_decoder =
 module type HANDLER = sig
   type t
 
-  module Future : Nofuture.S
+  module Future : Nofuture.S_IO_TIME
 
   module Body : sig
     type t
@@ -193,10 +193,7 @@ module type S = sig
     val optional : ('value, 'value option, 'result, 'error) rule
 
     val rate_limit :
-      backoff:(int -> int) ->
-      rate_limited:(Http.Response.t -> bool) ->
-      sleep:(float -> unit Handler.Future.t) ->
-      'error Retry.rule
+      ?backoff:(int -> int) -> (Http.Response.t -> bool) -> 'error Retry.rule
   end
 
   val make :

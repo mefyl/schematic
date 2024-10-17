@@ -1,7 +1,8 @@
 include
   Schematic_http_tests.Make
-    (Nofuture_lwt)
-    (Schematic_cohttp_lwt.Make (Cohttp_lwt_unix.Client) (Schematic.Json.String))
+    (Nofuture_lwt_unix)
+    (Schematic_cohttp_lwt.Make (Nofuture_lwt_unix) (Cohttp_lwt_unix.Client)
+       (Schematic.Json.String))
 
 let () =
   let test_suite clock _ _ tests =

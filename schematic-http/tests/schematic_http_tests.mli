@@ -1,5 +1,5 @@
 module Make
-    (Future : Nofuture.S)
+    (Future : Nofuture.S_IO_TIME)
     (Handler : Schematic_http.HANDLER with module Future = Future) : sig
   val run :
     ([> float Eio.Time.clock_ty ] Eio.Resource.t ->

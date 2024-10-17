@@ -170,7 +170,7 @@ module Make (Handler : HANDLER) = struct
               Future.return (Result.Ok (Some result)));
       }
 
-    let rate_limit ~backoff ~rate_limited ~sleep =
+    let rate_limit ?(backoff = fun i -> Base.Int.(min i 6 ** 2)) rate_limited =
       let rule protocol =
         let pp_retry =
           let open Fmt in
@@ -214,7 +214,7 @@ module Make (Handler : HANDLER) = struct
           let rec rate_limit errors (response, body) =
             if rate_limited response then
               let backoff = backoff errors request.url response in
-              let* () = sleep (Float.of_int backoff) in
+              let* () = Future.sleep (Float.of_int backoff) in
               protocol.f request (rate_limit (errors + 1))
             else f (response, body)
           in
