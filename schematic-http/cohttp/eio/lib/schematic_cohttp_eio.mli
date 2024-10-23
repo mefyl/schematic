@@ -11,5 +11,10 @@ val make :
   unit ->
   t
 
-module Make (Coding : Schematic.Coding.STR with type t = string) :
-  Schematic_http.HANDLER with type t = t and module Future = Nofuture_eio
+module Make
+    (Future : sig
+      include Nofuture_eio.S
+      include Nofuture.TIME with module Blocking = Blocking
+    end)
+    (Coding : Schematic.Coding.STR with type t = string) :
+  Schematic_http.HANDLER with type t = t and module Future = Future

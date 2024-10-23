@@ -16,10 +16,16 @@ let make ?https ~clock ~mono_clock ~net () =
     :> Eio.Time.Mono.ty Eio.Time.Mono.t;
   }
 
-module Make (Coding : Schematic.Coding.STR with type t = string) = struct
+module Make
+    (Future : sig
+      include Nofuture_eio.S
+      include Nofuture.TIME with module Blocking = Blocking
+    end)
+    (Coding : Schematic.Coding.STR with type t = string) =
+struct
   type nonrec t = t
 
-  module Future = Nofuture_eio
+  module Future = Future
 
   let send_content_length = true
 

@@ -9,7 +9,7 @@ homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "dune" {>= "3.0"}
-  "eio_main" {with-test & = "0.15"}
+  "eio_main" {with-test & >= "1.0"}
   "http" {>= "6.0.0~beta2" & < "7.0.0"}
   "nofuture"
   "timmy" {>= "1.1.3" & < "2.0.0"}

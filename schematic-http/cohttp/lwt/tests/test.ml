@@ -5,6 +5,8 @@ include
        (Schematic.Json.String))
 
 let () =
+  Eio_main.run @@ fun env ->
+  let mono_clock = Eio_mock.Clock.Mono.make () in
   let test_suite clock _ _ tests =
     Lwt_eio.with_event_loop ~clock @@ fun _ ->
     Lwt_eio.run_lwt @@ fun () ->
@@ -14,4 +16,4 @@ let () =
   and test_case name mode f =
     Alcotest_lwt.test_case name mode (fun _ client -> f client)
   in
-  run test_suite test_case
+  run env mono_clock test_suite test_case

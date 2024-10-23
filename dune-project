@@ -129,7 +129,7 @@
   (eio_main
    (and
     :with-test
-    (= 0.15)))
+    (>= 1.0)))
   (http
    (and
     (>= 6.0.0~beta2)
@@ -188,7 +188,7 @@
     (>= 6.0.0~beta2)
     (< 7.0.0)))
   (eio
-   (= 0.15))
+   (>= 1.0))
   nofuture-eio
   (schematic-http
    (= :version))))
@@ -196,7 +196,7 @@
 (package
  (name schematic-ffi)
  (synopsis "Generate FFI types and converters based on schemas")
- (authors "Yoha\195\175-Eliel BERREBY <yberreby@pm.me>")
+ (authors "Yohaï-Eliel BERREBY <yberreby@pm.me>")
  (depends
   bake
   logs

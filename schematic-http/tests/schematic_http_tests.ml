@@ -318,10 +318,8 @@ struct
       sleep_and_advance ~flush:true mono_clock 20.
   end
 
-  let run run test_case =
-    Eio_main.run @@ fun env ->
-    let mono_clock = Eio_mock.Clock.Mono.make ()
-    and net = Eio.Stdenv.net env in
+  let run env mono_clock run test_case =
+    let net = Eio.Stdenv.net env in
     let clock =
       (* stolen from Eio_mock.Backend *)
       let handler =
