@@ -169,6 +169,11 @@
    (and
     (>= 0.1.0)
     (< 0.2.0)))
+  (nofuture-lwt-unix
+   (and
+    (>= 0.1.0)
+    (< 0.2.0)
+    :with-test))
   (schematic-http
    (= :version))
   (timmy-lwt
