@@ -12,7 +12,7 @@ depends: [
   "alcotest" {>= "1.1.0" & with-test}
   "cohttp-eio" {>= "6.0.0~beta2" & < "7.0.0"}
   "eio" {>= "1.0"}
-  "nofuture-eio"
+  "nofuture-eio" {>= "0.1.0" & < "0.2.0"}
   "schematic-http" {= version}
   "odoc" {with-doc}
 ]

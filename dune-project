@@ -134,7 +134,10 @@
    (and
     (>= 6.0.0~beta2)
     (< 7.0.0)))
-  nofuture
+  (nofuture
+   (and
+    (>= 0.1.0)
+    (< 0.2.0)))
   (timmy
    (and
     (>= 1.1.3)
@@ -162,7 +165,10 @@
   (lwt_eio :with-test)
   (lwt
    (>= 5.6.0))
-  nofuture-lwt
+  (nofuture-lwt
+   (and
+    (>= 0.1.0)
+    (< 0.2.0)))
   (schematic-http
    (= :version))
   (timmy-lwt
@@ -189,7 +195,10 @@
     (< 7.0.0)))
   (eio
    (>= 1.0))
-  nofuture-eio
+  (nofuture-eio
+   (and
+    (>= 0.1.0)
+    (< 0.2.0)))
   (schematic-http
    (= :version))))
 
