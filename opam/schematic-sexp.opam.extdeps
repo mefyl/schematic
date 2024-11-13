@@ -43,7 +43,6 @@ depends: [
   "ocaml-compiler-libs" {= "v0.17.0"}
   "ocaml-config" {= "3"}
   "ocaml-syntax-shims" {= "1.0.0"}
-  "ocaml-system" {= "5.2.0"}
   "ocaml_intrinsics_kernel" {= "v0.17.1"}
   "ocamlbuild" {= "0.15.0"}
   "ocamlfind" {= "1.9.6"}
