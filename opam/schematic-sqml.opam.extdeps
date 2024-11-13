@@ -12,7 +12,6 @@ depends: [
   "ocamlformat" {= "0.26.2"}
   "opam-file-format"
   "sexplib"
-  "acid-lwt" {= "0.12.0"}
   "alcotest" {= "1.8.0" & with-test}
   "angstrom" {= "0.16.1"}
   "astring" {= "0.8.5" & with-test}
@@ -50,7 +49,6 @@ depends: [
   "menhirLib" {= "20240715"}
   "menhirSdk" {= "20240715"}
   "metapp" {= "0.4.4"}
-  "metaversion" {= "0.0.1"}
   "ocaml" {= "5.2.0"}
   "ocaml-compiler-libs" {= "v0.17.0"}
   "ocaml-config" {= "3"}
