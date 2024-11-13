@@ -8,11 +8,11 @@ license: "LGPL-3.0-or-later"
 homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
-  "ocamlformat" {= "0.26.1"}
+  "ocamlformat" {= "0.26.2"}
   "opam-file-format"
   "sexplib"
   "angstrom" {= "0.16.0"}
-  "base" {= "v0.15.1"}
+  "base" {= "v0.17.0"}
   "base-bigarray" {= "base"}
   "base-bytes" {= "base"}
   "base-threads" {= "base"}
@@ -55,8 +55,8 @@ depends: [
   "ocplib-endian" {= "1.2"}
   "ppx_derivers" {= "1.2.1"}
   "ppx_deriving" {= "5.2.1"}
-  "ppx_here" {= "v0.15.0"}
-  "ppx_sexp_conv" {= "v0.15.1"}
+  "ppx_here" {= "v0.17.0"}
+  "ppx_sexp_conv" {= "v0.17.0"}
   "ppxlib" {= "0.31.0"}
   "ptime" {= "1.1.0"}
   "re" {= "1.11.0"}
@@ -64,7 +64,7 @@ depends: [
   "sedlex" {= "3.2"}
   "semver2" {= "1.2.0"}
   "seq" {= "base"}
-  "sexplib0" {= "v0.15.1"}
+  "sexplib0" {= "v0.17.0"}
   "stdcompat" {= "19"}
   "stdlib-shims" {= "0.3.0"}
   "stringext" {= "1.6.0"}
@@ -78,4 +78,6 @@ dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"
 pin-depends: [
   ["landmarks.1.4" "git+https://github.com/routineco/landmarks.git#js"]
   ["landmarks-ppx.1.4" "git+https://github.com/routineco/landmarks.git#js"]
+  # Required for OCaml 5.2 until `stdcompat` releases a version 20
+  [ "stdcompat.19" "git+https://github.com/thierry-martinez/stdcompat.git#d53390d788027fe0a2282c4745eb3d1626341f99" ]
 ]
