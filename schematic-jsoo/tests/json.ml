@@ -9,7 +9,7 @@ module Json = Test_utils.Tests.Make (struct
       (fun fmt js -> Fmt.string fmt @@ to_string js)
       (fun l r -> String.equal (to_string l) (to_string r))
 
-  let of_json json = Some json
+  let of_json _ = None
   let extra_test _ _ = ()
 end)
 
