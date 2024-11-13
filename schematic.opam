@@ -26,7 +26,7 @@ depends: [
   "hlist" {>= "0.2.0" & < "0.3.0"}
   "landmarks"
   "landmarks-ppx"
-  "ocaml" {>= "4.14.0"}
+  "ocaml" {>= "5.2.0"}
   "ppxlib"
   "ppx_deriving"
   "ppx_here"

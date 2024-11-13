@@ -49,7 +49,7 @@
   landmarks
   landmarks-ppx
   (ocaml
-   (>= 4.14.0))
+   (>= 5.2.0))
   ppxlib
   ppx_deriving
   ppx_here
