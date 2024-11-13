@@ -6,7 +6,8 @@
  schematic-jsoo
  schematic-sexp
  schematic-sqml
- .logistic)
+ .logistic
+ opam)
 
 (env
  (dev
