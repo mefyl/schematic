@@ -31,6 +31,8 @@
  (description
   "Schematic lets you derive type meta informations using a ppx_deriving\ndriver and provide functionalities on top of it:\n\n* Conversion to and from JSON.\n* Deduction of JSON schema specification.\n* Conversion to and from js_of_ocaml FFI using schematic-jsoo.\n* Deduction of typescript definitions.\n")
  (depends
+  (logs
+   (>= 0.7.0))
   (alcotest
    (and
     (>= 1.1.0)
@@ -62,11 +64,6 @@
   (semver2
    (>= 1.2.0))
   uri)
- ; Dune 3.7 chokes on installation with files named the same anywhere in the tree, eg.
- ; Error: Multiple rules generated for
- ; _build/install/default/lib/schematic/src/schema.ml:
- ; - schematic/lib/dune:3
- ; - schematic/ppx/dune:3
  (conflicts
   (dune
    (or
@@ -79,6 +76,22 @@
  (description
   "Deduce js_of_ocaml FFI types\n and conversion functions from schematic type metadata.")
  (depends
+  (ppx_deriving
+   (and
+    (>= 6.0.3)
+    :with-test))
+  (uri
+   (>= 4.4.0))
+  (ptime
+   (>= 1.2.0))
+  (ppx_here
+   (>= v0.17.0))
+  (fmt
+   (>= 0.9.0))
+  (ezjsonm
+   (>= 1.3.0))
+  (base
+   (>= v0.17.1))
   (alcotest
    (and
     (>= 1.1.0)
@@ -98,6 +111,18 @@
  (synopsis "Derive sexps from Ocaml objects")
  (description "Encode to and from s-expressions via a schema.")
  (depends
+  (ppx_here
+   (and
+    (>= v0.17.0)
+    :with-test))
+  (ppx_deriving
+   (and
+    (>= 6.0.3)
+    :with-test))
+  (fmt
+   (>= 0.9.0))
+  (base
+   (>= v0.17.1))
   (alcotest
    (and
     (>= 1.1.0)
@@ -111,6 +136,14 @@
  (synopsis "Derive SQML bindings from Ocaml types")
  (description "Deduce SQML bindings from schematic type metadata.")
  (depends
+  (ppx_deriving
+   (and
+    (>= 6.0.3)
+    :with-test))
+  (ppx_here
+   (>= v0.17.0))
+  (base
+   (>= v0.17.1))
   (alcotest
    (and
     (>= 1.1.0)
@@ -126,6 +159,8 @@
  (name schematic-http)
  (synopsis "HTTP client with schematic encoding")
  (depends
+  (ppx_deriving
+   (>= 6.0.3))
   (cohttp-lwt
    (and
     (>= 5.3.0)
@@ -146,19 +181,49 @@
 (package
  (name schematic-ffi)
  (synopsis "Generate FFI types and converters based on schemas")
- (authors "Yoha\195\175-Eliel BERREBY <yberreby@pm.me>")
+ (authors "Yohaï-Eliel BERREBY <yberreby@pm.me>")
  (depends
+  (stdio
+   (and
+    (>= 0)
+    :with-test))
+  (alcotest
+   (and
+    (>= 1.8.0)
+    :with-test))
+  (uri
+   (>= 4.4.0))
+  (semver2
+   (>= 1.2.0))
+  (ptime
+   (>= 1.2.0))
+  (ppxlib
+   (>= 0.33.0))
+  (ppx_here
+   (>= v0.17.0))
+  (ppx_deriving
+   (>= 6.0.3))
+  (fmt
+   (>= 0.9.0))
+  (ezjsonm
+   (>= 1.3.0))
+  (base64
+   (>= 3.5.1))
+  (base
+   (>= v0.17.1))
   bake
   logs
   ppx_hash
   (schematic
    (= :version))
-  (metapp :with-test)))
+  metapp))
 
 (package
  (name schematic-cli)
  (synopsis "Schematic CLI tools")
  (depends
+  (ppxlib
+   (>= 0.33.0))
   (schematic
    (= :version))))
 
@@ -166,6 +231,14 @@
  (name entropic)
  (synopsis "Random dataset generation based on schematic")
  (depends
+  (alcotest
+   (and
+    (>= 1.8.0)
+    :with-test))
+  (ppx_here
+   (>= v0.17.0))
+  (base
+   (>= v0.17.1))
   cryptokit
   (schematic
    (= :version))))
