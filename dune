@@ -1,13 +1,13 @@
 (dirs
  entropic
- opam
  schematic
  schematic-ffi
  schematic-http
  schematic-jsoo
  schematic-sexp
  schematic-sqml
- .logistic)
+ .logistic
+ opam)
 
 (env
  (dev
@@ -20,9 +20,8 @@
 (alias
  (name default)
  (deps
+  entropic.opam
   schematic-cli.opam
-  schematic-cohttp-eio.opam
-  schematic-cohttp-lwt.opam
   schematic-ffi.opam
   schematic-http.opam
   schematic-jsoo.opam
@@ -55,6 +54,6 @@
     --cross
     base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
     --local
-    acid,bake,hlist,metaversion,nofuture,nofuture-eio,nofuture-lwt,sqml,timmy,timmy-lwt,timmy-unix))))
+    acid,acid-lwt,bake,hlist,metaversion,sqml,timmy,timmy-lwt))))
 
 (include dune.inc)

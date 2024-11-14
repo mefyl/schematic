@@ -1,5 +1,5 @@
 DOCKERFILE_BASE=ubuntu
-OCAML_VERSION=4.14.0
+OCAML_VERSION=5.2.0
 # Opam does not install these with `--deps-only` because they depend
 # (optionally) on schematic.
 OPAM_PACKAGES=timmy timmy-lwt timmy-unix sqml
