@@ -14,7 +14,7 @@
 
 (authors "mefyl <mefyl@gruntech.org>")
 
-(version 0.19.4)
+(version 0.20.0)
 
 (homepage https://gitlab.routine.co/routine/schematic)
 
@@ -36,7 +36,7 @@
     (>= 1.1.0)
     :with-test))
   (base
-   (>= v0.17.0))
+   (>= v0.15.0))
   (base64
    (>= 3.5.0))
   (ezjsonm
@@ -49,7 +49,7 @@
   landmarks
   landmarks-ppx
   (ocaml
-   (>= 5.2.0))
+   (>= 4.14.0))
   ppxlib
   ppx_deriving
   ppx_here
@@ -117,7 +117,7 @@
     :with-test))
   (sqml
    (and
-    (>= 0.10.0)
+    (>= 0.11.0)
     (< 0.12.0)))
   (schematic
    (= :version))))
@@ -126,27 +126,91 @@
  (name schematic-http)
  (synopsis "HTTP client with schematic encoding")
  (depends
-  (cohttp-lwt
+  (eio_main
    (and
-    (>= 5.3.0)
-    (< 6.0.0)))
-  (lwt
-   (>= 5.6.0))
+    :with-test
+    (>= 1.0)))
+  (http
+   (and
+    (>= 6.0.0~beta2)
+    (< 7.0.0)))
+  (nofuture
+   (and
+    (>= 0.1.0)
+    (< 0.2.0)))
   (timmy
    (and
-    (>= 1.0.0)
-    (< 2.0.0)))
-  (timmy-lwt
-   (and
-    (>= 1.0.0)
+    (>= 1.1.3)
     (< 2.0.0)))
   (schematic
    (= :version))))
 
 (package
+ (name schematic-cohttp-lwt)
+ (synopsis "cohttp-lwt implementation of schematic-http")
+ (depends
+  (alcotest-lwt
+   (and
+    (>= 1.1.0)
+    :with-test))
+  (cohttp-lwt
+   (and
+    (>= 6.0.0~beta2)
+    (< 7.0.0)))
+  (cohttp-lwt-unix
+   (and
+    :with-test
+    (>= 6.0.0~beta2)
+    (< 7.0.0)))
+  (lwt_eio :with-test)
+  (lwt
+   (>= 5.6.0))
+  (nofuture-lwt
+   (and
+    (>= 0.1.0)
+    (< 0.2.0)))
+  (nofuture-lwt-unix
+   (and
+    (>= 0.1.0)
+    (< 0.2.0)
+    :with-test))
+  (schematic-http
+   (= :version))
+  (timmy-lwt
+   (and
+    (>= 1.1.3)
+    (< 2.0.0)))
+  (timmy-unix
+   (and
+    :with-test
+    (>= 1.1.3)
+    (< 2.0.0)))))
+
+(package
+ (name schematic-cohttp-eio)
+ (synopsis "cohttp-eio implementation of schematic-http")
+ (depends
+  (alcotest
+   (and
+    (>= 1.1.0)
+    :with-test))
+  (cohttp-eio
+   (and
+    (>= 6.0.0~beta2)
+    (< 7.0.0)))
+  (eio
+   (>= 1.0))
+  (nofuture-eio
+   (and
+    (>= 0.1.0)
+    (< 0.2.0)))
+  (schematic-http
+   (= :version))))
+
+(package
  (name schematic-ffi)
  (synopsis "Generate FFI types and converters based on schemas")
- (authors "Yoha\195\175-Eliel BERREBY <yberreby@pm.me>")
+ (authors "Yohaï-Eliel BERREBY <yberreby@pm.me>")
  (depends
   bake
   logs

@@ -51,8 +51,7 @@ module Errors = struct
         (Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.string "test"))
     in
     Alcotest.(
-      check ~here:[%here] (result pass reject)
-        "undefined in JSON does not choke")
+      check ~here:[%here] (result pass reject) "string is not seen as object")
       (Ok (String "test")) res
 
   let tests =
