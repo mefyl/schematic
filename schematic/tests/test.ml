@@ -8,7 +8,7 @@ module Tests = Test_utils.Tests.Make (struct
   let of_json json = Some json
   let local_time_support = true
 
-  let extra_test ~here schema encoded =
+  let extra_test (Test_utils.Tests.Test { here; schema; _ }) encoded =
     let schema =
       Schematic.Json.Schema.of_schema schema
       |> Schematic.Json.encode Schematic.Json.Schema.schema

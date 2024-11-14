@@ -1,5 +1,7 @@
 (lang dune 3.0)
 
+(using directory-targets 0.1)
+
 (name schematic)
 
 (generate_opam_files true)
@@ -34,7 +36,7 @@
     (>= 1.1.0)
     :with-test))
   (base
-   (>= v0.15.0))
+   (>= v0.17.0))
   (base64
    (>= 3.5.0))
   (ezjsonm
@@ -47,7 +49,7 @@
   landmarks
   landmarks-ppx
   (ocaml
-   (>= 4.14.0))
+   (>= 5.2.0))
   ppxlib
   ppx_deriving
   ppx_here

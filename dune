@@ -6,7 +6,8 @@
  schematic-jsoo
  schematic-sexp
  schematic-sqml
- .logistic)
+ .logistic
+ opam)
 
 (env
  (dev
@@ -52,6 +53,6 @@
     --cross
     base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
     --local
-    acid,bake,hlist,sqml,timmy,timmy-lwt))))
+    acid,acid-lwt,bake,hlist,metaversion,sqml,timmy,timmy-lwt))))
 
 (include dune.inc)

@@ -10,7 +10,7 @@ module Jsoo = Test_utils.Tests.Make (struct
       (fun l r -> String.equal (to_string l) (to_string r))
 
   let of_json _ = None
-  let extra_test ~here:_ _ _ = ()
+  let extra_test _ _ = ()
 end)
 
 module Json = Test_utils.Tests.Make (struct
@@ -25,7 +25,7 @@ module Json = Test_utils.Tests.Make (struct
       (fun l r -> String.equal (to_string l) (to_string r))
 
   let of_json json = Some (Schematic_jsoo.Json.to_string json ^ "COIN")
-  let extra_test ~here:_ _ _ = ()
+  let extra_test _ _ = ()
 end)
 
 let () = Alcotest.run "Schematic_jsoo" (Jsoo.tests @ Json.tests)

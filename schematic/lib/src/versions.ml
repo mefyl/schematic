@@ -7,6 +7,7 @@ module V0_19_0 = struct
     module Schema = Json_schema
   end
 
+  module Kotlin = Kotlin
   module Marks = Marks
   module Schema = Schema
   module Schemas = Schemas

@@ -1,64 +1,74 @@
 opam-version: "2.0"
-name: "schematic-cli"
-version: "0.19.0"
-synopsis: "Schematic CLI tools"
+name: "entropic"
+version: "0.19.3"
+synopsis: "Random dataset generation based on schematic"
 maintainer: "mefyl <mefyl@gruntech.org>"
 authors: "mefyl <mefyl@gruntech.org>"
 license: "LGPL-3.0-or-later"
 homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
-  "ocamlformat" {= "0.26.1"}
+  "ocamlformat" {= "0.26.2"}
   "opam-file-format"
   "sexplib"
-  "angstrom" {= "0.16.0"}
-  "base" {= "v0.15.1"}
+  "angstrom" {= "0.16.1"}
+  "base" {= "v0.17.1"}
   "base-bigarray" {= "base"}
+  "base-domains" {= "base"}
+  "base-nnp" {= "base"}
   "base-threads" {= "base"}
   "base-unix" {= "base"}
   "base64" {= "3.5.1"}
-  "bigstringaf" {= "0.9.1"}
-  "cmdliner" {= "1.2.0"}
-  "conf-autoconf" {= "0.1"}
-  "conf-which" {= "1"}
-  "cppo" {= "1.6.9"}
+  "bigstringaf" {= "0.10.0"}
+  "cmdliner" {= "1.3.0"}
+  "conf-gmp" {= "4"}
+  "conf-gmp-powm-sec" {= "3"}
+  "conf-pkg-config" {= "3"}
+  "conf-zlib" {= "1"}
+  "cppo" {= "1.7.0"}
+  "cryptokit" {= "1.20"}
   "csexp" {= "1.5.2"}
   "cstruct" {= "6.2.0"}
-  "dune" {= "3.12.1"}
-  "dune-configurator" {= "3.12.1"}
+  "dune" {= "3.16.1"}
+  "dune-configurator" {= "3.16.1"}
   "ezjsonm" {= "1.3.0"}
   "fmt" {= "0.9.0"}
   "hex" {= "1.5.0"}
+  "host-arch-x86_64" {= "1"}
+  "host-system-other" {= "1"}
   "jsonm" {= "1.0.2"}
   "landmarks" {= "1.4"}
   "landmarks-ppx" {= "1.4"}
   "metapp" {= "0.4.4"}
-  "ocaml" {= "4.14.1"}
-  "ocaml-base-compiler" {= "4.14.1"}
-  "ocaml-compiler-libs" {= "v0.12.4"}
-  "ocaml-config" {= "2"}
-  "ocaml-options-vanilla" {= "1"}
+  "ocaml" {= "5.2.0"}
+  "ocaml-compiler-libs" {= "v0.17.0"}
+  "ocaml-config" {= "3"}
   "ocaml-syntax-shims" {= "1.0.0"}
-  "ocamlbuild" {= "0.14.2"}
+  "ocaml_intrinsics_kernel" {= "v0.17.1"}
+  "ocamlbuild" {= "0.15.0"}
   "ocamlfind" {= "1.9.6"}
   "ppx_derivers" {= "1.2.1"}
-  "ppx_deriving" {= "5.2.1"}
-  "ppx_here" {= "v0.15.0"}
-  "ppxlib" {= "0.31.0"}
-  "ptime" {= "1.1.0"}
-  "result" {= "1.5"}
+  "ppx_deriving" {= "6.0.3"}
+  "ppx_here" {= "v0.17.0"}
+  "ppxlib" {= "0.33.0"}
+  "ptime" {= "1.2.0"}
   "semver2" {= "1.2.0"}
   "seq" {= "base"}
-  "sexplib0" {= "v0.15.1"}
+  "sexplib0" {= "v0.17.0"}
   "stdcompat" {= "19"}
   "stdlib-shims" {= "0.3.0"}
   "stringext" {= "1.6.0"}
   "topkg" {= "1.0.7"}
   "uri" {= "4.4.0"}
   "uutf" {= "1.0.3"}
+  "zarith" {= "1.14"}
 ]
 dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"
 pin-depends: [
   ["landmarks.1.4" "git+https://github.com/routineco/landmarks.git#js"]
   ["landmarks-ppx.1.4" "git+https://github.com/routineco/landmarks.git#js"]
+  [
+    "stdcompat.19"
+    "git+https://github.com/thierry-martinez/stdcompat.git#d53390d788027fe0a2282c4745eb3d1626341f99"
+  ]
 ]
