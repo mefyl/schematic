@@ -20,6 +20,7 @@
 (alias
  (name default)
  (deps
+  entropic.opam
   schematic-cli.opam
   schematic-ffi.opam
   schematic-http.opam
