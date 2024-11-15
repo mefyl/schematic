@@ -31,7 +31,6 @@
  (description
   "Schematic lets you derive type meta informations using a ppx_deriving\ndriver and provide functionalities on top of it:\n\n* Conversion to and from JSON.\n* Deduction of JSON schema specification.\n* Conversion to and from js_of_ocaml FFI using schematic-jsoo.\n* Deduction of typescript definitions.\n")
  (depends
-  logs
   (alcotest
    (and
     (>= 1.1.0)
@@ -49,6 +48,7 @@
     (< 0.3.0)))
   landmarks
   landmarks-ppx
+  logs
   (ocaml
    (>= 4.14.0))
   ppxlib
@@ -80,40 +80,41 @@
  (description
   "Deduce js_of_ocaml FFI types\n and conversion functions from schematic type metadata.")
  (depends
-  (ppx_deriving :with-test)
-  uri
-  ptime
-  ppx_here
-  fmt
-  ezjsonm
-  base
   (alcotest
    (and
     (>= 1.1.0)
     :with-test))
+  base
   (conf-npm :with-test)
+  ezjsonm
+  fmt
   (js_of_ocaml
    (>= 4.0.0))
   (js_of_ocaml-ppx
    (>= 4.0.0))
   landmarks
   landmarks-ppx
+  (ppx_deriving :with-test)
+  ppx_here
+  ptime
   (schematic
-   (= :version))))
+   (= :version))
+  uri
+  ))
 
 (package
  (name schematic-sexp)
  (synopsis "Derive sexps from Ocaml objects")
  (description "Encode to and from s-expressions via a schema.")
  (depends
-  (ppx_here :with-test)
-  (ppx_deriving :with-test)
-  fmt
-  base
   (alcotest
    (and
     (>= 1.1.0)
     :with-test))
+  base
+  fmt
+  (ppx_here :with-test)
+  (ppx_deriving :with-test)
   (schematic
    (= :version))
   sexplib))
@@ -123,13 +124,13 @@
  (synopsis "Derive SQML bindings from Ocaml types")
  (description "Deduce SQML bindings from schematic type metadata.")
  (depends
-  (ppx_deriving :with-test)
-  ppx_here
-  base
   (alcotest
    (and
     (>= 1.1.0)
     :with-test))
+  base
+  (ppx_deriving :with-test)
+  ppx_here
   (sqml
    (and
     (>= 0.11.0)
@@ -141,7 +142,6 @@
  (name schematic-http)
  (synopsis "HTTP client with schematic encoding")
  (depends
-  ppx_deriving
   (eio_main
    (and
     :with-test
@@ -150,16 +150,19 @@
    (and
     (>= 6.0.0~beta2)
     (< 7.0.0)))
+  logs
   (nofuture
    (and
     (>= 0.1.0)
     (< 0.2.0)))
+  ppx_deriving
+  (schematic
+   (= :version))
   (timmy
    (and
     (>= 1.1.3)
     (< 2.0.0)))
-  (schematic
-   (= :version))))
+  ))
 
 (package
  (name schematic-cohttp-lwt)
@@ -169,6 +172,7 @@
    (and
     (>= 1.1.0)
     :with-test))
+  (cohttp-eio :with-test)
   (cohttp-lwt
    (and
     (>= 6.0.0~beta2)
@@ -178,6 +182,8 @@
     :with-test
     (>= 6.0.0~beta2)
     (< 7.0.0)))
+  (eio_main :with-test)
+  logs
   (lwt_eio :with-test)
   (lwt
    (>= 5.6.0))
@@ -190,6 +196,7 @@
     (>= 0.1.0)
     (< 0.2.0)
     :with-test))
+  (ppx_here :with-test)
   (schematic-http
    (= :version))
   (timmy-lwt
@@ -216,10 +223,13 @@
     (< 7.0.0)))
   (eio
    (>= 1.0))
+  (eio_main :with-test)
+  logs
   (nofuture-eio
    (and
     (>= 0.1.0)
     (< 0.2.0)))
+  (ppx_here :with-test)
   (schematic-http
    (= :version))))
 
@@ -228,24 +238,24 @@
  (synopsis "Generate FFI types and converters based on schemas")
  (authors "Yohaï-Eliel BERREBY <yberreby@pm.me>")
  (depends
-  (stdio :with-test)
   (alcotest :with-test)
-  uri
-  semver2
-  ptime
-  ppxlib
-  ppx_here
-  ppx_deriving
-  fmt
-  ezjsonm
-  base64
-  base
   bake
+  base
+  base64
+  ezjsonm
+  fmt
   logs
+  metapp
+  ppxlib
+  ppx_deriving
   ppx_hash
+  ppx_here
+  ptime
   (schematic
    (= :version))
-  metapp))
+  semver2
+  (stdio :with-test)
+  uri))
 
 (package
  (name schematic-cli)
@@ -260,8 +270,8 @@
  (synopsis "Random dataset generation based on schematic")
  (depends
   (alcotest :with-test)
-  ppx_here
   base
   cryptokit
+  ppx_here
   (schematic
    (= :version))))

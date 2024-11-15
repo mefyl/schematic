@@ -9,6 +9,10 @@ homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "dune" {>= "3.0"}
+  "ppx_here" {>= "v0.17.0" & with-test}
+  "eio_main" {>= "1.1" & with-test}
+  "cohttp-eio" {>= "6.0.0~beta2" & with-test}
+  "logs" {>= "0.7.0"}
   "alcotest-lwt" {>= "1.1.0" & with-test}
   "cohttp-lwt" {>= "6.0.0~beta2" & < "7.0.0"}
   "cohttp-lwt-unix" {with-test & >= "6.0.0~beta2" & < "7.0.0"}

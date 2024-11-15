@@ -9,6 +9,9 @@ homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "dune" {>= "3.0"}
+  "ppx_deriving" {>= "6.0.3"}
+  "logs" {>= "0.7.0"}
+  "ppx_deriving"
   "eio_main" {with-test & >= "1.0"}
   "http" {>= "6.0.0~beta2" & < "7.0.0"}
   "nofuture" {>= "0.1.0" & < "0.2.0"}
