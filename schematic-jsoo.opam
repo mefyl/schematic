@@ -12,6 +12,13 @@ homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "dune" {>= "3.0"}
+  "ppx_deriving" {with-test}
+  "uri"
+  "ptime"
+  "ppx_here"
+  "fmt"
+  "ezjsonm"
+  "base"
   "alcotest" {>= "1.1.0" & with-test}
   "conf-npm" {with-test}
   "js_of_ocaml" {>= "4.0.0"}

@@ -48,6 +48,7 @@
     (< 0.3.0)))
   landmarks
   landmarks-ppx
+  logs
   (ocaml
    (>= 4.14.0))
   ppxlib
@@ -83,15 +84,23 @@
    (and
     (>= 1.1.0)
     :with-test))
+  base
   (conf-npm :with-test)
+  ezjsonm
+  fmt
   (js_of_ocaml
    (>= 4.0.0))
   (js_of_ocaml-ppx
    (>= 4.0.0))
   landmarks
   landmarks-ppx
+  (ppx_deriving :with-test)
+  ppx_here
+  ptime
   (schematic
-   (= :version))))
+   (= :version))
+  uri
+  ))
 
 (package
  (name schematic-sexp)
@@ -102,6 +111,10 @@
    (and
     (>= 1.1.0)
     :with-test))
+  base
+  fmt
+  (ppx_here :with-test)
+  (ppx_deriving :with-test)
   (schematic
    (= :version))
   sexplib))
@@ -115,6 +128,9 @@
    (and
     (>= 1.1.0)
     :with-test))
+  base
+  (ppx_deriving :with-test)
+  ppx_here
   (sqml
    (and
     (>= 0.11.0)
@@ -134,16 +150,19 @@
    (and
     (>= 6.0.0~beta2)
     (< 7.0.0)))
+  logs
   (nofuture
    (and
     (>= 0.1.0)
     (< 0.2.0)))
+  ppx_deriving
+  (schematic
+   (= :version))
   (timmy
    (and
     (>= 1.1.3)
     (< 2.0.0)))
-  (schematic
-   (= :version))))
+  ))
 
 (package
  (name schematic-cohttp-lwt)
@@ -153,6 +172,7 @@
    (and
     (>= 1.1.0)
     :with-test))
+  (cohttp-eio :with-test)
   (cohttp-lwt
    (and
     (>= 6.0.0~beta2)
@@ -162,6 +182,8 @@
     :with-test
     (>= 6.0.0~beta2)
     (< 7.0.0)))
+  (eio_main :with-test)
+  logs
   (lwt_eio :with-test)
   (lwt
    (>= 5.6.0))
@@ -174,6 +196,7 @@
     (>= 0.1.0)
     (< 0.2.0)
     :with-test))
+  (ppx_here :with-test)
   (schematic-http
    (= :version))
   (timmy-lwt
@@ -200,10 +223,13 @@
     (< 7.0.0)))
   (eio
    (>= 1.0))
+  (eio_main :with-test)
+  logs
   (nofuture-eio
    (and
     (>= 0.1.0)
     (< 0.2.0)))
+  (ppx_here :with-test)
   (schematic-http
    (= :version))))
 
@@ -212,17 +238,30 @@
  (synopsis "Generate FFI types and converters based on schemas")
  (authors "Yohaï-Eliel BERREBY <yberreby@pm.me>")
  (depends
+  (alcotest :with-test)
   bake
+  base
+  base64
+  ezjsonm
+  fmt
   logs
+  metapp
+  ppxlib
+  ppx_deriving
   ppx_hash
+  ppx_here
+  ptime
   (schematic
    (= :version))
-  (metapp :with-test)))
+  semver2
+  (stdio :with-test)
+  uri))
 
 (package
  (name schematic-cli)
  (synopsis "Schematic CLI tools")
  (depends
+  ppxlib
   (schematic
    (= :version))))
 
@@ -230,6 +269,9 @@
  (name entropic)
  (synopsis "Random dataset generation based on schematic")
  (depends
+  (alcotest :with-test)
+  base
   cryptokit
+  ppx_here
   (schematic
    (= :version))))

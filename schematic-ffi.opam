@@ -9,11 +9,23 @@ homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "dune" {>= "3.0"}
+  "stdio" {with-test}
+  "alcotest" {with-test}
+  "uri"
+  "semver2"
+  "ptime"
+  "ppxlib"
+  "ppx_here"
+  "ppx_deriving"
+  "fmt"
+  "ezjsonm"
+  "base64"
+  "base"
   "bake"
   "logs"
   "ppx_hash"
   "schematic" {= version}
-  "metapp" {with-test}
+  "metapp"
   "odoc" {with-doc}
 ]
 build: [
