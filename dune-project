@@ -31,8 +31,7 @@
  (description
   "Schematic lets you derive type meta informations using a ppx_deriving\ndriver and provide functionalities on top of it:\n\n* Conversion to and from JSON.\n* Deduction of JSON schema specification.\n* Conversion to and from js_of_ocaml FFI using schematic-jsoo.\n* Deduction of typescript definitions.\n")
  (depends
-  (logs
-   (>= 0.7.0))
+  logs
   (alcotest
    (and
     (>= 1.1.0)
@@ -76,22 +75,13 @@
  (description
   "Deduce js_of_ocaml FFI types\n and conversion functions from schematic type metadata.")
  (depends
-  (ppx_deriving
-   (and
-    (>= 6.0.3)
-    :with-test))
-  (uri
-   (>= 4.4.0))
-  (ptime
-   (>= 1.2.0))
-  (ppx_here
-   (>= v0.17.0))
-  (fmt
-   (>= 0.9.0))
-  (ezjsonm
-   (>= 1.3.0))
-  (base
-   (>= v0.17.1))
+  (ppx_deriving :with-test)
+  uri
+  ptime
+  ppx_here
+  fmt
+  ezjsonm
+  base
   (alcotest
    (and
     (>= 1.1.0)
@@ -111,18 +101,10 @@
  (synopsis "Derive sexps from Ocaml objects")
  (description "Encode to and from s-expressions via a schema.")
  (depends
-  (ppx_here
-   (and
-    (>= v0.17.0)
-    :with-test))
-  (ppx_deriving
-   (and
-    (>= 6.0.3)
-    :with-test))
-  (fmt
-   (>= 0.9.0))
-  (base
-   (>= v0.17.1))
+  (ppx_here :with-test)
+  (ppx_deriving :with-test)
+  fmt
+  base
   (alcotest
    (and
     (>= 1.1.0)
@@ -136,14 +118,9 @@
  (synopsis "Derive SQML bindings from Ocaml types")
  (description "Deduce SQML bindings from schematic type metadata.")
  (depends
-  (ppx_deriving
-   (and
-    (>= 6.0.3)
-    :with-test))
-  (ppx_here
-   (>= v0.17.0))
-  (base
-   (>= v0.17.1))
+  (ppx_deriving :with-test)
+  ppx_here
+  base
   (alcotest
    (and
     (>= 1.1.0)
@@ -159,8 +136,7 @@
  (name schematic-http)
  (synopsis "HTTP client with schematic encoding")
  (depends
-  (ppx_deriving
-   (>= 6.0.3))
+  ppx_deriving
   (cohttp-lwt
    (and
     (>= 5.3.0)
@@ -183,34 +159,18 @@
  (synopsis "Generate FFI types and converters based on schemas")
  (authors "Yohaï-Eliel BERREBY <yberreby@pm.me>")
  (depends
-  (stdio
-   (and
-    (>= 0)
-    :with-test))
-  (alcotest
-   (and
-    (>= 1.8.0)
-    :with-test))
-  (uri
-   (>= 4.4.0))
-  (semver2
-   (>= 1.2.0))
-  (ptime
-   (>= 1.2.0))
-  (ppxlib
-   (>= 0.33.0))
-  (ppx_here
-   (>= v0.17.0))
-  (ppx_deriving
-   (>= 6.0.3))
-  (fmt
-   (>= 0.9.0))
-  (ezjsonm
-   (>= 1.3.0))
-  (base64
-   (>= 3.5.1))
-  (base
-   (>= v0.17.1))
+  (stdio :with-test)
+  (alcotest :with-test)
+  uri
+  semver2
+  ptime
+  ppxlib
+  ppx_here
+  ppx_deriving
+  fmt
+  ezjsonm
+  base64
+  base
   bake
   logs
   ppx_hash
@@ -222,8 +182,7 @@
  (name schematic-cli)
  (synopsis "Schematic CLI tools")
  (depends
-  (ppxlib
-   (>= 0.33.0))
+  ppxlib
   (schematic
    (= :version))))
 
@@ -231,14 +190,9 @@
  (name entropic)
  (synopsis "Random dataset generation based on schematic")
  (depends
-  (alcotest
-   (and
-    (>= 1.8.0)
-    :with-test))
-  (ppx_here
-   (>= v0.17.0))
-  (base
-   (>= v0.17.1))
+  (alcotest :with-test)
+  ppx_here
+  base
   cryptokit
   (schematic
    (= :version))))
