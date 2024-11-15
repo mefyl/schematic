@@ -9,9 +9,9 @@ homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "dune" {>= "3.0"}
-  "alcotest" {>= "1.8.0" & with-test}
-  "ppx_here" {>= "v0.17.0"}
-  "base" {>= "v0.17.1"}
+  "alcotest" {with-test}
+  "ppx_here"
+  "base"
   "cryptokit"
   "schematic" {= version}
   "odoc" {with-doc}

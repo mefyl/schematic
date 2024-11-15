@@ -9,7 +9,7 @@ homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "dune" {>= "3.0"}
-  "ppxlib" {>= "0.33.0"}
+  "ppxlib"
   "schematic" {= version}
   "odoc" {with-doc}
 ]
