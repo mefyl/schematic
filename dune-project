@@ -63,6 +63,11 @@
   (semver2
    (>= 1.2.0))
   uri)
+ ; Dune 3.7 chokes on installation with files named the same anywhere in the tree, eg.
+ ; Error: Multiple rules generated for
+ ; _build/install/default/lib/schematic/src/schema.ml:
+ ; - schematic/lib/dune:3
+ ; - schematic/ppx/dune:3
  (conflicts
   (dune
    (or
