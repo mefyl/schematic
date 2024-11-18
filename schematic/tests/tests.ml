@@ -156,6 +156,50 @@ struct
         ];
     }
 
+  let atom_int64 =
+    {
+      name = "int64";
+      speed = `Quick;
+      additional_test = None;
+      tests =
+        [
+          Test
+            {
+              name = "int64 atom";
+              here = [%here];
+              decoded = None;
+              value_testable = Alcotest.int64;
+              schema = int64_schema;
+              value = 9223372036854L;
+              expected = [%ezjsonm 9223372036854];
+              kotlin_class_name = Some "java.lang.Long";
+              is_kotlin_roundtrip_enabled = true;
+            };
+        ];
+    }
+
+  let atom_float =
+    {
+      name = "float";
+      speed = `Quick;
+      additional_test = None;
+      tests =
+        [
+          Test
+            {
+              name = "float atom";
+              here = [%here];
+              decoded = None;
+              value_testable = Alcotest.float 0.00001;
+              schema = float_schema;
+              value = 1.234567890;
+              expected = `Float 1.234567890;
+              kotlin_class_name = Some "java.lang.Float";
+              is_kotlin_roundtrip_enabled = true;
+            };
+        ];
+    }
+
   let atom_string =
     {
       name = "string";
@@ -173,6 +217,28 @@ struct
               value = "trente trois";
               expected = [%ezjsonm "trente trois"];
               kotlin_class_name = Some "java.lang.String";
+              is_kotlin_roundtrip_enabled = true;
+            };
+        ];
+    }
+
+  let atom_date =
+    {
+      name = "date";
+      speed = `Quick;
+      additional_test = None;
+      tests =
+        [
+          Test
+            {
+              name = "date atom";
+              here = [%here];
+              decoded = None;
+              value_testable = Alcotest.(triple int int int);
+              schema = Ptime.date_schema;
+              value = (2024, 8, 25);
+              expected = [%ezjsonm [ 2024; 8; 25 ]];
+              kotlin_class_name = Some "kotlinx.datetime.LocalDate";
               is_kotlin_roundtrip_enabled = true;
             };
         ];
@@ -2433,7 +2499,10 @@ struct
         test_cases =
           [
             atom_int;
+            atom_int64;
+            atom_float;
             atom_string;
+            atom_date;
             Optionals.options;
             Optionals.nullable_option;
             Optionals.default_option;
