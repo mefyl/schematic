@@ -1,11 +1,12 @@
-module V0_19_0 = struct
+module V0_20_0 = struct
   include Client
+
+  module Id : sig
+    type t = Id.t
+
+    val pp : t Fmt.t
+  end =
+    Id
+
   module Error = Error
 end
-
-module V0_19_1 = V0_19_0
-module V0_19_2 = V0_19_1
-module V0_19_3 = V0_19_2
-module V0_19_4 = V0_19_3
-module V0_19_5 = V0_19_4
-module V0_19_6 = V0_19_5

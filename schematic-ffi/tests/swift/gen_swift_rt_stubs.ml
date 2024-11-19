@@ -33,5 +33,6 @@ let () =
   let swift_contents = {|import CSchemas
 |} ^ schemas_src ^ rts_src in
 
-  let open Stdio.Out_channel in
-  write_all swift_filename ~data:swift_contents
+  Stdlib.Out_channel.(
+    with_open_text swift_filename @@ fun chan ->
+    output_string chan swift_contents)

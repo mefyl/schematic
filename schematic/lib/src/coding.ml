@@ -149,8 +149,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           Fmt.kstr f reason
         and ( >>= ) = Result.( >>= ) in
         match schema with
-        | Any (module Any) ->
-          Any.of_any (Coding.to_any v) |> type_error Any.name
+        | Any (module Any) -> Any.of_any Coding.coding v |> type_error Any.name
         | Bool -> Coding.to_bool v |> type_error "boolean"
         | Coding { f } -> decode_descriptor context (f (Some Coding.coding)) v
         | Date -> (
@@ -364,7 +363,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         match schema with
         | Any (module Any) -> (
           fun v ->
-            match Coding.of_any (Any.to_any v) with
+            match Coding.of_any Any.coding v with
             | Some v -> v
             | None ->
               Fmt.failwith "%s encoder cannot encode %s" Coding.name Any.name)

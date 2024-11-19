@@ -1,0 +1,17 @@
+(test
+ (name test)
+ (package schematic-cohttp-lwt)
+ (libraries
+  alcotest-lwt
+  cohttp-eio
+  cohttp-lwt-unix
+  eio_main
+  logs.fmt
+  lwt_eio
+  nofuture-lwt-unix
+  schematic_cohttp_lwt
+  schematic_http_tests
+  timmy-lwt.unix
+  timmy-unix.clock)
+ (preprocess
+  (pps ppx_here)))
