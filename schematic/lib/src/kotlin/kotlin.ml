@@ -249,15 +249,19 @@ module Parser = struct
       type a. Marks.t -> a Schema.descriptor -> kotlin * Marks.t =
    fun marks descriptor ->
     match descriptor with
+    | Any (module Coding) -> raise (NotYetImplemented "Any")
     | Bool -> (Atom (Simple "Boolean"), marks)
+    | Coding { f = _ } -> raise (NotYetImplemented "Coding")
     | Date -> (Atom (Simple "LocalDate"), marks)
     | Fixpoint lazy_descriptor ->
       descriptor_to_kotlin_marks marks (Lazy.force lazy_descriptor)
+    | Float -> (Atom (Simple "Float"), marks)
     | Ignore ->
       (Data_object, marks)
       (* Treat [Ignore] fields as an empty object that will be removed in a
          later pass *)
     | Int -> (Atom (Simple "Int"), marks)
+    | Int64 -> (Atom (Simple "Long"), marks)
     | Json -> (Atom (Simple "JsonElement"), marks)
     | List sub_schema ->
       (* TODO We will probably need [kotlin] to support generics *)
@@ -265,7 +269,9 @@ module Parser = struct
       let kotlin_type =
         type_name_and_kotlin_to_kotlin_type_exn type_name kotlin
       in
-      let kotlin = Atom (Generic ("List", [ kotlin_type ])) in
+      let kotlin =
+        Atom (Generic ("kotlin.collections.List", [ kotlin_type ]))
+      in
       (kotlin, marks)
     | Map { descriptor; _ } -> descriptor_to_kotlin_marks marks descriptor
     | Mapping value_schema ->
@@ -276,7 +282,10 @@ module Parser = struct
       let kotlin_type =
         type_name_and_kotlin_to_kotlin_type_exn type_name kotlin
       in
-      let kotlin = Atom (Generic ("Map", [ Simple "String"; kotlin_type ])) in
+      let kotlin =
+        Atom
+          (Generic ("kotlin.collections.Map", [ Simple "String"; kotlin_type ]))
+      in
       (kotlin, marks)
     | Null -> (Atom (Simple "Unit"), marks)
     | Nullable schema ->
@@ -356,8 +365,6 @@ module Parser = struct
         Sealed_interface { nested_data_classes; generics = [ (* TODO *) ] }
       in
       (kotlin, marks)
-    | _ ->
-      raise (NotYetImplemented (Fmt.str "%a" pp_debug_descriptor descriptor))
 
   and tuple_to_kotlin_marks :
       type a. Marks.t -> a Schema.tuple -> kotlin_type * Marks.t =
@@ -653,12 +660,24 @@ module Json = struct
     and encode_descriptor : type t. t Schema.descriptor -> t -> Ezjsonm.value =
      fun descriptor ->
       match descriptor with
+      | Any (module Coding) ->
+        raise
+          (NotYetImplemented
+             (Fmt.str "encode does not support descriptor %a"
+                pp_debug_descriptor descriptor))
       | Bool -> fun v -> `Bool v
+      | Coding { f = _ } ->
+        raise
+          (NotYetImplemented
+             (Fmt.str "encode does not support descriptor %a"
+                pp_debug_descriptor descriptor))
       | Date -> fun v -> v |> Date.to_string |> encode Schemas.string_schema
       | Fixpoint lazy_descriptor ->
         fun v -> encode_descriptor (Lazy.force lazy_descriptor) v
+      | Float -> fun v -> `Float v
       | Ignore -> Fn.const `Null
       | Int -> fun v -> `Float (Float.of_int v)
+      | Int64 -> fun v -> `Float (Float.of_int64 v)
       | Json -> Fn.id
       | List sub_schema ->
         let f = encode sub_schema in
@@ -714,11 +733,6 @@ module Json = struct
           match List.find_map ~f:(fun case -> case v) cases with
           | Some res -> res
           | None -> Fmt.failwith "unmatched variant case in schema")
-      | _ ->
-        raise
-          (NotYetImplemented
-             (Fmt.str "encode does not support descriptor %a"
-                pp_debug_descriptor descriptor))
 
     and encode_tuple :
         type t. t Hlist.t Schema.tuple -> t Hlist.t -> Ezjsonm.value =
@@ -844,8 +858,28 @@ module Json = struct
       in
 
       match descriptor with
+      | Any (module Coding) ->
+        fun json ->
+          Error
+            {
+              context with
+              reason =
+                Fmt.str
+                  "decode does not support descriptor %a while decoding %a"
+                  pp_debug_descriptor descriptor Json.pp json;
+            }
       | Bool -> (
         function `Bool v -> Ok v | json -> type_error "boolean" json)
+      | Coding { f = _ } ->
+        fun json ->
+          Error
+            {
+              context with
+              reason =
+                Fmt.str
+                  "decode does not support descriptor %a while decoding %a"
+                  pp_debug_descriptor descriptor Json.pp json;
+            }
       | Date -> (
         function
         | `String s ->
@@ -856,10 +890,15 @@ module Json = struct
         | json -> type_error "date" json)
       | Fixpoint lazy_descriptor ->
         fun json -> decode_descriptor context (Lazy.force lazy_descriptor) json
+      | Float -> (
+        function `Float f -> Ok f | json -> type_error "float" json)
       | Ignore -> Fn.const (Ok ())
       | Int -> (
         function
         | `Float f -> Ok (Float.to_int f) | json -> type_error "int" json)
+      | Int64 -> (
+        function
+        | `Float f -> Ok (Float.to_int64 f) | json -> type_error "int64" json)
       | Json -> fun json -> Ok json
       | List sub_schema -> (
         function
@@ -975,16 +1014,6 @@ module Json = struct
           in
           Ok (decoder decoded_value)
         | json -> type_error "object with 2 fields #type and value" json)
-      | _ ->
-        fun json ->
-          Error
-            {
-              context with
-              reason =
-                Fmt.str
-                  "decode does not support descriptor %a while decoding %a"
-                  pp_debug_descriptor descriptor Json.pp json;
-            }
 
     and decode_tuple :
         type t tuple.
@@ -1176,11 +1205,13 @@ import arrow.core.Option
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
 import kotlinx.serialization.json.JsonClassDiscriminator
+import kotlinx.serialization.json.JsonElement
 
 /**
  * Kotlin serialization does not provide serializers for OffsetDateTime. So we manually provide one
