@@ -10,7 +10,7 @@ bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "dune" {>= "3.0"}
   "alcotest" {>= "1.1.0" & with-test}
-  "cohttp-eio" {>= "6.0.0~beta2" & < "7.0.0"}
+  "cohttp-eio" {>= "6.0.0" & < "7.0.0"}
   "eio" {>= "1.0"}
   "eio_main" {with-test}
   "logs"

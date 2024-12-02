@@ -147,7 +147,7 @@
     (>= 1.0)))
   (http
    (and
-    (>= 6.0.0~beta2)
+    (>= 6.0.0)
     (< 7.0.0)))
   logs
   (nofuture
@@ -173,12 +173,12 @@
   (cohttp-eio :with-test)
   (cohttp-lwt
    (and
-    (>= 6.0.0~beta2)
+    (>= 6.0.0)
     (< 7.0.0)))
   (cohttp-lwt-unix
    (and
     :with-test
-    (>= 6.0.0~beta2)
+    (>= 6.0.0)
     (< 7.0.0)))
   (eio_main :with-test)
   logs
@@ -217,7 +217,7 @@
     :with-test))
   (cohttp-eio
    (and
-    (>= 6.0.0~beta2)
+    (>= 6.0.0)
     (< 7.0.0)))
   (eio
    (>= 1.0))

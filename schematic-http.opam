@@ -10,7 +10,7 @@ bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "dune" {>= "3.0"}
   "eio_main" {with-test & >= "1.0"}
-  "http" {>= "6.0.0~beta2" & < "7.0.0"}
+  "http" {>= "6.0.0" & < "7.0.0"}
   "logs"
   "nofuture" {>= "0.1.0" & < "0.2.0"}
   "ppx_deriving"

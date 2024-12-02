@@ -11,8 +11,8 @@ depends: [
   "dune" {>= "3.0"}
   "alcotest-lwt" {>= "1.1.0" & with-test}
   "cohttp-eio" {with-test}
-  "cohttp-lwt" {>= "6.0.0~beta2" & < "7.0.0"}
-  "cohttp-lwt-unix" {with-test & >= "6.0.0~beta2" & < "7.0.0"}
+  "cohttp-lwt" {>= "6.0.0" & < "7.0.0"}
+  "cohttp-lwt-unix" {with-test & >= "6.0.0" & < "7.0.0"}
   "eio_main" {with-test}
   "logs"
   "lwt_eio" {with-test}
