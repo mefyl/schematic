@@ -14,7 +14,7 @@
 
 (authors "mefyl <mefyl@gruntech.org>")
 
-(version 0.20.0)
+(version 0.20.1)
 
 (homepage https://gitlab.routine.co/routine/schematic)
 
@@ -99,8 +99,7 @@
   ptime
   (schematic
    (= :version))
-  uri
-  ))
+  uri))
 
 (package
  (name schematic-sexp)
@@ -148,7 +147,7 @@
     (>= 1.0)))
   (http
    (and
-    (>= 6.0.0~beta2)
+    (>= 6.0.0)
     (< 7.0.0)))
   logs
   (nofuture
@@ -161,8 +160,7 @@
   (timmy
    (and
     (>= 1.1.3)
-    (< 2.0.0)))
-  ))
+    (< 2.0.0)))))
 
 (package
  (name schematic-cohttp-lwt)
@@ -175,12 +173,12 @@
   (cohttp-eio :with-test)
   (cohttp-lwt
    (and
-    (>= 6.0.0~beta2)
+    (>= 6.0.0)
     (< 7.0.0)))
   (cohttp-lwt-unix
    (and
     :with-test
-    (>= 6.0.0~beta2)
+    (>= 6.0.0)
     (< 7.0.0)))
   (eio_main :with-test)
   logs
@@ -219,7 +217,7 @@
     :with-test))
   (cohttp-eio
    (and
-    (>= 6.0.0~beta2)
+    (>= 6.0.0)
     (< 7.0.0)))
   (eio
    (>= 1.0))

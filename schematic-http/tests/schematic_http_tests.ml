@@ -34,18 +34,14 @@ let sleep_and_advance ?(flush = false) clock seconds =
 
 let server mono_clock net sw =
   let server =
-    let callback _connection request body =
+    let callback _connection request (body : Cohttp_eio.Body.t) =
       let path = Cohttp.Request.uri request |> Uri.path in
       let () = Logs.info (fun m -> m "receive request %S" path) in
       match path with
-      | "/big" ->
-        let response = Cohttp.Response.make ()
-        and body = Cohttp_eio.Body.of_string Data.v in
-        (response, body)
+      | "/big" -> Cohttp_eio.Server.respond_string ~status:`OK ~body:Data.v ()
       | "/big-slow" ->
         let () = sleep_and_advance mono_clock 2. in
-        let response = Cohttp.Response.make ()
-        and body =
+        let body =
           let module String_source_chunked = struct
             type t = {
               s : string;
@@ -69,29 +65,16 @@ let server mono_clock net sw =
           let ops = Eio.Flow.Pi.source (module String_source_chunked) in
           Eio.Resource.T (String_source_chunked.create Data.v, ops)
         in
-        (response, body)
-      | "/cat" ->
-        let response = Cohttp.Response.make () in
-        (response, body)
-      | "/empty" ->
-        let response = Cohttp.Response.make ()
-        and body = Cohttp_eio.Body.of_string "" in
-        (response, body)
+        Cohttp_eio.Server.respond ~status:`OK ~body ()
+      | "/cat" -> Cohttp_eio.Server.respond ~status:`OK ~body ()
+      | "/empty" -> Cohttp_eio.Server.respond_string ~status:`OK ~body:"" ()
       | "/const" ->
-        let response = Cohttp.Response.make ()
-        and body =
-          Cohttp_eio.Body.of_string
-            (Schematic.Json.String.encode payload_schema const_payload)
-        in
-        (response, body)
+        Cohttp_eio.Server.respond_string ~status:`OK
+          ~body:(Schematic.Json.String.encode payload_schema const_payload)
+          ()
       | "/404" ->
-        let response = Cohttp.Response.make ~status:`Not_found ()
-        and body = Cohttp_eio.Body.of_string "INVALID" in
-        (response, body)
-      | _ ->
-        let response = Cohttp.Response.make ~status:`Not_found ()
-        and body = Cohttp_eio.Body.of_string "" in
-        (response, body)
+        Cohttp_eio.Server.respond_string ~status:`Not_found ~body:"INVALID" ()
+      | _ -> Cohttp_eio.Server.respond_string ~status:`Not_found ~body:"" ()
     in
     Cohttp_eio.Server.make ~callback ()
   in
