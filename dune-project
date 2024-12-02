@@ -14,7 +14,7 @@
 
 (authors "mefyl <mefyl@gruntech.org>")
 
-(version 0.20.0)
+(version 0.20.1)
 
 (homepage https://gitlab.routine.co/routine/schematic)
 
@@ -99,8 +99,7 @@
   ptime
   (schematic
    (= :version))
-  uri
-  ))
+  uri))
 
 (package
  (name schematic-sexp)
@@ -161,8 +160,7 @@
   (timmy
    (and
     (>= 1.1.3)
-    (< 2.0.0)))
-  ))
+    (< 2.0.0)))))
 
 (package
  (name schematic-cohttp-lwt)

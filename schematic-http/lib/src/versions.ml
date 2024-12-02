@@ -10,3 +10,5 @@ module V0_20_0 = struct
 
   module Error = Error
 end
+
+module V0_20_1 = V0_20_0
