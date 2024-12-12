@@ -992,6 +992,9 @@ module Json = struct
           when String.(
                  type_key = union_type_discriminator
                  && value_key = union_type_value) ->
+          let case_names =
+            List.map cases ~f:(fun (Case { name; _ }) -> to_pascal_case name)
+          in
           let case =
             List.find cases ~f:(fun (Case { name; _ }) ->
                 String.(to_pascal_case name = datatype))
@@ -1003,8 +1006,12 @@ module Json = struct
                   context with
                   path = context.path @ [ union_type_discriminator ];
                   reason =
-                    Fmt.str "Failed to decode Union: data type %S not supported"
-                      datatype;
+                    Fmt.str
+                      "Failed to decode Union: data type %S not supported, \
+                       expected one of %a"
+                      datatype
+                      Fmt.(list string)
+                      case_names;
                 }
           in
           let* decoded_value =
