@@ -566,9 +566,9 @@ module Parser = struct
       { unpack = (fun schema -> schema_to_swift_marks marks schema) }
       packed_schema
 
-  let big_union_of (marks : Marks.t) : swift Marks.with_parsing_status =
+  let big_union_of (marks : string list) : swift Marks.with_parsing_status =
     let name_to_case (name : string) = (name, [ (None, Simple name) ]) in
-    let cases = marks |> Map.keys |> List.map ~f:name_to_case in
+    let cases = marks |> List.map ~f:name_to_case in
     Marks.Done (Enum { generics = []; cases })
 end
 
@@ -1228,7 +1228,12 @@ module Public_api = struct
       (Fmt.list ~sep:Fmt.cut Generator.pp)
       (marks
       @ [
-          ("All", Parser.big_union_of (Map.of_alist_exn (module String) marks));
+          ( "All",
+            (* Add a type which is a big union of all the known types. This is
+               used by the tests because we can't dynamically dispatch on a
+               type, so we use this big enum to emulate it. *)
+            Parser.big_union_of
+              ([ "Int"; "Int64"; "Float"; "String" ] @ List.map ~f:fst marks) );
         ])
 
   let to_json = Json.Encode.encode
