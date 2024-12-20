@@ -38,6 +38,8 @@ type test_description =
       expected : Ezjsonm.value;
       kotlin_class_name : string option;
       is_kotlin_roundtrip_enabled : bool;
+      swift_class_name : string option;
+      is_swift_roundtrip_enabled : bool;
     }
       -> test_description
 
@@ -152,6 +154,8 @@ struct
               expected = [%ezjsonm 28];
               kotlin_class_name = Some "java.lang.Integer";
               is_kotlin_roundtrip_enabled = true;
+              swift_class_name = Some "Int";
+              is_swift_roundtrip_enabled = true;
             };
         ];
     }
@@ -174,6 +178,8 @@ struct
               expected = [%ezjsonm 9223372036854];
               kotlin_class_name = Some "java.lang.Long";
               is_kotlin_roundtrip_enabled = true;
+              swift_class_name = Some "Int64";
+              is_swift_roundtrip_enabled = true;
             };
         ];
     }
@@ -196,6 +202,8 @@ struct
               expected = `Float 1.234567890;
               kotlin_class_name = Some "java.lang.Float";
               is_kotlin_roundtrip_enabled = true;
+              swift_class_name = Some "Float";
+              is_swift_roundtrip_enabled = true;
             };
         ];
     }
@@ -218,6 +226,8 @@ struct
               expected = [%ezjsonm "trente trois"];
               kotlin_class_name = Some "java.lang.String";
               is_kotlin_roundtrip_enabled = true;
+              swift_class_name = Some "String";
+              is_swift_roundtrip_enabled = true;
             };
         ];
     }
@@ -240,6 +250,8 @@ struct
               expected = [%ezjsonm [ 2024; 8; 25 ]];
               kotlin_class_name = Some "kotlinx.datetime.LocalDate";
               is_kotlin_roundtrip_enabled = true;
+              swift_class_name = Some "Date";
+              is_swift_roundtrip_enabled = false;
             };
         ];
     }
@@ -263,6 +275,8 @@ struct
               false
               (* Kotlin's [Class.forName] does not support generics/nullable
                  types *);
+            swift_class_name = Some "Option";
+            is_swift_roundtrip_enabled = true;
           }
       in
       {
@@ -297,6 +311,8 @@ struct
             expected;
             kotlin_class_name = None;
             is_kotlin_roundtrip_enabled = true;
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = true;
           }
       in
       {
@@ -332,6 +348,8 @@ struct
             expected;
             kotlin_class_name = None;
             is_kotlin_roundtrip_enabled = true;
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = true;
           }
       in
       {
@@ -375,6 +393,8 @@ struct
                 expected = [%ezjsonm { a = None; b = [] }];
                 kotlin_class_name = None;
                 is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
               };
           ];
       }
@@ -416,6 +436,8 @@ struct
               expected = [%ezjsonm { major = 0; minor = 1; subminor = 2 }];
               kotlin_class_name = None;
               is_kotlin_roundtrip_enabled = true;
+              swift_class_name = None;
+              is_swift_roundtrip_enabled = true;
             };
         ];
     }
@@ -442,6 +464,8 @@ struct
               expected = [%ezjsonm { major = 3; minor = 4; subminor = 5 }];
               kotlin_class_name = None;
               is_kotlin_roundtrip_enabled = true;
+              swift_class_name = None;
+              is_swift_roundtrip_enabled = true;
             };
         ];
     }
@@ -484,6 +508,8 @@ struct
               kotlin_class_name = None;
               (* Type aliases are not supported for reflection *)
               is_kotlin_roundtrip_enabled = false;
+              swift_class_name = None;
+              is_swift_roundtrip_enabled = true;
             };
         ];
     }
@@ -517,6 +543,8 @@ struct
             (* Nested unions (sealed interfaces) not yet supported. The
                [aktually] variant is itself a union of ["aktually"] and
                ["mrmask"]. *)
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = false;
           }
       in
       {
@@ -572,6 +600,8 @@ struct
                 expected = [%ezjsonm "single"];
                 kotlin_class_name = None;
                 is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
               };
           ];
       }
@@ -604,6 +634,8 @@ struct
                 expected = [%ezjsonm { x = 239; y = 114; z = 353 }];
                 kotlin_class_name = None;
                 is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
               };
           ];
       }
@@ -660,6 +692,8 @@ struct
                 expected = [%ezjsonm None];
                 kotlin_class_name = None;
                 is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
               };
           ];
       }
@@ -694,6 +728,8 @@ struct
             expected;
             kotlin_class_name = None;
             is_kotlin_roundtrip_enabled = true;
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = true;
           }
       in
       {
@@ -735,6 +771,8 @@ struct
             expected;
             kotlin_class_name = None;
             is_kotlin_roundtrip_enabled = true;
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = true;
           }
       in
       {
@@ -770,6 +808,8 @@ struct
             is_kotlin_roundtrip_enabled =
               false
               (* Cannot find by reflection the class name for a list of X *);
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = false;
           }
       in
       {
@@ -812,6 +852,8 @@ struct
             is_kotlin_roundtrip_enabled =
               false
               (* Cannot find by reflection the class name for a list of X *);
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = false;
           }
       in
       {
@@ -859,6 +901,8 @@ struct
                   false
                   (* Cannot find by reflection the class name for a
                      [typealias] *);
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
               };
           ];
       }
@@ -886,6 +930,8 @@ struct
                   false
                   (* Cannot find by reflection the class name for a
                      [typealias] *);
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
               };
           ];
       }
@@ -916,6 +962,8 @@ struct
                 expected = [%ezjsonm "int"];
                 kotlin_class_name = None;
                 is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
               };
           ];
       }
@@ -954,6 +1002,8 @@ struct
                 expected = [%ezjsonm "int"];
                 kotlin_class_name = None;
                 is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
               };
             Test
               {
@@ -966,6 +1016,8 @@ struct
                 expected = [%ezjsonm "386"];
                 kotlin_class_name = None;
                 is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
               };
           ];
       }
@@ -1003,6 +1055,8 @@ struct
                 `O [ ("'char$", `Float 128.); ("type", `String "coin") ];
               kotlin_class_name = None;
               is_kotlin_roundtrip_enabled = true;
+              swift_class_name = None;
+              is_swift_roundtrip_enabled = true;
             };
         ];
     }
@@ -1039,6 +1093,8 @@ struct
                 expected = [%ezjsonm { value = 0; next = { value = 1 } }];
                 kotlin_class_name = None;
                 is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
               };
           ];
       }
@@ -1123,6 +1179,8 @@ struct
               expected = [%ezjsonm { next_b = { next_a = [%aq `O []] } }];
               kotlin_class_name = None;
               is_kotlin_roundtrip_enabled = true;
+              swift_class_name = None;
+              is_swift_roundtrip_enabled = true;
             };
         ];
     }
@@ -1155,6 +1213,8 @@ struct
               expected = [%ezjsonm { not_ignored = None }];
               kotlin_class_name = None;
               is_kotlin_roundtrip_enabled = true;
+              swift_class_name = None;
+              is_swift_roundtrip_enabled = true;
             };
         ];
     }
@@ -1240,6 +1300,8 @@ struct
                 expected = [%ezjsonm { a = 0; b = 1; c = 2; d = 3 }];
                 kotlin_class_name = None;
                 is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
               };
           ];
         additional_test =
@@ -1271,6 +1333,8 @@ struct
                 expected = [%ezjsonm { a = 0; b = 1; c = 2; d = 3 }];
                 kotlin_class_name = None;
                 is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
               };
           ];
         additional_test =
@@ -1297,6 +1361,8 @@ struct
             expected;
             kotlin_class_name = None;
             is_kotlin_roundtrip_enabled = true;
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = true;
           }
       in
       {
@@ -1359,6 +1425,8 @@ struct
                 expected = [%ezjsonm { maybe = true; b = 411; c = 412 }];
                 kotlin_class_name = None;
                 is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
               };
             Test
               {
@@ -1371,6 +1439,8 @@ struct
                 expected = [%ezjsonm { maybe = true; inline = 416 }];
                 kotlin_class_name = None;
                 is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
               };
           ];
       }
@@ -1412,6 +1482,8 @@ struct
                 expected = [%ezjsonm { value = 457 }];
                 kotlin_class_name = None;
                 is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
               };
           ];
       }
@@ -1451,6 +1523,8 @@ struct
             expected;
             kotlin_class_name = None;
             is_kotlin_roundtrip_enabled = true;
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = true;
           }
       in
       {
@@ -1485,6 +1559,8 @@ struct
             expected;
             kotlin_class_name = None;
             is_kotlin_roundtrip_enabled = true;
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = true;
           }
       in
       {
@@ -1564,6 +1640,8 @@ struct
                    }];
                kotlin_class_name = None;
                is_kotlin_roundtrip_enabled = true;
+               swift_class_name = None;
+               is_swift_roundtrip_enabled = true;
              };
          ]
         @
@@ -1589,6 +1667,8 @@ struct
                     }];
                 kotlin_class_name = None;
                 is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
               };
           ]
         else []);
@@ -1626,6 +1706,8 @@ struct
           expected;
           kotlin_class_name = None;
           is_kotlin_roundtrip_enabled = true;
+          swift_class_name = None;
+          is_swift_roundtrip_enabled = true;
         }
     in
     {
@@ -1672,6 +1754,8 @@ struct
           expected;
           kotlin_class_name = None;
           is_kotlin_roundtrip_enabled = true;
+          swift_class_name = None;
+          is_swift_roundtrip_enabled = true;
         }
     in
     {
@@ -1845,6 +1929,8 @@ struct
             expected;
             kotlin_class_name = None;
             is_kotlin_roundtrip_enabled = true;
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = true;
           }
       in
 
@@ -2120,6 +2206,8 @@ struct
               expected = [%ezjsonm { collision_a = 725; collision_b = "725" }];
               kotlin_class_name = None;
               is_kotlin_roundtrip_enabled = true;
+              swift_class_name = None;
+              is_swift_roundtrip_enabled = true;
             };
           Test
             {
@@ -2134,6 +2222,8 @@ struct
               expected = [%ezjsonm { collision_a = 725; collision_b = "725" }];
               kotlin_class_name = None;
               is_kotlin_roundtrip_enabled = true;
+              swift_class_name = None;
+              is_swift_roundtrip_enabled = true;
             };
         ];
     }
@@ -2167,6 +2257,8 @@ struct
             expected;
             kotlin_class_name = None;
             is_kotlin_roundtrip_enabled = true;
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = true;
           }
       in
       {
@@ -2237,6 +2329,8 @@ struct
             expected;
             kotlin_class_name = None;
             is_kotlin_roundtrip_enabled;
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = true;
           }
       in
       {
@@ -2319,6 +2413,8 @@ struct
             expected = json;
             kotlin_class_name = None;
             is_kotlin_roundtrip_enabled = true;
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = true;
           }
       in
       let test_legacy =
@@ -2343,6 +2439,8 @@ struct
             is_kotlin_roundtrip_enabled =
               false
               (* Disabled since the Kotlin data type uses the latest schema *);
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = false;
           }
       in
       {
@@ -2456,6 +2554,8 @@ struct
                 expected = [%ezjsonm 42];
                 kotlin_class_name = Some "java.lang.Integer";
                 is_kotlin_roundtrip_enabled = true;
+                swift_class_name = Some "Int";
+                is_swift_roundtrip_enabled = true;
               };
           ];
       }
@@ -2481,6 +2581,8 @@ struct
                   false
                   (* Kotlin [Class.forName] does not support generics like
                      [Pair<Integer, String>] *);
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
               };
           ];
       }
