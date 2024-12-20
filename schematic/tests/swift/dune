@@ -42,8 +42,7 @@
  ; - Move the binary (and its libs) in a directory accessible from the OCaml test
  (alias build-swift-test-app)
  (enabled_if %{bin-available:swiftc})
- (target
-  swift-app)
+ (target swift-app)
  (mode
   (promote
    (until-clean)
@@ -57,10 +56,7 @@
     swift-roundtrip
     (progn
      (run swiftc GeneratedTestController.swift App.swift)))
-   (run
-    cp
-    swift-roundtrip/main
-    %{target}))))
+   (run cp swift-roundtrip/main %{target}))))
 
 (executable
  (name swift_test_controller_generator)
