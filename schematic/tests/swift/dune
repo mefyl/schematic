@@ -69,7 +69,6 @@
  swift-roundtrip/
  (rule
   (alias generate-swift-test-controller)
-  (enabled_if %{bin-available:swift-format})
   (target GeneratedTestController.swift)
   (mode
    (promote
