@@ -178,10 +178,10 @@ type swift_struct = {
 }
 
 and swift_union = {
-  generics : swift_type list; [@ocaml.warning "-30"]
+  generics : swift_type list;
   cases : (string * (string option * swift_type) list) list;
 }
-[@@deriving show]
+[@@ocaml.warning "-30"] [@@deriving show]
 
 type swift =
   | Atom of swift_type  (** Type alias or basic type *)
