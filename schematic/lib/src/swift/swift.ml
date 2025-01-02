@@ -575,15 +575,40 @@ end
 module Generator = struct
   let original_pp_swift_type = pp_swift_type
 
+  (** Pretty-print the given list, or nothing if the list is empty *)
+  let pp_optional_list ~open_delim ~close_delim ?(sep = Fmt.comma) pp_elt :
+      'a list Fmt.t =
+   fun fmt list ->
+    match list with
+    | [] -> Fmt.pf fmt ""
+    | _ ->
+      Fmt.pf fmt "@[<1>%s%a%s@]" open_delim (Fmt.list ~sep pp_elt) list
+        close_delim
+
+  (** Pretty-print a single field inside a [struct] *)
   let rec pp_field : (string * swift_type) Fmt.t =
    fun f (field_name, field_type) ->
     Fmt.pf f "let %s: %a" field_name pp_swift_type field_type
+
+  (** Pretty-print a single [case] inside an [enum] *)
+  and pp_case : (string * (string option * swift_type) list) Fmt.t =
+   fun f (case_name, case_args) ->
+    let pp_case_arg fmt ((arg_name, case_arg) : string option * swift_type) =
+      let pp_name fmt = function
+        | None -> Fmt.pf fmt ""
+        | Some name -> Fmt.pf fmt "%s: " name
+      in
+      Fmt.pf fmt "%a%a" pp_name arg_name pp_swift_type case_arg
+    in
+    Fmt.pf f "case %s%a" case_name
+      (pp_optional_list ~open_delim:"(" ~close_delim:")" pp_case_arg)
+      case_args
 
   and pp_swift_type : swift_type Fmt.t =
    fun f swift_type ->
     let () =
       Logs.debug (fun m ->
-          m "pp_swift_type: Pretty-printing swift typee %a"
+          m "pp_swift_type: Pretty-printing swift type %a"
             original_pp_swift_type swift_type)
     in
     match swift_type with
@@ -604,49 +629,23 @@ module Generator = struct
         (Fmt.list ~sep:Fmt.cut pp_field)
         fields
     | Done (Enum { cases; generics }) ->
-      Fmt.pf f "@[<v 2>enum %s%a : Codable {@;<0 4>%a@]@;}" name pp_generics
+      Fmt.pf f "@[<v 2>enum %s%a : Codable {@;%a@]@;}@;" name pp_generics
         generics
-        (Fmt.list ~sep:Fmt.cut (pp_case ~parent_interface:name))
+        (Fmt.list ~sep:Fmt.cut pp_case)
         cases
 
-  (** The subclass of a sealed class. We can't reuse [pp_mark] as is because we
-      must add extra information, like the [@SerialName] or the parent interface
-      name that it implements. *)
-  and pp_case :
-      parent_interface:string ->
-      (string * (string option * swift_type) list) Fmt.t =
-   fun ~parent_interface f (case_name, case_args) ->
-    let pp_case_arg fmt ((arg_name, case_arg) : string option * swift_type) =
-      let pp_type fmt t =
-        match t with
-        | Simple name -> Fmt.pf fmt "%s" name
-        | Generic (name, args) -> Fmt.pf fmt "%s%a" name pp_generics args
-      and pp_name fmt = function
-        | None -> Fmt.pf fmt ""
-        | Some name -> Fmt.pf fmt "%s: " name
-      in
-      Fmt.pf fmt "%a%a" pp_name arg_name pp_type case_arg
-    in
-    match case_args with
-    | [] -> Fmt.pf f "case %s" case_name
-    | _ ->
-      Fmt.pf f "case %s(%a)" case_name
-        (Fmt.list ~sep:Fmt.comma pp_case_arg)
-        case_args
-
-  (** Special case if the list of generics is empty as [data class Foo<>] is
-      illegal in Swift. *)
+  (** Special case if the list of generics is empty as [Foo<>] is illegal in
+      Swift. *)
   and pp_generics : swift_type list Fmt.t =
    fun f swift_types ->
-    match swift_types with
-    | [] -> Fmt.pf f ""
-    | swift_types ->
-      Fmt.pf f "<%a>" Fmt.(list ~sep:comma pp_swift_type) swift_types
+    pp_optional_list ~open_delim:"<" ~close_delim:">" pp_swift_type f
+      swift_types
 
   let preamble : string =
     {|
 import Foundation
 
+// Isomorphic to `nil`, but using a more predictible JSON encoding
 struct Unit : Codable {}
 
 // Sad but required: Although Swift has native tuples, these are not `Codable`,
@@ -661,6 +660,7 @@ struct Tuple3<T0 : Codable, T1 : Codable, T2 : Codable> : Codable {
   let _2 : T2
 }
 
+// Isomorphic to `Optional`, but with a more regular JSON encoding
 struct Maybe<T : Codable> : Codable {
   let value : Optional<T>
 
