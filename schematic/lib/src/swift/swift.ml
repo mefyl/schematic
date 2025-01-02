@@ -649,7 +649,8 @@ import Foundation
 
 struct Unit : Codable {}
 
-// FIXME: Replace these ugly tuples with the native Swift tuples
+// Sad but required: Although Swift has native tuples, these are not `Codable`,
+// so we can't use them in the protocol, and we have to define our own ugly things
 struct Tuple1<T0 : Codable> : Codable {
   let _0 : T0
 }
