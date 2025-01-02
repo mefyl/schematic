@@ -1044,7 +1044,10 @@ module Json = struct
         with_sorted_keys @@ function
         (* For simplicity and consistency with the Swift generated types, we
            ignore the optional union key *)
-        | `O [ (datatype, `O [ ("_0", json) ]) ] | `O [ (datatype, json) ] ->
+        | `O [ (datatype, `O [ ("_0", json) ]) ]
+        (* Inline records in enums are serialized as inline constructor
+           arguments, so decode them the same way *)
+        | `O [ (datatype, json) ] ->
           let case_names =
             List.map cases ~f:(fun (Case { name; _ }) -> to_pascal_case name)
           in
@@ -1127,8 +1130,8 @@ module Json = struct
             context with
             reason =
               Fmt.str
-                "Only tuples of exactly 2 elements are currently supported, \
-                 but found JSON value: %a"
+                "Only tuples of 2 or 3 elements are currently supported, but \
+                 found JSON value: %a"
                 Json.pp json;
           }
 
