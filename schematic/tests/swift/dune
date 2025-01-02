@@ -78,5 +78,4 @@
    (progn
     (with-stdout-to
      "%{target}"
-     (run "%{dep:../swift_test_controller_generator.exe}"))
-    (run swift-format %{target})))))
+     (run "%{dep:../swift_test_controller_generator.exe}"))))))
