@@ -1249,18 +1249,15 @@ module Public_api = struct
 
   let pp = Generator.pp
 
+  let union_of types name =
+    ( name,
+      Parser.big_union_of
+        ([ "Int"; "Int64"; "Float"; "String" ] @ List.map ~f:fst types) )
+
   let pp_file fmt marks =
     Fmt.pf fmt "%s@.@[<v 0>%a@]" Generator.preamble
       (Fmt.list ~sep:Fmt.cut Generator.pp)
-      (marks
-      @ [
-          ( "All",
-            (* Add a type which is a big union of all the known types. This is
-               used by the tests because we can't dynamically dispatch on a
-               type, so we use this big enum to emulate it. *)
-            Parser.big_union_of
-              ([ "Int"; "Int64"; "Float"; "String" ] @ List.map ~f:fst marks) );
-        ])
+      marks
 
   let to_json = Json.Encode.encode
   let from_json = Json.Decode.decode

@@ -22,4 +22,5 @@ let () =
 
 %a
 |}
-    Schematic.Swift.pp_file swift_types
+    Schematic.Swift.pp_file
+    (swift_types @ [ Schematic.Swift.union_of swift_types "All" ])

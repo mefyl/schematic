@@ -7,6 +7,23 @@
 (** A parsed Swift type declaration and expression. *)
 type t
 
+(** [union_of types name] is a sum type named [name] with a case for each of
+    [types] (plus a few hardcoded built-in ones).
+
+    For instance, if [types] corresponds to two types called [Type1] and
+    [Type2], then [union_of types "All"] will be a type of the form
+
+    [[
+  enum All {
+    case Int(Int)
+    case String(String)
+    …
+    case Type1(Type1)
+    case Type2(Type2)
+  }
+  ]] *)
+val union_of : t list -> string -> t
+
 (** [of_packed_schemas schemas] is the list of Swift type declarations and
     expressions found in [schemas]. *)
 val of_packed_schemas : Schema.pack list -> t list
