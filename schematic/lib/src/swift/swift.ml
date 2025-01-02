@@ -386,10 +386,8 @@ module Parser = struct
       (Struct { fields = swift_fields; generics = [] }, marks)
     | String -> (Atom (Simple "String"), marks)
     | String_const _ -> (empty_struct, marks)
-    (* FIXME: Proper time handling *)
     | Time -> (Atom (Simple "Date"), marks)
-    | Time_local ->
-      (Atom (Simple "String"), marks) (* FIXME: Use the right time type *)
+    | Time_local -> (Atom (Simple "ZonedDate"), marks)
     | Tuple { items; _ } ->
       let swift_type, marks = tuple_to_swift_marks marks items in
       (Atom swift_type, marks)
@@ -675,6 +673,11 @@ struct Maybe<T : Codable> : Codable {
     try container.encode(value, forKey: .value)
   }
 }
+
+struct ZonedDate : Codable {
+  let date : Date
+  let gmt_offset : Int
+}
   |}
 end
 
@@ -740,7 +743,12 @@ module Json = struct
       | String_const _s -> Fn.const (`O [])
       | Time -> fun v -> `Float (Ptime.to_float_s v)
       | Time_local ->
-        fun (t, tz_offset_s) -> Json.Impl.of_time_local (t, tz_offset_s)
+        fun (t, tz_offset_s) ->
+          `O
+            [
+              ("date", `Float (Ptime.to_float_s t));
+              ("gmt_offset", `Float (Int.to_float tz_offset_s));
+            ]
       | Tuple { encode; items; _ } ->
         fun v ->
           let items_hlist = encode v in
@@ -1007,25 +1015,14 @@ module Json = struct
         | json -> type_error "time" json)
       | Time_local -> (
         function
-        | `String s -> (
-          let error (`RFC3339 (_, e)) =
-            {
-              context with
-              reason = Stdlib.Format.asprintf "%a" Ptime.pp_rfc3339_error e;
-            }
+        | `O [ ("date", `Float t); ("gmt_offset", `Float tz) ] ->
+          let* time =
+            match Ptime.of_float_s t with
+            | Some t -> Ok t
+            | None ->
+              Error { context with reason = Fmt.str "Invalid timestamp %f" t }
           in
-          let* t, tz, _ =
-            Ptime.of_rfc3339 ~strict:true s |> Result.map_error ~f:error
-          in
-          match tz with
-          | Some tz -> Ok (t, tz)
-          | None ->
-            Error
-              {
-                context with
-                reason =
-                  Stdlib.Format.asprintf "Time_local without timezone: %s" s;
-              })
+          Ok (time, Int.of_float_unchecked tz)
         | json -> type_error "time_local" json)
       | Tuple { decode = decode_hlist; items; _ } ->
         decode_tuple context decode_hlist items
