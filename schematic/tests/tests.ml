@@ -97,6 +97,8 @@ struct
            expected;
            kotlin_class_name = _;
            is_kotlin_roundtrip_enabled = _;
+           swift_class_name = _;
+           is_swift_roundtrip_enabled = _;
          } as test_descripton) =
     let encoded = Coding.encode schema value in
     let () =
