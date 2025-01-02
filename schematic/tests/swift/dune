@@ -48,7 +48,7 @@
    (until-clean)
    (only swift-app)))
  (deps
-  (alias_rec generate-swift-test-controller)
+  (alias swift-roundtrip/generate-swift-test-controller)
   (source_tree swift-roundtrip))
  (action
   (progn
