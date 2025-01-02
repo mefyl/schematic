@@ -387,7 +387,7 @@ module Parser = struct
     | String -> (Atom (Simple "String"), marks)
     | String_const _ -> (empty_struct, marks)
     (* FIXME: Proper time handling *)
-    | Time -> (Atom (Simple "String"), marks)
+    | Time -> (Atom (Simple "Date"), marks)
     | Time_local ->
       (Atom (Simple "String"), marks) (* FIXME: Use the right time type *)
     | Tuple { items; _ } ->
@@ -650,6 +650,8 @@ module Generator = struct
 import Foundation
 
 struct Unit : Codable {}
+
+// FIXME: Replace these ugly tuples with the native Swift tuples
 struct Tuple1<T0 : Codable> : Codable {
   let _0 : T0
 }
@@ -736,7 +738,7 @@ module Json = struct
           `O (encode_fields fields fields_hlist)
       | String -> fun v -> `String v
       | String_const _s -> Fn.const (`O [])
-      | Time -> fun v -> Json.Impl.of_time v
+      | Time -> fun v -> `Float (Ptime.to_float_s v)
       | Time_local ->
         fun (t, tz_offset_s) -> Json.Impl.of_time_local (t, tz_offset_s)
       | Tuple { encode; items; _ } ->
@@ -996,11 +998,13 @@ module Json = struct
       | String_const _s -> (
         function `O [] -> Ok () | json -> type_error "empty object" json)
       | Time -> (
-        fun json ->
-          Json.Impl.to_time json |> function
-          | Ok _ as ok -> ok
-          | Error None -> type_error "time" json
-          | Error (Some reason) -> Error { context with reason })
+        function
+        | `Float secs -> (
+          match Ptime.of_float_s secs with
+          | Some t -> Ok t
+          | None ->
+            Error { context with reason = Fmt.str "Invalid timestamp %f" secs })
+        | json -> type_error "time" json)
       | Time_local -> (
         function
         | `String s -> (
