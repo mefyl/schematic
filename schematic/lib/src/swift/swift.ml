@@ -237,7 +237,7 @@ module Parser = struct
   end
 
   let wrap_in_option : swift_type -> swift_type =
-   fun swift_type -> Generic ("Optional", [ swift_type ])
+   fun swift_type -> Generic ("Maybe", [ swift_type ])
 
   (** Try to find an adequate Swift type name. *)
   let type_name_and_swift_to_swift_type_exn :
@@ -386,9 +386,10 @@ module Parser = struct
       (Struct { fields = swift_fields; generics = [] }, marks)
     | String -> (Atom (Simple "String"), marks)
     | String_const _ -> (empty_struct, marks)
-    | Time -> (Atom (Simple "Date"), marks)
+    (* FIXME: Proper time handling *)
+    | Time -> (Atom (Simple "String"), marks)
     | Time_local ->
-      (Atom (Simple "Date"), marks) (* FIXME: Use the right time type *)
+      (Atom (Simple "String"), marks) (* FIXME: Use the right time type *)
     | Tuple { items; _ } ->
       let swift_type, marks = tuple_to_swift_marks marks items in
       (Atom swift_type, marks)
@@ -661,6 +662,17 @@ struct Tuple3<T0 : Codable, T1 : Codable, T2 : Codable> : Codable {
   let _1 : T1
   let _2 : T2
 }
+
+struct Maybe<T : Codable> : Codable {
+  let value : Optional<T>
+
+  // Custom encoding because the default one will just omit null values, while
+  // we'd rather have an explicit `null`
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(value, forKey: .value)
+  }
+}
   |}
 end
 
@@ -713,7 +725,7 @@ module Json = struct
         fun v ->
           let pairs = List.map ~f:(fun (k, v) -> (k, encode v)) v in
           `O pairs
-      | Null -> Fn.const (`O [])
+      | Null -> Fn.const (`O [ ("Unit", `O []) ])
       | Nullable schema ->
         let f = encode schema in
         fun v ->
@@ -734,18 +746,19 @@ module Json = struct
       | Union { cases; _ } -> (
         (* For simplicity and consistency with the Swift generated types, we
            ignore the optional union key *)
-        let cases =
+        let cases : (t -> Ezjsonm.value option) list =
           let f (Schema.Case { encoder; name; schema; _ }) =
             let encode = encode schema in
             fun v ->
               match encoder v with
-              | Some v ->
-                Some
-                  (`O
-                    [
-                      (union_type_discriminator, `String (to_pascal_case name));
-                      (union_type_value, encode v);
-                    ])
+              | Some v -> (
+                match (schema.id, schema.descriptor) with
+                | ( None,
+                    Object _ (* Inline record, directly encode as the body *) )
+                  ->
+                  Some (`O [ (to_pascal_case name, encode v) ])
+                | _ ->
+                  Some (`O [ (to_pascal_case name, `O [ ("_0", encode v) ]) ]))
               | None -> None
           in
           List.map ~f cases
@@ -767,7 +780,7 @@ module Json = struct
           [ element_1; element_2 ] ) ->
         let encoded_1 = encode schema_1 element_1 in
         let encoded_2 = encode schema_2 element_2 in
-        `O [ ("first", encoded_1); ("second", encoded_2) ]
+        `O [ ("_0", encoded_1); ("_1", encoded_2) ]
       | ( Item
             {
               schema = schema_1;
@@ -782,7 +795,7 @@ module Json = struct
         let encoded_1 = encode schema_1 element_1 in
         let encoded_2 = encode schema_2 element_2 in
         let encoded_3 = encode schema_3 element_3 in
-        `O [ ("first", encoded_1); ("second", encoded_2); ("third", encoded_3) ]
+        `O [ ("_0", encoded_1); ("_1", encoded_2); ("_2", encoded_3) ]
       | _, _ ->
         raise (NotYetImplemented "Only tuples of 2 or 3 elements are supported")
 
@@ -954,7 +967,14 @@ module Json = struct
               (key, decoded_value))
             fields
           |> Result.all
-      | Null -> ( function `O [] -> Ok () | json -> type_error "null" json)
+      | Null -> (
+        function
+        | `O [ ("Unit", `O []) ]
+        | `O []
+        (* XXX: Swift sometimes appear to serialize `Unit` as `{}` instead of [{
+           "Unit": {} }]. Not sure why *) ->
+          Ok ()
+        | json -> type_error "null" json)
       | Nullable schema -> (
         function
         | `O [ ("value", `Null) ] -> Ok None
@@ -1009,10 +1029,7 @@ module Json = struct
         function
         (* For simplicity and consistency with the Swift generated types, we
            ignore the optional union key *)
-        | `O [ (type_key, `String datatype); (value_key, json) ]
-          when String.(
-                 type_key = union_type_discriminator
-                 && value_key = union_type_value) ->
+        | `O [ (datatype, `O [ ("_0", json) ]) ] | `O [ (datatype, json) ] ->
           let case_names =
             List.map cases ~f:(fun (Case { name; _ }) -> to_pascal_case name)
           in
@@ -1051,22 +1068,28 @@ module Json = struct
         Ezjsonm.value ->
         (t, E.decoding) Result.t =
      fun context decode_hlist items json ->
+      let json =
+        (* Sort the json keys to make the pattern-matching easier *)
+        match json with
+        | `O lst ->
+          `O
+            (List.sort
+               ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2)
+               lst)
+        | j -> j
+      in
       match (items, json) with
       | ( Item
             {
               schema = schema_1;
               rest = Item { schema = schema_2; rest = ItemEnd };
             },
-          `O [ ("first", json_1); ("second", json_2) ] ) ->
+          `O [ ("_0", json_1); ("_1", json_2) ] ) ->
         let* decoded_1 =
-          decode
-            { context with path = context.path @ [ "first" ] }
-            schema_1 json_1
+          decode { context with path = context.path @ [ "_0" ] } schema_1 json_1
         in
         let* decoded_2 =
-          decode
-            { context with path = context.path @ [ "second" ] }
-            schema_2 json_2
+          decode { context with path = context.path @ [ "_1" ] } schema_2 json_2
         in
         let hlist = Hlist.[ decoded_1; decoded_2 ] in
         Ok (decode_hlist hlist)
@@ -1080,21 +1103,15 @@ module Json = struct
                     rest = Item { schema = schema_3; rest = ItemEnd };
                   };
             },
-          `O [ ("first", json_1); ("second", json_2); ("third", json_3) ] ) ->
+          `O [ ("_0", json_1); ("_1", json_2); ("_2", json_3) ] ) ->
         let* decoded_1 =
-          decode
-            { context with path = context.path @ [ "first" ] }
-            schema_1 json_1
+          decode { context with path = context.path @ [ "_0" ] } schema_1 json_1
         in
         let* decoded_2 =
-          decode
-            { context with path = context.path @ [ "second" ] }
-            schema_2 json_2
+          decode { context with path = context.path @ [ "_1" ] } schema_2 json_2
         in
         let* decoded_3 =
-          decode
-            { context with path = context.path @ [ "second" ] }
-            schema_3 json_3
+          decode { context with path = context.path @ [ "_2" ] } schema_3 json_3
         in
         let hlist = Hlist.[ decoded_1; decoded_2; decoded_3 ] in
         Ok (decode_hlist hlist)

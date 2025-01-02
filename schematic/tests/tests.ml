@@ -275,8 +275,8 @@ struct
               false
               (* Kotlin's [Class.forName] does not support generics/nullable
                  types *);
-            swift_class_name = Some "Option";
-            is_swift_roundtrip_enabled = true;
+            swift_class_name = Some "Optional";
+            is_swift_roundtrip_enabled = false;
           }
       in
       {
@@ -2330,7 +2330,7 @@ struct
             kotlin_class_name = None;
             is_kotlin_roundtrip_enabled;
             swift_class_name = None;
-            is_swift_roundtrip_enabled = true;
+            is_swift_roundtrip_enabled = is_kotlin_roundtrip_enabled;
           }
       in
       {
@@ -2582,7 +2582,7 @@ struct
                   (* Kotlin [Class.forName] does not support generics like
                      [Pair<Integer, String>] *);
                 swift_class_name = None;
-                is_swift_roundtrip_enabled = true;
+                is_swift_roundtrip_enabled = false;
               };
           ];
       }

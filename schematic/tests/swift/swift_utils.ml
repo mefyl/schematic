@@ -35,7 +35,7 @@ module Tests = Test_utils.Tests.Make (struct
     if is_swift_roundtrip_enabled then
       let swift_datatype =
         Option.map schema.id ~f:(fun schema_id ->
-            "co.routine." ^ Schematic.Swift.to_type_name schema_id)
+            Schematic.Swift.to_type_name schema_id)
         |> Option.first_some swift_class_name
         |> Option.value_exn ~here
       in

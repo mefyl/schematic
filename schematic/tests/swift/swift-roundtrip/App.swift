@@ -12,7 +12,8 @@ struct App {
     let receivedJson = CommandLine.arguments[2]
 
     let jsonDataRaw = "{ \"\(datatype)\": { \"_0\": \(receivedJson) } }"
-    // print(jsonDataRaw)
+    NSLog("Input type: " + datatype)
+    NSLog("Input data: " + jsonDataRaw)
     let jsonData = jsonDataRaw.data(using: .utf8)!
     let decoder = JSONDecoder()
     let encoder = JSONEncoder()
@@ -26,6 +27,7 @@ struct App {
       let jsonWithoutExtras = try JSONSerialization.data(
         withJSONObject: reencodedJson[datatype]!["_0"]!,
         options: [.fragmentsAllowed])
+      NSLog("Sending back: " + String(data: jsonWithoutExtras, encoding: .utf8)!)
       print(String(data: jsonWithoutExtras, encoding: .utf8)!)
     } catch {
       print("Decoding error:", error)
