@@ -684,6 +684,22 @@ end
 
 (** Module responsible for encoding into/decoding from Swift-compatible JSON. *)
 module Json = struct
+  (** [with_sorted_keys f json] is [f json'] where [json'] is similar to [json],
+      except that if it is an object then its keys are sorted.
+
+      This is useful for pattern-matching in [f] independently of the order of
+      the keys. *)
+  let with_sorted_keys f (json : Ezjsonm.value) =
+    let sort_keys = function
+      | `O keys ->
+        `O
+          (List.sort
+             ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2)
+             keys)
+      | json -> json
+    in
+    f (sort_keys json)
+
   module Encode = struct
     let rec encode : type t. t Schema.t -> t -> Ezjsonm.value =
      fun { descriptor; id; _ } t ->
@@ -1015,7 +1031,7 @@ module Json = struct
             Error { context with reason = Fmt.str "Invalid timestamp %f" secs })
         | json -> type_error "time" json)
       | Time_local -> (
-        function
+        with_sorted_keys @@ function
         | `O [ ("date", `Float t); ("gmt_offset", `Float tz) ] ->
           let* time =
             match Ptime.of_float_s t with
@@ -1028,7 +1044,7 @@ module Json = struct
       | Tuple { decode = decode_hlist; items; _ } ->
         decode_tuple context decode_hlist items
       | Union { cases; _ } -> (
-        function
+        with_sorted_keys @@ function
         (* For simplicity and consistency with the Swift generated types, we
            ignore the optional union key *)
         | `O [ (datatype, `O [ ("_0", json) ]) ] | `O [ (datatype, json) ] ->
@@ -1069,17 +1085,8 @@ module Json = struct
         tuple Hlist.t Schema.tuple ->
         Ezjsonm.value ->
         (t, E.decoding) Result.t =
-     fun context decode_hlist items json ->
-      let json =
-        (* Sort the json keys to make the pattern-matching easier *)
-        match json with
-        | `O lst ->
-          `O
-            (List.sort
-               ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2)
-               lst)
-        | j -> j
-      in
+     fun context decode_hlist items ->
+      with_sorted_keys @@ fun json ->
       match (items, json) with
       | ( Item
             {
