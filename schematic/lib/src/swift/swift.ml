@@ -178,7 +178,7 @@ type swift_struct = {
 }
 
 and swift_union = {
-  generics : swift_type list;
+  generics : swift_type list; [@ocaml.warning "-30"]
   cases : (string * (string option * swift_type) list) list;
 }
 [@@deriving show]
@@ -188,14 +188,6 @@ type swift =
   | Struct of swift_struct  (** A record *)
   | Enum of swift_union
 [@@deriving show]
-
-(** E.g. for [type foo = A of {bar: string} | B of Int], the [A] branch will
-    become [Inline] (because we don't have any type name to refer to), and [B]
-    will be [Wrap], because we wrap an existing type. *)
-and swift_case =
-  (* TODO Add generics *)
-  | Inline of swift
-  | Wrap of swift_type
 
 let empty_struct = Struct { generics = []; fields = [] }
 
