@@ -658,7 +658,11 @@ struct Tuple3<T0 : Codable, T1 : Codable, T2 : Codable> : Codable {
   let _2 : T2
 }
 
-// Isomorphic to `Optional`, but with a more regular JSON encoding
+// Isomorphic to `Optional`, but with a more regular JSON encoding:
+// The JSON encoding of `Optional<>` represents `Some(nil)` and `nil`
+// the same way, which makes the conversion lossy (which we can't afford).
+// This wrapper will represent `nil` as `{ "value": null}` and `Some(nil)` as
+// `{ "value": { "value": nil } }` which is ugly, but unambiguous.
 struct Maybe<T : Codable> : Codable {
   let value : Optional<T>
 
