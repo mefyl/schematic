@@ -185,9 +185,22 @@ type swift_struct = {
 
 and swift_union = {
   generics : swift_type list;
-  cases : (string * (string option * swift_type) list) list;
+  cases : swift_case list;
 }
 [@@ocaml.warning "-30"] [@@deriving show]
+
+and swift_case = {
+  case_name : string;
+  arguments : swift_argument list;
+}
+
+(** An argument for a Swift function/constructor. *)
+and swift_argument = {
+  argument_name : string option;
+      (** If [argument_name] is [Some name], make it a named argument
+          [name : type]. Otherwise, make it positional. *)
+  argument_type : swift_type;
+}
 
 type swift =
   | Atom of swift_type  (** Type alias or basic type *)
@@ -402,10 +415,26 @@ module Parser = struct
             let nested_type =
               match (type_name, swift) with
               | Some type_name, _swift ->
-                (case_name, [ (None, Simple type_name) ])
-              | None, Atom swift_type -> (case_name, [ (None, swift_type) ])
+                {
+                  case_name;
+                  arguments =
+                    [
+                      { argument_name = None; argument_type = Simple type_name };
+                    ];
+                }
+              | None, Atom swift_type ->
+                {
+                  case_name;
+                  arguments =
+                    [ { argument_name = None; argument_type = swift_type } ];
+                }
               | None, Struct { fields; _ } ->
-                (case_name, List.map fields ~f:(fun (name, t) -> (Some name, t)))
+                {
+                  case_name;
+                  arguments =
+                    List.map fields ~f:(fun (name, argument_type) ->
+                        { argument_name = Some name; argument_type });
+                }
               | None, _ ->
                 raise
                   (NotYetImplemented
@@ -539,7 +568,7 @@ module Parser = struct
            name and create an associated type. *)
         let id =
           nested_data_classes
-          |> List.map ~f:(fun (case_name, _swift_case) -> case_name)
+          |> List.map ~f:(fun { case_name; _ } -> case_name)
           |> String.concat ~sep:"-or-" |> to_pascal_case
         in
         let swift_type_name, _swift, marks =
@@ -564,7 +593,13 @@ module Parser = struct
       packed_schema
 
   let big_union_of (marks : string list) : swift Marks.with_parsing_status =
-    let name_to_case (name : string) = (name, [ (None, Simple name) ]) in
+    let name_to_case (case_name : string) =
+      {
+        case_name;
+        arguments =
+          [ { argument_name = None; argument_type = Simple case_name } ];
+      }
+    in
     let cases = marks |> List.map ~f:name_to_case in
     Marks.Done (Enum { generics = []; cases })
 end
@@ -589,18 +624,18 @@ module Generator = struct
     Fmt.pf f "let %s: %a" field_name pp_swift_type field_type
 
   (** Pretty-print a single [case] inside an [enum] *)
-  and pp_case : (string * (string option * swift_type) list) Fmt.t =
-   fun f (case_name, case_args) ->
-    let pp_case_arg fmt ((arg_name, case_arg) : string option * swift_type) =
+  and pp_case : swift_case Fmt.t =
+   fun f { case_name; arguments } ->
+    let pp_case_arg fmt { argument_name; argument_type } =
       let pp_name fmt = function
         | None -> Fmt.pf fmt ""
         | Some name -> Fmt.pf fmt "%s: " name
       in
-      Fmt.pf fmt "%a%a" pp_name arg_name pp_swift_type case_arg
+      Fmt.pf fmt "%a%a" pp_name argument_name pp_swift_type argument_type
     in
     Fmt.pf f "case %s%a" case_name
       (pp_optional_list ~open_delim:"(" ~close_delim:")" pp_case_arg)
-      case_args
+      arguments
 
   and pp_swift_type : swift_type Fmt.t =
    fun f swift_type ->
