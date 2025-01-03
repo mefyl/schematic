@@ -1029,9 +1029,9 @@ struct
 
   type escape = {
     special_char : int; [@schematic.as "'char$"]
-    keyword : string; [@schematic.as "type"]
+    keyword : string; [@schematic.as "if"]
   }
-  [@@deriving schema]
+  [@@schematic.name "if"] [@@deriving schema]
 
   let pp_escape fmt { special_char; keyword } =
     Fmt.pf fmt "(%i, %s)" special_char keyword

@@ -165,10 +165,12 @@ let union_type_discriminator = "#type"
 (** The JSON object field storing the value for [Union]s. *)
 let union_type_value = "value"
 
-(** Transform the given string into a valid Swift object field name. *)
-let to_object_field_name s =
-  let s = to_camel_case s in
+(** Transform the given string into a valid Swift identifier. *)
+let to_swift_identifier s =
   if Set.mem swift_reserved_words s then s ^ "_" else s
+
+let to_object_field_name s = to_swift_identifier @@ to_camel_case s
+let to_type_name s = to_swift_identifier @@ to_pascal_case s
 
 type swift_type =
   | Simple of string  (** E.g. [Foo] *)
@@ -268,7 +270,7 @@ module Parser = struct
           m "schema_to_swift_marks: Parsing schema %a" Schema.pp schema)
     in
     try
-      let swift_type_name = Option.map ~f:to_pascal_case id in
+      let swift_type_name = Option.map ~f:to_type_name id in
       let _generics, marks =
         (* TODO generics *)
         match parametric with
@@ -1291,7 +1293,7 @@ module Public_api = struct
 
   let to_json = Json.Encode.encode
   let from_json = Json.Decode.decode
-  let to_type_name = to_pascal_case
+  let to_type_name = to_type_name
 end
 
 include Public_api
