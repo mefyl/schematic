@@ -20,7 +20,6 @@ struct App {
 
     do {
       let data = try decoder.decode(All.self, from: jsonData)
-      // let data = All.VersionSimple(VersionSimple.Int)
       let reencoded = try encoder.encode(data)
       let reencodedJson =
         try JSONSerialization.jsonObject(with: reencoded, options: []) as! [String: [String: Any]]
