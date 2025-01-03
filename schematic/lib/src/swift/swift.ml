@@ -49,6 +49,7 @@ let swift_reserved_words =
   Set.of_list
     (module String)
     [
+      (* Keywords used in declarations *)
       "associatedtype";
       "borrowing";
       "class";
@@ -76,6 +77,7 @@ let swift_reserved_words =
       "subscript";
       "typealias";
       "var";
+      (* Keywords used in statements *)
       "break";
       "case";
       "catch";
@@ -95,6 +97,7 @@ let swift_reserved_words =
       "switch";
       "where";
       "while";
+      (* Keywords used in expressions and types *)
       "Any";
       "as";
       "await";
@@ -110,7 +113,9 @@ let swift_reserved_words =
       "throws";
       "true";
       "try";
+      (* Keywords used in patterns *)
       "_";
+      (* Keywords that begin with a number sign (#) *)
       "#available";
       "#colorLiteral";
       "#else";
@@ -123,6 +128,7 @@ let swift_reserved_words =
       "#selector";
       "#sourceLocation";
       "#unavailable";
+      (* Keywords reserved in particular contexts *)
       "associativity";
       "convenience";
       "didSet";
