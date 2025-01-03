@@ -21,7 +21,10 @@ type t
     case Type1(Type1)
     case Type2(Type2)
   }
-  ]] *)
+  ]]
+
+    This is moslty used in the tests to provide something similar to dynamic
+    dispatch on the universe of known types. *)
 val union_of : t list -> string -> t
 
 (** [of_packed_schemas schemas] is the list of Swift type declarations and
