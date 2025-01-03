@@ -679,7 +679,7 @@ module Generator = struct
 import Foundation
 
 // Isomorphic to `nil`, but using a more predictible JSON encoding
-struct Unit : Codable {}
+enum Unit : Codable { case Unit }
 
 // Sad but required: Although Swift has native tuples, these are not `Codable`,
 // so we can't use them in the protocol, and we have to define our own ugly things
@@ -1030,11 +1030,7 @@ module Json = struct
           |> Result.all
       | Null -> (
         function
-        | `O [ ("Unit", `O []) ]
-        | `O []
-        (* XXX: Swift sometimes appear to serialize `Unit` as `{}` instead of [{
-           "Unit": {} }]. Not sure why *) ->
-          Ok ()
+        | `O [ ("Unit", `O []) ] -> Ok ()
         | json -> type_error "null" json)
       | Nullable schema -> (
         function
