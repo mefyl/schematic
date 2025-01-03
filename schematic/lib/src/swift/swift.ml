@@ -1030,8 +1030,7 @@ module Json = struct
           |> Result.all
       | Null -> (
         function
-        | `O [ ("Unit", `O []) ] -> Ok ()
-        | json -> type_error "null" json)
+        | `O [ ("Unit", `O []) ] -> Ok () | json -> type_error "null" json)
       | Nullable schema -> (
         function
         | `O [ ("value", `Null) ] -> Ok None
