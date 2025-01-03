@@ -23,4 +23,10 @@ let () =
 %a
 |}
     Schematic.Swift.pp_file
+    (* The [All] type is a union of all the known types.
+
+       It is required because the tests want to dynamically choose a type based
+       on the command-line arguments, and Swift doesn't have this kind of
+       reflexion capability. This big union gives us back just enough to
+       implement it. *)
     (swift_types @ [ Schematic.Swift.union_of swift_types "All" ])
