@@ -28,7 +28,7 @@ val union_of : t list -> string -> t
     expressions found in [schemas]. *)
 val of_packed_schemas : Schema.pack list -> t list
 
-(** [pp fmt t] outputs the Swift type declarations, annotated with Swiftx
+(** [pp fmt t] outputs the Swift type declarations, annotated with Swift
     serialization support, for [t] to [fmt].
 
     This only prints the type declarations in itself, not the required imports. *)
