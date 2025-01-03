@@ -210,24 +210,18 @@ type swift =
 
 let empty_struct = Struct { generics = []; fields = [] }
 
-(** Schematic cannot depend on Timmy so we copy/paste the implementation of
-    functions we need to interact with Ptime dates *)
 module Date = struct
-  let to_string (year, month, day) = Fmt.str "%04i-%02i-%02i" year month day
+  (** A sligtly more structured version of [PTime.date] for serialization
+      purposes *)
+  type t = {
+    year : int;
+    month : int;
+    day : int;
+  }
+  [@@deriving schema]
 
-  let int_of_string msg s =
-    try Result.return @@ Int.of_string s
-    with _ -> Result.failf "invalid %s: %s" msg s
-
-  let of_string s =
-    match String.split ~on:'-' s with
-    | [ y; m; d ] ->
-      let ( let* ) = Result.( >>= ) in
-      let* y = int_of_string "year" y in
-      let* m = int_of_string "month" m in
-      let* d = int_of_string "day" d in
-      Ok (y, m, d)
-    | _ -> Result.fail Fmt.(str "invalid date: %s" s)
+  let of_ptime (year, month, day) = { year; month; day }
+  let to_ptime { year; month; day } = (year, month, day)
 end
 
 (** Module responsible for parsing Schematic schemas into a Swift AST. *)
@@ -335,7 +329,7 @@ module Parser = struct
     | Any (module Coding) -> raise (NotYetImplemented "Any")
     | Bool -> (Atom (Simple "Bool"), marks)
     | Coding { f = _ } -> raise (NotYetImplemented "Coding")
-    | Date -> (Atom (Simple "LocalDate"), marks)
+    | Date -> (Atom (Simple "TimelessDate"), marks)
     | Fixpoint lazy_descriptor ->
       descriptor_to_swift_marks marks (Lazy.force lazy_descriptor)
     | Float -> (Atom (Simple "Float"), marks)
@@ -709,9 +703,17 @@ struct Maybe<T : Codable> : Codable {
   }
 }
 
+// A date with a timezone offset, corresponding to the `Time_local`
 struct ZonedDate : Codable {
   let date : Date
   let gmt_offset : Int
+}
+
+// A date in the default (Gregorian) calendar
+struct TimelessDate : Codable {
+  let year : Int
+  let month : Int
+  let day : Int
 }
   |}
 end
@@ -760,7 +762,7 @@ module Json = struct
           (NotYetImplemented
              (Fmt.str "encode does not support descriptor %a"
                 pp_debug_descriptor descriptor))
-      | Date -> fun v -> v |> Date.to_string |> encode Schemas.string_schema
+      | Date -> fun v -> v |> Date.of_ptime |> encode Date.schema
       | Fixpoint lazy_descriptor ->
         fun v -> encode_descriptor (Lazy.force lazy_descriptor) v
       | Float -> fun v -> `Float v
@@ -975,14 +977,9 @@ module Json = struct
                   "decode does not support descriptor %a while decoding %a"
                   pp_debug_descriptor descriptor Json.pp json;
             }
-      | Date -> (
-        function
-        | `String s ->
-          let date_or_error = Date.of_string s in
-          Result.map_error
-            ~f:(fun reason -> { context with reason })
-            date_or_error
-        | json -> type_error "date" json)
+      | Date ->
+        fun json ->
+          Result.map ~f:Date.to_ptime @@ decode context Date.schema json
       | Fixpoint lazy_descriptor ->
         fun json -> decode_descriptor context (Lazy.force lazy_descriptor) json
       | Float -> (
@@ -1284,7 +1281,8 @@ module Public_api = struct
   let union_of types name =
     ( name,
       Parser.big_union_of
-        ([ "Int"; "Int64"; "Float"; "String" ] @ List.map ~f:fst types) )
+        ([ "Int"; "Int64"; "Float"; "String"; "TimelessDate" ]
+        @ List.map ~f:fst types) )
 
   let pp_file fmt marks =
     Fmt.pf fmt "%s@.@[<v 0>%a@]" Generator.preamble
