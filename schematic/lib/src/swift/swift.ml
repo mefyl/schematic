@@ -1,6 +1,8 @@
 module E = Error
 open Base
 
+[@@@ocaml.warning "-30"]
+
 let src = Logs.Src.create ~doc:"schematic Swift" "schematic"
 
 module Logs = (val Logs.src_log src)
@@ -189,7 +191,7 @@ and swift_union = {
   generics : swift_type list;
   cases : swift_case list;
 }
-[@@ocaml.warning "-30"] [@@deriving show]
+[@@deriving show]
 
 and swift_case = {
   case_name : string;
