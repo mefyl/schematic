@@ -1053,8 +1053,7 @@ struct
               value_testable = test_escape;
               schema = escape_schema;
               value = { special_char = 128; keyword = "coin" };
-              expected =
-                `O [ ("'char$", `Float 128.); ("if", `String "coin") ];
+              expected = `O [ ("'char$", `Float 128.); ("if", `String "coin") ];
               kotlin_class_name = None;
               is_kotlin_roundtrip_enabled = true;
               swift_class_name = None;
