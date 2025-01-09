@@ -1027,13 +1027,15 @@ struct
 
   (* Escape *)
 
-  type escape = {
+  type escape_record = {
     special_char : int; [@schematic.as "'char$"]
     keyword : string; [@schematic.as "if"]
   }
-  [@@schematic.name "if"] [@@deriving schema]
+  [@@schematic.name "if"]
 
-  let pp_escape fmt { special_char; keyword } =
+  and escape = If of escape_record [@@deriving schema]
+
+  let pp_escape fmt (If { special_char; keyword }) =
     Fmt.pf fmt "(%i, %s)" special_char keyword
 
   let test_escape = Alcotest.testable pp_escape ( = )
@@ -1052,7 +1054,7 @@ struct
               decoded = None;
               value_testable = test_escape;
               schema = escape_schema;
-              value = { special_char = 128; keyword = "coin" };
+              value = If { special_char = 128; keyword = "coin" };
               expected = `O [ ("'char$", `Float 128.); ("if", `String "coin") ];
               kotlin_class_name = None;
               is_kotlin_roundtrip_enabled = true;

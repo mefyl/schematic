@@ -408,7 +408,7 @@ module Parser = struct
               (Case { name = case_name; schema; _ })
               (marks, rest_nested_types)
             ->
-            let case_name = to_pascal_case case_name in
+            let case_name = to_object_field_name case_name in
             let type_name, swift, marks = schema_to_swift_marks marks schema in
             let nested_type =
               match (type_name, swift) with
@@ -567,7 +567,7 @@ module Parser = struct
         let id =
           nested_data_classes
           |> List.map ~f:(fun { case_name; _ } -> case_name)
-          |> String.concat ~sep:"-or-" |> to_pascal_case
+          |> String.concat ~sep:"-or-" |> to_object_field_name
         in
         let swift_type_name, _swift, marks =
           schema_to_swift_marks marks { schema with id = Some id }
@@ -823,9 +823,11 @@ module Json = struct
                 | ( None,
                     Object _ (* Inline record, directly encode as the body *) )
                   ->
-                  Some (`O [ (to_pascal_case name, encode v) ])
+                  Some (`O [ (to_object_field_name name, encode v) ])
                 | _ ->
-                  Some (`O [ (to_pascal_case name, `O [ ("_0", encode v) ]) ]))
+                  Some
+                    (`O
+                      [ (to_object_field_name name, `O [ ("_0", encode v) ]) ]))
               | None -> None
           in
           List.map ~f cases
@@ -1082,11 +1084,12 @@ module Json = struct
            arguments, so decode them the same way *)
         | `O [ (datatype, json) ] ->
           let case_names =
-            List.map cases ~f:(fun (Case { name; _ }) -> to_pascal_case name)
+            List.map cases ~f:(fun (Case { name; _ }) ->
+                to_object_field_name name)
           in
           let case =
             List.find cases ~f:(fun (Case { name; _ }) ->
-                String.(to_pascal_case name = datatype))
+                String.(to_object_field_name name = datatype))
           in
           let* (Case { decoder; schema; _ }) =
             Result.of_option case
