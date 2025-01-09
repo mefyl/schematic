@@ -159,6 +159,10 @@ let swift_reserved_words =
       "unowned";
       "weak";
       "willSet";
+
+      (* Not keywords, but stuff that needs to be in scope and shouldn't be shadowed *)
+      "Swift";
+      "Foundation";
     ]
 
 (** The JSON object field storing the data type for [Union]s. *)
@@ -246,7 +250,7 @@ module Parser = struct
   end
 
   let wrap_in_option : swift_type -> swift_type =
-   fun swift_type -> Generic ("Maybe", [ swift_type ])
+   fun swift_type -> Generic ("Routine.Maybe", [ swift_type ])
 
   (** Try to find an adequate Swift type name. *)
   let type_name_and_swift_to_swift_type_exn :
@@ -331,24 +335,24 @@ module Parser = struct
    fun marks descriptor ->
     match descriptor with
     | Any (module Coding) -> raise (NotYetImplemented "Any")
-    | Bool -> (Atom (Simple "Bool"), marks)
+    | Bool -> (Atom (Simple "Swift.Bool"), marks)
     | Coding { f = _ } -> raise (NotYetImplemented "Coding")
-    | Date -> (Atom (Simple "TimelessDate"), marks)
+    | Date -> (Atom (Simple "Routine.TimelessDate"), marks)
     | Fixpoint lazy_descriptor ->
       descriptor_to_swift_marks marks (Lazy.force lazy_descriptor)
-    | Float -> (Atom (Simple "Float"), marks)
+    | Float -> (Atom (Simple "Swift.Float"), marks)
     | Ignore ->
       (empty_struct, marks)
       (* Treat [Ignore] fields as an empty object that will be removed in a
          later pass *)
-    | Int -> (Atom (Simple "Int"), marks)
-    | Int64 -> (Atom (Simple "Int64"), marks)
-    | Json -> (Atom (Simple "JsonElement"), marks)
+    | Int -> (Atom (Simple "Swift.Int"), marks)
+    | Int64 -> (Atom (Simple "Swift.Int64"), marks)
+    | Json -> (Atom (Simple "Foundation.Data"), marks)
     | List sub_schema ->
       (* TODO We will probably need [swift] to support generics *)
       let type_name, swift, marks = schema_to_swift_marks marks sub_schema in
       let swift_type = type_name_and_swift_to_swift_type_exn type_name swift in
-      let swift = Atom (Generic ("Array", [ swift_type ])) in
+      let swift = Atom (Generic ("Swift.Array", [ swift_type ])) in
       (swift, marks)
     | Map { descriptor; _ } -> descriptor_to_swift_marks marks descriptor
     | Mapping value_schema ->
@@ -356,10 +360,10 @@ module Parser = struct
       let type_name, swift, marks = schema_to_swift_marks marks value_schema in
       let swift_type = type_name_and_swift_to_swift_type_exn type_name swift in
       let swift =
-        Atom (Generic ("Dictionary", [ Simple "String"; swift_type ]))
+        Atom (Generic ("Swift.Dictionary", [ Simple "Swift.String"; swift_type ]))
       in
       (swift, marks)
-    | Null -> (Atom (Simple "Unit"), marks)
+    | Null -> (Atom (Simple "Routine.Unit"), marks)
     | Nullable schema ->
       let type_name, swift, marks = schema_to_swift_marks marks schema in
       let () =
@@ -393,10 +397,10 @@ module Parser = struct
     | Object { fields; _ } ->
       let swift_fields, marks = object_fields_to_swift_marks marks fields in
       (Struct { fields = swift_fields; generics = [] }, marks)
-    | String -> (Atom (Simple "String"), marks)
+    | String -> (Atom (Simple "Swift.String"), marks)
     | String_const _ -> (empty_struct, marks)
-    | Time -> (Atom (Simple "Date"), marks)
-    | Time_local -> (Atom (Simple "ZonedDate"), marks)
+    | Time -> (Atom (Simple "Foundation.Date"), marks)
+    | Time_local -> (Atom (Simple "Routine.ZonedDate"), marks)
     | Tuple { items; _ } ->
       let swift_type, marks = tuple_to_swift_marks marks items in
       (Atom swift_type, marks)
@@ -462,7 +466,7 @@ module Parser = struct
           } ->
         let swift_type_1, marks = tuple_element_to_swift_type marks schema_1 in
         let swift_type_2, marks = tuple_element_to_swift_type marks schema_2 in
-        (Generic ("Tuple2", [ swift_type_1; swift_type_2 ]), marks)
+        (Generic ("Routine.Tuple2", [ swift_type_1; swift_type_2 ]), marks)
       | Item
           {
             schema = schema_1;
@@ -476,7 +480,7 @@ module Parser = struct
         let swift_type_1, marks = tuple_element_to_swift_type marks schema_1 in
         let swift_type_2, marks = tuple_element_to_swift_type marks schema_2 in
         let swift_type_3, marks = tuple_element_to_swift_type marks schema_3 in
-        (Generic ("Tuple3", [ swift_type_1; swift_type_2; swift_type_3 ]), marks)
+        (Generic ("Routine.Tuple3", [ swift_type_1; swift_type_2; swift_type_3 ]), marks)
       | _ ->
         raise (NotYetImplemented "Only tuples of 2 or 3 elements are supported")
 
@@ -660,7 +664,7 @@ module Generator = struct
         (Fmt.list ~sep:Fmt.cut pp_field)
         fields
     | Done (Enum { cases; generics }) ->
-      Fmt.pf f "@[<v 2>enum %s%a : Codable {@;%a@]@;}@;" name pp_generics
+      Fmt.pf f "@[<v 2>indirect enum %s%a : Codable {@;%a@]@;}@;" name pp_generics
         generics
         (Fmt.list ~sep:Fmt.cut pp_case)
         cases
@@ -676,48 +680,52 @@ module Generator = struct
     {|
 import Foundation
 
-// Isomorphic to `nil`, but using a more predictible JSON encoding
-enum Unit : Codable { case Unit }
+// Routine-specific types.
+// Wrapped in a caseless enum because that's apparently the best way to emulate namespaces in Swift
+enum Routine {
+  // Isomorphic to `nil`, but using a more predictible JSON encoding
+  enum Unit : Codable { case Unit }
 
-// Sad but required: Although Swift has native tuples, these are not `Codable`,
-// so we can't use them in the protocol, and we have to define our own ugly things
-struct Tuple2<T0 : Codable, T1 : Codable> : Codable {
-  let _0 : T0
-  let _1 : T1
-}
-struct Tuple3<T0 : Codable, T1 : Codable, T2 : Codable> : Codable {
-  let _0 : T0
-  let _1 : T1
-  let _2 : T2
-}
-
-// Isomorphic to `Optional`, but with a more regular JSON encoding:
-// The JSON encoding of `Optional<>` represents `Some(nil)` and `nil`
-// the same way, which makes the conversion lossy (which we can't afford).
-// This wrapper will represent `nil` as `{ "value": null}` and `Some(nil)` as
-// `{ "value": { "value": nil } }` which is ugly, but unambiguous.
-struct Maybe<T : Codable> : Codable {
-  let value : Optional<T>
-
-  // Custom encoding because the default one will just omit null values, while
-  // we'd rather have an explicit `null`
-  func encode(to encoder: Encoder) throws {
-    var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encode(value, forKey: .value)
+  // Sad but required: Although Swift has native tuples, these are not `Codable`,
+  // so we can't use them in the protocol, and we have to define our own ugly things
+  struct Tuple2<T0 : Codable, T1 : Codable> : Codable {
+    let _0 : T0
+    let _1 : T1
   }
-}
+  struct Tuple3<T0 : Codable, T1 : Codable, T2 : Codable> : Codable {
+    let _0 : T0
+    let _1 : T1
+    let _2 : T2
+  }
 
-// A date with a timezone offset, corresponding to the `Time_local`
-struct ZonedDate : Codable {
-  let date : Date
-  let gmt_offset : Int
-}
+  // Isomorphic to `Optional`, but with a more regular JSON encoding:
+  // The JSON encoding of `Optional<>` represents `Some(nil)` and `nil`
+  // the same way, which makes the conversion lossy (which we can't afford).
+  // This wrapper will represent `nil` as `{ "value": null}` and `Some(nil)` as
+  // `{ "value": { "value": nil } }` which is ugly, but unambiguous.
+  struct Maybe<T : Codable> : Codable {
+    let value : Optional<T>
 
-// A date in the default (Gregorian) calendar
-struct TimelessDate : Codable {
-  let year : Int
-  let month : Int
-  let day : Int
+    // Custom encoding because the default one will just omit null values, while
+    // we'd rather have an explicit `null`
+    func encode(to encoder: Encoder) throws {
+      var container = encoder.container(keyedBy: CodingKeys.self)
+      try container.encode(value, forKey: .value)
+    }
+  }
+
+  // A date with a timezone offset, corresponding to the `Time_local`
+  struct ZonedDate : Codable {
+    let date : Date
+    let gmt_offset : Int
+  }
+
+  // A date in the default (Gregorian) calendar
+  struct TimelessDate : Codable {
+    let year : Int
+    let month : Int
+    let day : Int
+  }
 }
   |}
 end
