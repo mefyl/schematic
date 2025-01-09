@@ -1,2 +1,4 @@
 schematic/lib/src/kotlin/ @julien.debon
 schematic/tests/kotlin/ @julien.debon
+schematic/lib/src/swift/ @julien.debon
+schematic/tests/swift/ @julien.debon
