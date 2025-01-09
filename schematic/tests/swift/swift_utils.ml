@@ -34,9 +34,10 @@ module Tests = Test_utils.Tests.Make (struct
         }) _encoded =
     if is_swift_roundtrip_enabled then
       let swift_datatype =
-        Option.map schema.id ~f:(fun schema_id ->
-            Schematic.Swift.to_type_name schema_id)
+        schema.id
         |> Option.first_some swift_class_name
+        |> Option.map ~f:(fun schema_id ->
+               Schematic.Swift.to_type_name schema_id)
         |> Option.value_exn ~here
       in
       let json_sent = Schematic.Swift.to_json schema value in

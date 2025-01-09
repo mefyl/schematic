@@ -159,8 +159,8 @@ let swift_reserved_words =
       "unowned";
       "weak";
       "willSet";
-
-      (* Not keywords, but stuff that needs to be in scope and shouldn't be shadowed *)
+      (* Not keywords, but stuff that needs to be in scope and shouldn't be
+         shadowed *)
       "Swift";
       "Foundation";
     ]
@@ -360,7 +360,8 @@ module Parser = struct
       let type_name, swift, marks = schema_to_swift_marks marks value_schema in
       let swift_type = type_name_and_swift_to_swift_type_exn type_name swift in
       let swift =
-        Atom (Generic ("Swift.Dictionary", [ Simple "Swift.String"; swift_type ]))
+        Atom
+          (Generic ("Swift.Dictionary", [ Simple "Swift.String"; swift_type ]))
       in
       (swift, marks)
     | Null -> (Atom (Simple "Routine.Unit"), marks)
@@ -480,7 +481,9 @@ module Parser = struct
         let swift_type_1, marks = tuple_element_to_swift_type marks schema_1 in
         let swift_type_2, marks = tuple_element_to_swift_type marks schema_2 in
         let swift_type_3, marks = tuple_element_to_swift_type marks schema_3 in
-        (Generic ("Routine.Tuple3", [ swift_type_1; swift_type_2; swift_type_3 ]), marks)
+        ( Generic
+            ("Routine.Tuple3", [ swift_type_1; swift_type_2; swift_type_3 ]),
+          marks )
       | _ ->
         raise (NotYetImplemented "Only tuples of 2 or 3 elements are supported")
 
@@ -597,7 +600,7 @@ module Parser = struct
   let big_union_of (marks : string list) : swift Marks.with_parsing_status =
     let name_to_case (case_name : string) =
       {
-        case_name;
+        case_name = to_type_name case_name;
         arguments =
           [ { argument_name = None; argument_type = Simple case_name } ];
       }
@@ -664,8 +667,8 @@ module Generator = struct
         (Fmt.list ~sep:Fmt.cut pp_field)
         fields
     | Done (Enum { cases; generics }) ->
-      Fmt.pf f "@[<v 2>indirect enum %s%a : Codable {@;%a@]@;}@;" name pp_generics
-        generics
+      Fmt.pf f "@[<v 2>indirect enum %s%a : Codable {@;%a@]@;}@;" name
+        pp_generics generics
         (Fmt.list ~sep:Fmt.cut pp_case)
         cases
 
@@ -1296,7 +1299,13 @@ module Public_api = struct
   let union_of types name =
     ( name,
       Parser.big_union_of
-        ([ "Int"; "Int64"; "Float"; "String"; "TimelessDate" ]
+        ([
+           "Swift.Int";
+           "Swift.Int64";
+           "Swift.Float";
+           "Swift.String";
+           "Routine.TimelessDate";
+         ]
         @ List.map ~f:fst types) )
 
   let pp_file fmt marks =

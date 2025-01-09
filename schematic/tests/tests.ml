@@ -156,7 +156,7 @@ struct
               expected = [%ezjsonm 28];
               kotlin_class_name = Some "java.lang.Integer";
               is_kotlin_roundtrip_enabled = true;
-              swift_class_name = Some "Int";
+              swift_class_name = Some "Swift.Int";
               is_swift_roundtrip_enabled = true;
             };
         ];
@@ -180,7 +180,7 @@ struct
               expected = [%ezjsonm 9223372036854];
               kotlin_class_name = Some "java.lang.Long";
               is_kotlin_roundtrip_enabled = true;
-              swift_class_name = Some "Int64";
+              swift_class_name = Some "Swift.Int64";
               is_swift_roundtrip_enabled = true;
             };
         ];
@@ -204,7 +204,7 @@ struct
               expected = `Float 1.234567890;
               kotlin_class_name = Some "java.lang.Float";
               is_kotlin_roundtrip_enabled = true;
-              swift_class_name = Some "Float";
+              swift_class_name = Some "Swift.Float";
               is_swift_roundtrip_enabled = true;
             };
         ];
@@ -228,7 +228,7 @@ struct
               expected = [%ezjsonm "trente trois"];
               kotlin_class_name = Some "java.lang.String";
               is_kotlin_roundtrip_enabled = true;
-              swift_class_name = Some "String";
+              swift_class_name = Some "Swift.String";
               is_swift_roundtrip_enabled = true;
             };
         ];
@@ -277,7 +277,7 @@ struct
               false
               (* Kotlin's [Class.forName] does not support generics/nullable
                  types *);
-            swift_class_name = Some "Optional";
+            swift_class_name = Some "Routine.Maybe";
             is_swift_roundtrip_enabled = false;
           }
       in
@@ -2557,7 +2557,7 @@ struct
                 expected = [%ezjsonm 42];
                 kotlin_class_name = Some "java.lang.Integer";
                 is_kotlin_roundtrip_enabled = true;
-                swift_class_name = Some "Int";
+                swift_class_name = Some "Swift.Int";
                 is_swift_roundtrip_enabled = true;
               };
           ];
