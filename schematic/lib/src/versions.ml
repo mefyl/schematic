@@ -18,3 +18,8 @@ module V0_20_0 = struct
 end
 
 module V0_20_1 = V0_20_0
+
+module V0_20_2 = struct
+  include V0_20_1
+  module Swift = Swift
+end

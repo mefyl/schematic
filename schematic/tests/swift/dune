@@ -1,0 +1,81 @@
+(include_subdirs no)
+
+(library
+ (name swift_utils)
+ (modules swift_utils)
+ (preprocess
+  (pps
+   ppx_deriving.eq
+   ppx_deriving.make
+   ppx_deriving.show
+   ppx_deriving.ord
+   ppx_here
+   ppx_yojson
+   schematic_ppx
+   --
+   --cookie
+   "schematic-version=\"0.15.0\""))
+ (libraries alcotest schematic base fmt logs.fmt test_utils))
+
+(tests
+ (names swift)
+ (enabled_if %{bin-available:swiftc})
+ (package schematic)
+ (modules swift)
+ (deps
+  (alias build-swift-test-app))
+ (preprocess
+  (pps
+   ppx_deriving.eq
+   ppx_deriving.show
+   ppx_deriving.ord
+   ppx_here
+   schematic_ppx
+   --
+   --cookie
+   "schematic-version=\"0.15.0\""))
+ (libraries alcotest schematic swift_utils))
+
+(rule
+ ; - Build the Swift roundtrip test app
+ ; - Unzip the built artifact
+ ; - Move the binary (and its libs) in a directory accessible from the OCaml test
+ (alias build-swift-test-app)
+ (enabled_if %{bin-available:swiftc})
+ (target swift-app)
+ (mode
+  (promote
+   (until-clean)
+   (only swift-app)))
+ (deps
+  (alias swift-roundtrip/generate-swift-test-controller)
+  (source_tree swift-roundtrip))
+ (action
+  (progn
+   (chdir
+    swift-roundtrip
+    (progn
+     (run swiftc GeneratedTestController.swift App.swift)))
+   (run cp swift-roundtrip/main %{target}))))
+
+(executable
+ (name swift_test_controller_generator)
+ (modules swift_test_controller_generator)
+ (libraries schematic swift_utils logs.fmt)
+ (preprocess
+  (pps ppx_here schematic.ppx ppx_deriving.show)))
+
+(subdir
+ swift-roundtrip/
+ (rule
+  (alias generate-swift-test-controller)
+  (target GeneratedTestController.swift)
+  (mode
+   (promote
+    (until-clean)
+    (only GeneratedTestController.swift)))
+  (action
+   (progn
+    (with-stdout-to
+     "%{target}"
+     (run "%{dep:../swift_test_controller_generator.exe}"))))))
