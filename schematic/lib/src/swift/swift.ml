@@ -662,12 +662,12 @@ module Generator = struct
         name
     | Done (Atom alias) -> Fmt.pf f "typealias %s = %a" name pp_swift_type alias
     | Done (Struct { fields; generics }) ->
-      Fmt.pf f "@[<v 2>class %s%a : Codable {@;%a@]@;}@;" name pp_generics
+      Fmt.pf f "@[<v 2>final class %s%a : Codable, Sendable {@;%a@]@;}@;" name pp_generics
         generics
         (Fmt.list ~sep:Fmt.cut pp_field)
         fields
     | Done (Enum { cases; generics }) ->
-      Fmt.pf f "@[<v 2>indirect enum %s%a : Codable {@;%a@]@;}@;" name
+      Fmt.pf f "@[<v 2>indirect enum %s%a : Codable, Sendable {@;%a@]@;}@;" name
         pp_generics generics
         (Fmt.list ~sep:Fmt.cut pp_case)
         cases
@@ -682,6 +682,10 @@ module Generator = struct
   let preamble : string =
     {|
 import Foundation
+
+// Dirty workaround to make the code compile on the CI (and my machine)
+// as they are using Swift 5.8, and `Date` was only made `Sendable` in 6.0
+extension Foundation.Date: @unchecked Sendable {}
 
 // Routine-specific types.
 // Wrapped in a caseless enum because that's apparently the best way to emulate namespaces in Swift
