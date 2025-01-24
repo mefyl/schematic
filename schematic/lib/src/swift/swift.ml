@@ -735,7 +735,10 @@ public enum Routine {
     public let month : Int
     public let day : Int
   }
-}
+  |}
+
+  let postamble = {|
+} // enum Routine
   |}
 end
 
@@ -1310,14 +1313,14 @@ module Public_api = struct
            "Swift.Int64";
            "Swift.Float";
            "Swift.String";
-           "Routine.TimelessDate";
+           "TimelessDate";
          ]
         @ List.map ~f:fst types) )
 
   let pp_file fmt marks =
-    Fmt.pf fmt "%s@.@[<v 0>%a@]" Generator.preamble
+    Fmt.pf fmt "%s@.@[<v 0>%a@]%s" Generator.preamble
       (Fmt.list ~sep:Fmt.cut Generator.pp)
-      marks
+      marks Generator.postamble
 
   let to_json = Json.Encode.encode
   let from_json = Json.Decode.decode
