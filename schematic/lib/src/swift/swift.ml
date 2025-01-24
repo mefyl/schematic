@@ -660,14 +660,16 @@ module Generator = struct
       Fmt.failwith
         "Parsing is complete but we still have In Progress parsing for type %s"
         name
-    | Done (Atom alias) -> Fmt.pf f "typealias %s = %a" name pp_swift_type alias
+    | Done (Atom alias) ->
+      Fmt.pf f "public typealias %s = %a" name pp_swift_type alias
     | Done (Struct { fields; generics }) ->
-      Fmt.pf f "@[<v 2>final class %s%a : Codable, Sendable {@;%a@]@;}@;" name pp_generics
-        generics
+      Fmt.pf f "@[<v 2>public final class %s%a : Codable, Sendable {@;%a@]@;}@;"
+        name pp_generics generics
         (Fmt.list ~sep:Fmt.cut pp_field)
         fields
     | Done (Enum { cases; generics }) ->
-      Fmt.pf f "@[<v 2>indirect enum %s%a : Codable, Sendable {@;%a@]@;}@;" name
+      Fmt.pf f
+        "@[<v 2>public indirect enum %s%a : Codable, Sendable {@;%a@]@;}@;" name
         pp_generics generics
         (Fmt.list ~sep:Fmt.cut pp_case)
         cases
@@ -689,20 +691,20 @@ extension Foundation.Date: @unchecked Sendable {}
 
 // Routine-specific types.
 // Wrapped in a caseless enum because that's apparently the best way to emulate namespaces in Swift
-enum Routine {
+public enum Routine {
   // Isomorphic to `nil`, but using a more predictible JSON encoding
-  enum Unit : Codable { case Unit }
+  public enum Unit : Codable, Sendable { case Unit }
 
-  // Sad but required: Although Swift has native tuples, these are not `Codable`,
+  // Sad but required: Although Swift has native tuples, these are not `Codable, Sendable`,
   // so we can't use them in the protocol, and we have to define our own ugly things
-  struct Tuple2<T0 : Codable, T1 : Codable> : Codable {
-    let _0 : T0
-    let _1 : T1
+  public struct Tuple2<T0 : Codable& Sendable, T1 : Codable& Sendable> : Codable, Sendable {
+    public let _0 : T0
+    public let _1 : T1
   }
-  struct Tuple3<T0 : Codable, T1 : Codable, T2 : Codable> : Codable {
-    let _0 : T0
-    let _1 : T1
-    let _2 : T2
+  public struct Tuple3<T0 : Codable& Sendable, T1 : Codable& Sendable, T2 : Codable& Sendable> : Codable, Sendable {
+    public let _0 : T0
+    public let _1 : T1
+    public let _2 : T2
   }
 
   // Isomorphic to `Optional`, but with a more regular JSON encoding:
@@ -710,28 +712,28 @@ enum Routine {
   // the same way, which makes the conversion lossy (which we can't afford).
   // This wrapper will represent `nil` as `{ "value": null}` and `Some(nil)` as
   // `{ "value": { "value": nil } }` which is ugly, but unambiguous.
-  struct Maybe<T : Codable> : Codable {
-    let value : Optional<T>
+  public struct Maybe<T : Codable& Sendable> : Codable, Sendable {
+    public let value : Optional<T>
 
     // Custom encoding because the default one will just omit null values, while
     // we'd rather have an explicit `null`
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
       var container = encoder.container(keyedBy: CodingKeys.self)
       try container.encode(value, forKey: .value)
     }
   }
 
   // A date with a timezone offset, corresponding to the `Time_local`
-  struct ZonedDate : Codable {
-    let date : Date
-    let gmt_offset : Int
+  public struct ZonedDate : Codable, Sendable {
+    public let date : Foundation.Date
+    public let gmt_offset : Int
   }
 
   // A date in the default (Gregorian) calendar
-  struct TimelessDate : Codable {
-    let year : Int
-    let month : Int
-    let day : Int
+  public struct TimelessDate : Codable, Sendable {
+    public let year : Int
+    public let month : Int
+    public let day : Int
   }
 }
   |}
