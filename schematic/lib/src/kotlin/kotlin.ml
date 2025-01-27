@@ -85,6 +85,9 @@ let union_type_discriminator = "#type"
 (** The JSON object field storing the value for [Union]s. *)
 let union_type_value = "value"
 
+(** The Kotlin type for [option]. *)
+let option_kotlin_type = "Option"
+
 (** Transform the given string into a valid Kotlin object field name. *)
 let to_object_field_name s =
   let s = to_camel_case s in
@@ -165,7 +168,7 @@ module Parser = struct
   end
 
   let wrap_in_option : kotlin_type -> kotlin_type =
-   fun kotlin_type -> Generic ("Option", [ kotlin_type ])
+   fun kotlin_type -> Generic (option_kotlin_type, [ kotlin_type ])
 
   (** Try to find an adequate Kotlin type name. *)
   let type_name_and_kotlin_to_kotlin_type_exn :
@@ -530,15 +533,21 @@ end
 module Generator = struct
   let original_pp_kotlin_type = pp_kotlin_type
 
+  (** Convenience for Android developers: default all option types to [None] *)
+  let add_default_none_for_option : kotlin_type -> string = function
+    | Generic (name, _) when String.equal name option_kotlin_type -> " = None"
+    | _ -> ""
+
   let rec pp_field : (string * kotlin_type) Fmt.t =
    fun f (field_name, field_type) ->
-    Fmt.pf f "val %s: %a" field_name pp_kotlin_type field_type
+    Fmt.pf f "val %s: %a%s" field_name pp_kotlin_type field_type
+      (add_default_none_for_option field_type)
 
   and pp_kotlin_type : kotlin_type Fmt.t =
    fun f kotlin_type ->
     let () =
       Logs.debug (fun m ->
-          m "pp_kotlin_type: Pretty-printing kotlin typee %a"
+          m "pp_kotlin_type: Pretty-printing kotlin type %a"
             original_pp_kotlin_type kotlin_type)
     in
     match kotlin_type with
@@ -1208,6 +1217,7 @@ module Public_api = struct
 
 %a@.
 
+import arrow.core.None
 import arrow.core.Option
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
