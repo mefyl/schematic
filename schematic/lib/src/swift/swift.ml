@@ -653,6 +653,16 @@ module Generator = struct
     | Simple s -> Fmt.pf f "%s" s
     | Generic (s, generics) -> Fmt.pf f "%s%a" s pp_generics generics
 
+  and pp_class_init : (string * swift_type) list Fmt.t =
+   fun f fields ->
+    Fmt.pf f "public init(%a) { %a }"
+      Fmt.(list ~sep:comma (pair ~sep:(any ":@ ") string pp_swift_type))
+      fields
+      Fmt.(
+        list ~sep:(any "@;") (fun fmt (name, _) ->
+            pf fmt "self.%s = %s" name name))
+      fields
+
   and pp : (string * swift Parser.Marks.with_parsing_status) Fmt.t =
    fun f (name, swift) ->
     match swift with
@@ -663,10 +673,11 @@ module Generator = struct
     | Done (Atom alias) ->
       Fmt.pf f "public typealias %s = %a" name pp_swift_type alias
     | Done (Struct { fields; generics }) ->
-      Fmt.pf f "@[<v 2>public final class %s%a : Codable, Sendable {@;%a@]@;}@;"
+      Fmt.pf f
+        "@[<v 2>public final class %s%a : Codable, Sendable {@;%a@;%a@]@;}@;"
         name pp_generics generics
         (Fmt.list ~sep:Fmt.cut pp_field)
-        fields
+        fields pp_class_init fields
     | Done (Enum { cases; generics }) ->
       Fmt.pf f
         "@[<v 2>public indirect enum %s%a : Codable, Sendable {@;%a@]@;}@;" name
