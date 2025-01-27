@@ -165,9 +165,6 @@ let swift_reserved_words =
       "Foundation";
     ]
 
-(** The JSON object field storing the data type for [Union]s. *)
-let union_type_discriminator = "#type"
-
 (** The JSON object field storing the value for [Union]s. *)
 let union_type_value = "value"
 
@@ -177,6 +174,7 @@ let to_swift_identifier s =
 
 let to_object_field_name s = to_swift_identifier @@ to_camel_case s
 let to_type_name s = to_swift_identifier @@ to_pascal_case s
+let to_enum_case_name = to_object_field_name
 
 type swift_type =
   | Simple of string  (** E.g. [Foo] *)
@@ -413,7 +411,7 @@ module Parser = struct
               (Case { name = case_name; schema; _ })
               (marks, rest_nested_types)
             ->
-            let case_name = to_object_field_name case_name in
+            let case_name = to_enum_case_name case_name in
             let type_name, swift, marks = schema_to_swift_marks marks schema in
             let nested_type =
               match (type_name, swift) with
@@ -854,11 +852,10 @@ module Json = struct
                 | ( None,
                     Object _ (* Inline record, directly encode as the body *) )
                   ->
-                  Some (`O [ (to_object_field_name name, encode v) ])
+                  Some (`O [ (to_enum_case_name name, encode v) ])
                 | _ ->
                   Some
-                    (`O
-                      [ (to_object_field_name name, `O [ ("_0", encode v) ]) ]))
+                    (`O [ (to_enum_case_name name, `O [ ("_0", encode v) ]) ]))
               | None -> None
           in
           List.map ~f cases
@@ -1115,19 +1112,17 @@ module Json = struct
            arguments, so decode them the same way *)
         | `O [ (datatype, json) ] ->
           let case_names =
-            List.map cases ~f:(fun (Case { name; _ }) ->
-                to_object_field_name name)
+            List.map cases ~f:(fun (Case { name; _ }) -> to_enum_case_name name)
           in
           let case =
             List.find cases ~f:(fun (Case { name; _ }) ->
-                String.(to_object_field_name name = datatype))
+                String.(to_enum_case_name name = datatype))
           in
           let* (Case { decoder; schema; _ }) =
             Result.of_option case
               ~error:
                 {
                   context with
-                  path = context.path @ [ union_type_discriminator ];
                   reason =
                     Fmt.str
                       "Failed to decode Union: data type %S not supported, \
@@ -1143,7 +1138,7 @@ module Json = struct
               schema json
           in
           Ok (decoder decoded_value)
-        | json -> type_error "object with 2 fields #type and value" json)
+        | json -> type_error "object with a type matching the enum case" json)
 
     and decode_tuple :
         type t tuple.
