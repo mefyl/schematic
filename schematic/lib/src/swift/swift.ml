@@ -709,11 +709,20 @@ public enum Routine {
   public struct Tuple2<T0 : Codable& Sendable, T1 : Codable& Sendable> : Codable, Sendable {
     public let _0 : T0
     public let _1 : T1
+    public init(_0 : T0, _1 : T1) {
+      self._0 = _0
+      self._1 = _1
+    }
   }
   public struct Tuple3<T0 : Codable& Sendable, T1 : Codable& Sendable, T2 : Codable& Sendable> : Codable, Sendable {
     public let _0 : T0
     public let _1 : T1
     public let _2 : T2
+    public init(_0 : T0, _1 : T1, _2 : T2) {
+      self._0 = _0
+      self._1 = _1
+      self._2 = _2
+    }
   }
 
   // Isomorphic to `Optional`, but with a more regular JSON encoding:
@@ -730,12 +739,21 @@ public enum Routine {
       var container = encoder.container(keyedBy: CodingKeys.self)
       try container.encode(value, forKey: .value)
     }
+
+    public init(value : Optional<T>) {
+      self.value = value
+    }
   }
 
   // A date with a timezone offset, corresponding to the `Time_local`
   public struct ZonedDate : Codable, Sendable {
     public let date : Foundation.Date
     public let gmt_offset : Int
+
+    public init(date : Foundation.Date, gmt_offset : Int) {
+      self.date = date
+      self.gmt_offset = gmt_offset
+    }
   }
 
   // A date in the default (Gregorian) calendar
@@ -743,6 +761,12 @@ public enum Routine {
     public let year : Int
     public let month : Int
     public let day : Int
+
+    public init(year : Int, month : Int, day : Int) {
+      self.year = year
+      self.month = month
+      self.day = day
+    }
   }
   |}
 
