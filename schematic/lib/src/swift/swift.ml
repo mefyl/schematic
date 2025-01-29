@@ -624,7 +624,7 @@ module Generator = struct
   (** Pretty-print a single field inside a [struct] *)
   let rec pp_field : (string * swift_type) Fmt.t =
    fun f (field_name, field_type) ->
-    Fmt.pf f "let %s: %a" field_name pp_swift_type field_type
+    Fmt.pf f "public let %s: %a" field_name pp_swift_type field_type
 
   (** Pretty-print a single [case] inside an [enum] *)
   and pp_case : swift_case Fmt.t =
