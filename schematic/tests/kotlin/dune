@@ -77,6 +77,7 @@
  kotlin-roundtrip/app/src/main/kotlin/co/routine
  (rule
   (alias generate-kotlin-test-controller)
+  (enabled_if %{bin-available:ktfmt})
   (target GeneratedTestController.kt)
   (mode
    (promote

@@ -1,4 +1,4 @@
-(lang dune 3.0)
+(lang dune 3.15)
 
 (using directory-targets 0.1)
 
@@ -14,7 +14,7 @@
 
 (authors "mefyl <mefyl@gruntech.org>")
 
-(version 0.19.6)
+(version 0.19.7)
 
 (homepage https://gitlab.routine.co/routine/schematic)
 
