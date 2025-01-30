@@ -165,9 +165,6 @@ let swift_reserved_words =
       "Foundation";
     ]
 
-(** The JSON object field storing the data type for [Union]s. *)
-let union_type_discriminator = "#type"
-
 (** The JSON object field storing the value for [Union]s. *)
 let union_type_value = "value"
 
@@ -177,6 +174,7 @@ let to_swift_identifier s =
 
 let to_object_field_name s = to_swift_identifier @@ to_camel_case s
 let to_type_name s = to_swift_identifier @@ to_pascal_case s
+let to_enum_case_name = to_object_field_name
 
 type swift_type =
   | Simple of string  (** E.g. [Foo] *)
@@ -413,7 +411,7 @@ module Parser = struct
               (Case { name = case_name; schema; _ })
               (marks, rest_nested_types)
             ->
-            let case_name = to_object_field_name case_name in
+            let case_name = to_enum_case_name case_name in
             let type_name, swift, marks = schema_to_swift_marks marks schema in
             let nested_type =
               match (type_name, swift) with
@@ -626,7 +624,7 @@ module Generator = struct
   (** Pretty-print a single field inside a [struct] *)
   let rec pp_field : (string * swift_type) Fmt.t =
    fun f (field_name, field_type) ->
-    Fmt.pf f "let %s: %a" field_name pp_swift_type field_type
+    Fmt.pf f "public let %s: %a" field_name pp_swift_type field_type
 
   (** Pretty-print a single [case] inside an [enum] *)
   and pp_case : swift_case Fmt.t =
@@ -653,6 +651,16 @@ module Generator = struct
     | Simple s -> Fmt.pf f "%s" s
     | Generic (s, generics) -> Fmt.pf f "%s%a" s pp_generics generics
 
+  and pp_class_init : (string * swift_type) list Fmt.t =
+   fun f fields ->
+    Fmt.pf f "public init(%a) { %a }"
+      Fmt.(list ~sep:comma (pair ~sep:(any ":@ ") string pp_swift_type))
+      fields
+      Fmt.(
+        list ~sep:(any "@;") (fun fmt (name, _) ->
+            pf fmt "self.%s = %s" name name))
+      fields
+
   and pp : (string * swift Parser.Marks.with_parsing_status) Fmt.t =
    fun f (name, swift) ->
     match swift with
@@ -660,14 +668,17 @@ module Generator = struct
       Fmt.failwith
         "Parsing is complete but we still have In Progress parsing for type %s"
         name
-    | Done (Atom alias) -> Fmt.pf f "typealias %s = %a" name pp_swift_type alias
+    | Done (Atom alias) ->
+      Fmt.pf f "public typealias %s = %a" name pp_swift_type alias
     | Done (Struct { fields; generics }) ->
-      Fmt.pf f "@[<v 2>class %s%a : Codable {@;%a@]@;}@;" name pp_generics
-        generics
+      Fmt.pf f
+        "@[<v 2>public final class %s%a : Codable, Sendable {@;%a@;%a@]@;}@;"
+        name pp_generics generics
         (Fmt.list ~sep:Fmt.cut pp_field)
-        fields
+        fields pp_class_init fields
     | Done (Enum { cases; generics }) ->
-      Fmt.pf f "@[<v 2>indirect enum %s%a : Codable {@;%a@]@;}@;" name
+      Fmt.pf f
+        "@[<v 2>public indirect enum %s%a : Codable, Sendable {@;%a@]@;}@;" name
         pp_generics generics
         (Fmt.list ~sep:Fmt.cut pp_case)
         cases
@@ -683,22 +694,35 @@ module Generator = struct
     {|
 import Foundation
 
+// Dirty workaround to make the code compile on the CI (and my machine)
+// as they are using Swift 5.8, and `Date` was only made `Sendable` in 6.0
+extension Foundation.Date: @unchecked Sendable {}
+
 // Routine-specific types.
 // Wrapped in a caseless enum because that's apparently the best way to emulate namespaces in Swift
-enum Routine {
+public enum Routine {
   // Isomorphic to `nil`, but using a more predictible JSON encoding
-  enum Unit : Codable { case Unit }
+  public enum Unit : Codable, Sendable { case Unit }
 
-  // Sad but required: Although Swift has native tuples, these are not `Codable`,
+  // Sad but required: Although Swift has native tuples, these are not `Codable, Sendable`,
   // so we can't use them in the protocol, and we have to define our own ugly things
-  struct Tuple2<T0 : Codable, T1 : Codable> : Codable {
-    let _0 : T0
-    let _1 : T1
+  public struct Tuple2<T0 : Codable& Sendable, T1 : Codable& Sendable> : Codable, Sendable {
+    public let _0 : T0
+    public let _1 : T1
+    public init(_0 : T0, _1 : T1) {
+      self._0 = _0
+      self._1 = _1
+    }
   }
-  struct Tuple3<T0 : Codable, T1 : Codable, T2 : Codable> : Codable {
-    let _0 : T0
-    let _1 : T1
-    let _2 : T2
+  public struct Tuple3<T0 : Codable& Sendable, T1 : Codable& Sendable, T2 : Codable& Sendable> : Codable, Sendable {
+    public let _0 : T0
+    public let _1 : T1
+    public let _2 : T2
+    public init(_0 : T0, _1 : T1, _2 : T2) {
+      self._0 = _0
+      self._1 = _1
+      self._2 = _2
+    }
   }
 
   // Isomorphic to `Optional`, but with a more regular JSON encoding:
@@ -706,30 +730,48 @@ enum Routine {
   // the same way, which makes the conversion lossy (which we can't afford).
   // This wrapper will represent `nil` as `{ "value": null}` and `Some(nil)` as
   // `{ "value": { "value": nil } }` which is ugly, but unambiguous.
-  struct Maybe<T : Codable> : Codable {
-    let value : Optional<T>
+  public struct Maybe<T : Codable& Sendable> : Codable, Sendable {
+    public let value : Optional<T>
 
     // Custom encoding because the default one will just omit null values, while
     // we'd rather have an explicit `null`
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
       var container = encoder.container(keyedBy: CodingKeys.self)
       try container.encode(value, forKey: .value)
+    }
+
+    public init(value : Optional<T>) {
+      self.value = value
     }
   }
 
   // A date with a timezone offset, corresponding to the `Time_local`
-  struct ZonedDate : Codable {
-    let date : Date
-    let gmt_offset : Int
+  public struct ZonedDate : Codable, Sendable {
+    public let date : Foundation.Date
+    public let gmt_offset : Int
+
+    public init(date : Foundation.Date, gmt_offset : Int) {
+      self.date = date
+      self.gmt_offset = gmt_offset
+    }
   }
 
   // A date in the default (Gregorian) calendar
-  struct TimelessDate : Codable {
-    let year : Int
-    let month : Int
-    let day : Int
+  public struct TimelessDate : Codable, Sendable {
+    public let year : Int
+    public let month : Int
+    public let day : Int
+
+    public init(year : Int, month : Int, day : Int) {
+      self.year = year
+      self.month = month
+      self.day = day
+    }
   }
-}
+  |}
+
+  let postamble = {|
+} // enum Routine
   |}
 end
 
@@ -834,11 +876,10 @@ module Json = struct
                 | ( None,
                     Object _ (* Inline record, directly encode as the body *) )
                   ->
-                  Some (`O [ (to_object_field_name name, encode v) ])
+                  Some (`O [ (to_enum_case_name name, encode v) ])
                 | _ ->
                   Some
-                    (`O
-                      [ (to_object_field_name name, `O [ ("_0", encode v) ]) ]))
+                    (`O [ (to_enum_case_name name, `O [ ("_0", encode v) ]) ]))
               | None -> None
           in
           List.map ~f cases
@@ -1095,19 +1136,17 @@ module Json = struct
            arguments, so decode them the same way *)
         | `O [ (datatype, json) ] ->
           let case_names =
-            List.map cases ~f:(fun (Case { name; _ }) ->
-                to_object_field_name name)
+            List.map cases ~f:(fun (Case { name; _ }) -> to_enum_case_name name)
           in
           let case =
             List.find cases ~f:(fun (Case { name; _ }) ->
-                String.(to_object_field_name name = datatype))
+                String.(to_enum_case_name name = datatype))
           in
           let* (Case { decoder; schema; _ }) =
             Result.of_option case
               ~error:
                 {
                   context with
-                  path = context.path @ [ union_type_discriminator ];
                   reason =
                     Fmt.str
                       "Failed to decode Union: data type %S not supported, \
@@ -1123,7 +1162,7 @@ module Json = struct
               schema json
           in
           Ok (decoder decoded_value)
-        | json -> type_error "object with 2 fields #type and value" json)
+        | json -> type_error "object with a type matching the enum case" json)
 
     and decode_tuple :
         type t tuple.
@@ -1304,14 +1343,14 @@ module Public_api = struct
            "Swift.Int64";
            "Swift.Float";
            "Swift.String";
-           "Routine.TimelessDate";
+           "TimelessDate";
          ]
         @ List.map ~f:fst types) )
 
   let pp_file fmt marks =
-    Fmt.pf fmt "%s@.@[<v 0>%a@]" Generator.preamble
+    Fmt.pf fmt "%s@.@[<v 0>%a@]%s" Generator.preamble
       (Fmt.list ~sep:Fmt.cut Generator.pp)
-      marks
+      marks Generator.postamble
 
   let to_json = Json.Encode.encode
   let from_json = Json.Decode.decode
