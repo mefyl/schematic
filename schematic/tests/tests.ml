@@ -252,7 +252,7 @@ struct
               expected = [%ezjsonm [ 2024; 8; 25 ]];
               kotlin_class_name = Some "kotlinx.datetime.LocalDate";
               is_kotlin_roundtrip_enabled = true;
-              swift_class_name = Some "Routine.TimelessDate";
+              swift_class_name = Some "TimelessDate";
               is_swift_roundtrip_enabled = true;
             };
         ];
