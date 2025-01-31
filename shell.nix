@@ -8,12 +8,14 @@ let
   thisRoutineRepo = logisticFullNixShell.lib.mkRoutineRepo ./. {
     withSwift = true;
 
-    # Ignore `schematic-http` and `schematic-sqml` because they depend on `timmy` which depends on `schematic`, which is not really supported by `opam-nix` (and frankly is a weird code organization)
+    # Explicitly ignore some opam files because they depend on `timmy` which depends on `schematic`, which is not really supported by `opam-nix` (and frankly is a weird code organization)
     # See https://github.com/tweag/opam-nix/issues/111
     opamSourceFilterRules = ''
       *
       !*.opam
       schematic-http.opam
+      schematic-cohttp-lwt.opam
+      schematic-cohttp-eio.opam
       schematic-sqml.opam
     '';
   };
