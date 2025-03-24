@@ -93,9 +93,13 @@
     :with-test))
   (conf-npm :with-test)
   (js_of_ocaml
-   (>= 4.0.0))
+    (and
+     (>= 4.0.0)
+     (< 6.0.0)))
   (js_of_ocaml-ppx
-   (>= 4.0.0))
+   (and
+     (>= 4.0.0)
+     (< 6.0.0)))
   landmarks
   landmarks-ppx
   (schematic
