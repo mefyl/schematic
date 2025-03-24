@@ -102,6 +102,10 @@
      (< 6.0.0)))
   landmarks
   landmarks-ppx
+  (ppx_yojson
+   (and
+    (>= 1.2.0)
+    :with-test))
   (schematic
    (= :version))))
 

@@ -25,6 +25,7 @@ depends: [
   "js_of_ocaml-ppx" {>= "4.0.0" & < "6.0.0"}
   "landmarks"
   "landmarks-ppx"
+  "ppx_yojson" {>= "1.2.0" & with-test}
   "schematic" {= version}
   "odoc" {with-doc}
 ]
