@@ -2103,7 +2103,7 @@ struct
             (fun () ->
               test ~here:[%here] "missing" Recursive.schema
                 {|{"value":0,"next":{"value":1,"next":{"value":"nope"}}}|}
-                {|path next.next.value: expected integer, got string|});
+                {|path next.next.value: expected integer, got "nope"|});
       }
   end
 
