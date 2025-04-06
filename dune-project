@@ -14,7 +14,7 @@
 
 (authors "mefyl <mefyl@gruntech.org>")
 
-(version 0.19.7)
+(version 0.19.8)
 
 (homepage https://gitlab.routine.co/routine/schematic)
 
@@ -93,13 +93,13 @@
     :with-test))
   (conf-npm :with-test)
   (js_of_ocaml
-    (and
-     (>= 4.0.0)
-     (< 6.0.0)))
+   (and
+    (>= 4.0.0)
+    (< 6.0.0)))
   (js_of_ocaml-ppx
    (and
-     (>= 4.0.0)
-     (< 6.0.0)))
+    (>= 4.0.0)
+    (< 6.0.0)))
   landmarks
   landmarks-ppx
   (ppx_yojson

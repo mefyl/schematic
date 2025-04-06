@@ -28,3 +28,8 @@ module V0_19_7 = struct
   include V0_19_6
   module Swift = Swift
 end
+
+module V0_19_8 = struct
+  include V0_19_7
+  module Streaming = Streaming
+end
