@@ -206,6 +206,11 @@ module Make (Impl : IMPL) = struct
     in
     read_schema { schema = schema.Schema.id; path = []; reason = "" } schema
 
+  let of_channel schema channel =
+    let input = Impl.Input.of_channel channel in
+    let (_ : Impl.Input.t), result = read schema input in
+    result
+
   let of_string schema string =
     let read =
       let* result = read schema in
@@ -216,7 +221,8 @@ module Make (Impl : IMPL) = struct
       result
     in
     let input = Impl.Input.of_string string in
-    read input |> snd
+    let (_ : Impl.Input.t), result = read input in
+    result
 
   type 'a writer = ('a, Impl.Output.t) Writer.t
 
@@ -327,6 +333,11 @@ module Make (Impl : IMPL) = struct
       write_descriptor { context with schema = schema.id } schema.descriptor v
     in
     write_schema { schema = None; path = []; reason = "" } schema
+
+  let to_channel schema value channel =
+    let output = Impl.Output.of_channel channel in
+    let _ouptut : Impl.Output.t = write schema value output in
+    ()
 
   let to_string schema value =
     let result = Buffer.create 4096 in

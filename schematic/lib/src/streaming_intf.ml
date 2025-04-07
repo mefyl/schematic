@@ -14,9 +14,11 @@ module type S = sig
 
   val name : string
   val read : 'a Schema.t -> Input.t -> Input.t * ('a, Error.decoding) Result.t
+  val of_channel : 'a Schema.t -> in_channel -> ('a, Error.decoding) Result.t
   val of_string : 'a Schema.t -> string -> ('a, Error.decoding) Result.t
   val write : 'a Schema.t -> 'a -> Output.t -> Output.t
   val to_string : 'a Schema.t -> 'a -> string
+  val to_channel : 'a Schema.t -> 'a -> out_channel -> unit
 end
 
 module Reader = struct
