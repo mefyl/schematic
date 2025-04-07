@@ -4,13 +4,18 @@ type 'a customizable =
   ]
 
 module type S = sig
-  type input
-  type output
+  module Input : sig
+    type t
+  end
+
+  module Output : sig
+    type t
+  end
 
   val name : string
-  val read : 'a Schema.t -> input -> input * ('a, Error.decoding) Result.t
+  val read : 'a Schema.t -> Input.t -> Input.t * ('a, Error.decoding) Result.t
   val of_string : 'a Schema.t -> string -> ('a, Error.decoding) Result.t
-  val write : 'a Schema.t -> 'a -> output -> output
+  val write : 'a Schema.t -> 'a -> Output.t -> Output.t
   val to_string : 'a Schema.t -> 'a -> string
 end
 

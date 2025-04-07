@@ -59,6 +59,9 @@ end
 module Make (Impl : IMPL) = struct
   let name = Impl.name
 
+  module Input = Impl.Input
+  module Output = Impl.Output
+
   type 'a reader = ('a, Impl.Input.t, E.decoding) Reader.t
 
   let requirement_return (type a req) (req : (a, req) Schema.requirement)

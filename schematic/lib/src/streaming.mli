@@ -18,4 +18,4 @@ module Reader : sig
 end
 
 module Make (Impl : IMPL) :
-  S with type input := Impl.Input.t and type output := Impl.Output.t
+  S with module Input = Impl.Input and module Output = Impl.Output
