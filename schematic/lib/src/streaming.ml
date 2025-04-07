@@ -4,7 +4,11 @@ open Base
 open Schemas
 
 type date_tuple = int * int * int [@@deriving schema]
-type 'a mapping = (string * 'a) list [@@deriving schema]
+type ('a, 'b) pair = 'a * 'b [@@deriving schema]
+
+let mapping_schema element_schema =
+  list_schema @@ pair_schema string_schema element_schema
+
 type time_local_pair = Ptime.t * int [@@deriving schema]
 
 module Reader = struct
