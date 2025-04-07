@@ -212,7 +212,7 @@ module Streaming = struct
 
     let push_back token reader =
       let () = assert (Option.is_none reader.token) in
-      ({ reader with token = Some token }, Result.Ok false)
+      ({ reader with token = Some token }, Result.Ok ())
 
     let eof =
       token >>= function
@@ -227,10 +227,14 @@ module Streaming = struct
     let par_r =
       token >>= function
       | RPAREN -> return ()
-      | token -> fail {|expected "(", got %a|} pp_token token
+      | token -> fail {|expected ")", got %a|} pp_token token
 
     let par_r_maybe =
-      token >>= function RPAREN -> return true | token -> push_back token
+      token >>= function
+      | RPAREN -> return true
+      | token ->
+        let* () = push_back token in
+        return false
 
     let string =
       let* token in
@@ -274,7 +278,9 @@ module Streaming = struct
 
     let object_field_push _ =
       par_r_maybe >>= function
-      | true -> return None
+      | true ->
+        let* () = push_back RPAREN in
+        return None
       | false ->
         let* () = par_l in
         let* string in
@@ -287,7 +293,8 @@ module Streaming = struct
       par_r_maybe >>= function
       | true -> return None
       | false ->
-        let+ content in
+        let* content in
+        let+ () = par_r in
         Some content
 
     let time = `Generic

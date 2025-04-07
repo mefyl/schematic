@@ -10,7 +10,7 @@ let roundtrip test schema value () =
     Fmt.epr "repr: %S@." string;
     Schematic_sexp.Stream.of_string schema string
   in
-  Alcotest.(check ~here:[%here] (result test reject))
+  Alcotest.(check ~here:[%here] (result test (module Schematic.Error.Decoding)))
     "tumbled value" tumbled (Result.Ok value)
 
 let trailing_garbage () =
@@ -39,6 +39,8 @@ and shape =
 [@@deriving eq, schema, show]
 
 let circle = { center = { x = 52; y = 42 }; diameter = 70 }
+
+type cons = { next : cons option } [@@deriving eq, schema, show]
 
 let () =
   let test_case name = Alcotest.test_case name `Quick in
@@ -78,6 +80,11 @@ let () =
                      bottom_right = { x = 1024; y = 768 };
                    };
                ];
+          test_case "recursive"
+          @@ roundtrip
+               Alcotest.(testable pp_cons equal_cons)
+               cons_schema
+               { next = Some { next = Some { next = None } } };
         ] );
       ("serialization data", [ test_case "trailing garbage" trailing_garbage ]);
     ]

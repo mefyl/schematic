@@ -242,7 +242,10 @@ module Make (Impl : IMPL) = struct
         match W.date with
         | `Generic -> write_schema context date_tuple_schema
         | `Custom f -> f)
-      | Fixpoint s -> fun v -> write_descriptor context (Lazy.force s) v
+      | Fixpoint s ->
+        (* Delay evaluation to break infinite recursions. FIXME: voids the whole
+           optimization*)
+        fun v -> write_descriptor context (Lazy.force s) v
       | Float -> W.float
       | Ignore -> ignore
       | Int -> W.int
@@ -329,8 +332,8 @@ module Make (Impl : IMPL) = struct
               Fmt.(option string)
               context.schema)
     and write_schema : type t. E.decoding -> t Schema.t -> t writer =
-     fun context schema v ->
-      write_descriptor { context with schema = schema.id } schema.descriptor v
+     fun context schema ->
+      write_descriptor { context with schema = schema.id } schema.descriptor
     in
     write_schema { schema = None; path = []; reason = "" } schema
 
