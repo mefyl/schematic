@@ -7,8 +7,50 @@ include Schematic_sexp_intf
 type _ Coding.coding += Coding : t Coding.coding
 type Coding.any += Sexp of t
 
+module Json_conv (Sexp : sig
+  type t =
+    | Atom of string
+    | List of t list
+end) =
+struct
+  let rec of_json = function
+    | `Null -> Sexp.Atom ":null"
+    | `Bool b -> List [ Atom ":b"; Atom (Bool.to_string b) ]
+    | `Float f -> List [ Atom ":f"; Atom (Float.to_string f) ]
+    | `String s -> List [ Atom ":s"; Atom s ]
+    | `A items -> List [ Atom ":a"; List (List.map ~f:of_json items) ]
+    | `O fields ->
+      List
+        [
+          Atom ":o";
+          List
+            (List.map
+               ~f:(fun (name, value) -> Sexp.List [ Atom name; of_json value ])
+               fields);
+        ]
+
+  (* Shamelessly stolen from json-derivers, without the dependency on an
+     obsolete version of Base *)
+  let to_json json =
+    let rec to_json = function
+      | Sexp.Atom ":null" -> `Null
+      | List [ Atom ":b"; Atom b ] -> `Bool (Bool.of_string b)
+      | List [ Atom ":f"; Atom f ] -> `Float (Float.of_string f)
+      | List [ Atom ":s"; Atom s ] -> `String s
+      | List [ Atom ":a"; List items ] -> `A (List.map ~f:to_json items)
+      | List [ Atom ":o"; List fields ] -> `O (List.map fields ~f:field_to_json)
+      | _ -> failwith "invalid sexp shape for JSON"
+    and field_to_json = function
+      | List [ Atom name; value ] -> (name, to_json value)
+      | _ -> failwith "invalid sexp shape for JSON"
+    in
+    try Some (to_json json) with _ -> None
+end
+
 module Coding : Coding.IMPL with type t = t = struct
   let coding = Coding
+
+  include Json_conv (Sexp)
 
   type nonrec t = t
 
@@ -42,32 +84,6 @@ module Coding : Coding.IMPL with type t = t = struct
   let of_float = to_atom Float.to_string
   let of_int = to_atom Int.to_string
   let of_int64 = to_atom Int64.to_string
-
-  (* Shamelessly stolen from json-derivers, without the dependency on an
-     obsolete version of Base *)
-  let rec of_json = function
-    | `Null -> Sexplib.Sexp.Atom "Null"
-    | `Bool v0 ->
-      Sexplib.Sexp.List [ Sexplib.Sexp.Atom "Bool"; sexp_of_bool v0 ]
-    | `Float v0 ->
-      Sexplib.Sexp.List [ Sexplib.Sexp.Atom "Float"; sexp_of_float v0 ]
-    | `String v0 ->
-      Sexplib.Sexp.List [ Sexplib.Sexp.Atom "String"; sexp_of_string v0 ]
-    | `A v0 ->
-      Sexplib.Sexp.List [ Sexplib.Sexp.Atom "A"; sexp_of_list of_json v0 ]
-    | `O v0 ->
-      Sexplib.Sexp.List
-        [
-          Sexplib.Sexp.Atom "O";
-          sexp_of_list
-            (function
-              | v0, v1 ->
-                let v0 = sexp_of_string v0
-                and v1 = of_json v1 in
-                Sexplib.Sexp.List [ v0; v1 ])
-            v0;
-        ]
-
   let of_list l = Sexp.List l
   let of_option = function Some v -> Sexp.List [ v ] | None -> Sexp.List []
   let of_string s = Sexp.Atom s
@@ -90,63 +106,6 @@ module Coding : Coding.IMPL with type t = t = struct
   let to_float = of_atom Float.of_string
   let to_int = of_atom Int.of_string
   let to_int64 = of_atom Int64.of_string
-
-  (* Shamelessly stolen from json-derivers, without the dependency on an
-     obsolete version of Base *)
-  let rec to_json : t -> Ezjsonm.value option = function
-    | Sexplib.Sexp.Atom atom as _sexp -> (
-      match atom with
-      | "Null" -> Some `Null
-      | "Bool" | "Float" | "String" | "A" | "O" | _ -> None)
-    | Sexplib.Sexp.List (Sexplib.Sexp.Atom atom :: sexp_args) as _sexp -> (
-      try
-        match atom with
-        | "Bool" as _tag -> (
-          match sexp_args with
-          | v0 :: [] ->
-            let v0 = bool_of_sexp v0 in
-            Some (`Bool v0)
-          | _ -> None)
-        | "Float" as _tag -> (
-          match sexp_args with
-          | v0 :: [] ->
-            let v0 = float_of_sexp v0 in
-            Some (`Float v0)
-          | _ -> None)
-        | "String" as _tag -> (
-          match sexp_args with
-          | v0 :: [] ->
-            let v0 = string_of_sexp v0 in
-            Some (`String v0)
-          | _ -> None)
-        | "A" as _tag -> (
-          match sexp_args with
-          | v0 :: [] ->
-            let v0 = list_of_sexp to_json v0 |> Option.all in
-            Option.map ~f:(fun v -> `A v) v0
-          | _ -> None)
-        | "O" as _tag -> (
-          match sexp_args with
-          | v0 :: [] ->
-            let v0 =
-              list_of_sexp
-                (function
-                  | Sexplib.Sexp.List [ v0; v1 ] ->
-                    let v0 = string_of_sexp v0
-                    and v1 = to_json v1 in
-                    Option.map ~f:(fun v1 -> (v0, v1)) v1
-                  | _ -> None)
-                v0
-              |> Option.all
-            in
-            Option.map ~f:(fun f -> `O f) v0
-          | _ -> None)
-        | "Null" -> None
-        | _ -> None
-      with _ -> None)
-    | Sexplib.Sexp.List (Sexplib.Sexp.List _ :: _) -> None
-    | Sexplib.Sexp.List [] -> None
-
   let to_list = function Sexp.List l -> Some l | _ -> None
 
   let to_option = function
@@ -178,13 +137,9 @@ end
 module Streaming = struct
   let name = Coding.name
 
+  include Json_conv (Csexp)
+
   module Input = struct
-    open Schematic.Streaming.Reader
-
-    let fail fmt =
-      let f error = fail (`Content error) in
-      Fmt.kstr f fmt
-
     type token = Sexplib.Parser.token
 
     let pp_token f = function
@@ -196,147 +151,226 @@ module Streaming = struct
 
     type t = {
       buffer : Buffer.t;
-      input : Lexing.lexbuf;
-      token : token option;
+      get_char : unit -> char;
+      get_string : int -> string;
+      input : Csexp.Parser.Lexer.t;
+      mutable token : token option;
     }
 
-    let of_lexbuf input = { buffer = Buffer.create 4096; input; token = None }
-    let of_channel channel = of_lexbuf @@ Lexing.from_channel channel
-    let of_string input = of_lexbuf @@ Lexing.from_string input
+    let fail reason =
+      (* FIXME: preserve context *)
+      raise
+        (Schematic.Streaming.Content
+           { Schematic.Error.Decoding.empty with reason })
+
+    let failf fmt = Fmt.kstr fail fmt
+
+    let of_lexbuf get_char get_string =
+      {
+        buffer = Buffer.create 4096;
+        get_char;
+        get_string;
+        input = Csexp.Parser.Lexer.create ();
+        token = None;
+      }
+
+    let of_channel channel =
+      let buffer = Bytes.create 4096
+      and pos = ref 0
+      and length = ref 0 in
+      let refill () =
+        match Stdlib.input channel buffer 0 (Bytes.length buffer) with
+        | 0 -> raise End_of_file
+        | l ->
+          let () = length := l
+          and () = pos := 0 in
+          ()
+      in
+      let rec get_char () =
+        let current = !pos in
+        if current < !length then
+          let () = pos := current + 1 in
+          Bytes.get buffer current
+        else
+          let () = refill () in
+          get_char ()
+      and get_string n =
+        let current = !pos in
+        if current + n <= !length then
+          let () = pos := current + n in
+          Bytes.To_string.sub ~pos:current ~len:n buffer
+        else
+          let l = !length in
+          let () = length := 0 in
+          let suffix = Stdlib.really_input_string channel (n - l + current) in
+          if current = l then suffix
+          else
+            Bytes.To_string.sub ~pos:current ~len:(l - current) buffer ^ suffix
+      in
+      of_lexbuf get_char get_string
+
+    let of_string input =
+      let len = String.length input
+      and pos = ref 0 in
+      let get_char () =
+        if !pos < len then
+          let () = pos := !pos + 1 in
+          input.[!pos - 1]
+        else raise End_of_file
+      and get_string n =
+        let start = !pos in
+        if start + n <= len then
+          let () = pos := start + n in
+          String.sub ~pos:start ~len:n input
+        else raise End_of_file
+      in
+      of_lexbuf get_char get_string
 
     let token = function
       | { token = Some token; _ } as t ->
-        ({ t with token = None }, Result.Ok token)
-      | { buffer; input; _ } as t ->
-        (t, Result.Ok (Sexplib.Lexer.main ~buf:buffer input))
+        let () = t.token <- None in
+        token
+      | { input; get_char; get_string; _ } ->
+        let rec get () =
+          match Csexp.Parser.Lexer.feed input @@ get_char () with
+          | Await -> get ()
+          | Lparen -> Sexplib.Parser.LPAREN
+          | Rparen -> RPAREN
+          | Atom n -> STRING (get_string n)
+          | exception Csexp.Parser.Parse_error reason -> fail reason
+        in
+        let res = try get () with End_of_file -> EOF in
+        res
 
     let push_back token reader =
       let () = assert (Option.is_none reader.token) in
-      ({ reader with token = Some token }, Result.Ok ())
+      reader.token <- Some token
 
-    let eof =
-      token >>= function
-      | EOF -> return ()
-      | token -> fail {|expected end of input, got %a|} pp_token token
+    let eof reader =
+      match token reader with
+      | EOF -> ()
+      | token -> failf {|expected end of input, got %a|} pp_token token
 
-    let par_l =
-      token >>= function
-      | LPAREN -> return ()
-      | token -> fail {|expected "(", got %a|} pp_token token
+    let par_l reader =
+      match token reader with
+      | LPAREN -> ()
+      | token -> failf {|expected "(", got %a|} pp_token token
 
-    let par_r =
-      token >>= function
-      | RPAREN -> return ()
-      | token -> fail {|expected ")", got %a|} pp_token token
+    let par_r reader =
+      match token reader with
+      | RPAREN -> ()
+      | token -> failf {|expected ")", got %a|} pp_token token
 
-    let par_r_maybe =
-      token >>= function
-      | RPAREN -> return true
+    let par_r_maybe reader =
+      match token reader with
+      | RPAREN -> true
       | token ->
-        let* () = push_back token in
-        return false
+        let () = push_back token reader in
+        false
 
-    let string =
-      let* token in
-      match token with
-      | STRING v -> return v
-      | token -> fail {|expected string, got %a|} pp_token token
+    let string reader =
+      match token reader with
+      | STRING v -> v
+      | token -> failf {|expected string, got %a|} pp_token token
 
-    let bool =
-      string >>= function
-      | "true" -> return true
-      | "false" -> return false
-      | string -> fail {|expected \"true\" or \"false\", got %S|} string
+    let bool reader =
+      match string reader with
+      | "true" -> true
+      | "false" -> false
+      | string -> failf {|expected \"true\" or \"false\", got %S|} string
 
     let date = `Generic
 
-    let decoded_string name decode =
-      let* string in
+    let decoded_string name decode reader =
+      let string = string reader in
       match decode string with
-      | Some value -> return value
-      | None -> fail {|expected %s, got %S|} name string
+      | Some value -> value
+      | None -> failf {|expected %s, got %S|} name string
 
     let float = decoded_string "float" Float.of_string_opt
     let int = decoded_string "integer" Int.of_string_opt
     let int64 = decoded_string "integer" Int64.of_string_opt
 
+    let list_of_sexp f = function
+      | Csexp.List l -> List.map ~f l
+      | _ -> failwith "ffs"
+
     let json =
       (* FIXME: stream, or even better implement and use the generic
          implementation *)
       let f reader =
-        let token = ref reader.token in
-        let sexp =
-          match
-            Sexplib.Parser.sexp
-              (fun buffer ->
-                match !token with
-                | None -> Sexplib.Lexer.main buffer
-                | Some look_ahead ->
-                  let () = token := None in
-                  look_ahead)
-              reader.input
-            |> Coding.to_json
-          with
-          | Some json -> Result.Ok json
-          | None -> Result.Error (`Content "invalid JSON sexp")
-          | exception exn -> Result.Error (`Content (Exn.to_string exn))
+        let rec get_sexp =
+          let open Csexp.Parser.Stack in
+          function
+          | Sexp (sexp, Empty) -> sexp
+          | stack ->
+            let stack =
+              match token reader with
+              | LPAREN -> add_token Lparen stack
+              | RPAREN -> add_token Rparen stack
+              | HASH_SEMI -> stack
+              | STRING atom -> add_atom atom stack
+              | EOF -> fail "end of input while parsing inner sexp"
+            in
+            get_sexp stack
         in
-        ({ reader with token = !token }, sexp)
+        let sexp = get_sexp Empty in
+        match to_json sexp with
+        | Some yes -> yes
+        | None -> fail "invalid sexp shape for JSON"
       in
       `Custom f
 
-    let list element =
-      let* () = par_l in
-      let rec elements element =
-        par_r_maybe >>= function
-        | true -> return []
-        | false ->
-          let* head = element in
-          let+ tail = elements element in
-          head :: tail
-      in
-      elements element
+    let list_push reader =
+      let () = par_l reader in
+      None
 
+    let list_pop = par_r
+
+    let list_item_push reader =
+      match par_r_maybe reader with
+      | true ->
+        let () = push_back RPAREN reader in
+        false
+      | false -> true
+
+    let list_item_pop _ = ()
     let object_push = par_l
     let object_pop = par_r
 
-    let object_field_push _ =
-      par_r_maybe >>= function
+    let object_field_push _ reader =
+      match par_r_maybe reader with
       | true ->
-        let* () = push_back RPAREN in
-        return None
+        let () = push_back RPAREN reader in
+        None
       | false ->
-        let* () = par_l in
-        let* string in
-        return (Some string)
+        let () = par_l reader in
+        let string = string reader in
+        Some string
 
     let object_field_pop = par_r
 
-    let option content =
-      let* () = par_l in
-      par_r_maybe >>= function
-      | true -> return None
-      | false ->
-        let* content in
-        let+ () = par_r in
-        Some content
+    let option_push reader =
+      let () = par_l reader in
+      not (par_r_maybe reader)
 
+    let option_pop = par_r
     let time = `Generic
     let time_local = `Generic
     let tuple_push = par_l
     let tuple_pop = par_r
-    let tuple_item_push : (unit, t, _) Schematic.Streaming.Reader.t = return ()
-    let tuple_item_pop : (unit, t, _) Schematic.Streaming.Reader.t = return ()
+    let tuple_item_push _ = ()
+    let tuple_item_pop _ = ()
 
-    let union_push cases =
-      let* () = par_l in
-      let* string in
+    let union_push cases reader =
+      let () = par_l reader in
+      let string = string reader in
       match
         List.find cases ~f:(fun (Schematic.Schema.Case { name; _ }) ->
             String.(name = string))
       with
-      | None -> fail "no case matches %S" string
-      | Some case -> return case
+      | None -> failf "no case matches %S" string
+      | Some case -> case
 
     let union_pop = par_r
   end
@@ -356,26 +390,22 @@ module Streaming = struct
       let writer = v writer in
       f () writer
 
-    let string_unsafe string t =
-      if t.space_needed then t.put " ";
+    let string string t =
+      t.put @@ Int.to_string @@ String.length string;
+      t.put ":";
       t.put string;
-      { t with space_needed = true }
-
-    let string string =
-      let open Sexplib0.Sexp.Private in
-      string_unsafe (mach_maybe_esc_str string)
+      t
 
     let par_l t =
-      if t.space_needed then t.put " ";
       t.put "(";
-      { t with space_needed = false }
+      t
 
     let par_r t =
       t.put ")";
-      { t with space_needed = false }
+      t
 
     let encoded_string encode v = string (encode v)
-    let bool v = string_unsafe (if v then "true" else "false")
+    let bool v = string (if v then "true" else "false")
     let date = `Generic
     let eof = return
     let float = encoded_string Float.to_string
@@ -383,14 +413,11 @@ module Streaming = struct
     let int64 = encoded_string Int64.to_string
 
     let json =
-      (* FIXME: stream, or even better implement and use the generic
-         implementation *)
+      (* FIXME: stream *)
       let f sexp writer =
-        let () = if writer.space_needed then writer.put " " in
-        let sexp = Coding.of_json sexp in
-        let () = writer.put @@ Sexp.to_string_mach sexp
-        and space_needed = match sexp with Atom _ -> true | List _ -> false in
-        { writer with space_needed }
+        let sexp = of_json sexp in
+        let () = writer.put @@ Csexp.to_string sexp in
+        writer
       in
       `Custom f
 
@@ -401,12 +428,16 @@ module Streaming = struct
     let object_push = par_l
     let object_pop = par_r
 
-    let object_field_push name =
-      let* () = par_l in
-      string name
+    let object_field_push name writer =
+      let _ = par_l writer in
+      string name writer
 
     let object_field_pop = par_r
-    let option_none = string_unsafe "()"
+
+    let option_none writer =
+      writer.put "()";
+      writer
+
     let option_push = par_l
     let option_pop = par_r
     let time = `Generic

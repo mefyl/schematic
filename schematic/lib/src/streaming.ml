@@ -11,32 +11,6 @@ let mapping_schema element_schema =
 
 type time_local_pair = Ptime.t * int [@@deriving schema]
 
-module Reader = struct
-  module T = struct
-    type ('a, 'state, 'error) t = 'state -> 'state * ('a, 'error) Result.t
-
-    let return v state = (state, Result.Ok v)
-
-    let bind v ~f =
-      let res state =
-        let state, v = v state in
-        match v with
-        | Result.Ok v -> f v state
-        | Result.Error _ as error -> (state, error)
-      in
-      res
-
-    let map = `Define_using_bind
-  end
-
-  include T
-  include Base.Monad.Make3 (T)
-
-  let ( let* ) = ( >>= )
-  let ( let+ ) = ( >>| )
-  let fail error reader = (reader, Result.Error error)
-end
-
 module Writer = struct
   type ('a, 'writer) t = 'a -> 'writer -> 'writer
 
@@ -66,7 +40,7 @@ module Make (Impl : IMPL) = struct
   module Input = Impl.Input
   module Output = Impl.Output
 
-  type 'a reader = ('a, Impl.Input.t, E.decoding) Reader.t
+  type 'a reader = ('a, Impl.Input.t) Reader.t
 
   let requirement_return (type a req) (req : (a, req) Schema.requirement)
       (v : a) : req =
@@ -77,183 +51,188 @@ module Make (Impl : IMPL) = struct
     | Optional -> Some v
     | Required -> v
 
-  open Reader
+  let fail context reason = raise (Content { context with E.Decoding.reason })
+  let failf context fmt = Fmt.kstr (fail context) fmt
 
-  let unwrap_error context f reader =
-    let reader, result = f reader in
-    ( reader,
-      Base.Result.map_error result ~f:(function
-        | `Channel reason | `Content reason -> { context with E.reason }
-        | `Decoding error -> error) )
-
-  let read schema =
-    let module R = Impl.Input in
-    let rec read_descriptor :
-        type t. E.decoding -> t Schema.descriptor -> t reader =
-     fun context descriptor ->
-      let err f = unwrap_error context f
-      and fail fmt =
-        let f reason = fail { context with reason } in
-        Fmt.kstr f fmt
-      and error_wrap (value, result) =
-        (value, Result.map_error result ~f:(fun error -> `Decoding error))
-      in
-      match descriptor with
-      | Any (module Any) ->
-        fail "any %s descriptor not supported when streaming" Any.name
-      | Bool -> R.bool |> err
-      | Coding { f } -> read_descriptor context (f None)
-      | Date -> (
-        match R.date with
-        | `Generic -> read_schema context date_tuple_schema
-        | `Custom f -> f |> err)
-      | Fixpoint s -> read_descriptor context (Lazy.force s)
-      | Float -> R.float |> err
-      | Ignore -> return ()
-      | Int -> R.int |> err
-      | Int64 -> R.int64 |> err
-      | Json -> (
-        match R.json with
-        | `Generic -> failwith "fixme: schematic JSON streaming not implemented"
-        | `Custom json -> json |> err)
-      | List items_schema ->
-        R.list
-          (Fn.compose error_wrap
-             (read_schema
-                { context with path = "[]" :: context.path }
-                items_schema))
-        |> err
-      | Map { decode; descriptor; _ } -> (
-        let* value = read_descriptor context descriptor in
-        match decode value with
-        | Result.Error reason -> fail "%s" reason
-        | Result.Ok value -> return value)
-      | Mapping items_schema ->
-        read_schema context (mapping_schema items_schema)
-      | Null -> return ()
-      | Nullable schema ->
-        R.option (Fn.compose error_wrap (read_schema context schema)) |> err
-      | Object { fields = fields_schema; decode = decode_object; _ } ->
-        let* () = R.object_push |> err in
-        let* fields =
-          let rec decode_object :
-              type t.
-              string option ->
-              t Hlist.t Schema.fields ->
-              R.t ->
-              R.t * (t Hlist.t, E.decoding) Result.t =
-           fun current_field -> function
-            | FieldEnd -> return Hlist.[]
-            | Field { field; rest } -> (
-              match Schema.field_schema field.schema with
-              | { descriptor = Ignore; _ } ->
-                let* rest = decode_object current_field rest in
-                return Hlist.(requirement_return field.requirement () :: rest)
-              | schema ->
-                let* head, current_field =
-                  match field.requirement with
-                  | Default _ | Optional | Required -> (
-                    let* name =
-                      match current_field with
-                      | Some field -> return (Some field)
-                      | None -> R.object_field_push field.name |> err
-                    in
-                    (* FIXME: this assumes fields come in order *)
-                    match name with
-                    | Some name when String.(name = field.name) ->
-                      let* head =
-                        read_schema
-                          { context with path = name :: context.path }
-                          schema
+  let read schema reader =
+    try
+      let module R = Impl.Input in
+      let rec read_descriptor :
+          type t. E.decoding -> t Schema.descriptor -> t reader =
+       fun context descriptor reader ->
+        match descriptor with
+        | Any (module Any) ->
+          failf context "any %s descriptor not supported when streaming"
+            Any.name
+        | Bool -> R.bool reader
+        | Coding { f } -> read_descriptor context (f None) reader
+        | Date -> (
+          match R.date with
+          | `Generic -> read_schema context date_tuple_schema reader
+          | `Custom f -> f reader)
+        | Fixpoint s -> read_descriptor context (Lazy.force s) reader
+        | Float -> R.float reader
+        | Ignore -> ()
+        | Int -> R.int reader
+        | Int64 -> R.int64 reader
+        | Json -> (
+          match R.json with
+          | `Generic ->
+            fail context "fixme: schematic JSON streaming not implemented"
+          | `Custom f -> f reader)
+        | List items_schema ->
+          let _fixme = R.list_push reader in
+          let items =
+            let rec read_items acc reader =
+              match R.list_item_push reader with
+              | false -> acc
+              | true ->
+                let head = read_schema context items_schema reader in
+                let () = R.list_item_pop reader in
+                read_items (head :: acc) reader
+            in
+            read_items [] reader |> List.rev
+          in
+          let () = R.list_pop reader in
+          items
+        | Map { decode; descriptor; _ } -> (
+          let value = read_descriptor context descriptor reader in
+          match decode value with
+          | Result.Error error -> fail context error
+          | Result.Ok value -> value)
+        | Mapping items_schema ->
+          read_schema context (mapping_schema items_schema) reader
+        | Null -> ()
+        | Nullable schema -> (
+          match R.option_push reader with
+          | false -> None
+          | true ->
+            let value = read_schema context schema reader in
+            let () = R.option_pop reader in
+            Some value)
+        | Object { fields = fields_schema; decode = decode_object; _ } ->
+          let () = R.object_push reader in
+          let fields =
+            let rec decode_object :
+                type t. string option -> t Hlist.t Schema.fields -> t Hlist.t =
+             fun current_field -> function
+              | FieldEnd -> Hlist.[]
+              | Field { field; rest } -> (
+                match Schema.field_schema field.schema with
+                | { descriptor = Ignore; _ } ->
+                  let rest = decode_object current_field rest in
+                  Hlist.(requirement_return field.requirement () :: rest)
+                | schema ->
+                  let head, current_field =
+                    match field.requirement with
+                    | Default _ | Optional | Required -> (
+                      let name =
+                        match current_field with
+                        | Some field -> Some field
+                        | None -> R.object_field_push field.name reader
                       in
-                      let* () = R.object_field_pop |> err in
-                      return (requirement_return field.requirement head, None)
-                    | _ -> (
-                      match field.requirement with
-                      | Computed -> (* unreachable *) return (None, name)
-                      | Computed_optional ->
-                        (* unreachable *) return (None, name)
-                      | Default value -> return (value, name)
-                      | Optional -> return (None, name)
-                      | Required -> fail "missing field: %s" field.name))
-                  | Computed -> return (None, current_field)
-                  | Computed_optional -> return (None, current_field)
+                      (* FIXME: this assumes fields come in order *)
+                      match name with
+                      | Some name when String.(name = field.name) ->
+                        let head =
+                          read_schema
+                            { context with path = name :: context.path }
+                            schema reader
+                        in
+                        let () = R.object_field_pop reader in
+                        (requirement_return field.requirement head, None)
+                      | _ -> (
+                        match field.requirement with
+                        | Computed -> (* unreachable *) (None, name)
+                        | Computed_optional -> (* unreachable *) (None, name)
+                        | Default value -> (value, name)
+                        | Optional -> (None, name)
+                        | Required ->
+                          failf context "missing required field %S" field.name))
+                    | Computed -> (None, current_field)
+                    | Computed_optional -> (None, current_field)
+                  in
+                  let tail = decode_object current_field rest in
+                  Hlist.(head :: tail))
+            in
+            decode_object None fields_schema
+          in
+          let () = R.object_pop reader in
+          decode_object fields
+        | String -> R.string reader
+        | String_const _ -> ()
+        | Time -> (
+          match R.time with
+          | `Generic -> (
+            let timestamp = read_descriptor context Float reader in
+            match Ptime.of_float_s timestamp with
+            | Some time -> time
+            | None -> failf context "timestamp does not fit: %f" timestamp)
+          | `Custom f -> f reader)
+        | Time_local -> (
+          match R.time_local with
+          | `Generic -> read_schema context time_local_pair_schema reader
+          | `Custom f -> f reader)
+        | Tuple { items; decode = decode_tuple; _ } ->
+          let () = R.tuple_push reader in
+          let items =
+            let rec decode_tuple : type t. int -> t Schema.tuple -> t =
+             fun i -> function
+              | ItemEnd ->
+                let () = R.tuple_pop reader in
+                Hlist.[]
+              | Item { schema; rest } ->
+                let () = R.tuple_item_push reader in
+                let head =
+                  read_schema
+                    { context with path = Int.to_string i :: context.path }
+                    schema reader
                 in
-                let+ tail = decode_object current_field rest in
-                Hlist.(head :: tail))
+                let () = R.tuple_item_pop reader in
+                let tail = decode_tuple (i + 1) rest in
+                Hlist.(head :: tail)
+            in
+            decode_tuple 0 items
           in
-          decode_object None fields_schema
-        in
-        let+ () = R.object_pop |> err in
-        decode_object fields
-      | String -> R.string |> err
-      | String_const _ -> return ()
-      | Time -> (
-        match R.time with
-        | `Generic -> (
-          let* timestamp = read_descriptor context Float in
-          match Ptime.of_float_s timestamp with
-          | Some time -> return time
-          | None -> fail "timestamp does not fit: %f" timestamp)
-        | `Custom f -> f |> err)
-      | Time_local -> (
-        match R.time_local with
-        | `Generic -> read_schema context time_local_pair_schema
-        | `Custom f -> f |> err)
-      | Tuple { items; decode = decode_tuple; _ } ->
-        let* () = R.tuple_push |> err in
-        let+ items =
-          let rec decode_tuple :
-              type t. int -> t Schema.tuple -> (t, R.t, E.decoding) Reader.t =
-           fun i -> function
-            | ItemEnd ->
-              let+ () = R.tuple_pop |> err in
-              Hlist.[]
-            | Item { schema; rest } ->
-              let* () = R.tuple_item_push |> err in
-              let* head =
-                read_schema
-                  { context with path = Int.to_string i :: context.path }
-                  schema
-              in
-              let* () = R.tuple_item_pop |> err in
-              let+ tail = decode_tuple (i + 1) rest in
-              Hlist.(head :: tail)
+          decode_tuple items
+        | Union { cases; _ } ->
+          let (Case case) = R.union_push cases reader in
+          let value =
+            read_schema
+              { context with path = case.name :: context.path }
+              case.schema reader
           in
-          decode_tuple 0 items
-        in
-        decode_tuple items
-      | Union { cases; _ } ->
-        let* (Case case) = R.union_push cases |> err in
-        let* value =
-          read_schema
-            { context with path = case.name :: context.path }
-            case.schema
-        in
-        let+ () = R.union_pop |> err in
-        case.decoder value
-    and read_schema : type t. E.decoding -> t Schema.t -> t reader =
-     fun context schema v ->
-      read_descriptor { context with schema = schema.id } schema.descriptor v
-    in
-    read_schema { schema = schema.Schema.id; path = []; reason = "" } schema
+          let () = R.union_pop reader in
+          case.decoder value
+      and read_schema : type t. E.decoding -> t Schema.t -> t reader =
+       fun context schema input ->
+        read_descriptor
+          { context with schema = schema.id }
+          schema.descriptor input
+      in
+      read_schema
+        { schema = schema.Schema.id; path = []; reason = "" }
+        schema reader
+      |> Result.return
+    with Content error -> Result.Error error
 
   let of_channel schema channel =
     let input = Impl.Input.of_channel channel in
-    let (_ : Impl.Input.t), result = read schema input in
-    result
+    read schema input
 
   let of_string schema string =
-    let read =
-      let* result = read schema in
-      let+ () =
-        Impl.Input.eof
-        |> unwrap_error { schema = schema.id; path = []; reason = "" }
+    let read reader =
+      let ( let* ) = Result.( >>= ) in
+      let* result = read schema reader in
+      let* () =
+        try Impl.Input.eof reader |> Result.return
+        with _ ->
+          Result.Error { E.schema = schema.Schema.id; path = []; reason = "" }
       in
-      result
+      Result.Ok result
     in
     let input = Impl.Input.of_string string in
-    let (_ : Impl.Input.t), result = read input in
+    let result = read input in
     result
 
   type 'a writer = ('a, Impl.Output.t) Writer.t
@@ -267,7 +246,7 @@ module Make (Impl : IMPL) = struct
      fun context -> function
       | Any (module Any) ->
         (* FIXME: support any *)
-        Fmt.failwith "any %s descriptor not supported when streaming" Any.name
+        failf context "any %s descriptor not supported when streaming" Any.name
       | Bool -> W.bool
       | Coding { f } -> write_descriptor context (f None)
       | Date -> (
@@ -284,7 +263,8 @@ module Make (Impl : IMPL) = struct
       | Int64 -> W.int64
       | Json -> (
         match W.json with
-        | `Generic -> failwith "fixme: schematic JSON streaming not implemented"
+        | `Generic ->
+          fail context "fixme: schematic JSON streaming not implemented"
         | `Custom writer -> writer)
       | List items_schema ->
         let items =
@@ -360,7 +340,7 @@ module Make (Impl : IMPL) = struct
           match List.find_map cases ~f:(fun case -> case value writer) with
           | Some res -> res
           | None ->
-            Fmt.failwith "unmatched variant case in schema %a"
+            failf context "unmatched variant case in schema %a"
               Fmt.(option string)
               context.schema)
     and write_schema : type t. E.decoding -> t Schema.t -> t writer =

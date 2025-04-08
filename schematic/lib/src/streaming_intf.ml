@@ -13,7 +13,7 @@ module type S = sig
   end
 
   val name : string
-  val read : 'a Schema.t -> Input.t -> Input.t * ('a, Error.decoding) Result.t
+  val read : 'a Schema.t -> Input.t -> ('a, Error.decoding) Result.t
   val of_channel : 'a Schema.t -> in_channel -> ('a, Error.decoding) Result.t
   val of_string : 'a Schema.t -> string -> ('a, Error.decoding) Result.t
   val write : 'a Schema.t -> 'a -> Output.t -> Output.t
@@ -22,26 +22,22 @@ module type S = sig
 end
 
 module Reader = struct
-  type ('a, 'reader, 'error) t = 'reader -> 'reader * ('a, 'error) Result.t
+  type ('a, 'reader) t = 'reader -> 'a
 end
 
 module Writer = struct
   type ('a, 'writer) t = 'a -> 'writer -> 'writer
 end
 
+exception Content of Error.Decoding.t
+exception Channel of string
+
 module type IMPL = sig
   val name : string
 
   module Input : sig
     type t
-
-    type error :=
-      [ `Channel of string
-      | `Content of string
-      | `Decoding of Error.decoding
-      ]
-
-    type 'a reader := ('a, t, error) Reader.t
+    type 'a reader := ('a, t) Reader.t
 
     val of_channel : in_channel -> t
     val of_string : string -> t
@@ -52,12 +48,16 @@ module type IMPL = sig
     val int : int reader
     val int64 : int64 reader
     val json : Ezjsonm.value reader customizable
-    val list : 'a reader -> 'a list reader
+    val list_push : int option reader
+    val list_pop : unit reader
+    val list_item_push : bool reader
+    val list_item_pop : unit reader
     val object_push : unit reader
     val object_pop : unit reader
     val object_field_push : string -> string option reader
     val object_field_pop : unit reader
-    val option : 'a reader -> 'a option reader
+    val option_push : bool reader
+    val option_pop : unit reader
     val string : string reader
     val time : Ptime.t reader customizable
     val time_local : (Ptime.t * int) reader customizable

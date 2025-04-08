@@ -13,7 +13,7 @@ let roundtrip ~here test schema value () =
     Schematic_sexp.Stream.of_string schema string
   in
   Alcotest.(check ~here (result test (module Schematic.Error.Decoding)))
-    "tumbled value" tumbled (Result.Ok value)
+    "tumbled value" (Result.Ok value) tumbled
 
 let trailing_garbage () =
   Alcotest.(check ~here:[%here] (result int pass))
@@ -78,6 +78,10 @@ let () =
           @@ roundtrip ~here:[%here]
                Alcotest.(list int)
                [%schema: int list] [ 12; 34; 56 ];
+          test_case "options"
+          @@ roundtrip ~here:[%here]
+               Alcotest.(list @@ option int)
+               [%schema: int option list] [ Some 12; None; Some 56 ];
           test_case "tuple"
           @@ roundtrip ~here:[%here]
                Alcotest.(triple int string unit)
