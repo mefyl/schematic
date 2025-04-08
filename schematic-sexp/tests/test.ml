@@ -85,6 +85,9 @@ let () =
                Alcotest.(testable pp_cons equal_cons)
                cons_schema
                { next = Some { next = Some { next = None } } };
+          test_case "JSON"
+          @@ roundtrip (module Schematic.Json) Schematic.Json.schema
+          @@ Schematic.Json.encode circle_schema circle;
         ] );
       ("serialization data", [ test_case "trailing garbage" trailing_garbage ]);
     ]

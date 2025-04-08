@@ -51,7 +51,7 @@ module type IMPL = sig
     val float : float reader
     val int : int reader
     val int64 : int64 reader
-    val json : Ezjsonm.t reader customizable
+    val json : Ezjsonm.value reader customizable
     val list : 'a reader -> 'a list reader
     val object_push : unit reader
     val object_pop : unit reader

@@ -259,7 +259,23 @@ module Streaming = struct
     let float = decoded_string "float" Float.of_string_opt
     let int = decoded_string "integer" Int.of_string_opt
     let int64 = decoded_string "integer" Int64.of_string_opt
-    let json = `Generic
+
+    let json =
+      (* FIXME: stream, or even better implement and use the generic
+         implementation *)
+      let f reader =
+        let sexp =
+          match
+            Sexplib.Parser.sexp Sexplib.Lexer.main reader.input
+            |> Coding.to_json
+          with
+          | Some json -> Result.Ok json
+          | None -> Result.Error (`Content "invalid JSON sexp")
+          | exception exn -> Result.Error (`Content (Exn.to_string exn))
+        in
+        (reader, sexp)
+      in
+      `Custom f
 
     let list element =
       let* () = par_l in
@@ -357,7 +373,16 @@ module Streaming = struct
     let float = encoded_string Float.to_string
     let int = encoded_string Int.to_string
     let int64 = encoded_string Int64.to_string
-    let json = `Generic
+
+    let json =
+      (* FIXME: stream, or even better implement and use the generic
+         implementation *)
+      let f sexp writer =
+        let () = Coding.of_json sexp |> Sexp.to_string_mach |> writer.put in
+        writer
+      in
+      `Custom f
+
     let list_push = par_l
     let list_pop = par_r
     let list_item_push = return

@@ -112,7 +112,10 @@ module Make (Impl : IMPL) = struct
       | Ignore -> return ()
       | Int -> R.int |> err
       | Int64 -> R.int64 |> err
-      | Json -> failwith "fixme: schematic JSON streaming not implemented"
+      | Json -> (
+        match R.json with
+        | `Generic -> failwith "fixme: schematic JSON streaming not implemented"
+        | `Custom json -> json |> err)
       | List items_schema ->
         R.list (Fn.compose error_wrap (read_schema context items_schema)) |> err
       | Map { decode; descriptor; _ } -> (
