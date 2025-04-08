@@ -386,8 +386,11 @@ module Streaming = struct
       (* FIXME: stream, or even better implement and use the generic
          implementation *)
       let f sexp writer =
-        let () = Coding.of_json sexp |> Sexp.to_string_mach |> writer.put in
-        writer
+        let () = if writer.space_needed then writer.put " " in
+        let sexp = Coding.of_json sexp in
+        let () = writer.put @@ Sexp.to_string_mach sexp
+        and space_needed = match sexp with Atom _ -> true | List _ -> false in
+        { writer with space_needed }
       in
       `Custom f
 

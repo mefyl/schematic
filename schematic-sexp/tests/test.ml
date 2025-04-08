@@ -103,7 +103,7 @@ let () =
           @@ roundtrip ~here:[%here]
                Alcotest.(list (module Schematic.Json))
                Schematic.(Schemas.list_schema Json.schema)
-          @@ [ `A [] ];
+          @@ [ `A []; `Null; `Null; `Null ];
         ] );
       ("serialization data", [ test_case "trailing garbage" trailing_garbage ]);
     ]
