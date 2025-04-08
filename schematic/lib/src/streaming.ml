@@ -117,7 +117,12 @@ module Make (Impl : IMPL) = struct
         | `Generic -> failwith "fixme: schematic JSON streaming not implemented"
         | `Custom json -> json |> err)
       | List items_schema ->
-        R.list (Fn.compose error_wrap (read_schema context items_schema)) |> err
+        R.list
+          (Fn.compose error_wrap
+             (read_schema
+                { context with path = "[]" :: context.path }
+                items_schema))
+        |> err
       | Map { decode; descriptor; _ } -> (
         let* value = read_descriptor context descriptor in
         match decode value with
@@ -150,7 +155,11 @@ module Make (Impl : IMPL) = struct
                     (* FIXME: this assumes fields come in order *)
                     match name with
                     | Some name when String.(name = field.name) ->
-                      let* head = read_schema context schema in
+                      let* head =
+                        read_schema
+                          { context with path = name :: context.path }
+                          schema
+                      in
                       let* () = R.object_field_pop |> err in
                       return (requirement_return field.requirement head)
                     | _ -> (
@@ -188,23 +197,32 @@ module Make (Impl : IMPL) = struct
         let* () = R.tuple_push |> err in
         let+ items =
           let rec decode_tuple :
-              type t. t Schema.tuple -> (t, R.t, E.decoding) Reader.t = function
+              type t. int -> t Schema.tuple -> (t, R.t, E.decoding) Reader.t =
+           fun i -> function
             | ItemEnd ->
               let+ () = R.tuple_pop |> err in
               Hlist.[]
             | Item { schema; rest } ->
               let* () = R.tuple_item_push |> err in
-              let* head = read_schema context schema in
+              let* head =
+                read_schema
+                  { context with path = Int.to_string i :: context.path }
+                  schema
+              in
               let* () = R.tuple_item_pop |> err in
-              let+ tail = decode_tuple rest in
+              let+ tail = decode_tuple (i + 1) rest in
               Hlist.(head :: tail)
           in
-          decode_tuple items
+          decode_tuple 0 items
         in
         decode_tuple items
       | Union { cases; _ } ->
         let* (Case case) = R.union_push cases |> err in
-        let* value = read_schema context case.schema in
+        let* value =
+          read_schema
+            { context with path = case.name :: context.path }
+            case.schema
+        in
         let+ () = R.union_pop |> err in
         case.decoder value
     and read_schema : type t. E.decoding -> t Schema.t -> t reader =
