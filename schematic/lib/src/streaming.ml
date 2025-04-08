@@ -138,20 +138,26 @@ module Make (Impl : IMPL) = struct
         let* fields =
           let rec decode_object :
               type t.
+              string option ->
               t Hlist.t Schema.fields ->
               R.t ->
-              R.t * (t Hlist.t, E.decoding) Result.t = function
+              R.t * (t Hlist.t, E.decoding) Result.t =
+           fun current_field -> function
             | FieldEnd -> return Hlist.[]
             | Field { field; rest } -> (
               match Schema.field_schema field.schema with
               | { descriptor = Ignore; _ } ->
-                let* rest = decode_object rest in
+                let* rest = decode_object current_field rest in
                 return Hlist.(requirement_return field.requirement () :: rest)
               | schema ->
-                let* head =
+                let* head, current_field =
                   match field.requirement with
                   | Default _ | Optional | Required -> (
-                    let* name = R.object_field_push field.name |> err in
+                    let* name =
+                      match current_field with
+                      | Some field -> return (Some field)
+                      | None -> R.object_field_push field.name |> err
+                    in
                     (* FIXME: this assumes fields come in order *)
                     match name with
                     | Some name when String.(name = field.name) ->
@@ -161,21 +167,22 @@ module Make (Impl : IMPL) = struct
                           schema
                       in
                       let* () = R.object_field_pop |> err in
-                      return (requirement_return field.requirement head)
+                      return (requirement_return field.requirement head, None)
                     | _ -> (
                       match field.requirement with
-                      | Computed -> (* unreachable *) return None
-                      | Computed_optional -> (* unreachable *) return None
-                      | Default value -> return value
-                      | Optional -> return None
+                      | Computed -> (* unreachable *) return (None, name)
+                      | Computed_optional ->
+                        (* unreachable *) return (None, name)
+                      | Default value -> return (value, name)
+                      | Optional -> return (None, name)
                       | Required -> fail "missing field: %s" field.name))
-                  | Computed -> return None
-                  | Computed_optional -> return None
+                  | Computed -> return (None, current_field)
+                  | Computed_optional -> return (None, current_field)
                 in
-                let+ tail = decode_object rest in
+                let+ tail = decode_object current_field rest in
                 Hlist.(head :: tail))
           in
-          decode_object fields_schema
+          decode_object None fields_schema
         in
         let+ () = R.object_pop |> err in
         decode_object fields

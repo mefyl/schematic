@@ -44,6 +44,15 @@ let circle = { center = { x = 52; y = 42 }; diameter = 70 }
 
 type cons = { next : cons option } [@@deriving eq, schema, show]
 
+module Opt = struct
+  type t = {
+    a : int option;
+    b : int option;
+    c : int option;
+  }
+  [@@deriving eq, schema, show]
+end
+
 let () =
   let test_case name = Alcotest.test_case name `Quick in
   Alcotest.run "Schematic_sexp"
@@ -104,6 +113,11 @@ let () =
                Alcotest.(list (module Schematic.Json))
                Schematic.(Schemas.list_schema Json.schema)
           @@ [ `A []; `Null; `Null; `Null ];
+          test_case "optional fields"
+          @@ roundtrip ~here:[%here]
+               (module Opt)
+               Opt.schema
+               { a = Some 0; b = None; c = Some 1 };
         ] );
       ("serialization data", [ test_case "trailing garbage" trailing_garbage ]);
     ]
