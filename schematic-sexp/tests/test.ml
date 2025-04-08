@@ -1,16 +1,18 @@
+open Base
+
 module Schemas_library = struct
   type Schematic.Schema.library += V
 
   let v = V
 end
 
-let roundtrip test schema value () =
+let roundtrip ~here test schema value () =
   let tumbled =
     let string = Schematic_sexp.Stream.to_string schema value in
     Fmt.epr "repr: %S@." string;
     Schematic_sexp.Stream.of_string schema string
   in
-  Alcotest.(check ~here:[%here] (result test (module Schematic.Error.Decoding)))
+  Alcotest.(check ~here (result test (module Schematic.Error.Decoding)))
     "tumbled value" tumbled (Result.Ok value)
 
 let trailing_garbage () =
@@ -48,28 +50,35 @@ let () =
     [
       ( "roundtrip",
         [
-          test_case "unit" @@ roundtrip Alcotest.unit [%schema: unit] ();
-          test_case "int" @@ roundtrip Alcotest.int [%schema: int] 21;
+          test_case "unit"
+          @@ roundtrip ~here:[%here] Alcotest.unit [%schema: unit] ();
+          test_case "int"
+          @@ roundtrip ~here:[%here] Alcotest.int [%schema: int] 21;
           test_case "float"
-          @@ roundtrip (Alcotest.float 0.) [%schema: float] 123.456;
+          @@ roundtrip ~here:[%here] (Alcotest.float 0.) [%schema: float]
+               123.456;
           test_case "string"
-          @@ roundtrip Alcotest.string [%schema: string] "LoremIpsum";
+          @@ roundtrip ~here:[%here] Alcotest.string [%schema: string]
+               "LoremIpsum";
           test_case "escaped string"
-          @@ roundtrip Alcotest.string [%schema: string] "Choke ) on #; this";
+          @@ roundtrip ~here:[%here] Alcotest.string [%schema: string]
+               "Choke ) on #; this";
           test_case "empty list"
-          @@ roundtrip Alcotest.(list int) [%schema: int list] [];
+          @@ roundtrip ~here:[%here] Alcotest.(list int) [%schema: int list] [];
           test_case "int list"
-          @@ roundtrip Alcotest.(list int) [%schema: int list] [ 12; 34; 56 ];
+          @@ roundtrip ~here:[%here]
+               Alcotest.(list int)
+               [%schema: int list] [ 12; 34; 56 ];
           test_case "tuple"
-          @@ roundtrip
+          @@ roundtrip ~here:[%here]
                Alcotest.(triple int string unit)
                [%schema: int * string * unit] (12, "34", ());
           test_case "circle"
-          @@ roundtrip
+          @@ roundtrip ~here:[%here]
                Alcotest.(testable pp_circle equal_circle)
                circle_schema circle;
           test_case "objects"
-          @@ roundtrip
+          @@ roundtrip ~here:[%here]
                Alcotest.(list @@ testable pp_shape equal_shape)
                [%schema: shape list]
                [
@@ -81,13 +90,20 @@ let () =
                    };
                ];
           test_case "recursive"
-          @@ roundtrip
+          @@ roundtrip ~here:[%here]
                Alcotest.(testable pp_cons equal_cons)
                cons_schema
                { next = Some { next = Some { next = None } } };
           test_case "JSON"
-          @@ roundtrip (module Schematic.Json) Schematic.Json.schema
+          @@ roundtrip ~here:[%here]
+               (module Schematic.Json)
+               Schematic.Json.schema
           @@ Schematic.Json.encode circle_schema circle;
+          test_case "JSONs"
+          @@ roundtrip ~here:[%here]
+               Alcotest.(list (module Schematic.Json))
+               Schematic.(Schemas.list_schema Json.schema)
+          @@ [ `A [] ];
         ] );
       ("serialization data", [ test_case "trailing garbage" trailing_garbage ]);
     ]

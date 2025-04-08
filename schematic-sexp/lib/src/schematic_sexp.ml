@@ -264,16 +264,24 @@ module Streaming = struct
       (* FIXME: stream, or even better implement and use the generic
          implementation *)
       let f reader =
+        let token = ref reader.token in
         let sexp =
           match
-            Sexplib.Parser.sexp Sexplib.Lexer.main reader.input
+            Sexplib.Parser.sexp
+              (fun buffer ->
+                match !token with
+                | None -> Sexplib.Lexer.main buffer
+                | Some look_ahead ->
+                  let () = token := None in
+                  look_ahead)
+              reader.input
             |> Coding.to_json
           with
           | Some json -> Result.Ok json
           | None -> Result.Error (`Content "invalid JSON sexp")
           | exception exn -> Result.Error (`Content (Exn.to_string exn))
         in
-        (reader, sexp)
+        ({ reader with token = !token }, sexp)
       in
       `Custom f
 
