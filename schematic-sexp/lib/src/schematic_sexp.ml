@@ -140,21 +140,11 @@ module Streaming = struct
   include Json_conv (Csexp)
 
   module Input = struct
-    type token = Sexplib.Parser.token
-
-    let pp_token f = function
-      | Sexplib.Parser.STRING s -> Fmt.Dump.string f s
-      | LPAREN -> Fmt.string f "("
-      | RPAREN -> Fmt.string f ")"
-      | EOF -> Fmt.string f "EOF"
-      | HASH_SEMI -> Fmt.string f "#;"
-
     type t = {
-      buffer : Buffer.t;
-      get_char : unit -> char;
-      get_string : int -> string;
-      input : Csexp.Parser.Lexer.t;
-      mutable token : token option;
+      buffer : Bytes.t;
+      mutable length : int;
+      mutable position : int;
+      channel : Stdlib.in_channel option;
     }
 
     let fail reason =
@@ -165,113 +155,84 @@ module Streaming = struct
 
     let failf fmt = Fmt.kstr fail fmt
 
-    let of_lexbuf get_char get_string =
-      {
-        buffer = Buffer.create 4096;
-        get_char;
-        get_string;
-        input = Csexp.Parser.Lexer.create ();
-        token = None;
-      }
-
     let of_channel channel =
-      let buffer = Bytes.create 4096
-      and pos = ref 0
-      and length = ref 0 in
-      let refill () =
-        match Stdlib.input channel buffer 0 (Bytes.length buffer) with
-        | 0 -> raise End_of_file
-        | l ->
-          let () = length := l
-          and () = pos := 0 in
-          ()
-      in
-      let rec get_char () =
-        let current = !pos in
-        if current < !length then
-          let () = pos := current + 1 in
-          Bytes.get buffer current
-        else
-          let () = refill () in
-          get_char ()
-      and get_string n =
-        let current = !pos in
-        if current + n <= !length then
-          let () = pos := current + n in
-          Bytes.To_string.sub ~pos:current ~len:n buffer
-        else
-          let l = !length in
-          let () = length := 0 in
-          let suffix = Stdlib.really_input_string channel (n - l + current) in
-          if current = l then suffix
-          else
-            Bytes.To_string.sub ~pos:current ~len:(l - current) buffer ^ suffix
-      in
-      of_lexbuf get_char get_string
+      let buffer = Bytes.create 4096 in
+      { buffer; position = 0; length = 0; channel = Some channel }
 
     let of_string input =
-      let len = String.length input
-      and pos = ref 0 in
-      let get_char () =
-        if !pos < len then
-          let () = pos := !pos + 1 in
-          input.[!pos - 1]
-        else raise End_of_file
-      and get_string n =
-        let start = !pos in
-        if start + n <= len then
-          let () = pos := start + n in
-          String.sub ~pos:start ~len:n input
-        else raise End_of_file
-      in
-      of_lexbuf get_char get_string
+      let buffer = Bytes.unsafe_of_string_promise_no_mutation input in
+      { buffer; position = 0; length = String.length input; channel = None }
 
-    let token = function
-      | { token = Some token; _ } as t ->
-        let () = t.token <- None in
-        token
-      | { input; get_char; get_string; _ } ->
-        let rec get () =
-          match Csexp.Parser.Lexer.feed input @@ get_char () with
-          | Await -> get ()
-          | Lparen -> Sexplib.Parser.LPAREN
-          | Rparen -> RPAREN
-          | Atom n -> STRING (get_string n)
-          | exception Csexp.Parser.Parse_error reason -> fail reason
+    let ensure t =
+      if t.position < t.length then true
+      else
+        match t.channel with
+        | None -> false
+        | Some channel ->
+          let length = Stdlib.input channel t.buffer 0 4096 in
+          if length > 0 then
+            let () = t.position <- 0
+            and () = t.length <- length in
+            true
+          else false
+
+    let eof t =
+      if ensure t then
+        failf {|expected end of input, got %c|} @@ Bytes.get t.buffer t.position
+
+    let par_l t =
+      if ensure t then
+        match Bytes.get t.buffer t.position with
+        | '(' -> t.position <- t.position + 1
+        | c -> failf {|expected "(", got %c|} c
+      else failf {|expected "(", got end of input|}
+
+    let par_r_maybe t =
+      if ensure t then
+        match Bytes.get t.buffer t.position with ')' -> true | _ -> false
+      else failf {|expected ")", got end of input|}
+
+    let par_r t = if par_r_maybe t then t.position <- t.position + 1
+
+    let string t =
+      let atom_length =
+        let rec read_int n =
+          if ensure t then
+            let () = t.position <- t.position + 1 in
+            match Bytes.get t.buffer (t.position - 1) with
+            | ':' -> n
+            | '0' -> read_int ((n * 10) + 0)
+            | '1' -> read_int ((n * 10) + 1)
+            | '2' -> read_int ((n * 10) + 2)
+            | '3' -> read_int ((n * 10) + 3)
+            | '4' -> read_int ((n * 10) + 4)
+            | '5' -> read_int ((n * 10) + 5)
+            | '6' -> read_int ((n * 10) + 6)
+            | '7' -> read_int ((n * 10) + 7)
+            | '8' -> read_int ((n * 10) + 8)
+            | '9' -> read_int ((n * 10) + 9)
+            | c -> failf {|invalid char in atom length: %c|} c
+          else failf {|end of input in atom size|}
         in
-        let res = try get () with End_of_file -> EOF in
-        res
-
-    let push_back token reader =
-      let () = assert (Option.is_none reader.token) in
-      reader.token <- Some token
-
-    let eof reader =
-      match token reader with
-      | EOF -> ()
-      | token -> failf {|expected end of input, got %a|} pp_token token
-
-    let par_l reader =
-      match token reader with
-      | LPAREN -> ()
-      | token -> failf {|expected "(", got %a|} pp_token token
-
-    let par_r reader =
-      match token reader with
-      | RPAREN -> ()
-      | token -> failf {|expected ")", got %a|} pp_token token
-
-    let par_r_maybe reader =
-      match token reader with
-      | RPAREN -> true
-      | token ->
-        let () = push_back token reader in
-        false
-
-    let string reader =
-      match token reader with
-      | STRING v -> v
-      | token -> failf {|expected string, got %a|} pp_token token
+        read_int 0
+      in
+      let current = t.position in
+      if current + atom_length <= t.length then
+        let () = t.position <- current + atom_length in
+        Bytes.To_string.sub ~pos:current ~len:atom_length t.buffer
+      else
+        match t.channel with
+        | None -> fail {|end of input in atom|}
+        | Some channel ->
+          let length = t.length in
+          let () = t.length <- 0
+          and suffix =
+            Stdlib.really_input_string channel (atom_length - length + current)
+          in
+          if current = length then suffix
+          else
+            Bytes.To_string.sub ~pos:current ~len:(length - current) t.buffer
+            ^ suffix
 
     let bool reader =
       match string reader with
@@ -298,25 +259,26 @@ module Streaming = struct
     let json =
       (* FIXME: stream, or even better implement and use the generic
          implementation *)
-      let f reader =
+      let f t =
         let rec get_sexp =
           let open Csexp.Parser.Stack in
           function
           | Sexp (sexp, Empty) -> sexp
           | stack ->
-            let stack =
-              match token reader with
-              | LPAREN -> add_token Lparen stack
-              | RPAREN -> add_token Rparen stack
-              | HASH_SEMI -> stack
-              | STRING atom -> add_atom atom stack
-              | EOF -> fail "end of input while parsing inner sexp"
-            in
-            get_sexp stack
+            if ensure t then
+              match Bytes.get t.buffer t.position with
+              | '(' ->
+                let () = t.position <- t.position + 1 in
+                get_sexp @@ add_token Lparen stack
+              | ')' ->
+                let () = t.position <- t.position + 1 in
+                get_sexp @@ add_token Rparen stack
+              | _ -> get_sexp @@ add_atom (string t) stack
+            else fail "end of input while parsing inner sexp"
         in
         let sexp = get_sexp Empty in
         match to_json sexp with
-        | Some yes -> yes
+        | Some json -> json
         | None -> fail "invalid sexp shape for JSON"
       in
       `Custom f
@@ -326,33 +288,26 @@ module Streaming = struct
       None
 
     let list_pop = par_r
-
-    let list_item_push reader =
-      match par_r_maybe reader with
-      | true ->
-        let () = push_back RPAREN reader in
-        false
-      | false -> true
-
+    let list_item_push reader = not @@ par_r_maybe reader
     let list_item_pop _ = ()
     let object_push = par_l
     let object_pop = par_r
 
     let object_field_push _ reader =
-      match par_r_maybe reader with
-      | true ->
-        let () = push_back RPAREN reader in
-        None
-      | false ->
+      if par_r_maybe reader then None
+      else
         let () = par_l reader in
         let string = string reader in
         Some string
 
     let object_field_pop = par_r
 
-    let option_push reader =
-      let () = par_l reader in
-      not (par_r_maybe reader)
+    let option_push t =
+      let () = par_l t in
+      if par_r_maybe t then
+        let () = t.position <- t.position + 1 in
+        false
+      else true
 
     let option_pop = par_r
     let time = `Generic
