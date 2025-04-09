@@ -56,6 +56,8 @@ module type IMPL = sig
     val object_pop : unit reader
     val object_field_push : string -> string option reader
     val object_field_pop : unit reader
+    val object_field_opt_push : string -> string option reader
+    val object_field_opt_pop : unit reader
     val option_push : bool reader
     val option_pop : unit reader
     val string : string reader
@@ -91,6 +93,9 @@ module type IMPL = sig
     val object_pop : const
     val object_field_push : string writer
     val object_field_pop : const
+    val object_field_opt_push : string writer
+    val object_field_opt_pop : const
+    val object_field_opt_none : string writer
     val option_none : const
     val option_push : const
     val option_pop : const

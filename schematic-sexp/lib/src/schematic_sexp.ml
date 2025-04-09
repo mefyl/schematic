@@ -292,15 +292,17 @@ module Streaming = struct
     let list_item_pop _ = ()
     let object_push = par_l
     let object_pop = par_r
+    let object_field_push name _ = Some name
+    let object_field_pop _ = ()
 
-    let object_field_push _ reader =
-      if par_r_maybe reader then None
-      else
-        let () = par_l reader in
-        let string = string reader in
-        Some string
+    let object_field_opt_push name t =
+      let () = par_l t in
+      if par_r_maybe t then
+        let () = t.position <- t.position + 1 in
+        None
+      else Some name
 
-    let object_field_pop = par_r
+    let object_field_opt_pop = par_r
 
     let option_push t =
       let () = par_l t in
@@ -382,12 +384,14 @@ module Streaming = struct
     let list_item_pop = return
     let object_push = par_l
     let object_pop = par_r
+    let object_field_push _ t = t
+    let object_field_pop t = t
+    let object_field_opt_push _ t = par_l t
+    let object_field_opt_pop t = par_r t
 
-    let object_field_push name writer =
-      let _ = par_l writer in
-      string name writer
-
-    let object_field_pop = par_r
+    let object_field_opt_none _ t =
+      t.put "()";
+      t
 
     let option_none writer =
       writer.put "()";
@@ -402,8 +406,9 @@ module Streaming = struct
     let tuple_item_push = return
     let tuple_item_pop = return
 
-    let union_push _idx (Schematic.Schema.Case { name; _ }) =
-      object_field_push name
+    let union_push _idx (Schematic.Schema.Case { name; _ }) t =
+      let t = par_l t in
+      string name t
 
     let union_pop = par_r
   end

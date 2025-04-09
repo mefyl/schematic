@@ -129,7 +129,11 @@ module Make (Impl : IMPL) = struct
                       let name =
                         match current_field with
                         | Some field -> Some field
-                        | None -> R.object_field_push field.name reader
+                        | None -> (
+                          match field.requirement with
+                          | Optional ->
+                            R.object_field_opt_push field.name reader
+                          | _ -> R.object_field_push field.name reader)
                       in
                       (* FIXME: this assumes fields come in order *)
                       match name with
@@ -139,7 +143,11 @@ module Make (Impl : IMPL) = struct
                             { context with path = name :: context.path }
                             schema reader
                         in
-                        let () = R.object_field_pop reader in
+                        let () =
+                          match field.requirement with
+                          | Optional -> R.object_field_opt_pop reader
+                          | _ -> R.object_field_pop reader
+                        in
                         (requirement_return field.requirement head, None)
                       | _ -> (
                         match field.requirement with
@@ -297,7 +305,12 @@ module Make (Impl : IMPL) = struct
               in
               match requirement with
               | Default _ -> field *:: rest
-              | Optional -> option field Fn.id *:: rest
+              | Optional ->
+                let field_opt =
+                  W.object_field_opt_push name *> write_schema context schema
+                  <* W.object_field_opt_pop
+                in
+                option field_opt (W.object_field_opt_none name) *:: rest
               | Required -> field *:: rest
               | Computed | Computed_optional -> ignore))
         in
