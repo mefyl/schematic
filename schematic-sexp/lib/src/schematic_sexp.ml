@@ -256,31 +256,28 @@ module Streaming = struct
       | Csexp.List l -> List.map ~f l
       | _ -> failwith "ffs"
 
-    let json =
-      (* FIXME: stream *)
-      let json t =
-        let rec get_sexp =
-          let open Csexp.Parser.Stack in
-          function
-          | Sexp (sexp, Empty) -> sexp
-          | stack ->
-            if ensure t then
-              match Bytes.get t.buffer t.position with
-              | '(' ->
-                let () = t.position <- t.position + 1 in
-                get_sexp @@ add_token Lparen stack
-              | ')' ->
-                let () = t.position <- t.position + 1 in
-                get_sexp @@ add_token Rparen stack
-              | _ -> get_sexp @@ add_atom (string t) stack
-            else fail "end of input while parsing inner sexp"
-        in
-        let sexp = get_sexp Empty in
-        match to_json sexp with
-        | Some json -> json
-        | None -> fail "invalid sexp shape for JSON"
+    (* FIXME: stream *)
+    let json t =
+      let rec get_sexp =
+        let open Csexp.Parser.Stack in
+        function
+        | Sexp (sexp, Empty) -> sexp
+        | stack ->
+          if ensure t then
+            match Bytes.get t.buffer t.position with
+            | '(' ->
+              let () = t.position <- t.position + 1 in
+              get_sexp @@ add_token Lparen stack
+            | ')' ->
+              let () = t.position <- t.position + 1 in
+              get_sexp @@ add_token Rparen stack
+            | _ -> get_sexp @@ add_atom (string t) stack
+          else fail "end of input while parsing inner sexp"
       in
-      `Custom json
+      let sexp = get_sexp Empty in
+      match to_json sexp with
+      | Some json -> json
+      | None -> fail "invalid sexp shape for JSON"
 
     let list_push reader =
       let () = par_l reader in

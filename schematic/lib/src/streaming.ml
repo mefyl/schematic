@@ -75,11 +75,7 @@ module Make (Impl : IMPL) = struct
         | Ignore -> ()
         | Int -> R.int reader
         | Int64 -> R.int64 reader
-        | Json -> (
-          match R.json with
-          | `Generic ->
-            fail context "fixme: schematic JSON streaming not implemented"
-          | `Custom f -> f reader)
+        | Json -> R.json reader
         | List items_schema ->
           let _fixme = R.list_push reader in
           let items =
