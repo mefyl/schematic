@@ -126,34 +126,29 @@ module Make (Impl : IMPL) = struct
             end in
             let rec read_field :
                 type has t.
-                string option ->
                 (has, t, fields) stack ->
                 t Hlist.t Schema.fields ->
                 fields Hlist.t =
-             fun current_field stack -> function
+             fun stack -> function
               | FieldEnd -> rev [] stack
               | Field { field; rest } -> (
                 match Schema.field_schema field.schema with
                 | { descriptor = Ignore; _ } ->
-                  read_field current_field
+                  read_field
                     (requirement_return field.requirement () :: stack)
                     rest
                 | schema ->
-                  let head, current_field =
+                  let head =
                     match field.requirement with
                     | Default _ | Optional | Required -> (
-                      let name =
-                        match current_field with
-                        | Some field -> Some field
-                        | None -> (
-                          match field.requirement with
-                          | Optional ->
-                            R.object_field_opt_push field.name reader
-                          | _ -> R.object_field_push field.name reader)
+                      let some =
+                        match field.requirement with
+                        | Optional -> R.object_field_opt_push reader
+                        | _ ->
+                          let () = R.object_field_push reader in
+                          true
                       in
-                      (* FIXME: this assumes fields come in order *)
-                      match name with
-                      | Some name when String.(name = field.name) ->
+                      if some then
                         let head =
                           read_schema
                             { context with path = name :: context.path }
@@ -164,21 +159,21 @@ module Make (Impl : IMPL) = struct
                           | Optional -> R.object_field_opt_pop reader
                           | _ -> R.object_field_pop reader
                         in
-                        (requirement_return field.requirement head, None)
-                      | _ -> (
+                        requirement_return field.requirement head
+                      else
                         match field.requirement with
-                        | Computed -> (* unreachable *) (None, name)
-                        | Computed_optional -> (* unreachable *) (None, name)
-                        | Default value -> (value, name)
-                        | Optional -> (None, name)
+                        | Computed -> (* unreachable *) None
+                        | Computed_optional -> (* unreachable *) None
+                        | Default value -> value
+                        | Optional -> None
                         | Required ->
-                          failf context "missing required field %S" field.name))
-                    | Computed -> (None, current_field)
-                    | Computed_optional -> (None, current_field)
+                          failf context "missing required field %S" field.name)
+                    | Computed -> None
+                    | Computed_optional -> None
                   in
-                  read_field current_field (head :: stack) rest)
+                  read_field (head :: stack) rest)
             in
-            read_field None [] fields_schema
+            read_field [] fields_schema
           in
           let () = R.object_push reader in
           let fields = read_fields fields in

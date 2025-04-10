@@ -288,15 +288,15 @@ module Streaming = struct
     let list_item_pop _ = ()
     let object_push = par_l
     let object_pop = par_r
-    let object_field_push name _ = Some name
+    let object_field_push _ = ()
     let object_field_pop _ = ()
 
-    let object_field_opt_push name t =
+    let object_field_opt_push t =
       let () = par_l t in
       if par_r_maybe t then
         let () = t.position <- t.position + 1 in
-        None
-      else Some name
+        false
+      else true
 
     let object_field_opt_pop = par_r
 
