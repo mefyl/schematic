@@ -3,8 +3,8 @@ open Base
 
 let buffer_length = 4096
 
-let round size =
-  let rem = match size % 8 with 0 -> 0 | n -> 8 - n in
+let[@inline] round size =
+  let rem = match Stdlib.Int.logand size 0x7 with 0 -> 0 | n -> 8 - n in
   (size + rem, rem)
 
 module Impl = struct
