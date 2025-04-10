@@ -51,26 +51,24 @@ module Make (Impl : IMPL) = struct
     | Optional -> Some v
     | Required -> v
 
-  let fail context reason = raise (Content { context with E.Decoding.reason })
-  let failf context fmt = Fmt.kstr (fail context) fmt
+  let fail reason = raise (Content { E.Decoding.empty with E.Decoding.reason })
+  let failf fmt = Fmt.kstr fail fmt
 
   let read schema reader =
     try
       let module R = Impl.Input in
-      let rec read_descriptor :
-          type t. E.decoding -> t Schema.descriptor -> t reader =
-       fun context descriptor reader ->
+      let rec read_descriptor : type t. t Schema.descriptor -> t reader =
+       fun descriptor reader ->
         match descriptor with
         | Any (module Any) ->
-          failf context "any %s descriptor not supported when streaming"
-            Any.name
+          failf "any %s descriptor not supported when streaming" Any.name
         | Bool -> R.bool reader
-        | Coding { f } -> read_descriptor context (f None) reader
+        | Coding { f } -> read_descriptor (f None) reader
         | Date -> (
           match R.date with
-          | `Generic -> read_schema context date_tuple_schema reader
+          | `Generic -> read_schema date_tuple_schema reader
           | `Custom f -> f reader)
-        | Fixpoint s -> read_descriptor context (Lazy.force s) reader
+        | Fixpoint s -> read_descriptor (Lazy.force s) reader
         | Float -> R.float reader
         | Ignore -> ()
         | Int -> R.int reader
@@ -83,7 +81,7 @@ module Make (Impl : IMPL) = struct
               match R.list_item_push reader with
               | false -> acc
               | true ->
-                let head = read_schema context items_schema reader in
+                let head = read_schema items_schema reader in
                 let () = R.list_item_pop reader in
                 read_items (head :: acc) reader
             in
@@ -92,18 +90,18 @@ module Make (Impl : IMPL) = struct
           let () = R.list_pop reader in
           items
         | Map { decode; descriptor; _ } -> (
-          let value = read_descriptor context descriptor reader in
+          let value = read_descriptor descriptor reader in
           match decode value with
-          | Result.Error error -> fail context error
+          | Result.Error error -> fail error
           | Result.Ok value -> value)
         | Mapping items_schema ->
-          read_schema context (mapping_schema items_schema) reader
+          read_schema (mapping_schema items_schema) reader
         | Null -> ()
         | Nullable schema -> (
           match R.option_push reader with
           | false -> None
           | true ->
-            let value = read_schema context schema reader in
+            let value = read_schema schema reader in
             let () = R.option_pop reader in
             Some value)
         | Object { fields; decode = decode_object; _ } ->
@@ -149,11 +147,7 @@ module Make (Impl : IMPL) = struct
                           true
                       in
                       if some then
-                        let head =
-                          read_schema
-                            { context with path = name :: context.path }
-                            schema reader
-                        in
+                        let head = read_schema schema reader in
                         let () =
                           match field.requirement with
                           | Optional -> R.object_field_opt_pop reader
@@ -167,7 +161,7 @@ module Make (Impl : IMPL) = struct
                         | Default value -> value
                         | Optional -> None
                         | Required ->
-                          failf context "missing required field %S" field.name)
+                          failf "missing required field %S" field.name)
                     | Computed -> None
                     | Computed_optional -> None
                   in
@@ -184,14 +178,14 @@ module Make (Impl : IMPL) = struct
         | Time -> (
           match R.time with
           | `Generic -> (
-            let timestamp = read_descriptor context Float reader in
+            let timestamp = read_descriptor Float reader in
             match Ptime.of_float_s timestamp with
             | Some time -> time
-            | None -> failf context "timestamp does not fit: %f" timestamp)
+            | None -> failf "timestamp does not fit: %f" timestamp)
           | `Custom f -> f reader)
         | Time_local -> (
           match R.time_local with
-          | `Generic -> read_schema context time_local_pair_schema reader
+          | `Generic -> read_schema time_local_pair_schema reader
           | `Custom f -> f reader)
         | Tuple { items; decode = decode_tuple; _ } ->
           let () = R.tuple_push reader in
@@ -203,11 +197,7 @@ module Make (Impl : IMPL) = struct
                 Hlist.[]
               | Item { schema; rest } ->
                 let () = R.tuple_item_push reader in
-                let head =
-                  read_schema
-                    { context with path = Int.to_string i :: context.path }
-                    schema reader
-                in
+                let head = read_schema schema reader in
                 let () = R.tuple_item_pop reader in
                 let tail = decode_tuple (i + 1) rest in
                 Hlist.(head :: tail)
@@ -217,23 +207,13 @@ module Make (Impl : IMPL) = struct
           decode_tuple items
         | Union { cases; _ } ->
           let (Case case) = R.union_push cases reader in
-          let value =
-            read_schema
-              { context with path = case.name :: context.path }
-              case.schema reader
-          in
+          let value = read_schema case.schema reader in
           let () = R.union_pop reader in
           case.decoder value
-      and read_schema : type t. E.decoding -> t Schema.t -> t reader =
-       fun context schema input ->
-        read_descriptor
-          { context with schema = schema.id }
-          schema.descriptor input
+      and read_schema : type t. t Schema.t -> t reader =
+       fun schema input -> read_descriptor schema.descriptor input
       in
-      read_schema
-        { schema = schema.Schema.id; path = []; reason = "" }
-        schema reader
-      |> Result.return
+      read_schema schema reader |> Result.return
     with Content error -> Result.Error error
 
   let of_channel schema channel =
@@ -266,7 +246,7 @@ module Make (Impl : IMPL) = struct
      fun context -> function
       | Any (module Any) ->
         (* FIXME: support any *)
-        failf context "any %s descriptor not supported when streaming" Any.name
+        failf "any %s descriptor not supported when streaming" Any.name
       | Bool -> W.bool
       | Coding { f } -> write_descriptor context (f None)
       | Date -> (
@@ -283,8 +263,7 @@ module Make (Impl : IMPL) = struct
       | Int64 -> W.int64
       | Json -> (
         match W.json with
-        | `Generic ->
-          fail context "fixme: schematic JSON streaming not implemented"
+        | `Generic -> fail "fixme: schematic JSON streaming not implemented"
         | `Custom writer -> writer)
       | List items_schema ->
         let items =
@@ -365,7 +344,7 @@ module Make (Impl : IMPL) = struct
           match List.find_map cases ~f:(fun case -> case value writer) with
           | Some res -> res
           | None ->
-            failf context "unmatched variant case in schema %a"
+            failf "unmatched variant case in schema %a"
               Fmt.(option string)
               context.schema)
     and write_schema : type t. E.decoding -> t Schema.t -> t writer =
