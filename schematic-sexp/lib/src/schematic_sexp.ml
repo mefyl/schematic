@@ -337,7 +337,6 @@ module Streaming = struct
     let of_put put = { put; space_needed = false }
     let of_channel channel = of_put (Stdlib.output_string channel)
     let of_buffer buffer = of_put (Buffer.add_string buffer)
-    let return = Fn.id
 
     let ( let* ) v f writer =
       let writer = v writer in
@@ -346,21 +345,14 @@ module Streaming = struct
     let string string t =
       t.put @@ Int.to_string @@ String.length string;
       t.put ":";
-      t.put string;
-      t
+      t.put string
 
-    let par_l t =
-      t.put "(";
-      t
-
-    let par_r t =
-      t.put ")";
-      t
-
+    let par_l t = t.put "("
+    let par_r t = t.put ")"
     let encoded_string encode v = string (encode v)
     let bool v = string (if v then "true" else "false")
     let date = `Generic
-    let eof = return
+    let eof _ = ()
     let float = encoded_string Float.to_string
     let int = encoded_string Int.to_string
     let int64 = encoded_string Int64.to_string
@@ -369,41 +361,33 @@ module Streaming = struct
       (* FIXME: stream *)
       let json sexp writer =
         let sexp = of_json sexp in
-        let () = writer.put @@ Csexp.to_string sexp in
-        writer
+        writer.put @@ Csexp.to_string sexp
       in
       `Custom json
 
-    let list_push = par_l
+    let list_push _ = par_l
     let list_pop = par_r
-    let list_item_push = return
-    let list_item_pop = return
+    let list_item_push _ = ()
+    let list_item_pop _ = ()
     let object_push = par_l
     let object_pop = par_r
-    let object_field_push _ t = t
-    let object_field_pop t = t
+    let object_field_push _ _ = ()
+    let object_field_pop _ = ()
     let object_field_opt_push _ t = par_l t
     let object_field_opt_pop t = par_r t
-
-    let object_field_opt_none _ t =
-      t.put "()";
-      t
-
-    let option_none writer =
-      writer.put "()";
-      writer
-
+    let object_field_opt_none _ t = t.put "()"
+    let option_none t = t.put "()"
     let option_push = par_l
     let option_pop = par_r
     let time = `Generic
     let time_local = `Generic
     let tuple_push = par_l
     let tuple_pop = par_r
-    let tuple_item_push = return
-    let tuple_item_pop = return
+    let tuple_item_push _ = ()
+    let tuple_item_pop _ = ()
 
     let union_push _idx (Schematic.Schema.Case { name; _ }) t =
-      let t = par_l t in
+      let () = par_l t in
       string name t
 
     let union_pop = par_r

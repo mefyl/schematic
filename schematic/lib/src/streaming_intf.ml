@@ -16,7 +16,7 @@ module type S = sig
   val read : 'a Schema.t -> Input.t -> ('a, Error.decoding) Result.t
   val of_channel : 'a Schema.t -> in_channel -> ('a, Error.decoding) Result.t
   val of_string : 'a Schema.t -> string -> ('a, Error.decoding) Result.t
-  val write : 'a Schema.t -> 'a -> Output.t -> Output.t
+  val write : 'a Schema.t -> 'a -> Output.t -> unit
   val to_string : 'a Schema.t -> 'a -> string
   val to_channel : 'a Schema.t -> 'a -> out_channel -> unit
 end
@@ -26,7 +26,7 @@ module Reader = struct
 end
 
 module Writer = struct
-  type ('a, 'writer) t = 'a -> 'writer -> 'writer
+  type ('a, 'writer) t = 'a -> 'writer -> unit
 end
 
 exception Content of Error.Decoding.t
@@ -74,7 +74,7 @@ module type IMPL = sig
   module Output : sig
     type t
     type 'a writer := ('a, t) Writer.t
-    type const := t -> t
+    type const := t -> unit
 
     val of_channel : out_channel -> t
     val of_buffer : Buffer.t -> t
@@ -85,7 +85,7 @@ module type IMPL = sig
     val int : int writer
     val int64 : int64 writer
     val json : Ezjsonm.value writer customizable
-    val list_push : const
+    val list_push : int writer
     val list_pop : const
     val list_item_push : const
     val list_item_pop : const

@@ -31,5 +31,6 @@ end
 
 module V0_19_8 = struct
   include V0_19_7
+  module Marshal = Marshal
   module Streaming = Streaming
 end
