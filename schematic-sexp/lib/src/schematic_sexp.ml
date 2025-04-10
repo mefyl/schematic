@@ -365,7 +365,7 @@ module Streaming = struct
       in
       `Custom json
 
-    let list_push _ = par_l
+    let list_push = par_l
     let list_pop = par_r
     let list_item_push _ = ()
     let list_item_pop _ = ()

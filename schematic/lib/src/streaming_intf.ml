@@ -85,7 +85,7 @@ module type IMPL = sig
     val int : int writer
     val int64 : int64 writer
     val json : Ezjsonm.value writer customizable
-    val list_push : int writer
+    val list_push : const
     val list_pop : const
     val list_item_push : const
     val list_item_pop : const
