@@ -242,24 +242,23 @@ module Streaming = struct
 
     let date = `Generic
 
-    let decoded_string name decode reader =
+    let[@inline] decoded_string name decode reader =
       let string = string reader in
       match decode string with
       | Some value -> value
       | None -> failf {|expected %s, got %S|} name string
 
-    let float = decoded_string "float" Float.of_string_opt
-    let int = decoded_string "integer" Int.of_string_opt
-    let int64 = decoded_string "integer" Int64.of_string_opt
+    let float t = decoded_string "float" Float.of_string_opt t
+    let int t = decoded_string "integer" Int.of_string_opt t
+    let int64 t = decoded_string "integer" Int64.of_string_opt t
 
     let list_of_sexp f = function
       | Csexp.List l -> List.map ~f l
       | _ -> failwith "ffs"
 
     let json =
-      (* FIXME: stream, or even better implement and use the generic
-         implementation *)
-      let f t =
+      (* FIXME: stream *)
+      let json t =
         let rec get_sexp =
           let open Csexp.Parser.Stack in
           function
@@ -281,7 +280,7 @@ module Streaming = struct
         | Some json -> json
         | None -> fail "invalid sexp shape for JSON"
       in
-      `Custom f
+      `Custom json
 
     let list_push reader =
       let () = par_l reader in
@@ -371,12 +370,12 @@ module Streaming = struct
 
     let json =
       (* FIXME: stream *)
-      let f sexp writer =
+      let json sexp writer =
         let sexp = of_json sexp in
         let () = writer.put @@ Csexp.to_string sexp in
         writer
       in
-      `Custom f
+      `Custom json
 
     let list_push = par_l
     let list_pop = par_r
