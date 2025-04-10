@@ -109,14 +109,14 @@ module Make (Impl : IMPL) = struct
         | Object { fields = fields_schema; decode = decode_object; _ } ->
           let () = R.object_push reader in
           let fields =
-            let rec decode_object :
+            let rec read_field :
                 type t. string option -> t Hlist.t Schema.fields -> t Hlist.t =
              fun current_field -> function
               | FieldEnd -> Hlist.[]
               | Field { field; rest } -> (
                 match Schema.field_schema field.schema with
                 | { descriptor = Ignore; _ } ->
-                  let rest = decode_object current_field rest in
+                  let rest = read_field current_field rest in
                   Hlist.(requirement_return field.requirement () :: rest)
                 | schema ->
                   let head, current_field =
@@ -156,10 +156,10 @@ module Make (Impl : IMPL) = struct
                     | Computed -> (None, current_field)
                     | Computed_optional -> (None, current_field)
                   in
-                  let tail = decode_object current_field rest in
+                  let tail = read_field current_field rest in
                   Hlist.(head :: tail))
             in
-            decode_object None fields_schema
+            read_field None fields_schema
           in
           let () = R.object_pop reader in
           decode_object fields

@@ -187,7 +187,7 @@ module Streaming = struct
         | c -> failf {|expected "(", got %c|} c
       else failf {|expected "(", got end of input|}
 
-    let par_r_maybe t =
+    let[@inline] par_r_maybe t =
       if ensure t then
         match Bytes.get t.buffer t.position with ')' -> true | _ -> false
       else failf {|expected ")", got end of input|}
