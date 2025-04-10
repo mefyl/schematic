@@ -106,18 +106,38 @@ module Make (Impl : IMPL) = struct
             let value = read_schema context schema reader in
             let () = R.option_pop reader in
             Some value)
-        | Object { fields = fields_schema; decode = decode_object; _ } ->
-          let () = R.object_push reader in
-          let fields =
+        | Object { fields; decode = decode_object; _ } ->
+          let[@inline] read_fields (type fields)
+              (fields_schema : fields Hlist.t Schema_intf.fields) :
+              fields Hlist.t =
+            let open struct
+              type ('has, 'want, 't) stack =
+                | ( :: ) :
+                    'head * ('has, 'head -> 'want, 't) stack
+                    -> ('head -> 'has, 'want, 't) stack
+                | [] : (unit, 't, 't) stack
+
+              let rec rev :
+                  type has want t.
+                  want Hlist.t -> (has, want, t) stack -> t Hlist.t =
+               fun acc -> function
+                | [] -> acc
+                | head :: tail -> rev (head :: acc) tail
+            end in
             let rec read_field :
-                type t. string option -> t Hlist.t Schema.fields -> t Hlist.t =
-             fun current_field -> function
-              | FieldEnd -> Hlist.[]
+                type has t.
+                string option ->
+                (has, t, fields) stack ->
+                t Hlist.t Schema.fields ->
+                fields Hlist.t =
+             fun current_field stack -> function
+              | FieldEnd -> rev [] stack
               | Field { field; rest } -> (
                 match Schema.field_schema field.schema with
                 | { descriptor = Ignore; _ } ->
-                  let rest = read_field current_field rest in
-                  Hlist.(requirement_return field.requirement () :: rest)
+                  read_field current_field
+                    (requirement_return field.requirement () :: stack)
+                    rest
                 | schema ->
                   let head, current_field =
                     match field.requirement with
@@ -156,11 +176,12 @@ module Make (Impl : IMPL) = struct
                     | Computed -> (None, current_field)
                     | Computed_optional -> (None, current_field)
                   in
-                  let tail = read_field current_field rest in
-                  Hlist.(head :: tail))
+                  read_field current_field (head :: stack) rest)
             in
-            read_field None fields_schema
+            read_field None [] fields_schema
           in
+          let () = R.object_push reader in
+          let fields = read_fields fields in
           let () = R.object_pop reader in
           decode_object fields
         | String -> R.string reader
