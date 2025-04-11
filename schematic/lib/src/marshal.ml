@@ -1,3 +1,10 @@
+(** The marshalling format aligns everything to 8-bytes blocks to ensure we
+    never half-read an int64 and have to move memory around.
+
+    JSON tags can be arbitrary, so they where picked to be the ASCII character
+    of what they denote ('S' for string, 'O' for object ...) so that binary
+    files are slightly less obfuscated. *)
+
 module E = Error
 open Base
 
@@ -34,6 +41,8 @@ let failf fmt = Fmt.kstr fail fmt
 module Input = struct
   type t = {
     buffer : Bytes.t;
+        (** The input content. Don't mutate directly as this can be immutable
+            data when built from screen, solely use [fill]. *)
     fill : ?position:int -> until:int -> Bytes.t -> int;
         (** [fill ?position ~until buffer] reads at most [until - position]
             bytes from the input into [buffer] at position [position] (default
@@ -67,10 +76,12 @@ module Input = struct
 
   let padding = Bytes.create 8
 
+  (** Ensure we have at least one 8 byte block available. *)
   let ensure t =
     if t.position = t.length then
       let () = t.position <- 0 in
       let () = t.length <- t.fill ~until:(Bytes.length t.buffer) t.buffer in
+      (* all input file size must be a multiple of 8 *)
       if t.length < 8 then fail "premature end of file"
 
   let eof t =
@@ -120,12 +131,12 @@ module Input = struct
 
   let rec json t =
     match int t with
-    | 78 -> `Null
-    | 102 -> `Bool false
-    | 116 -> `Bool true
-    | 70 -> `Float (float t)
-    | 83 -> `String (string t)
-    | 65 ->
+    | 78 (* N *) -> `Null
+    | 102 (* f *) -> `Bool false
+    | 116 (* t *) -> `Bool true
+    | 70 (* F *) -> `Float (float t)
+    | 83 (* S *) -> `String (string t)
+    | 65 (* A *) ->
       let rec read acc = function
         | 0 -> `A (List.rev acc)
         | n ->
@@ -133,7 +144,7 @@ module Input = struct
           read (value :: acc) (n - 1)
       in
       read [] @@ int t
-    | 79 ->
+    | 79 (* O *) ->
       let rec read acc = function
         | 0 -> `O (List.rev acc)
         | n ->
