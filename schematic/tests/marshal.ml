@@ -1,5 +1,15 @@
 open Base
 
+(* Once upon a time, there used to be abstraction and design in the code the
+   people of these lands produced. But they were smitten by the god of the flops
+   and his evil antechrist the garbage collector, and lost all ability to think,
+   ending up fiddling with bits and offsets in buffers like monkeys bashing
+   keyboards with wrenches.
+
+   And it was a sad and barren land, devoid of any original thought, but the
+   servers did not burst in flame anymore and that seemed to appease the
+   gods. *)
+
 module Schemas_library = struct
   type Schematic.Schema.library += V
 
