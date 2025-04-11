@@ -34,21 +34,26 @@ let failf fmt = Fmt.kstr fail fmt
 module Input = struct
   type t = {
     buffer : Bytes.t;
-    fill : Bytes.t -> int -> int -> int;  (** [fill buffer position until] *)
+    fill : ?position:int -> until:int -> Bytes.t -> int;
+        (** [fill ?position ~until buffer] reads at most [until - position]
+            bytes from the input into [buffer] at position [position] (default
+            0) at most and returns the position past the last character read. If
+            the returned value is inferior to [until], the end of input was
+            reached during the read.*)
     mutable position : int;
     mutable length : int;
   }
 
   let of_channel channel =
     let buffer = Bytes.create buffer_length in
-    let rec fill bytes position until =
+    let rec fill ?(position = 0) ~until bytes =
       match Stdlib.input channel bytes position (until - position) with
       | 0 -> position
       | n ->
         let position = position + n in
-        if position = until then position else fill bytes position until
+        if position = until then position else fill ~position ~until bytes
     in
-    let length = fill buffer 0 buffer_length in
+    let length = fill ~until:buffer_length buffer in
     { buffer; position = 0; length; fill }
 
   let of_string input =
@@ -57,7 +62,7 @@ module Input = struct
       buffer;
       position = 0;
       length = String.length input;
-      fill = (fun _ position _ -> position);
+      fill = (fun ?(position = 0) ~until:_ _ -> position);
     }
 
   let padding = Bytes.create 8
@@ -65,11 +70,13 @@ module Input = struct
   let ensure t =
     if t.position = t.length then
       let () = t.position <- 0 in
-      let () = t.length <- t.fill t.buffer 0 @@ Bytes.length t.buffer in
+      let () = t.length <- t.fill ~until:(Bytes.length t.buffer) t.buffer in
       if t.length < 8 then fail "premature end of file"
 
   let eof t =
-    if t.position < t.length || t.fill t.buffer 0 @@ Bytes.length t.buffer > 0
+    if
+      t.position < t.length
+      || t.fill ~until:(Bytes.length t.buffer) t.buffer > 0
     then
       failf {|expected end of input, got %c|} @@ Bytes.get t.buffer t.position
 
@@ -100,8 +107,10 @@ module Input = struct
           ~dst:content ()
       in
       let () = t.position <- t.length
-      and filled = t.fill content prefix_length string_length in
-      let _ : int = t.fill padding 0 padding_length in
+      and filled =
+        t.fill ~position:prefix_length ~until:string_length content
+      in
+      let _ : int = t.fill ~until:padding_length padding in
       if filled = string_length then
         Bytes.unsafe_to_string ~no_mutation_while_string_reachable:content
       else fail "end of input in string"
