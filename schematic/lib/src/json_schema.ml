@@ -78,12 +78,12 @@ let of_schema schema =
       let t, marks = of_descriptor marks s.descriptor in
       let type_ =
         Null :: t.validation.type_ |> List.dedup_and_sort ~compare:Poly.compare
-      and one_of =
-        match t.applicator.one_of with [] -> [] | cases -> null :: cases
+      and any_of =
+        match t.applicator.any_of with [] -> [] | cases -> null :: cases
       in
       ( {
           t with
-          applicator = { t.applicator with one_of };
+          applicator = { t.applicator with any_of };
           validation = { t.validation with type_ };
         },
         marks )
@@ -155,8 +155,8 @@ let of_schema schema =
       with
       | [ applicator ] -> (make ~applicator ~validation (), marks)
       | l ->
-        let one_of = List.map ~f:(fun applicator -> make ~applicator ()) l in
-        (make ~applicator:(make_applicator ~one_of ()) ~validation (), marks))
+        let any_of = List.map ~f:(fun applicator -> make ~applicator ()) l in
+        (make ~applicator:(make_applicator ~any_of ()) ~validation (), marks))
     | Schema.Tuple { items; _ } ->
       let fields, marks =
         let rec tuple_applicator : type u. ids -> u Schema.tuple -> t list * ids
@@ -200,7 +200,7 @@ let of_schema schema =
         in
         List.fold_map ~f ~init:marks cases
       in
-      let applicator = make_applicator ~one_of:schemas ()
+      let applicator = make_applicator ~any_of:schemas ()
       and validation =
         let f = function { validation = { type_; _ }; _ } -> type_ in
         make_validation
