@@ -22,12 +22,12 @@ let roundtrip ~here test schema value () =
     let () = Fmt.epr "repr: %S@." string in
     Schematic.Marshal.of_string schema string
   in
-  Alcotest.(check ~here (result test (module Schematic.Error.Decoding)))
+  Alcotest.(check ~here (result test string))
     "tumbled value" (Result.Ok value) tumbled
 
 let trailing_garbage () =
-  Alcotest.(check ~here:[%here] (result int pass))
-    "reading integer" (Result.Error Schematic.Error.Decoding.empty)
+  Alcotest.(check ~here:[%here] (result int string))
+    "reading integer" (Result.Error "expected end of input, got x")
   @@ Schematic.Marshal.of_string [%schema: int]
        "\x00\x00\x00\x00\x00\x00\x00\x00xxx"
 

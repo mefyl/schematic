@@ -4,6 +4,8 @@ type 'a customizable =
   ]
 
 module type S = sig
+  type error
+
   module Input : sig
     type t
   end
@@ -13,9 +15,9 @@ module type S = sig
   end
 
   val name : string
-  val read : 'a Schema.t -> Input.t -> ('a, Error.decoding) Result.t
-  val of_channel : 'a Schema.t -> in_channel -> ('a, Error.decoding) Result.t
-  val of_string : 'a Schema.t -> string -> ('a, Error.decoding) Result.t
+  val read : 'a Schema.t -> Input.t -> ('a, error) Result.t
+  val of_channel : 'a Schema.t -> in_channel -> ('a, error) Result.t
+  val of_string : 'a Schema.t -> string -> ('a, error) Result.t
   val write : 'a Schema.t -> 'a -> Output.t -> unit
   val to_string : 'a Schema.t -> 'a -> string
   val to_channel : 'a Schema.t -> 'a -> out_channel -> unit

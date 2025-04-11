@@ -12,4 +12,8 @@ module Output : sig
   val of_buffer : Buffer.t -> t
 end
 
-include Streaming.S with module Input := Input and module Output := Output
+include
+  Streaming.S
+    with module Input := Input
+     and module Output := Output
+     and type error := string

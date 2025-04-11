@@ -25,8 +25,10 @@ let[@inline] round ?(header = 0) size =
   in
   (size + rem, rem)
 
+exception Content of string
+
 let name = "marshal"
-let fail reason = raise (Streaming.Content { E.Decoding.empty with reason })
+let fail reason = raise (Content reason)
 let failf fmt = Fmt.kstr fail fmt
 
 module Input = struct
@@ -238,7 +240,7 @@ module Input = struct
        fun schema input -> read_descriptor schema.descriptor input
       in
       read_schema schema reader |> Result.return
-    with Streaming.Content error -> Result.Error error
+    with Content error -> Result.Error error
 end
 
 let read = Input.read
@@ -253,8 +255,7 @@ let of_string schema string =
     let* result = read schema reader in
     let* () =
       try Input.eof reader |> Result.return
-      with _ ->
-        Result.Error { E.schema = schema.Schema.id; path = []; reason = "" }
+      with Content error -> Result.Error error
     in
     Result.Ok result
   in
