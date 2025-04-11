@@ -40,7 +40,7 @@ module Input = struct
   }
 
   let of_channel channel =
-    let buffer = Bytes.create 4096 in
+    let buffer = Bytes.create buffer_length in
     let rec fill bytes position until =
       match Stdlib.input channel bytes position (until - position) with
       | 0 -> position
@@ -441,7 +441,7 @@ let to_channel schema value channel =
   write schema value output
 
 let to_string schema value =
-  let result = Buffer.create 4096 in
+  let result = Buffer.create buffer_length in
   let output = Output.of_buffer result in
   let _output = write schema value output in
   Buffer.contents result
