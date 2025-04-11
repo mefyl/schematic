@@ -286,21 +286,30 @@ let of_string schema string =
 module Output = struct
   type t = {
     buffer : Bytes.t;
-    flush : Bytes.t -> int -> int -> unit;
+    flush : ?position:int -> size:int -> Bytes.t -> unit;
+        (** [flush  ?position ~size buffer] writes to the input [size] bytes
+            from [buffer] starting at [position] (default 0). *)
     mutable position : int;
   }
 
   let of_flush flush =
     { buffer = Bytes.create buffer_length; flush; position = 0 }
 
-  let of_channel channel = of_flush (Stdlib.output channel)
+  let of_channel channel =
+    let flush ?(position = 0) ~size buffer =
+      Stdlib.output channel buffer position size
+    in
+    of_flush flush
 
   let of_buffer buffer =
-    of_flush (fun bytes pos len -> Buffer.add_subbytes buffer bytes ~pos ~len)
+    let flush ?(position = 0) ~size bytes =
+      Buffer.add_subbytes buffer bytes ~pos:position ~len:size
+    in
+    of_flush flush
 
   let ensure size t =
     if t.position + size > buffer_length then
-      let () = t.flush t.buffer 0 t.position in
+      let () = t.flush ~size:t.position t.buffer in
       t.position <- 0
 
   let padding = Bytes.init 8 ~f:(fun _ -> '\x00')
@@ -331,31 +340,31 @@ module Output = struct
       t.position <- t.position + size
     else
       let () =
-        t.flush (Bytes.unsafe_of_string_promise_no_mutation v) 0 length
+        t.flush ~size:length (Bytes.unsafe_of_string_promise_no_mutation v)
       in
-      if pad > 0 then t.flush padding 0 pad
+      if pad > 0 then t.flush ~size:pad padding
 
   let[@inline] bool v t = int (if v then 1 else 0) t
   let[@inline] float v t = int64 (Int64.bits_of_float v) t
-  let eof t = if t.position > 0 then t.flush t.buffer 0 t.position
+  let eof t = if t.position > 0 then t.flush ~size:t.position t.buffer
 
   (* FIXME: could be made more compact *)
   let json json t =
     let rec write = function
-      | `Null -> int 78 t
-      | `Bool false -> int 102 t
-      | `Bool true -> int 116 t
+      | `Null -> int 78 (* N *) t
+      | `Bool false -> int 102 (* f *) t
+      | `Bool true -> int 116 (* t *) t
       | `Float f ->
-        let () = int 70 t in
+        let () = int 70 (* F *) t in
         float f t
-      | `String s ->
+      | `String s (* S *) ->
         let () = int 83 t in
         string s t
-      | `A items ->
+      | `A items (* A *) ->
         let () = int 65 t in
         let () = int (List.length items) t in
         List.iter items ~f:write
-      | `O fields ->
+      | `O fields (* O *) ->
         let () = int 79 t in
         let () = int (List.length fields) t in
         List.iter fields ~f:(fun (name, value) ->
