@@ -78,6 +78,9 @@ module Make (Impl : IMPL) = struct
                 Some (head, reader)
             in
             Base.Sequence.unfold ~init:reader ~f:read_items |> construct
+            |> function
+            | Result.Ok result -> result
+            | Result.Error error -> failf "%s" error
           in
           let () = R.list_pop reader in
           items

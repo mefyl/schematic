@@ -175,7 +175,9 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
             Coding.to_list v |> type_error "array"
             >>= map_results ~f:(decode_schema context item)
           in
-          Base.Sequence.of_list items |> construct |> Result.return
+          Base.Sequence.of_list items
+          |> construct
+          |> Result.map_error ~f:(fun reason -> { context with reason })
         | Map { decode = cons; descriptor; _ } ->
           decode_descriptor context descriptor v >>= fun value ->
           cons value |> Result.map_error ~f:(fun reason -> error "%s" reason)

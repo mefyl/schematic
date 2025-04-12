@@ -68,13 +68,6 @@ and _ descriptor =
   | Int64 : int64 descriptor
   | Json : Ezjsonm.value descriptor
   | List : 'a t -> 'a list descriptor
-  | Sequence : {
-      construct : 'item Base.Sequence.t -> 'result;
-      deconstruct : 'result -> 'item Base.Sequence.t;
-      item : 'item t;
-      length : 'result -> int;
-    }
-      -> 'result descriptor
   (* 'a: facing, 'b: underlying *)
   | Map : {
       decode : 'a -> ('b, string) Result.t;
@@ -91,6 +84,13 @@ and _ descriptor =
       fields : 'fields Hlist.t fields;
     }
       -> 't descriptor
+  | Sequence : {
+      construct : 'item Base.Sequence.t -> ('result, string) Result.t;
+      deconstruct : 'result -> 'item Base.Sequence.t;
+      item : 'item t;
+      length : 'result -> int;
+    }
+      -> 'result descriptor
   | String : string descriptor
   | String_const : string -> unit descriptor
   | Time : Ptime.t descriptor

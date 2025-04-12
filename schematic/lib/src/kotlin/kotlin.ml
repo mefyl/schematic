@@ -935,7 +935,7 @@ module Json = struct
       | Sequence { construct; item; _ } -> (
         function
         | `A v ->
-          let+ items =
+          let* items =
             v
             |> List.map ~f:(fun json ->
                    decode
@@ -944,6 +944,7 @@ module Json = struct
             |> Result.all
           in
           items |> Base.Sequence.of_list |> construct
+          |> Result.map_error ~f:(function reason -> { context with reason })
         | json -> type_error "array" json)
       | Map { descriptor; decode = cons; _ } ->
         fun json ->

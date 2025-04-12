@@ -180,7 +180,7 @@ module Input = struct
               read_items (i - 1) (head :: acc) reader
           in
           read_items size [] reader
-        | Sequence { item; construct; _ } ->
+        | Sequence { item; construct; _ } -> (
           let size = int reader in
           let read_item = function
             | 0 -> None
@@ -188,7 +188,9 @@ module Input = struct
               let head = read_schema item reader in
               Some (head, i - 1)
           in
-          Base.Sequence.unfold ~init:size ~f:read_item |> construct
+          Base.Sequence.unfold ~init:size ~f:read_item |> construct |> function
+          | Result.Ok result -> result
+          | Result.Error reason -> fail reason)
         | Map { decode; descriptor; _ } -> (
           let value = read_descriptor descriptor reader in
           match decode value with
