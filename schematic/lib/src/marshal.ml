@@ -42,7 +42,7 @@ module Input = struct
   type t = {
     buffer : Bytes.t;
         (** The input content. Don't mutate directly as this can be immutable
-            data when built from screen, solely use [fill]. *)
+            data when built from string, solely use [fill]. *)
     fill : ?position:int -> until:int -> Bytes.t -> int;
         (** [fill ?position ~until buffer] reads at most [until - position]
             bytes from the input into [buffer] at position [position] (default
