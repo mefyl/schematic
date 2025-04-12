@@ -170,6 +170,12 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | List items_schema ->
           let* v = Coding.to_list v |> type_error "array" in
           map_results ~f:(decode_schema context items_schema) v
+        | Sequence { construct; item; _ } ->
+          let* items =
+            Coding.to_list v |> type_error "array"
+            >>= map_results ~f:(decode_schema context item)
+          in
+          Base.Sequence.of_list items |> construct |> Result.return
         | Map { decode = cons; descriptor; _ } ->
           decode_descriptor context descriptor v >>= fun value ->
           cons value |> Result.map_error ~f:(fun reason -> error "%s" reason)
@@ -390,6 +396,11 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | List items_schema ->
           let f = encode_schema context items_schema in
           fun v -> Coding.of_list (List.map ~f v)
+        | Sequence { deconstruct; item; _ } ->
+          let f = encode_schema context item in
+          fun v ->
+            v |> deconstruct |> Base.Sequence.map ~f |> Base.Sequence.to_list
+            |> Coding.of_list
         | Map { encode = decons; descriptor; _ } ->
           let encode = encode_descriptor context descriptor in
           fun v -> encode @@ decons v

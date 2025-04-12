@@ -169,6 +169,8 @@ module Make (Entropy : Entropy.S) = struct
         let*! len = range 0 (Size.to_int size) in
         List.init len ~f:(fun _ -> of_descriptor Size.(size / len) d.descriptor)
         |> all >>| Result.all
+      | Sequence { construct; item; _ } ->
+        of_descriptor size (List item) >>|! Base.Sequence.of_list >>|! construct
       | Map { decode; descriptor; _ } ->
         of_descriptor size descriptor >>=! fun v -> return (decode v)
       | Mapping d ->

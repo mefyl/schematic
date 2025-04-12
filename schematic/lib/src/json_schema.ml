@@ -62,10 +62,11 @@ let of_schema schema =
       (make ~validation (), marks)
     | Json -> (make (), marks)
     | List schema ->
-      let schema, marks = of_schema marks schema in
-      let applicator = make_applicator ~items:(Items_schema schema) ()
-      and validation = make_validation ~type_:[ Array ] () in
-      (make ~applicator ~validation (), marks)
+      let item, marks = of_schema marks schema in
+      list_schema marks item
+    | Sequence { item; _ } ->
+      let item, marks = of_schema marks item in
+      list_schema marks item
     | Map { descriptor; _ } -> of_descriptor marks descriptor
     | Mapping schema ->
       let schema, marks = of_schema marks schema in
@@ -210,5 +211,9 @@ let of_schema schema =
           ()
       in
       (make ~applicator ~validation (), marks)
+  and list_schema marks item =
+    let applicator = make_applicator ~items:(Items_schema item) ()
+    and validation = make_validation ~type_:[ Array ] () in
+    (make ~applicator ~validation (), marks)
   in
   of_schema (Set.empty (module String)) schema |> fst

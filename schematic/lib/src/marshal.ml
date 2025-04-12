@@ -180,6 +180,15 @@ module Input = struct
               read_items (i - 1) (head :: acc) reader
           in
           read_items size [] reader
+        | Sequence { item; construct; _ } ->
+          let size = int reader in
+          let read_item = function
+            | 0 -> None
+            | i ->
+              let head = read_schema item reader in
+              Some (head, i - 1)
+          in
+          Base.Sequence.unfold ~init:size ~f:read_item |> construct
         | Map { decode; descriptor; _ } -> (
           let value = read_descriptor descriptor reader in
           match decode value with
@@ -392,6 +401,10 @@ module Output = struct
       | List items_schema ->
         int (List.length v) writer;
         List.iter v ~f:(fun item -> write_schema items_schema item writer)
+      | Sequence { deconstruct; item; length; _ } ->
+        int (length v) writer;
+        deconstruct v
+        |> Base.Sequence.iter ~f:(fun v -> write_schema item v writer)
       | Map { encode; descriptor; _ } ->
         write_descriptor descriptor (encode v) writer
       | Null -> ()

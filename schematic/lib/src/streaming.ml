@@ -66,6 +66,21 @@ module Make (Impl : IMPL) = struct
           in
           let () = R.list_pop reader in
           items
+        | Sequence { item; construct; _ } ->
+          let _fixme = R.list_push reader in
+          let items =
+            let read_items reader =
+              match R.list_item_push reader with
+              | false -> None
+              | true ->
+                let head = read_schema item reader in
+                let () = R.list_item_pop reader in
+                Some (head, reader)
+            in
+            Base.Sequence.unfold ~init:reader ~f:read_items |> construct
+          in
+          let () = R.list_pop reader in
+          items
         | Map { decode; descriptor; _ } -> (
           let value = read_descriptor descriptor reader in
           match decode value with
@@ -224,6 +239,13 @@ module Make (Impl : IMPL) = struct
         let () = W.list_push writer in
         let () =
           List.iter v ~f:(fun v -> write_schema context items_schema v writer)
+        in
+        W.list_pop writer
+      | Sequence { item; deconstruct; _ } ->
+        let () = W.list_push writer in
+        let () =
+          deconstruct v
+          |> Base.Sequence.iter ~f:(fun v -> write_schema context item v writer)
         in
         W.list_pop writer
       | Map { encode; descriptor; _ } ->

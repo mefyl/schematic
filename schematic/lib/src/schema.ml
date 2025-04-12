@@ -47,6 +47,11 @@ let rec pp_descriptor : type u. Marks.t -> u descriptor Fmt.t =
       @@ const string "[" ++ sp
          ++ (box @@ const (pp marks) schema)
          ++ sp ++ const string "]"
+    | Sequence { item; _ } ->
+      box ~indent
+      @@ const string "[" ++ sp
+         ++ (box @@ const (pp marks) item)
+         ++ sp ++ const string "]"
     | Map { descriptor; _ } -> const (pp_descriptor marks) descriptor
     | Mapping schema -> const (pp marks) schema
     | Null -> const string "Null"
@@ -489,6 +494,7 @@ module Walk (W : WALK) = struct
     | Int64 -> W.int64
     | Json -> W.json
     | List l -> W.list (schema l)
+    | Sequence { item; _ } -> W.list (schema item)
     | Null -> W.null
     | String -> W.string
     | Time -> W.time
@@ -630,6 +636,10 @@ let compare schema =
     | Int | Int64 -> Base.Poly.compare
     | Json -> compare_json
     | List schema -> Base.List.compare (compare schema.descriptor)
+    | Sequence { item; deconstruct; _ } ->
+      fun l r ->
+        Base.Sequence.compare (compare item.descriptor) (deconstruct l)
+          (deconstruct r)
     | Map { encode; descriptor; _ } ->
       fun l r -> compare descriptor (encode l) (encode r)
     | Mapping schema -> assoc_compare (compare schema.descriptor)
@@ -726,6 +736,9 @@ module Name = struct
     | { descriptor = List p; _ } ->
       let+ p = of_schema p in
       Name.Parametric ("list", [ p ])
+    | { descriptor = Sequence { item; _ }; _ } ->
+      let+ p = of_schema item in
+      Name.Parametric ("list", [ p ])
     | { descriptor = Map _; _ } -> None
     | { descriptor = Mapping p; _ } ->
       let+ p = of_schema p in
@@ -814,6 +827,7 @@ and descriptor_to_sexp : type a. a descriptor -> Sexp.t = function
   | Int64 -> Atom "Int64"
   | Json -> Atom "Json"
   | List s -> List [ Atom "List"; to_sexp s ]
+  | Sequence { item; _ } -> List [ Atom "List"; to_sexp item ]
   | Map { descriptor; _ } -> List [ Atom "Map"; descriptor_to_sexp descriptor ]
   | Mapping s -> List [ Atom "Mapping"; to_sexp s ]
   | Null -> Atom "Null"
