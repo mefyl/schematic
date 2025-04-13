@@ -38,7 +38,12 @@ let json_schema = Schema.make Json
 let json_schema_versioned (_ : Schema.version) = json_schema
 let list_schema schema = Schema.make (List schema)
 let list_schema_versioned _ = list_schema
-let mapping_schema schema = Schema.make (Mapping schema)
+
+let mapping_schema item =
+  let construct = Fn.compose Result.return Base.Sequence.to_list
+  and deconstruct = Base.Sequence.of_list in
+  Schema.make (Mapping { construct; deconstruct; item; length = List.length })
+
 let option_schema s = Schema.make (Nullable s)
 let option_schema_versioned _ = option_schema
 let string_const_schema s = Schema.make (String_const s)
@@ -225,3 +230,23 @@ let one_or_many_versioned schema _ =
   Schema.map ~decode ~encode either
 
 let one_or_many schema = one_or_many_versioned schema None
+
+module Pair = struct
+  type ('a, 'b) t = 'a * 'b
+
+  let schema first second =
+    Schema.make
+      (Tuple
+         {
+           decode = (fun Hlist.[ first; second ] -> (first, second));
+           encode = (fun (first, second) -> Hlist.[ first; second ]);
+           items =
+             Item
+               {
+                 schema = first;
+                 rest = Item { schema = second; rest = ItemEnd };
+               };
+         })
+
+  let schema_versioned _ = schema
+end

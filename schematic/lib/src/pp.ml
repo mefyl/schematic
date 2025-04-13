@@ -42,9 +42,10 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
      @@ of_schema item)
       ']'
   | Map { descriptor; encode; _ } -> using encode @@ of_descriptor descriptor
-  | Mapping schema ->
+  | Mapping { deconstruct; item; _ } ->
     composite_object '{'
-      (list ~sep:semi @@ pair ~sep:colon Dump.string (of_schema schema))
+      (using deconstruct @@ using Base.Sequence.to_seq @@ seq ~sep:semi
+      @@ pair ~sep:colon Dump.string (of_schema item))
       '}'
   | Null -> const string "()"
   | Nullable schema -> option ~none:(const string "None") (of_schema schema)

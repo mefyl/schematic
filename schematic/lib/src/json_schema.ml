@@ -68,8 +68,8 @@ let of_schema schema =
       let item, marks = of_schema marks item in
       list_schema marks item
     | Map { descriptor; _ } -> of_descriptor marks descriptor
-    | Mapping schema ->
-      let schema, marks = of_schema marks schema in
+    | Mapping { item; _ } ->
+      let schema, marks = of_schema marks item in
       let applicator =
         make_applicator ~additionalProperties:(Properties_schema schema) ()
       and validation = make_validation ~type_:[ Object ] () in

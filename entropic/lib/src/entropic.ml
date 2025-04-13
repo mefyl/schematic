@@ -16,6 +16,8 @@ type json =
   ]
 [@@deriving schema]
 
+type ('a, 'b) pair = 'a * 'b [@@deriving schema]
+
 module Size : sig
   (** A type representing an integer size.
 
@@ -175,13 +177,15 @@ module Make (Entropy : Entropy.S) = struct
         >>=! Fn.compose Monad.return construct
       | Map { decode; descriptor; _ } ->
         of_descriptor size descriptor >>=! fun v -> return (decode v)
-      | Mapping d ->
-        let*! len = range 0 (Size.to_int size) in
-        List.init len ~f:(fun _ ->
-            let+! key = string
-            and+! data = of_descriptor Size.(size / len) d.descriptor in
-            (key, data))
-        |> all >>| Result.all
+      | Mapping { construct; deconstruct; item; length } ->
+        of_descriptor size
+          (Sequence
+             {
+               construct;
+               deconstruct;
+               item = pair_schema Schematic.Schemas.string_schema item;
+               length;
+             })
       | Null -> return (Result.return ())
       | Nullable d ->
         let*! some = bool in

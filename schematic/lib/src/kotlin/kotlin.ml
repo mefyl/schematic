@@ -274,11 +274,9 @@ module Parser = struct
       (* TODO We will probably need [kotlin] to support generics *)
       list_to_kotlin_marks marks item
     | Map { descriptor; _ } -> descriptor_to_kotlin_marks marks descriptor
-    | Mapping value_schema ->
+    | Mapping { item; _ } ->
       (* TODO We will probably need [kotlin] to support generics *)
-      let type_name, kotlin, marks =
-        schema_to_kotlin_marks marks value_schema
-      in
+      let type_name, kotlin, marks = schema_to_kotlin_marks marks item in
       let kotlin_type =
         type_name_and_kotlin_to_kotlin_type_exn type_name kotlin
       in
@@ -709,11 +707,15 @@ module Json = struct
       | Map { descriptor; encode = decons; _ } ->
         let encode = encode_descriptor descriptor in
         fun v -> encode (decons v)
-      | Mapping value_schema ->
-        let encode = encode value_schema in
-        fun v ->
-          let pairs = List.map ~f:(fun (k, v) -> (k, encode v)) v in
-          `O pairs
+      | Mapping { construct; deconstruct; item; length } ->
+        encode_descriptor
+          (Sequence
+             {
+               construct;
+               deconstruct;
+               item = Schemas.(Pair.schema string_schema item);
+               length;
+             })
       | Null -> Fn.const (`O [])
       | Nullable schema ->
         let f = encode schema in
@@ -845,8 +847,10 @@ module Json = struct
   end
 
   module Decode = struct
-    let ( let+ ) = Result.( >>| )
-    let ( let* ) = Result.( >>= )
+    let ( >>= ) = Result.( >>= )
+    let ( >>| ) = Result.( >>| )
+    let ( let* ) = ( >>= )
+    let ( let+ ) = ( >>| )
 
     let requirement_return : type a req. (a, req) Schema.requirement -> a -> req
         =
@@ -871,12 +875,10 @@ module Json = struct
         Ezjsonm.value ->
         (t, E.decoding) Result.t =
      fun context descriptor ->
+      let fail reason = Error { context with reason } in
+      let failf fmt = Fmt.kstr fail fmt in
       let type_error expected json =
-        Error
-          {
-            context with
-            reason = Fmt.str "Expected a %s but got %a" expected Json.pp json;
-          }
+        failf "expected a %s but got %a" expected Json.pp json
       in
       match descriptor with
       | Any (module Coding) ->
@@ -951,23 +953,15 @@ module Json = struct
           let* underlying = decode_descriptor context descriptor json in
           cons underlying
           |> Result.map_error ~f:(fun reason -> { context with reason })
-      | Mapping value_schema ->
-        fun json ->
-          let* fields =
-            match json with
-            | `O fields -> Ok fields
-            | json -> type_error "mapping" json
-          in
-          List.map
-            ~f:(fun (key, value) ->
-              let+ decoded_value =
-                decode
-                  { context with path = context.path @ [ key ] }
-                  value_schema value
-              in
-              (key, decoded_value))
-            fields
-          |> Result.all
+      | Mapping { construct; deconstruct; item; length } ->
+        decode_descriptor context
+          (Sequence
+             {
+               construct;
+               deconstruct;
+               item = Schemas.(Pair.schema string_schema item);
+               length;
+             })
       | Null -> ( function `O [] -> Ok () | json -> type_error "null" json)
       | Nullable schema -> (
         function
