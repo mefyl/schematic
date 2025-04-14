@@ -9,6 +9,7 @@ homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "ocamlformat" {= "0.26.2"}
+  "opam-dune-lint"
   "opam-file-format"
   "sexplib"
   "angstrom" {= "0.16.1"}
