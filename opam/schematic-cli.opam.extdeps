@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "schematic-cli"
-version: "0.20.1"
+version: "0.20.2"
 synopsis: "Schematic CLI tools"
 maintainer: "mefyl <mefyl@gruntech.org>"
 authors: "mefyl <mefyl@gruntech.org>"
@@ -11,6 +11,7 @@ depends: [
   "ocamlformat" {= "0.26.2"}
   "opam-file-format"
   "sexplib"
+  "opam-dune-lint"
   "angstrom" {= "0.16.1"}
   "base" {= "v0.17.1"}
   "base-bigarray" {= "base"}
@@ -22,63 +23,55 @@ depends: [
   "base64" {= "3.5.1"}
   "bigstringaf" {= "0.10.0"}
   "cmdliner" {= "1.3.0"}
-  "cppo" {= "1.7.0"}
+  "conf-autoconf" {= "0.2"}
+  "cppo" {= "1.8.0"}
   "csexp" {= "1.5.2"}
   "cstruct" {= "6.2.0"}
-  "dune" {= "3.16.0"}
-  "dune-configurator" {= "3.16.0"}
+  "dune" {= "3.18.0"}
+  "dune-configurator" {= "3.18.0"}
   "ezjsonm" {= "1.3.0"}
-  "fmt" {= "0.9.0"}
+  "fmt" {= "0.10.0"}
   "gen" {= "1.1"}
   "hex" {= "1.5.0"}
   "host-arch-x86_64" {= "1"}
   "host-system-other" {= "1"}
-  "js_of_ocaml" {= "5.8.2"}
-  "js_of_ocaml-compiler" {= "5.8.2"}
+  "js_of_ocaml-compiler" {= "5.9.1"}
   "jsonm" {= "1.0.2"}
-  "landmarks" {= "1.4"}
-  "landmarks-ppx" {= "1.4"}
-  "logs" {= "0.7.0"}
-  "lwt" {= "5.7.0"}
+  "landmarks" {= "1.5"}
+  "landmarks-ppx" {= "1.5"}
+  "logs" {= "0.8.0"}
+  "lwt" {= "5.9.1"}
   "menhir" {= "20240715"}
   "menhirCST" {= "20240715"}
   "menhirLib" {= "20240715"}
   "menhirSdk" {= "20240715"}
   "metapp" {= "0.4.4"}
-  "ocaml" {= "5.1.2"}
-  "ocaml-compiler-libs" {= "v0.12.4"}
+  "ocaml" {= "5.2.2"}
+  "ocaml-compiler-libs" {= "v0.17.0"}
   "ocaml-config" {= "3"}
   "ocaml-syntax-shims" {= "1.0.0"}
-  "ocaml-variants" {= "5.1.2+trunk"}
+  "ocaml-variants" {= "5.2.2+trunk"}
   "ocaml_intrinsics_kernel" {= "v0.17.1"}
-  "ocamlbuild" {= "0.15.0"}
-  "ocamlfind" {= "1.9.6"}
+  "ocamlbuild" {= "0.16.1"}
+  "ocamlfind" {= "1.9.8"}
   "ocplib-endian" {= "1.2"}
   "ppx_derivers" {= "1.2.1"}
   "ppx_deriving" {= "6.0.3"}
   "ppx_here" {= "v0.17.0"}
-  "ppxlib" {= "0.33.0"}
+  "ppxlib" {= "0.35.0"}
   "ptime" {= "1.2.0"}
   "result" {= "1.5"}
-  "sedlex" {= "3.2"}
+  "sedlex" {= "3.4"}
   "semver2" {= "1.2.0"}
   "seq" {= "base"}
   "sexplib0" {= "v0.17.0"}
-  "stdcompat" {= "19"}
+  "stdcompat" {= "20.1"}
   "stdlib-shims" {= "0.3.0"}
   "stringext" {= "1.6.0"}
-  "topkg" {= "1.0.7"}
+  "topkg" {= "1.0.8"}
   "uchar" {= "0.0.2"}
   "uri" {= "4.4.0"}
-  "uutf" {= "1.0.3"}
+  "uutf" {= "1.0.4"}
   "yojson" {= "2.2.2"}
 ]
 dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"
-pin-depends: [
-  ["landmarks.1.4" "git+https://github.com/routineco/landmarks.git#js"]
-  ["landmarks-ppx.1.4" "git+https://github.com/routineco/landmarks.git#js"]
-  [
-    "stdcompat.19"
-    "git+https://github.com/thierry-martinez/stdcompat.git#d53390d788027fe0a2282c4745eb3d1626341f99"
-  ]
-]
