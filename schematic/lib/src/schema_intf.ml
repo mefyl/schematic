@@ -71,18 +71,18 @@ and _ descriptor =
   | Json : Ezjsonm.value descriptor
   | List : 'a t -> 'a list descriptor
   | Map : {
-      decode : 'encoded -> ('exposed, string) Result.t;
-      encode : 'exposed -> 'encoded;
+      decode : 'encoded -> ('t, string) Result.t;
+      encode : 't -> 'encoded;
       descriptor : 'encoded descriptor;
     }
-      -> 'exposed descriptor
+      -> 't descriptor
   | Mapping : {
-      construct : (string * 'item) Sequence.t -> ('result, string) Result.t;
-      deconstruct : 'result -> (string * 'item) Sequence.t;
+      construct : (string * 'item) Sequence.t -> ('t, string) Result.t;
+      deconstruct : 't -> (string * 'item) Sequence.t;
       item : 'item t;
-      length : 'result -> int;
+      length : 't -> int;
     }
-      -> 'result descriptor
+      -> 't descriptor
       (** A dictionary.
 
           Some backend will specialize this case, for instance JSON will
