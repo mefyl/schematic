@@ -25,8 +25,8 @@ depends: [
   "ezjsonm" {>= "1.1.0"}
   "fmt"
   "hlist" {>= "0.2.0" & < "0.3.0"}
-  "landmarks"
-  "landmarks-ppx"
+  "landmarks" {>= "1.5"}
+  "landmarks-ppx" {>= "1.5"}
   "ocaml" {>= "5.2.0"}
   "ppxlib"
   "ppx_deriving"
@@ -55,9 +55,3 @@ build: [
   ]
 ]
 dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"
-pin-depends: [
-  [ "landmarks.1.4" "git+https://github.com/routineco/landmarks.git#js" ]
-  [ "landmarks-ppx.1.4" "git+https://github.com/routineco/landmarks.git#js" ]
-  # Required for OCaml 5.2 until `stdcompat` releases a version 20
-  [ "stdcompat.19" "git+https://github.com/thierry-martinez/stdcompat.git#d53390d788027fe0a2282c4745eb3d1626341f99" ]
-]

@@ -1,3 +1,5 @@
+open Base
+
 type (_, _) requirement =
   | Computed : ('a, 'a option) requirement
   | Computed_optional : ('a, 'a option option) requirement
@@ -68,14 +70,23 @@ and _ descriptor =
   | Int64 : int64 descriptor
   | Json : Ezjsonm.value descriptor
   | List : 'a t -> 'a list descriptor
-  (* 'a: facing, 'b: underlying *)
   | Map : {
-      decode : 'a -> ('b, string) Result.t;
-      encode : 'b -> 'a;
-      descriptor : 'a descriptor;
+      decode : 'encoded -> ('t, string) Result.t;
+      encode : 't -> 'encoded;
+      descriptor : 'encoded descriptor;
     }
-      -> 'b descriptor
-  | Mapping : 'a t -> (string * 'a) list descriptor
+      -> 't descriptor
+  | Mapping : {
+      construct : (string * 'item) Sequence.t -> ('t, string) Result.t;
+      deconstruct : 't -> (string * 'item) Sequence.t;
+      item : 'item t;
+      length : 't -> int;
+    }
+      -> 't descriptor
+      (** A dictionary.
+
+          Some backend will specialize this case, for instance JSON will
+          represent this as and object and not a list of pairs. *)
   | Null : unit descriptor
   | Nullable : 'a t -> 'a option descriptor
   | Object : {
@@ -84,6 +95,15 @@ and _ descriptor =
       fields : 'fields Hlist.t fields;
     }
       -> 't descriptor
+  | Sequence : {
+      construct : 'item Sequence.t -> ('result, string) Result.t;
+      deconstruct : 'result -> 'item Sequence.t;
+      item : 'item t;
+      length : 'result -> int;
+    }
+      -> 'result descriptor
+      (** A list of values just like [List], but consumed and produced as a
+          sequence. *)
   | String : string descriptor
   | String_const : string -> unit descriptor
   | Time : Ptime.t descriptor
@@ -128,7 +148,7 @@ module type WALK = sig
   type case
   type field
 
-  module M : Base.Monad.S
+  module M : Monad.S
 
   (* Schema *)
 
@@ -209,7 +229,7 @@ type 't flatten =
     }
       -> 't flatten
 
-module Make_inline (M : Base.Monad.S) = struct
+module Make_inline (M : Monad.S) = struct
   (** A ['res inline] maps a field to a ['res]. *)
   type 'res inline = {
     f : 't 'req. ('t, 'req) field -> 'res M.t;

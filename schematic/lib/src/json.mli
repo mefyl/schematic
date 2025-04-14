@@ -6,4 +6,4 @@ val schema : t Schema.t
 val schema_versioned : Schema.version -> t Schema.t
 
 module String : Coding.STR with type t = string
-module Make (Impl : Impl) : S
+module Make (_ : Impl) : S

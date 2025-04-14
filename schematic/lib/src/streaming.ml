@@ -5,10 +5,6 @@ open Schemas
 
 type date_tuple = int * int * int [@@deriving schema]
 type ('a, 'b) pair = 'a * 'b [@@deriving schema]
-
-let mapping_schema element_schema =
-  list_schema @@ pair_schema string_schema element_schema
-
 type time_local_pair = Ptime.t * int [@@deriving schema]
 
 module Make (Impl : IMPL) = struct
@@ -31,6 +27,10 @@ module Make (Impl : IMPL) = struct
   let fail reason = raise (Content { E.Decoding.empty with E.Decoding.reason })
   let failf fmt = Fmt.kstr fail fmt
 
+  let ok_or_fail = function
+    | Result.Ok ok -> ok
+    | Result.Error reason -> fail reason
+
   let read schema reader =
     try
       let module R = Impl.Input in
@@ -52,7 +52,7 @@ module Make (Impl : IMPL) = struct
         | Int64 -> R.int64 reader
         | Json -> R.json reader
         | List items_schema ->
-          let _fixme = R.list_push reader in
+          let () = R.list_push reader in
           let items =
             let rec read_items acc reader =
               match R.list_item_push reader with
@@ -66,13 +66,15 @@ module Make (Impl : IMPL) = struct
           in
           let () = R.list_pop reader in
           items
-        | Map { decode; descriptor; _ } -> (
+        | Sequence { item; construct; _ } ->
+          read_sequence item reader |> construct |> ok_or_fail
+        | Map { decode; descriptor; _ } ->
           let value = read_descriptor descriptor reader in
-          match decode value with
-          | Result.Error error -> fail error
-          | Result.Ok value -> value)
-        | Mapping items_schema ->
-          read_schema (mapping_schema items_schema) reader
+          decode value |> ok_or_fail
+        | Mapping { construct; item; _ } ->
+          read_sequence (pair_schema Schemas.string_schema item) reader
+          |> construct
+          |> ok_or_fail
         | Null -> ()
         | Nullable schema -> (
           match R.option_push reader with
@@ -168,6 +170,20 @@ module Make (Impl : IMPL) = struct
           case.decoder value
       and read_schema : type t. t Schema.t -> t reader =
        fun schema input -> read_descriptor schema.descriptor input
+      and[@inline] read_sequence : type a. a Schema.t -> a Sequence.t reader =
+       fun item reader ->
+        let _fixme = R.list_push reader in
+        let read_item reader =
+          match R.list_item_push reader with
+          | false ->
+            let () = R.list_pop reader in
+            None
+          | true ->
+            let head = read_schema item reader in
+            let () = R.list_item_pop reader in
+            Some (head, reader)
+        in
+        Base.Sequence.unfold ~init:reader ~f:read_item
       in
       read_schema schema reader |> Result.return
     with Content error -> Result.Error error
@@ -226,6 +242,13 @@ module Make (Impl : IMPL) = struct
           List.iter v ~f:(fun v -> write_schema context items_schema v writer)
         in
         W.list_pop writer
+      | Sequence { item; deconstruct; _ } ->
+        let () = W.list_push writer in
+        let () =
+          deconstruct v
+          |> Base.Sequence.iter ~f:(fun v -> write_schema context item v writer)
+        in
+        W.list_pop writer
       | Map { encode; descriptor; _ } ->
         write_descriptor context descriptor (encode v) writer
       | Null -> ()
@@ -236,8 +259,16 @@ module Make (Impl : IMPL) = struct
           let () = W.option_push writer in
           let () = write_schema context s v writer in
           W.option_pop writer)
-      | Mapping items_schema ->
-        write_schema context (mapping_schema items_schema) v writer
+      | Mapping { deconstruct; item; _ } ->
+        let () = W.list_push writer in
+        let () =
+          v
+          |> deconstruct
+          |> Base.Sequence.iter ~f:(fun (key, data) ->
+                 W.string key writer;
+                 write_schema context item data writer)
+        in
+        W.list_pop writer
       | Object { fields; encode; _ } ->
         let () = W.object_push writer in
         let () =

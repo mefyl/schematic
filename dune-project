@@ -47,8 +47,10 @@
    (and
     (>= 0.2.0)
     (< 0.3.0)))
-  landmarks
-  landmarks-ppx
+  (landmarks
+   (>= 1.5))
+  (landmarks-ppx
+   (>= 1.5))
   (ocaml
    (>= 5.2.0))
   ppxlib

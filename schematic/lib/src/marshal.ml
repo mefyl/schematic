@@ -9,11 +9,7 @@ module E = Error
 open Base
 
 type date_tuple = int * int * int [@@deriving schema]
-type ('a, 'b) pair = 'a * 'b [@@deriving schema]
 type time_local_pair = Ptime.t * int [@@deriving schema]
-
-let mapping_schema element_schema =
-  Schemas.(list_schema @@ pair_schema string_schema element_schema)
 
 let requirement_return (type a req) (req : (a, req) Schema.requirement) (v : a)
     : req =
@@ -37,6 +33,10 @@ exception Content of string
 let name = "marshal"
 let fail reason = raise (Content reason)
 let failf fmt = Fmt.kstr fail fmt
+
+let ok_or_fail = function
+  | Result.Ok result -> result
+  | Result.Error reason -> fail reason
 
 module Input = struct
   type t = {
@@ -180,13 +180,13 @@ module Input = struct
               read_items (i - 1) (head :: acc) reader
           in
           read_items size [] reader
-        | Map { decode; descriptor; _ } -> (
+        | Map { decode; descriptor; _ } ->
           let value = read_descriptor descriptor reader in
-          match decode value with
-          | Result.Error error -> fail error
-          | Result.Ok value -> value)
-        | Mapping items_schema ->
-          read_schema (mapping_schema items_schema) reader
+          decode value |> ok_or_fail
+        | Mapping { construct; item; _ } ->
+          read_sequence Schemas.(Pair.schema string_schema item) reader
+          |> construct
+          |> ok_or_fail
         | Null -> ()
         | Nullable schema ->
           if bool reader then Some (read_schema schema reader) else None
@@ -229,6 +229,8 @@ module Input = struct
             read_field fields_schema
           in
           decode_object fields
+        | Sequence { item; construct; _ } ->
+          read_sequence item reader |> construct |> ok_or_fail
         | String -> string reader
         | String_const _ -> ()
         | Time -> (
@@ -258,6 +260,16 @@ module Input = struct
             case.decoder value)
       and read_schema : type a. a Schema.t -> t -> a =
        fun schema input -> read_descriptor schema.descriptor input
+      and[@inline] read_sequence : type a. a Schema.t -> t -> a Sequence.t =
+       fun item reader ->
+        let size = int reader in
+        let read_item = function
+          | 0 -> None
+          | i ->
+            let head = read_schema item reader in
+            Some (head, i - 1)
+        in
+        Base.Sequence.unfold ~init:size ~f:read_item
       in
       read_schema schema reader |> Result.return
     with Content error -> Result.Error error
@@ -392,6 +404,10 @@ module Output = struct
       | List items_schema ->
         int (List.length v) writer;
         List.iter v ~f:(fun item -> write_schema items_schema item writer)
+      | Sequence { deconstruct; item; length; _ } ->
+        int (length v) writer;
+        deconstruct v
+        |> Base.Sequence.iter ~f:(fun v -> write_schema item v writer)
       | Map { encode; descriptor; _ } ->
         write_descriptor descriptor (encode v) writer
       | Null -> ()
@@ -401,8 +417,12 @@ module Output = struct
         | Some v ->
           bool true writer;
           write_schema schema v writer)
-      | Mapping items_schema ->
-        write_schema (mapping_schema items_schema) v writer
+      | Mapping { deconstruct; item; _ } ->
+        v
+        |> deconstruct
+        |> Base.Sequence.iter ~f:(fun (key, data) ->
+               string key writer;
+               write_schema item data writer)
       | Object { fields; encode; _ } ->
         let rec write_fields :
             type a. a Hlist.t Schema.fields -> a Hlist.t -> t -> unit =
