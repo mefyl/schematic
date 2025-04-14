@@ -1,9 +1,9 @@
 (** The marshalling format aligns everything to 8-bytes blocks to ensure we
     never half-read an int64 and have to move memory around.
 
-    JSON tags can be arbitrary, so they where picked to be the ASCII character
-    of what they denote ('S' for string, 'O' for object ...) so that binary
-    files are slightly less obfuscated. *)
+    JSON tags can be arbitrary, so they were picked to be the ASCII character of
+    what they denote ('S' for string, 'O' for object ...) so that binary files
+    are slightly less obfuscated. *)
 
 module E = Error
 open Base
