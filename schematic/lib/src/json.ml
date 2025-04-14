@@ -17,7 +17,8 @@ let rec pp f json =
       box
       @@ const string "["
          ++ (hvbox ~indent @@ (cut ++ const (list ~sep:comma pp) elements))
-         ++ cut ++ const string "]"
+         ++ cut
+         ++ const string "]"
     | `O elements ->
       box
       @@ const string "{"
@@ -28,7 +29,8 @@ let rec pp f json =
                        (box ~indent
                        @@ pair ~sep:(const string ":" ++ sp) Dump.string pp))
                     elements)
-         ++ cut ++ const string "}"
+         ++ cut
+         ++ const string "}"
   in
   pp f ()
 

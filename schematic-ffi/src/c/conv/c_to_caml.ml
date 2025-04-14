@@ -96,7 +96,8 @@ let payload_variant_to_caml
              ( Identifier.to_string constr_name,
                const pp_statements
                  ([ Fmt.str "v = caml_alloc(%d, %i)" n_fields tag ]
-                 @ stmts @ [ "break" ]) ))
+                 @ stmts
+                 @ [ "break" ]) ))
     in
     let cases =
       basic_cases @ rich_cases
@@ -110,7 +111,9 @@ let payload_variant_to_caml
     in
     let switch = block ~indent "switch (x.tag)" cases in
     const pp_statements [ p0; l1 "v" ]
-    ++ cut ++ switch ++ cut
+    ++ cut
+    ++ switch
+    ++ cut
     ++ const pp_statements [ return_val "v" ]
   in
   ("x", pp)
@@ -158,7 +161,9 @@ let poly_variant_to_caml (`Poly_variant { name; basic; rich; _ }) =
   in
   let pp =
     const pp_statements [ p0; l1 "v" ]
-    ++ cut ++ switch ++ cut
+    ++ cut
+    ++ switch
+    ++ cut
     ++ const pp_statements [ return_val "v" ]
   in
   ("x", pp)
@@ -192,7 +197,9 @@ let array_to_caml (`Array elem_type) =
   in
   let pp =
     const pp_statements [ p0; l2 "cli" "cons"; "cli = Val_emptylist" ]
-    ++ cut ++ loop ++ cut
+    ++ cut
+    ++ loop
+    ++ cut
     ++ const pp_statements [ return_val "cli" ]
   in
   ("arr", pp)
@@ -209,7 +216,9 @@ let mapped_to_caml name (`Mapped front_facing) =
   let pp =
     const pp_statements
       [ p0; l2 "v_front" "v"; {|static const value* decode = NULL|} ]
-    ++ cut ++ if_decode ++ cut
+    ++ cut
+    ++ if_decode
+    ++ cut
     ++ const pp_statements
          [
            "assert(decode != NULL)";

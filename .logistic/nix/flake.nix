@@ -51,11 +51,18 @@
                                 , extraDevPackagesQuery ? { }
                                 , extraDevPackages ? (pkgs: [ ])
                                 , extraOverlay ? (final: prev: { })
+                                , opamSourceFilterRules ? ''
+                                    *
+                                    !*.opam
+                                  ''
                                 , resolveArgsOverride ? (args: args)
                                 , extraRepos ? [ ]
                                   # Unfortunately the OCaml version must be passed explicitly because it impacts the development packages (LSP, etc.) provided by the shell.
                                 , ocamlVersion ? "5.2.0"
-                                ,
+                                , withSwift ? false
+                                  # Whether to make the shell swift-compatible.
+                                  # This isn't enabled by default as it is
+                                  # somewhat invasive (forcing the stdenv to use clang in particular)
                                 }:
         flake-utils.lib.eachDefaultSystem (
           system:
@@ -64,15 +71,16 @@
               let parsedVersion = builtins.splitVersion ocamlVersion;
               in builtins.elemAt parsedVersion 0 + "_" + builtins.elemAt parsedVersion 1;
 
-            pkgs = nixpkgs.legacyPackages.${system};
+            pkgs = import nixpkgs {
+              inherit system;
+              # Required for steam-run
+              config.allowUnfree = true;
+            };
 
             # Only keep the Opam files to maximize Nix caching
             opamFilesFilter = gitignore.lib.gitignoreFilterWith {
               basePath = path;
-              extraRules = ''
-                *
-                !*.opam
-              '';
+              extraRules = opamSourceFilterRules;
             };
             opamFiles = pkgs.lib.cleanSourceWith { src = path; filter = opamFilesFilter; };
 
@@ -129,7 +137,7 @@
                 query;
 
             overlay = final: prev: {
-              # You can add overrides here
+              # You can add overrides here or pass them from each individual `shell.nix` via `extraOverlay`.
               # To add a local, development repo (e.g. your hacked `schematic` rather than the one from Routine's `opam` repo), you can `overrideAttrs` to replace the source like this:
               #
               # schematic = prev.schematic.overrideAttrs (a: {
@@ -138,23 +146,57 @@
               # });
               #
               # Remember to update your nix-shell (e.g. with `direnv reload`) after every change in the local repo.
-              timmy-jsoo = prev.timmy-jsoo.overrideAttrs (a: { buildInputs = a.nativeBuildInputs or [ ] ++ [ pkgs.nodejs prev.logs ]; });
+              schematic-http = prev.schematic-http.overrideAttrs (a: { buildInputs = a.nativeBuildInputs or [ ] ++ [ prev.logs ]; });
+              timmy-jsoo = prev.timmy-jsoo.overrideAttrs (a: { buildInputs = a.nativeBuildInputs or [ ] ++ [ prev.logs ]; });
               timmy-unix = prev.timmy-unix.overrideAttrs (a: { buildInputs = a.buildInputs or [ ] ++ [ pkgs.tzdata prev.logs ]; });
               timmy-lwt = prev.timmy-lwt.overrideAttrs (a: { buildInputs = a.buildInputs or [ ] ++ [ prev.logs ]; });
-              schematic = prev.schematic.overrideAttrs (a: { buildInputs = a.buildInputs or [ ] ++ [ prev.logs ]; });
-              routine-controller-lib = prev.routine-controller-lib.overrideAttrs (a: { buildInputs = a.buildInputs or [ ] ++ [ pkgs.nodejs pkgs.yarn ]; });
-              routine-front-controller = prev.routine-front-controller.overrideAttrs (a: { buildInputs = a.buildInputs or [ ] ++ [ pkgs.nodejs pkgs.yarn ]; });
+              acid-jsoo = prev.acid-jsoo.overrideAttrs (a: { buildInputs = a.nativeBuildInputs or [ ] ++ [ prev.acid-lwt ]; });
+
+              # On NixOS, this looks for timezone files in a non-existent location.
               conf-tzdata = null;
+
+              # Because of our pin of cohttp 6.0.0~beta2, which is weird
+              cohttp-eio = prev.cohttp-eio.overrideAttrs (a: {
+                buildInputs = a.nativeBuildInputs or [ ] ++ [
+                  prev.uri
+                  prev.logs
+                  prev.fmt
+
+                  final.http
+                  final.cohttp
+                ];
+              });
+              cohttp = prev.cohttp.overrideAttrs (a: {
+                buildInputs = a.nativeBuildInputs or [ ] ++ [
+                  (final.http or null)
+                ];
+              });
             };
 
-            scope' = scope.overrideScope overlay;
+            scope' = scope.overrideScope (pkgs.lib.composeExtensions overlay extraOverlay);
 
-            # Packages from devPackagesQuery
             devPackages = [
               # For some reason, these packages cannot be installed via `opam-nix` as it leads to resolution conflicts 🤷 So we use the Nix packages instead.
               pkgs.ocaml-ng."ocamlPackages_${ocamlPackagesVersion}".ocamlformat_0_26_2
               pkgs.ocaml-ng."ocamlPackages_${ocamlPackagesVersion}".ocaml-lsp
               pkgs.ocaml-ng."ocamlPackages_${ocamlPackagesVersion}".merlin
+
+              # System libraries
+              pkgs.appimage-run
+              pkgs.autoconf
+              pkgs.gmp.dev
+              pkgs.libev
+              pkgs.libffi
+              pkgs.openssl.dev
+              pkgs.pkg-config
+              pkgs.postgresql
+              pkgs.sqlite
+              pkgs.steam-run
+              pkgs.zlib.dev
+
+              # JS tooling
+              pkgs.yarn
+              pkgs.nodejs
             ] ++
             builtins.attrValues
               (pkgs.lib.getAttrs (builtins.attrNames devPackagesQuery) scope');
@@ -166,26 +208,9 @@
             routine_run = pkgs.buildFHSEnv {
               name = "routine-run";
 
-              targetPkgs = pkgs: [
-                pkgs.xdg-utils
-                pkgs.glibc.bin
-                pkgs.glib
-                pkgs.iana-etc
-                pkgs.nss
-                pkgs.libdrm
-                pkgs.gtk3
-                pkgs.pango
-                pkgs.nspr
-                pkgs.dbus
-                pkgs.dbus-glib
-                pkgs.cairo
-                pkgs.xorg.libX11
-                pkgs.xorg.libXext
-                pkgs.xorg.libXfixes
-                pkgs.xorg.libXrandr
-                pkgs.xorg.libxcb
-                pkgs.xorg.libXcomposite
-              ] ++ pkgs.electron.buildInputs ++ pkgs.electron.unwrapped.buildInputs;
+              targetPkgs = pkgs:
+                (pkgs.appimageTools.defaultFhsEnvArgs.targetPkgs pkgs) ++
+                (pkgs.appimageTools.defaultFhsEnvArgs.multiPkgs pkgs);
 
               runScript = pkgs.writers.writeBash "routine-run" ''
                 executable="''${1:-./dist_electron/linux-unpacked/routine}"
@@ -202,21 +227,33 @@
               inherit pkgs;
             };
 
+            swiftPackages = let p = pkgs; in [
+              p.swift
+              p.swiftPackages.Dispatch
+              p.swiftPackages.Foundation
+              p.swift-format
+              p.swift-corelibs-libdispatch
+              p.gcc
+            ];
+
           in
           {
             legacyPackages = scope';
 
             inherit packages;
 
-            devShells.default = pkgs.mkShell {
-              NODE_OPTIONS = "--max_old_space_size=4096";
-              inputsFrom = builtins.attrValues packages;
-              buildInputs =
-                devPackages ++
-                ciPackages ++
-                (extraDevPackages pkgs) ++
-                [ routine_run ];
-            };
+            devShells.default =
+              let mkShell = if withSwift then pkgs.mkShell.override { stdenv = pkgs.clangStdenv; } else pkgs.mkShell; in
+              mkShell {
+                NODE_OPTIONS = "--max_old_space_size=4096";
+                inputsFrom = builtins.attrValues packages;
+                buildInputs =
+                  devPackages ++
+                  ciPackages ++
+                  (extraDevPackages pkgs) ++
+                  (if withSwift then swiftPackages else [ ]) ++
+                  [ routine_run ];
+              };
           }
         );
     };

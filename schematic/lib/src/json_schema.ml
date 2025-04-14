@@ -62,13 +62,11 @@ let of_schema schema =
       (make ~validation (), marks)
     | Json -> (make (), marks)
     | List schema ->
-      let schema, marks = of_schema marks schema in
-      let applicator = make_applicator ~items:(Items_schema schema) ()
-      and validation = make_validation ~type_:[ Array ] () in
-      (make ~applicator ~validation (), marks)
+      let item, marks = of_schema marks schema in
+      list_schema marks item
     | Map { descriptor; _ } -> of_descriptor marks descriptor
-    | Mapping schema ->
-      let schema, marks = of_schema marks schema in
+    | Mapping { item; _ } ->
+      let schema, marks = of_schema marks item in
       let applicator =
         make_applicator ~additionalProperties:(Properties_schema schema) ()
       and validation = make_validation ~type_:[ Object ] () in
@@ -78,15 +76,18 @@ let of_schema schema =
       let t, marks = of_descriptor marks s.descriptor in
       let type_ =
         Null :: t.validation.type_ |> List.dedup_and_sort ~compare:Poly.compare
-      and one_of =
-        match t.applicator.one_of with [] -> [] | cases -> null :: cases
+      and any_of =
+        match t.applicator.any_of with [] -> [] | cases -> null :: cases
       in
       ( {
           t with
-          applicator = { t.applicator with one_of };
+          applicator = { t.applicator with any_of };
           validation = { t.validation with type_ };
         },
         marks )
+    | Sequence { item; _ } ->
+      let item, marks = of_schema marks item in
+      list_schema marks item
     | String ->
       let validation = make_validation ~type_:[ String ] () in
       (make ~validation (), marks)
@@ -155,8 +156,8 @@ let of_schema schema =
       with
       | [ applicator ] -> (make ~applicator ~validation (), marks)
       | l ->
-        let one_of = List.map ~f:(fun applicator -> make ~applicator ()) l in
-        (make ~applicator:(make_applicator ~one_of ()) ~validation (), marks))
+        let any_of = List.map ~f:(fun applicator -> make ~applicator ()) l in
+        (make ~applicator:(make_applicator ~any_of ()) ~validation (), marks))
     | Schema.Tuple { items; _ } ->
       let fields, marks =
         let rec tuple_applicator : type u. ids -> u Schema.tuple -> t list * ids
@@ -200,15 +201,20 @@ let of_schema schema =
         in
         List.fold_map ~f ~init:marks cases
       in
-      let applicator = make_applicator ~one_of:schemas ()
+      let applicator = make_applicator ~any_of:schemas ()
       and validation =
         let f = function { validation = { type_; _ }; _ } -> type_ in
         make_validation
           ~type_:
-            (List.map ~f schemas |> List.concat
+            (List.map ~f schemas
+            |> List.concat
             |> List.dedup_and_sort ~compare:Poly.compare)
           ()
       in
       (make ~applicator ~validation (), marks)
+  and list_schema marks item =
+    let applicator = make_applicator ~items:(Items_schema item) ()
+    and validation = make_validation ~type_:[ Array ] () in
+    (make ~applicator ~validation (), marks)
   in
   of_schema (Set.empty (module String)) schema |> fst

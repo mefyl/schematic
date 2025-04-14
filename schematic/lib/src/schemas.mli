@@ -116,3 +116,12 @@ end
 
 val one_or_many_versioned : 't Schema.t -> Schema.version -> 't list Schema.t
 val one_or_many : 't Schema.t -> 't list Schema.t
+
+module Pair : sig
+  type ('a, 'b) t = 'a * 'b
+
+  val schema : 'a Schema.t -> 'b Schema.t -> ('a, 'b) t Schema.t
+
+  val schema_versioned :
+    Schema.version -> 'a Schema.t -> 'b Schema.t -> ('a, 'b) t Schema.t
+end

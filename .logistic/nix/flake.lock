@@ -3,11 +3,11 @@
     "flake-compat": {
       "flake": false,
       "locked": {
-        "lastModified": 1696426674,
-        "narHash": "sha256-kvjfFW7WAETZlt09AgDn1MrtKzP7t90Vf7vypd3OL1U=",
+        "lastModified": 1733328505,
+        "narHash": "sha256-NeCCThCEP3eCl2l/+27kNNK7QrwZB1IJCrXfrbv5oqU=",
         "owner": "edolstra",
         "repo": "flake-compat",
-        "rev": "0f9255e01c2351cc7d116c072cb317785dd33b33",
+        "rev": "ff81ac966bb2cae68946d5ed5fc4994f96d0ffec",
         "type": "github"
       },
       "original": {
@@ -106,11 +106,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1732014248,
-        "narHash": "sha256-y/MEyuJ5oBWrWAic/14LaIr/u5E0wRVzyYsouYY3W6w=",
+        "lastModified": 1743315132,
+        "narHash": "sha256-6hl6L/tRnwubHcA4pfUUtk542wn2Om+D4UnDhlDW9BE=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "23e89b7da85c3640bbc2173fe04f4bd114342367",
+        "rev": "52faf482a3889b7619003c0daec593a1912fddc1",
         "type": "github"
       },
       "original": {
@@ -133,11 +133,11 @@
         "opam2json": "opam2json"
       },
       "locked": {
-        "lastModified": 1732617437,
-        "narHash": "sha256-jj25fziYrES8Ix6HkfSiLzrN6MZjiwlHUxFSIuLRjgE=",
+        "lastModified": 1735755465,
+        "narHash": "sha256-ajcHT7JaqHWHy7cd2STB4TuQzCRf7sEfTH0waklOMB4=",
         "owner": "tweag",
         "repo": "opam-nix",
-        "rev": "ea8b9cb81fe94e1fc45c6376fcff15f17319c445",
+        "rev": "6e6a1ac0203c3595c1ffac129d9ac32d8f7989c1",
         "type": "github"
       },
       "original": {
@@ -181,11 +181,11 @@
     "opam-repository_2": {
       "flake": false,
       "locked": {
-        "lastModified": 1732546313,
-        "narHash": "sha256-binKiNZ2vhS2GeP+bL9DgTBiLk1BMxDixoU6wMDc4HA=",
+        "lastModified": 1735758653,
+        "narHash": "sha256-gqguh7QGzJCUobf10dQ7LATJdnymHYhijsGuSsMv/VM=",
         "owner": "ocaml",
         "repo": "opam-repository",
-        "rev": "dd68f43c18a7cac9646e514ea9535083973242b0",
+        "rev": "631e587f169807aaf233a49289573c1bb7c174b7",
         "type": "github"
       },
       "original": {
@@ -229,11 +229,11 @@
     "routine-opam-repository": {
       "flake": false,
       "locked": {
-        "lastModified": 1732003664,
-        "narHash": "sha256-EgBtd1Mj5Q4kupK5PZqNtgvb4F2JUANg1KQjA1nPUg8=",
+        "lastModified": 1738234584,
+        "narHash": "sha256-eu6UI3pfre5+4PLCdoOjv5aD9w1YPzuLarj8zFAl8/8=",
         "ref": "refs/heads/master",
-        "rev": "99fd3040bf962dbd5e91627067ec30c3f66e9786",
-        "revCount": 487,
+        "rev": "e9bcc915036eb3039e8ff267322aba58112069fa",
+        "revCount": 500,
         "type": "git",
         "url": "ssh://git@gitlab.routine.co/routine/opam.git"
       },

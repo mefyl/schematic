@@ -39,10 +39,14 @@ module Make (S : MARK) = struct
         let open Fmt in
         let inner : (_ * (_ * _)) Fmt.t =
          fun f (s, (v, _r)) ->
-          (const string s ++ const char ',' ++ sp ++ const char '{'
-         ++ const S.pp v ++ const char ','
-         (* XXX: cannot use Marks.pp here (unsafe module recursiveness) *)
-         ++ const string " ..."
+          (const string s
+          ++ const char ','
+          ++ sp
+          ++ const char '{'
+          ++ const S.pp v
+          ++ const char ','
+          (* XXX: cannot use Marks.pp here (unsafe module recursiveness) *)
+          ++ const string " ..."
           ++ const char '}')
             f ()
         in
@@ -82,7 +86,10 @@ module Make (S : MARK) = struct
       let open Fmt in
       let sep = const char ',' ++ sp in
       let pp =
-        const string "Marks:" ++ sp ++ const char '(' ++ list Mark.pp ~sep
+        const string "Marks:"
+        ++ sp
+        ++ const char '('
+        ++ list Mark.pp ~sep
         ++ const char ')'
       in
       pp f l

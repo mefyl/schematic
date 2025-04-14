@@ -175,7 +175,8 @@ module Make (Handler : HANDLER) = struct
         let pp_retry =
           let open Fmt in
           using (fun i -> if i <= 1 then None else Some i)
-          @@ option ~none:nop @@ fmt " (%i retries)"
+          @@ option ~none:nop
+          @@ fmt " (%i retries)"
         and retry_after = "retry-after" in
         let backoff errors uri resp =
           let log pv v =

@@ -14,7 +14,7 @@
 
 (authors "mefyl <mefyl@gruntech.org>")
 
-(version 0.20.1)
+(version 0.20.2)
 
 (homepage https://gitlab.routine.co/routine/schematic)
 
@@ -46,8 +46,10 @@
    (and
     (>= 0.2.0)
     (< 0.3.0)))
-  landmarks
-  landmarks-ppx
+  (landmarks
+   (>= 1.5))
+  (landmarks-ppx
+   (>= 1.5))
   logs
   (ocaml
    (>= 4.14.0))
@@ -89,14 +91,22 @@
   ezjsonm
   fmt
   (js_of_ocaml
-   (>= 4.0.0))
+   (and
+    (>= 4.0.0)
+    (< 6.0.0)))
   (js_of_ocaml-ppx
-   (>= 4.0.0))
+   (and
+    (>= 4.0.0)
+    (< 6.0.0)))
   landmarks
   landmarks-ppx
   (ppx_deriving :with-test)
   ppx_here
   ptime
+  (ppx_yojson
+   (and
+    (>= 1.2.0)
+    :with-test))
   (schematic
    (= :version))
   uri))
@@ -112,8 +122,8 @@
     :with-test))
   base
   fmt
-  (ppx_here :with-test)
   (ppx_deriving :with-test)
+  (ppx_here :with-test)
   (schematic
    (= :version))
   sexplib))

@@ -107,7 +107,8 @@ and c_typename c =
     Identifier.make s
 
 and tuple_name items =
-  Identifier.make @@ "tuple_"
+  Identifier.make
+  @@ "tuple_"
   ^ (items
     |> List.map ~f:(Fn.compose Identifier.to_string c_typename)
     |> String.concat ~sep:"_")

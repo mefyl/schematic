@@ -121,7 +121,8 @@ let () =
        method toString o =
          o_of_js_exn o
          |> Schematic.Json.encode o_schema
-         |> Schematic_jsoo.Json.to_string |> Js.string
+         |> Schematic_jsoo.Json.to_string
+         |> Js.string
 
        method toJs o = o_of_js_exn o |> Schematic_jsoo.Jsoo.encode o_schema
 
@@ -130,7 +131,8 @@ let () =
          @@
          let open Result in
          Schematic_jsoo.Jsoo.decode variant_schema js
-         |> decode_error "js" >>| variant_to_js
+         |> decode_error "js"
+         >>| variant_to_js
 
        method any js =
          match

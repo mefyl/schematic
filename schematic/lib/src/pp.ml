@@ -9,7 +9,8 @@ let composite_object open_ pp close =
   box
   @@ const char open_
      ++ (hvbox ~indent:1 @@ (cut ++ pp))
-     ++ cut ++ const char close
+     ++ cut
+     ++ const char close
 
 let colon fmt x = (const char ':' ++ sp) fmt x
 
@@ -37,9 +38,12 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
   | Json -> fun f json -> Json.pp f json
   | List schema -> composite_object '[' (list ~sep:semi @@ of_schema schema) ']'
   | Map { descriptor; encode; _ } -> using encode @@ of_descriptor descriptor
-  | Mapping schema ->
+  | Mapping { deconstruct; item; _ } ->
     composite_object '{'
-      (list ~sep:semi @@ pair ~sep:colon Dump.string (of_schema schema))
+      (using deconstruct
+      @@ using Base.Sequence.to_seq
+      @@ seq ~sep:semi
+      @@ pair ~sep:colon Dump.string (of_schema item))
       '}'
   | Null -> const string "()"
   | Nullable schema -> option ~none:(const string "None") (of_schema schema)
@@ -75,6 +79,13 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
         '}'
     in
     fun fmt v -> printer fmt (encode v)
+  | Sequence { deconstruct; item; _ } ->
+    composite_object '['
+      (using deconstruct
+      @@ using Base.Sequence.to_seq
+      @@ seq ~sep:semi
+      @@ of_schema item)
+      ']'
   | String -> Dump.string
   | String_const s -> const Dump.string s
   | Time -> Ptime.pp

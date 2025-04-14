@@ -41,9 +41,14 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
 
   let type_error (context : E.decoding) expected v = function
     | Some v -> Result.return v
-    | None ->
-      Result.fail @@ fail context "%s"
-      @@ type_error expected (Coding.type_name v)
+    | None -> (
+      match Coding.to_string v with
+      | Some string ->
+        Result.fail @@ fail context "expected %s, got %S" expected string
+      | None ->
+        Result.fail
+        @@ fail context "%s"
+        @@ type_error expected (Coding.type_name v))
 
   let key_get (context : E.decoding) o f =
     match Coding.key_get with
@@ -165,16 +170,30 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | List items_schema ->
           let* v = Coding.to_list v |> type_error "array" in
           map_results ~f:(decode_schema context items_schema) v
+        | Sequence { construct; item; _ } ->
+          let* items =
+            Coding.to_list v
+            |> type_error "array"
+            >>= map_results ~f:(decode_schema context item)
+          in
+          Base.Sequence.of_list items
+          |> construct
+          |> Result.map_error ~f:(fun reason -> { context with reason })
         | Map { decode = cons; descriptor; _ } ->
           decode_descriptor context descriptor v >>= fun value ->
           cons value |> Result.map_error ~f:(fun reason -> error "%s" reason)
-        | Mapping fields_schema ->
-          let* fields = Coding.to_fields v |> type_error "mapping" in
-          let f (name, value) =
-            decode_schema context fields_schema value >>= fun value ->
-            Result.return (name, value)
+        | Mapping { construct; item; _ } ->
+          let* fields =
+            let f (name, value) =
+              decode_schema context item value >>= fun value ->
+              Result.return (name, value)
+            in
+            Coding.to_fields v |> type_error "mapping" >>= map_results ~f
           in
-          map_results ~f fields
+          fields
+          |> Base.Sequence.of_list
+          |> construct
+          |> Result.map_error ~f:(fun reason -> error "%s" reason)
         | Null ->
           let res =
             match Coding.to_option v with Some None -> Some () | _ -> None
@@ -385,6 +404,14 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | List items_schema ->
           let f = encode_schema context items_schema in
           fun v -> Coding.of_list (List.map ~f v)
+        | Sequence { deconstruct; item; _ } ->
+          let f = encode_schema context item in
+          fun v ->
+            v
+            |> deconstruct
+            |> Base.Sequence.map ~f
+            |> Base.Sequence.to_list
+            |> Coding.of_list
         | Map { encode = decons; descriptor; _ } ->
           let encode = encode_descriptor context descriptor in
           fun v -> encode @@ decons v
@@ -392,10 +419,14 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | Nullable s ->
           let encode = encode_schema context s in
           fun v -> Option.map ~f:encode v |> Coding.of_option
-        | Mapping fields_schema ->
-          let encode = encode_schema context fields_schema in
+        | Mapping { deconstruct; item; _ } ->
+          let encode = encode_schema context item in
           fun v ->
-            Coding.of_fields (List.map ~f:(fun (name, v) -> (name, encode v)) v)
+            Coding.of_fields
+              (v
+              |> deconstruct
+              |> Base.Sequence.map ~f:(fun (name, v) -> (name, encode v))
+              |> Base.Sequence.to_list)
         | Object { fields; encode; _ } ->
           let f =
             Schema.Inline.value

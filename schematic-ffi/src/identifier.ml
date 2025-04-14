@@ -12,7 +12,8 @@ let reserved_names = [ "time"; "id"; "self" ]
 let make s =
   if List.mem reserved_names s ~equal:String.equal then s ^ "_"
   else
-    String.split ~on:'-' s |> String.concat ~sep:"_"
+    String.split ~on:'-' s
+    |> String.concat ~sep:"_"
     |> String.substr_replace_all ~pattern:"'" ~with_:"_sq_"
     |> String.substr_replace_all ~pattern:"\"" ~with_:"_dblq_"
 

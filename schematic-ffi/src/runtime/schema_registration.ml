@@ -25,6 +25,7 @@ let rec traverse_descriptor :
   | Coding { f } -> traverse_descriptor id (f None)
   | Fixpoint d -> traverse_descriptor id (Lazy.force d)
   | List s -> traverse_schema s
+  | Sequence { item; _ } -> traverse_schema item
   | Map { descriptor = serialized_d; encode; decode } as map_d ->
     let id : string =
       match id with
@@ -38,7 +39,7 @@ let rec traverse_descriptor :
     let id = id |> Identifier.normalize_s in
     register_map id ~serialized ~encode ~decode;
     traverse_descriptor None serialized_d
-  | Mapping s -> traverse_schema s
+  | Mapping { item; _ } -> traverse_schema item
   | Nullable s -> traverse_schema s
   | Object { fields; _ } -> traverse_fields fields
   | Tuple { items; _ } -> traverse_tuple items

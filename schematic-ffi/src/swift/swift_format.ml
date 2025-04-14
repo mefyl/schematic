@@ -33,7 +33,11 @@ let switch ?(default : unit Fmt.t option) (on : string)
     | None -> nop
   in
   const string ("switch " ^ on ^ " {")
-  ++ cut ++ cases ++ cut ++ maybe_default ++ const char '}'
+  ++ cut
+  ++ cases
+  ++ cut
+  ++ maybe_default
+  ++ const char '}'
 
 let swift_statements l = Fmt.(const (list string ~sep:cut) l)
 
@@ -48,4 +52,5 @@ let closure args body =
   let maybe_in = if List.is_empty args then nop else const string " in" in
   let args = const (list pp_arg ~sep:(const char ',')) args in
   vbox ~indent (const string "{ " ++ args ++ maybe_in ++ cut ++ vbox body)
-  ++ cut ++ const char '}'
+  ++ cut
+  ++ const char '}'

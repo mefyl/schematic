@@ -67,10 +67,11 @@ let rec encode_type ~context ~type_context core_type =
     | [%type: (string * [%t? t]) list] ->
       expanded_of_descriptor ~loc
         [%expr
-          Schema.Mapping
-            [%e
-              schema_of_expanded ~context ~loc
-              @@ encode_type ~context ~type_context t]]
+          (mapping_schema
+             [%e
+               schema_of_expanded ~context ~loc
+               @@ encode_type ~context ~type_context t])
+            .descriptor]
     (* Plain type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
       Expression

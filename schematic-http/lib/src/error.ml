@@ -24,10 +24,13 @@ let pp pp_reason f { method_; reason; status; uri } =
     let open Fmt in
     box ~indent:2
     @@ const string (Http.Method.to_string method_)
-       ++ const char ' ' ++ const Uri.pp uri
+       ++ const char ' '
+       ++ const Uri.pp uri
        ++ const
             (option (const string " (" ++ Http.Status.pp ++ const char ')'))
             status
-       ++ const char ':' ++ sp ++ const pp_reason reason
+       ++ const char ':'
+       ++ sp
+       ++ const pp_reason reason
   in
   printer f ()

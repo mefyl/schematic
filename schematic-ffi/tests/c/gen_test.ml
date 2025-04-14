@@ -655,7 +655,8 @@ let check_unordered_strings ~here name expected actual =
 module Generate_types = struct
   let test ~here schema expected =
     let actual =
-      ctypes_of_schema schema |> List.map ~f:C.export
+      ctypes_of_schema schema
+      |> List.map ~f:C.export
       |> List.map ~f:(fun gen -> "\n" ^ C.typedef_src gen)
     in
     check_unordered_strings ~here "typedefs" expected actual
@@ -723,7 +724,8 @@ end
 module Of_caml = struct
   let test ~here schema expected =
     let actual =
-      C.ctypes_of_schema schema |> List.map ~f:C.export
+      C.ctypes_of_schema schema
+      |> List.map ~f:C.export
       |> List.map ~f:(fun C.{ of_caml; _ } ->
              C.impl_src of_caml |> fun s -> "\n" ^ s ^ "\n")
     in
@@ -780,7 +782,8 @@ end
 module To_caml = struct
   let test ~here schema expected =
     let actual =
-      C.ctypes_of_schema schema |> List.map ~f:C.export
+      C.ctypes_of_schema schema
+      |> List.map ~f:C.export
       |> List.map ~f:(fun C.{ to_caml; _ } ->
              C.impl_src to_caml |> fun s -> "\n" ^ s ^ "\n")
     in

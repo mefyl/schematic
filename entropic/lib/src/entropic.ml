@@ -154,7 +154,8 @@ module Make (Entropy : Entropy.S) = struct
           add_span epoch
             (Span.of_d_ps (days, 0L) |> Option.value_exn ~here:[%here])
           |> Option.value_exn ~here:[%here]
-          |> to_date_time |> fst)
+          |> to_date_time
+          |> fst)
       | Fixpoint d -> of_descriptor size @@ Lazy.force d
       | Float -> float
       | Ignore -> return (Result.return ())
@@ -164,16 +165,19 @@ module Make (Entropy : Entropy.S) = struct
       | List d ->
         let*! len = range ~fixed:true 0 (Size.to_int size) in
         List.init len ~f:(fun _ -> of_descriptor Size.(size / len) d.descriptor)
-        |> all >>| Result.all
+        |> all
+        >>| Result.all
       | Map { decode; descriptor; _ } ->
         of_descriptor size descriptor >>=! fun v -> return (decode v)
-      | Mapping d ->
-        let*! len = range ~fixed:true 0 (Size.to_int size) in
-        List.init len ~f:(fun _ ->
-            let+! key = string
-            and+! data = of_descriptor Size.(size / len) d.descriptor in
-            (key, data))
-        |> all >>| Result.all
+      | Mapping { construct; deconstruct; item; length } ->
+        of_descriptor size
+          (Sequence
+             {
+               construct;
+               deconstruct;
+               item = Schematic.Schemas.(Pair.schema string_schema item);
+               length;
+             })
       | Null -> return (Result.return ())
       | Nullable d ->
         let*! some = bool in
@@ -222,6 +226,10 @@ module Make (Entropy : Entropy.S) = struct
           decode_fields fields
         in
         decode fields
+      | Sequence { construct; item; _ } ->
+        of_descriptor size (List item)
+        >>|! Base.Sequence.of_list
+        >>=! Fn.compose Monad.return construct
       | String -> string
       | String_const _ -> return (Result.return ())
       | Time -> time
@@ -311,11 +319,16 @@ module Make (Entropy : Entropy.S) = struct
             of_descriptor buffer d.descriptor value)
       | Map { encode; descriptor; _ } ->
         of_descriptor buffer descriptor @@ encode value
-      | Mapping d ->
-        let () = int buffer @@ List.length value in
-        List.iter value ~f:(fun (key, data) ->
-            let () = string buffer key in
-            of_descriptor buffer d.descriptor data)
+      | Mapping { construct; deconstruct; item; length } ->
+        of_descriptor buffer
+          (Sequence
+             {
+               construct;
+               deconstruct;
+               item = Schematic.Schemas.(Pair.schema string_schema item);
+               length;
+             })
+          value
       | Null -> ()
       | Nullable d -> (
         match value with
@@ -354,6 +367,11 @@ module Make (Entropy : Entropy.S) = struct
           | { requirement = Computed_optional; _ } -> ()
         in
         write_fields fields @@ encode value
+      | Sequence { deconstruct; item; _ } ->
+        value
+        |> deconstruct
+        |> Base.Sequence.to_list
+        |> of_descriptor buffer (List item)
       | String -> string buffer value
       | String_const _ -> ()
       | Time -> time buffer value

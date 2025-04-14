@@ -1,23 +1,37 @@
-type decoding = {
+module Decoding = struct
+  type t = {
+    path : string list;
+    schema : string option;
+    reason : string;
+  }
+  [@@deriving eq]
+
+  let empty = { path = []; schema = None; reason = "" }
+
+  let pp formatter { path; schema; reason } =
+    let path = match path with [] -> None | _ -> Some (List.rev path) in
+    Fmt.(
+      pf formatter "%a%a%s"
+        (option
+           (const string "path "
+           ++ list ~sep:(const char '.') string
+           ++ const string ": "))
+        path
+        (option (const string "schema " ++ string ++ const string ": "))
+        schema reason)
+
+  let to_string = Fmt.to_to_string pp
+end
+
+type decoding = Decoding.t = {
   path : string list;
   schema : string option;
   reason : string;
 }
 [@@deriving eq]
 
-let pp_decoding formatter { path; schema; reason } =
-  let path = match path with [] -> None | _ -> Some (List.rev path) in
-  Fmt.(
-    pf formatter "%a%a%s"
-      (option
-         (const string "path "
-         ++ list ~sep:(const char '.') string
-         ++ const string ": "))
-      path
-      (option (const string "schema " ++ string ++ const string ": "))
-      schema reason)
-
-let decoding_to_string = Fmt.to_to_string pp_decoding
+let pp_decoding = Decoding.pp
+let decoding_to_string = Decoding.to_string
 
 type parsing = string [@@deriving eq]
 
