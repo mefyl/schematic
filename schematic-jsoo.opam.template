@@ -1,4 +1,0 @@
-pin-depends: [
-  [ "landmarks.1.4" "git+https://github.com/routineco/landmarks.git#js" ]
-  [ "landmarks-ppx.1.4" "git+https://github.com/routineco/landmarks.git#js" ]
-]
