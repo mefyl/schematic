@@ -156,7 +156,8 @@ module Make (Entropy : Entropy.S) = struct
           add_span epoch
             (Span.of_d_ps (days, 0L) |> Option.value_exn ~here:[%here])
           |> Option.value_exn ~here:[%here]
-          |> to_date_time |> fst)
+          |> to_date_time
+          |> fst)
       | Fixpoint d -> of_descriptor size @@ Lazy.force d
       | Float -> float
       | Ignore -> return (Result.return ())
@@ -168,7 +169,8 @@ module Make (Entropy : Entropy.S) = struct
       | List d ->
         let*! len = range 0 (Size.to_int size) in
         List.init len ~f:(fun _ -> of_descriptor Size.(size / len) d.descriptor)
-        |> all >>| Result.all
+        |> all
+        >>| Result.all
       | Sequence { construct; item; _ } ->
         of_descriptor size (List item)
         >>|! Base.Sequence.of_list

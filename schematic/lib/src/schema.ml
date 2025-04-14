@@ -44,9 +44,11 @@ let rec pp_descriptor : type u. Marks.t -> u descriptor Fmt.t =
     | Json -> const string "Json"
     | List schema ->
       box ~indent
-      @@ const string "[" ++ sp
+      @@ const string "["
+         ++ sp
          ++ (box @@ const (pp marks) schema)
-         ++ sp ++ const string "]"
+         ++ sp
+         ++ const string "]"
     | Map { descriptor; _ } -> const (pp_descriptor marks) descriptor
     | Mapping { item; _ } -> const (pp marks) item
     | Null -> const string "Null"
@@ -54,9 +56,11 @@ let rec pp_descriptor : type u. Marks.t -> u descriptor Fmt.t =
       const string "Nullable (" ++ const (pp marks) s ++ const string ")"
     | Sequence { item; _ } ->
       box ~indent
-      @@ const string "[" ++ sp
+      @@ const string "["
+         ++ sp
          ++ (box @@ const (pp marks) item)
-         ++ sp ++ const string "]"
+         ++ sp
+         ++ const string "]"
     | String -> const string "String"
     | String_const v -> escape v
     | Time -> const string "Time"
@@ -65,18 +69,22 @@ let rec pp_descriptor : type u. Marks.t -> u descriptor Fmt.t =
       box
       @@ (hvbox ~indent
          @@ (const string "{" ++ sp ++ const (hvbox (pp_fields marks)) fields))
-         ++ sp ++ const string "}"
+         ++ sp
+         ++ const string "}"
     | Tuple { items; _ } ->
       box
       @@ (hvbox ~indent
          @@ (const string "[" ++ sp ++ const (hvbox (pp_tuple marks)) items))
-         ++ sp ++ const string "]"
+         ++ sp
+         ++ const string "]"
     | Union { cases; _ } ->
       box
       @@ hvbox ~indent
-           (const string "Union [" ++ sp
+           (const string "Union ["
+           ++ sp
            ++ (hvbox @@ const (hvbox (list ~sep:comma (pp_case marks))) cases))
-         ++ sp ++ const string "]"
+         ++ sp
+         ++ const string "]"
   in
   fmt f ()
 
@@ -162,7 +170,8 @@ let rec walk_fields :
         in
         walk_fields schema.descriptor f)
       cases
-    |> Result.all |> Result.map ~f:List.concat
+    |> Result.all
+    |> Result.map ~f:List.concat
   | s ->
     Result.fail (Fmt.str "inline field is not an object: %a" pp_descriptor s)
 

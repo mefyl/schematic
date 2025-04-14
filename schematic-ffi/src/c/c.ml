@@ -54,11 +54,13 @@ let h_and_c_of_ctypes ?(safety_checks = false) ~h_include
     [ Fmt.str "static const value* %s = NULL;" C_builtins.poly_compare_symbol ]
     @ (cgens |> List.map ~f:statics_src)
     |> Option.some_if safety_checks
-    |> Option.to_list |> List.concat
+    |> Option.to_list
+    |> List.concat
   in
   let c_file_contents =
     Fmt.str "#include \"%s\"" h_include
-    :: Builtins.implementations :: (statics @ user_impls)
+    :: Builtins.implementations
+    :: (statics @ user_impls)
     |> nl_concat
   in
   (header_file_contents, c_file_contents)

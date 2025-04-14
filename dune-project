@@ -116,14 +116,15 @@
  (synopsis "Derive sexps from Ocaml objects")
  (description "Encode to and from s-expressions via a schema.")
  (depends
-  (ppx_here :with-test)
-  (ppx_deriving :with-test)
-  fmt
-  base
   (alcotest
    (and
     (>= 1.1.0)
     :with-test))
+  base
+  csexp
+  fmt
+  (ppx_deriving :with-test)
+  (ppx_here :with-test)
   (schematic
    (= :version))
   sexplib))

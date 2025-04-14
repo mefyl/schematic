@@ -137,7 +137,8 @@ let helpers name schema =
     match of_js js with
     | Result.Ok event -> event
     | Result.Error e ->
-      Js_error.raise_ @@ Js_error.of_error
+      Js_error.raise_
+      @@ Js_error.of_error
       @@ new%js Js.error_constr
            (Js.string
               (Fmt.str "invalid %s: %a" name Schematic.Error.pp_decoding e))

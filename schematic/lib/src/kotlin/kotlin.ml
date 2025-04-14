@@ -508,7 +508,8 @@ module Parser = struct
         let id =
           nested_data_classes
           |> List.map ~f:(fun (case_name, _kotlin_case) -> case_name)
-          |> String.concat ~sep:"-or-" |> to_pascal_case
+          |> String.concat ~sep:"-or-"
+          |> to_pascal_case
         in
         let kotlin_type_name, _kotlin, marks =
           schema_to_kotlin_marks marks { schema with id = Some id }
@@ -945,7 +946,9 @@ module Json = struct
                      item json)
             |> Result.all
           in
-          items |> Base.Sequence.of_list |> construct
+          items
+          |> Base.Sequence.of_list
+          |> construct
           |> Result.map_error ~f:(function reason -> { context with reason })
         | json -> type_error "array" json)
       | Map { descriptor; decode = cons; _ } ->

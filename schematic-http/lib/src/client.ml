@@ -376,7 +376,8 @@ end
 let pp_retry =
   let open Fmt in
   using (fun i -> if i <= 1 then None else Some i)
-  @@ option ~none:nop @@ fmt " (%i retries)"
+  @@ option ~none:nop
+  @@ fmt " (%i retries)"
 
 module Rate_limit' (Rate : RATE_LIMIT') (Handler : HANDLER) = struct
   include Handler

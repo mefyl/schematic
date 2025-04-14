@@ -37,7 +37,10 @@ let pp pp_reason f { method_; reason; status = _; uri } =
     let open Fmt in
     box ~indent:2
     @@ const string Cohttp.Code.(string_of_method method_)
-       ++ const char ' ' ++ const Uri.pp uri ++ const char ':' ++ sp
+       ++ const char ' '
+       ++ const Uri.pp uri
+       ++ const char ':'
+       ++ sp
        ++ const pp_reason reason
   in
   printer f ()

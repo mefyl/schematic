@@ -185,7 +185,8 @@ module Input = struct
           decode value |> ok_or_fail
         | Mapping { construct; item; _ } ->
           read_sequence Schemas.(Pair.schema string_schema item) reader
-          |> construct |> ok_or_fail
+          |> construct
+          |> ok_or_fail
         | Null -> ()
         | Nullable schema ->
           if bool reader then Some (read_schema schema reader) else None
@@ -417,7 +418,8 @@ module Output = struct
           bool true writer;
           write_schema schema v writer)
       | Mapping { deconstruct; item; _ } ->
-        v |> deconstruct
+        v
+        |> deconstruct
         |> Base.Sequence.iter ~f:(fun (key, data) ->
                string key writer;
                write_schema item data writer)

@@ -73,7 +73,8 @@ module Make (Impl : IMPL) = struct
           decode value |> ok_or_fail
         | Mapping { construct; item; _ } ->
           read_sequence (pair_schema Schemas.string_schema item) reader
-          |> construct |> ok_or_fail
+          |> construct
+          |> ok_or_fail
         | Null -> ()
         | Nullable schema -> (
           match R.option_push reader with
@@ -261,7 +262,8 @@ module Make (Impl : IMPL) = struct
       | Mapping { deconstruct; item; _ } ->
         let () = W.list_push writer in
         let () =
-          v |> deconstruct
+          v
+          |> deconstruct
           |> Base.Sequence.iter ~f:(fun (key, data) ->
                  W.string key writer;
                  write_schema context item data writer)

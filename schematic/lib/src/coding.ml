@@ -46,7 +46,8 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       | Some string ->
         Result.fail @@ fail context "expected %s, got %S" expected string
       | None ->
-        Result.fail @@ fail context "%s"
+        Result.fail
+        @@ fail context "%s"
         @@ type_error expected (Coding.type_name v))
 
   let key_get (context : E.decoding) o f =
@@ -172,7 +173,8 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           map_results ~f:(decode_schema context items_schema) v
         | Sequence { construct; item; _ } ->
           let* items =
-            Coding.to_list v |> type_error "array"
+            Coding.to_list v
+            |> type_error "array"
             >>= map_results ~f:(decode_schema context item)
           in
           Base.Sequence.of_list items
@@ -189,7 +191,9 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
             in
             Coding.to_fields v |> type_error "mapping" >>= map_results ~f
           in
-          fields |> Base.Sequence.of_list |> construct
+          fields
+          |> Base.Sequence.of_list
+          |> construct
           |> Result.map_error ~f:(fun reason -> error "%s" reason)
         | Null ->
           let res =
@@ -404,7 +408,10 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | Sequence { deconstruct; item; _ } ->
           let f = encode_schema context item in
           fun v ->
-            v |> deconstruct |> Base.Sequence.map ~f |> Base.Sequence.to_list
+            v
+            |> deconstruct
+            |> Base.Sequence.map ~f
+            |> Base.Sequence.to_list
             |> Coding.of_list
         | Map { encode = decons; descriptor; _ } ->
           let encode = encode_descriptor context descriptor in
@@ -417,7 +424,8 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           let encode = encode_schema context item in
           fun v ->
             Coding.of_fields
-              (v |> deconstruct
+              (v
+              |> deconstruct
               |> Base.Sequence.map ~f:(fun (name, v) -> (name, encode v))
               |> Base.Sequence.to_list)
         | Object { fields; encode; _ } ->

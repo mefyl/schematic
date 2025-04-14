@@ -9,7 +9,8 @@ let composite_object open_ pp close =
   box
   @@ const char open_
      ++ (hvbox ~indent:1 @@ (cut ++ pp))
-     ++ cut ++ const char close
+     ++ cut
+     ++ const char close
 
 let colon fmt x = (const char ':' ++ sp) fmt x
 
@@ -39,7 +40,9 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
   | Map { descriptor; encode; _ } -> using encode @@ of_descriptor descriptor
   | Mapping { deconstruct; item; _ } ->
     composite_object '{'
-      (using deconstruct @@ using Base.Sequence.to_seq @@ seq ~sep:semi
+      (using deconstruct
+      @@ using Base.Sequence.to_seq
+      @@ seq ~sep:semi
       @@ pair ~sep:colon Dump.string (of_schema item))
       '}'
   | Null -> const string "()"
@@ -78,8 +81,10 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
     fun fmt v -> printer fmt (encode v)
   | Sequence { deconstruct; item; _ } ->
     composite_object '['
-      (using deconstruct @@ using Base.Sequence.to_seq @@ seq ~sep:semi
-     @@ of_schema item)
+      (using deconstruct
+      @@ using Base.Sequence.to_seq
+      @@ seq ~sep:semi
+      @@ of_schema item)
       ']'
   | String -> Dump.string
   | String_const s -> const Dump.string s
