@@ -66,10 +66,8 @@ module Make (Impl : IMPL) = struct
           in
           let () = R.list_pop reader in
           items
-        | Sequence { item; construct; _ } -> (
-          read_sequence item reader |> construct |> function
-          | Result.Ok result -> result
-          | Result.Error error -> failf "%s" error)
+        | Sequence { item; construct; _ } ->
+          read_sequence item reader |> construct |> ok_or_fail
         | Map { decode; descriptor; _ } ->
           let value = read_descriptor descriptor reader in
           decode value |> ok_or_fail
