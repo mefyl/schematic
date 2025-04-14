@@ -70,11 +70,9 @@ module Make (Impl : IMPL) = struct
           read_sequence item reader |> construct |> function
           | Result.Ok result -> result
           | Result.Error error -> failf "%s" error)
-        | Map { decode; descriptor; _ } -> (
+        | Map { decode; descriptor; _ } ->
           let value = read_descriptor descriptor reader in
-          match decode value with
-          | Result.Error error -> fail error
-          | Result.Ok value -> value)
+          decode value |> ok_or_fail
         | Mapping { construct; item; _ } ->
           read_sequence (pair_schema Schemas.string_schema item) reader
           |> construct |> ok_or_fail

@@ -9,7 +9,6 @@ module E = Error
 open Base
 
 type date_tuple = int * int * int [@@deriving schema]
-type ('a, 'b) pair = 'a * 'b [@@deriving schema]
 type time_local_pair = Ptime.t * int [@@deriving schema]
 
 let requirement_return (type a req) (req : (a, req) Schema.requirement) (v : a)
@@ -181,17 +180,13 @@ module Input = struct
               read_items (i - 1) (head :: acc) reader
           in
           read_items size [] reader
-        | Sequence { item; construct; _ } -> (
-          read_sequence item reader |> construct |> function
-          | Result.Ok result -> result
-          | Result.Error reason -> fail reason)
-        | Map { decode; descriptor; _ } -> (
+        | Sequence { item; construct; _ } ->
+          read_sequence item reader |> construct |> ok_or_fail
+        | Map { decode; descriptor; _ } ->
           let value = read_descriptor descriptor reader in
-          match decode value with
-          | Result.Error error -> fail error
-          | Result.Ok value -> value)
+          decode value |> ok_or_fail
         | Mapping { construct; item; _ } ->
-          read_sequence (pair_schema Schemas.string_schema item) reader
+          read_sequence Schemas.(Pair.schema string_schema item) reader
           |> construct |> ok_or_fail
         | Null -> ()
         | Nullable schema ->

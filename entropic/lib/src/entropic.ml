@@ -16,8 +16,6 @@ type json =
   ]
 [@@deriving schema]
 
-type ('a, 'b) pair = 'a * 'b [@@deriving schema]
-
 module Size : sig
   (** A type representing an integer size.
 
@@ -183,7 +181,7 @@ module Make (Entropy : Entropy.S) = struct
              {
                construct;
                deconstruct;
-               item = pair_schema Schematic.Schemas.string_schema item;
+               item = Schematic.Schemas.(Pair.schema string_schema item);
                length;
              })
       | Null -> return (Result.return ())
