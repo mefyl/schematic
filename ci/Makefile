@@ -20,7 +20,12 @@ build:
 	$(DUNE) subst
 	$(DUNE) build --profile release $(if ${DUNE_PACKAGES},--only-packages="${DUNE_PACKAGES}") --ignore-promoted-rules @install
 
+# `opam-dune-lint` does not correctly honor the global switch set via OPAMSWITCH env var, so as a workaround, we symlink `_opam`
+# See https://discuss.ocaml.org/t/opam-dune-lint-fails-on-bare-opam-initialization/16045/2
 lint:
+	ln -s /root/_opam _opam
+	opam exec -- opam-dune-lint
+	rm _opam
 	$(DUNE) build @fmt
 
 check:
@@ -34,10 +39,11 @@ package:
 	if ! test -e Dockerfile; then echo "FROM alpine" > Dockerfile; fi
 	sed '1aADD _install/ /usr/' Dockerfile > Dockerfile.package
 	docker buildx build --cache-to type=inline -f "Dockerfile.package" . -t "$(IMAGE):$$(git describe --always)"
+	echo "$(IMAGE):$$(git describe --always)"
 	docker push "$(IMAGE):$$(git describe --always)"
 	docker tag "$(IMAGE):$$(git describe --always)" "$(IMAGE):$$SLUG"
+	echo "$(IMAGE):$$SLUG"
 	docker push "$(IMAGE):$$SLUG"
-	echo "docker-image \"$(IMAGE):$$(git describe --always)\"" > metrics.txt
 
 package/clean:
 	docker rmi "$(IMAGE):$$(git describe --always)" "$(IMAGE):$$SLUG"

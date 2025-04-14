@@ -57,12 +57,12 @@ RUN ssh-keyscan gitlab.routine.co > /root/.ssh/known_hosts
 # No recursive lookup available
 ARG PACKAGES
 RUN if test -n "$PACKAGES"; then apt-get install --yes $PACKAGES; fi
-ADD .exists *.opam.extdeps /root/
+ADD .exists opam/*.opam.extdeps /root/
 # Disable automatic depexts because of incompatibility with the latest node package
 RUN apt-get install --yes libgmp-dev nodejs && opam option depext=false
 RUN opam update && \
     if EXTDEPS=$(find /root -name '*.extdeps'); then \
-      for f in /root/*.extdeps; do mv ${f} ${f%.extdeps}; done \
+      for f in $EXTDEPS; do mv ${f} ${f%.extdeps}; done \
     fi && \
     opam switch create /root --confirm-level=unsafe-yes --deps-only --with-test --with-doc && \
     opam config --switch=/root set jobs $(nproc) && \
@@ -73,7 +73,7 @@ ENV OPAMSWITCH=/root
 ARG OPAM_PACKAGES OPAM_WITHOUT_PACKAGES
 ADD .exists *.opam /root/
 RUN --mount=type=ssh \
-    opam repository add --all routine git@gitlab.routine.co:routine/opam && \
+    opam repository add --all routine git@gitlab.routine.co:routine/opam#3d611f193a7eed960981f74031045364396c19a8 && \
     opam update && \
     opam install --confirm-level=unsafe-yes --deps-only --with-test /root && \
     (if test -n "$OPAM_PACKAGES"; then opam install --confirm-level=unsafe-yes $OPAM_PACKAGES; fi) && \
