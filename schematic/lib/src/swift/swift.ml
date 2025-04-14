@@ -572,7 +572,8 @@ module Parser = struct
         let id =
           nested_data_classes
           |> List.map ~f:(fun { case_name; _ } -> case_name)
-          |> String.concat ~sep:"-or-" |> to_object_field_name
+          |> String.concat ~sep:"-or-"
+          |> to_object_field_name
         in
         let swift_type_name, _swift, marks =
           schema_to_swift_marks marks { schema with id = Some id }

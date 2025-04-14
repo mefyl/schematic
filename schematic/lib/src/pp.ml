@@ -9,7 +9,8 @@ let composite_object open_ pp close =
   box
   @@ const char open_
      ++ (hvbox ~indent:1 @@ (cut ++ pp))
-     ++ cut ++ const char close
+     ++ cut
+     ++ const char close
 
 let colon fmt x = (const char ':' ++ sp) fmt x
 

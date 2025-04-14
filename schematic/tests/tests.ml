@@ -1607,12 +1607,14 @@ struct
   let test_time_local = Alcotest.testable pp_event_local ( = )
 
   let make_time s =
-    Ptime.of_rfc3339 s |> Result.ok
+    Ptime.of_rfc3339 s
+    |> Result.ok
     |> Option.value_exn ?here:None ?error:None ?message:None
     |> fun (t, _, _) -> t
 
   let make_time_local s =
-    Ptime.of_rfc3339 s |> Result.ok
+    Ptime.of_rfc3339 s
+    |> Result.ok
     |> Option.value_exn ?here:None ?error:None ?message:None
     |> fun (t, tz, _) -> (t, Option.value_exn tz)
 

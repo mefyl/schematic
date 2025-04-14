@@ -253,6 +253,7 @@ sch_time timespec_to_sch_time(struct timespec ts) {
 }
 
 |}
-  ^ json_of_caml_builtin ^ json_to_caml_builtin
+  ^ json_of_caml_builtin
+  ^ json_to_caml_builtin
 
 let declarations = headers ^ typedefs ^ signatures

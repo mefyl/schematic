@@ -46,7 +46,8 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       | Some string ->
         Result.fail @@ fail context "expected %s, got %S" expected string
       | None ->
-        Result.fail @@ fail context "%s"
+        Result.fail
+        @@ fail context "%s"
         @@ type_error expected (Coding.type_name v))
 
   let key_get (context : E.decoding) o f =

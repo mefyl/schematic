@@ -205,9 +205,11 @@ let pp ?(indent = 2) fmt ts =
     let printer =
       let open Fmt in
       let tuple =
-        const char '[' ++ break 1 indent
+        const char '['
+        ++ break 1 indent
         ++ (hvbox @@ list ~sep:comma (hvbox (pp Delimited)))
-        ++ sp ++ const char ']'
+        ++ sp
+        ++ const char ']'
       and object_ =
         let field f (name, v, required) =
           let pp =
@@ -219,9 +221,11 @@ let pp ?(indent = 2) fmt ts =
           in
           pp f (name, v)
         in
-        const char '{' ++ break 1 indent
+        const char '{'
+        ++ break 1 indent
         ++ (hvbox @@ list ~sep:semi field)
-        ++ sp ++ const char '}'
+        ++ sp
+        ++ const char '}'
       and union =
         let pp =
           hvbox @@ list ~sep:(custom_break " | " " |") (hvbox (pp Union))
@@ -238,7 +242,8 @@ let pp ?(indent = 2) fmt ts =
       | String s -> const Dump.string s
       | Template { name; args } ->
         hbox
-        @@ const string name ++ const char '<'
+        @@ const string name
+           ++ const char '<'
            ++ const (list ~sep:comma (pp Delimited)) args
            ++ const char '>'
       | Tuple l -> const tuple l

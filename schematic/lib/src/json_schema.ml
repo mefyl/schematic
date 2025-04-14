@@ -205,7 +205,8 @@ let of_schema schema =
         let f = function { validation = { type_; _ }; _ } -> type_ in
         make_validation
           ~type_:
-            (List.map ~f schemas |> List.concat
+            (List.map ~f schemas
+            |> List.concat
             |> List.dedup_and_sort ~compare:Poly.compare)
           ()
       in

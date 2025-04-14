@@ -7,7 +7,8 @@ module String = Schematic.Coding.Make_string (struct
     include Jsoo.Impl
 
     let of_time t =
-      Ptime.to_rfc3339 t |> Js_of_ocaml.Js.string
+      Ptime.to_rfc3339 t
+      |> Js_of_ocaml.Js.string
       |> Js_of_ocaml.Js.Unsafe.coerce
 
     let to_time v =
@@ -17,7 +18,8 @@ module String = Schematic.Coding.Make_string (struct
 
     let of_time_local (t, tz_offset_s) =
       Ptime.to_rfc3339 ~tz_offset_s t
-      |> Js_of_ocaml.Js.string |> Js_of_ocaml.Js.Unsafe.coerce
+      |> Js_of_ocaml.Js.string
+      |> Js_of_ocaml.Js.Unsafe.coerce
 
     let to_time_local v =
       match to_string v with
