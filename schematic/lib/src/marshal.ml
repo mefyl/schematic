@@ -91,11 +91,6 @@ module Input = struct
     then
       failf {|expected end of input, got %c|} @@ Bytes.get t.buffer t.position
 
-  let[@inline] int16 t =
-    let () = ensure t in
-    let () = t.position <- t.position + 2 in
-    Bytes.unsafe_get_int16 t.buffer (t.position - 2)
-
   let[@inline] int64 t =
     let () = ensure t in
     let () = t.position <- t.position + 8 in
@@ -104,6 +99,11 @@ module Input = struct
   let[@inline] int t = Int64.to_int_exn (int64 t)
 
   let string t =
+    let[@inline] int16 t =
+      let () = ensure t in
+      let () = t.position <- t.position + 2 in
+      Bytes.unsafe_get_int16 t.buffer (t.position - 2)
+    in
     let string_length = int16 t in
     let input_length, padding_length = round ~header:2 string_length in
     let current = t.position in
@@ -314,11 +314,6 @@ module Output = struct
 
   let padding = Bytes.init 8 ~f:(fun _ -> '\x00')
 
-  let[@inline] int16 v t =
-    let () = ensure 2 t in
-    let () = Bytes.unsafe_set_int16 t.buffer t.position v in
-    t.position <- t.position + 2
-
   let[@inline] int64 v t =
     let () = ensure 8 t in
     let () = Bytes.unsafe_set_int64 t.buffer t.position v in
@@ -327,6 +322,11 @@ module Output = struct
   let[@inline] int v t = int64 (Int64.of_int v) t
 
   let string v t =
+    let[@inline] int16 v t =
+      let () = ensure 2 t in
+      let () = Bytes.unsafe_set_int16 t.buffer t.position v in
+      t.position <- t.position + 2
+    in
     let length = String.length v in
     let () = int16 length t in
     let size, pad = round ~header:2 length in
