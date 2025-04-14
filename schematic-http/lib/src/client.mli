@@ -3,12 +3,12 @@ include module type of Client_intf
 module Make (Handler : HANDLER) :
   S with type 'a t = 'a Handler.response and type error = Handler.error
 
-module Rate_limit (Rate : RATE_LIMIT) (Handler : HANDLER) :
+module Rate_limit (_ : RATE_LIMIT) (Handler : HANDLER) :
   HANDLER
     with type 'a response = 'a Handler.response
      and type error = Handler.error
 
-module Rate_limit' (Rate : RATE_LIMIT') (Handler : HANDLER) :
+module Rate_limit' (_ : RATE_LIMIT') (Handler : HANDLER) :
   HANDLER
     with type 'a response = 'a Handler.response
      and type error = Handler.error
@@ -32,7 +32,7 @@ val check_status_is :
 (** [With_timeout (Timeout) (Handler)] is [Handler] with timeout defaulting to
     [Timeout.v]. *)
 module With_timeout
-    (Timeout : sig
+    (_ : sig
       val v : Timmy.Span.t
     end)
     (Handler : HANDLER) :
@@ -41,7 +41,7 @@ module With_timeout
      and type error = Handler.error
 
 module With_headers
-    (Headers : sig
+    (_ : sig
       val headers : (string * string) list
     end)
     (Handler : HANDLER) :
@@ -59,8 +59,8 @@ module Map_error
   HANDLER with type 'a response = 'a Handler.response and type error = E.t
 
 module Cohttp
-    (Client : Cohttp_lwt.S.Client)
-    (Coding : Schematic.Coding.STR with type t = string) :
+    (_ : Cohttp_lwt.S.Client)
+    (_ : Schematic.Coding.STR with type t = string) :
   HANDLER with type 'a response = 'a and type error = Error.never
 
 val src : Logs.Src.t
