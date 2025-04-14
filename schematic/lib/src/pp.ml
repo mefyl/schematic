@@ -36,11 +36,6 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
   | Int64 -> int64
   | Json -> fun f json -> Json.pp f json
   | List schema -> composite_object '[' (list ~sep:semi @@ of_schema schema) ']'
-  | Sequence { deconstruct; item; _ } ->
-    composite_object '['
-      (using deconstruct @@ using Base.Sequence.to_seq @@ seq ~sep:semi
-     @@ of_schema item)
-      ']'
   | Map { descriptor; encode; _ } -> using encode @@ of_descriptor descriptor
   | Mapping { deconstruct; item; _ } ->
     composite_object '{'
@@ -81,6 +76,11 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
         '}'
     in
     fun fmt v -> printer fmt (encode v)
+  | Sequence { deconstruct; item; _ } ->
+    composite_object '['
+      (using deconstruct @@ using Base.Sequence.to_seq @@ seq ~sep:semi
+     @@ of_schema item)
+      ']'
   | String -> Dump.string
   | String_const s -> const Dump.string s
   | Time -> Ptime.pp

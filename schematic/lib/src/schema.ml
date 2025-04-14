@@ -47,16 +47,16 @@ let rec pp_descriptor : type u. Marks.t -> u descriptor Fmt.t =
       @@ const string "[" ++ sp
          ++ (box @@ const (pp marks) schema)
          ++ sp ++ const string "]"
-    | Sequence { item; _ } ->
-      box ~indent
-      @@ const string "[" ++ sp
-         ++ (box @@ const (pp marks) item)
-         ++ sp ++ const string "]"
     | Map { descriptor; _ } -> const (pp_descriptor marks) descriptor
     | Mapping { item; _ } -> const (pp marks) item
     | Null -> const string "Null"
     | Nullable s ->
       const string "Nullable (" ++ const (pp marks) s ++ const string ")"
+    | Sequence { item; _ } ->
+      box ~indent
+      @@ const string "[" ++ sp
+         ++ (box @@ const (pp marks) item)
+         ++ sp ++ const string "]"
     | String -> const string "String"
     | String_const v -> escape v
     | Time -> const string "Time"
@@ -494,7 +494,6 @@ module Walk (W : WALK) = struct
     | Int64 -> W.int64
     | Json -> W.json
     | List l -> W.list (schema l)
-    | Sequence { item; _ } -> W.list (schema item)
     | Null -> W.null
     | String -> W.string
     | Time -> W.time
@@ -502,6 +501,7 @@ module Walk (W : WALK) = struct
     | Map { descriptor = d; _ } -> W.map @@ descriptor ~id d
     | Mapping { item; _ } -> W.mapping (schema item)
     | Nullable s -> W.nullable (schema s)
+    | Sequence { item; _ } -> W.list (schema item)
     | String_const s -> W.string_const s
     | Object _ as o -> (
       let fields =
@@ -743,9 +743,6 @@ module Name = struct
     | { descriptor = List p; _ } ->
       let+ p = of_schema p in
       Name.Parametric ("list", [ p ])
-    | { descriptor = Sequence { item; _ }; _ } ->
-      let+ p = of_schema item in
-      Name.Parametric ("list", [ p ])
     | { descriptor = Map _; _ } -> None
     | { descriptor = Mapping { item; _ }; _ } ->
       let+ p = of_schema item in
@@ -755,6 +752,9 @@ module Name = struct
       let+ p = of_schema p in
       Name.Parametric ("option", [ p ])
     | { descriptor = Object _; _ } -> None
+    | { descriptor = Sequence { item; _ }; _ } ->
+      let+ p = of_schema item in
+      Name.Parametric ("list", [ p ])
     | { descriptor = String; _ } -> Some (Id "string")
     | { descriptor = String_const _; _ } -> None
     | { descriptor = Time; _ } -> Some (Id "time")

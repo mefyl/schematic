@@ -180,8 +180,6 @@ module Input = struct
               read_items (i - 1) (head :: acc) reader
           in
           read_items size [] reader
-        | Sequence { item; construct; _ } ->
-          read_sequence item reader |> construct |> ok_or_fail
         | Map { decode; descriptor; _ } ->
           let value = read_descriptor descriptor reader in
           decode value |> ok_or_fail
@@ -230,6 +228,8 @@ module Input = struct
             read_field fields_schema
           in
           decode_object fields
+        | Sequence { item; construct; _ } ->
+          read_sequence item reader |> construct |> ok_or_fail
         | String -> string reader
         | String_const _ -> ()
         | Time -> (

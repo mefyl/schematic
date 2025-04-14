@@ -64,9 +64,6 @@ let of_schema schema =
     | List schema ->
       let item, marks = of_schema marks schema in
       list_schema marks item
-    | Sequence { item; _ } ->
-      let item, marks = of_schema marks item in
-      list_schema marks item
     | Map { descriptor; _ } -> of_descriptor marks descriptor
     | Mapping { item; _ } ->
       let schema, marks = of_schema marks item in
@@ -88,6 +85,9 @@ let of_schema schema =
           validation = { t.validation with type_ };
         },
         marks )
+    | Sequence { item; _ } ->
+      let item, marks = of_schema marks item in
+      list_schema marks item
     | String ->
       let validation = make_validation ~type_:[ String ] () in
       (make ~validation (), marks)
