@@ -102,6 +102,8 @@ and _ descriptor =
       length : 'result -> int;
     }
       -> 'result descriptor
+      (** A list of values just like [List], but consumed and produced as a
+          sequence. *)
   | String : string descriptor
   | String_const : string -> unit descriptor
   | Time : Ptime.t descriptor
