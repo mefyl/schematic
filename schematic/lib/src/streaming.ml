@@ -52,7 +52,7 @@ module Make (Impl : IMPL) = struct
         | Int64 -> R.int64 reader
         | Json -> R.json reader
         | List items_schema ->
-          let _fixme = R.list_push reader in
+          let () = R.list_push reader in
           let items =
             let rec read_items acc reader =
               match R.list_item_push reader with

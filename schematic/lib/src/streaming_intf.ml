@@ -50,7 +50,7 @@ module type IMPL = sig
     val int : int reader
     val int64 : int64 reader
     val json : Ezjsonm.value reader
-    val list_push : int option reader
+    val list_push : unit reader
     val list_pop : unit reader
     val list_item_push : bool reader
     val list_item_pop : unit reader

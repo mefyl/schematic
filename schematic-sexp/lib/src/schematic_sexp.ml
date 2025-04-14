@@ -279,10 +279,7 @@ module Streaming = struct
       | Some json -> json
       | None -> fail "invalid sexp shape for JSON"
 
-    let list_push reader =
-      let () = par_l reader in
-      None
-
+    let list_push reader = par_l reader
     let list_pop = par_r
     let list_item_push reader = not @@ par_r_maybe reader
     let list_item_pop _ = ()
