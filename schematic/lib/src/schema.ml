@@ -48,10 +48,15 @@ let rec pp_descriptor : type u. Marks.t -> u descriptor Fmt.t =
          ++ (box @@ const (pp marks) schema)
          ++ sp ++ const string "]"
     | Map { descriptor; _ } -> const (pp_descriptor marks) descriptor
-    | Mapping schema -> const (pp marks) schema
+    | Mapping { item; _ } -> const (pp marks) item
     | Null -> const string "Null"
     | Nullable s ->
       const string "Nullable (" ++ const (pp marks) s ++ const string ")"
+    | Sequence { item; _ } ->
+      box ~indent
+      @@ const string "[" ++ sp
+         ++ (box @@ const (pp marks) item)
+         ++ sp ++ const string "]"
     | String -> const string "String"
     | String_const v -> escape v
     | Time -> const string "Time"
@@ -494,8 +499,9 @@ module Walk (W : WALK) = struct
     | Time -> W.time
     | Time_local -> W.time_local
     | Map { descriptor = d; _ } -> W.map @@ descriptor ~id d
-    | Mapping s -> W.mapping (schema s)
+    | Mapping { item; _ } -> W.mapping (schema item)
     | Nullable s -> W.nullable (schema s)
+    | Sequence { item; _ } -> W.list (schema item)
     | String_const s -> W.string_const s
     | Object _ as o -> (
       let fields =
@@ -630,9 +636,20 @@ let compare schema =
     | Int | Int64 -> Base.Poly.compare
     | Json -> compare_json
     | List schema -> Base.List.compare (compare schema.descriptor)
+    | Sequence { item; deconstruct; _ } ->
+      fun l r ->
+        Base.Sequence.compare (compare item.descriptor) (deconstruct l)
+          (deconstruct r)
     | Map { encode; descriptor; _ } ->
       fun l r -> compare descriptor (encode l) (encode r)
-    | Mapping schema -> assoc_compare (compare schema.descriptor)
+    | Mapping { deconstruct; item; _ } ->
+      fun l r ->
+        let compare_field (key_l, value_l) (key_r, value_r) =
+          match String.compare key_l key_r with
+          | 0 -> compare item.descriptor value_l value_r
+          | n -> n
+        in
+        Base.Sequence.compare compare_field (deconstruct l) (deconstruct r)
     | Null -> fun () () -> 0
     | Nullable s -> fun l r -> Base.Option.compare (compare s.descriptor) l r
     | String -> String.compare
@@ -727,14 +744,17 @@ module Name = struct
       let+ p = of_schema p in
       Name.Parametric ("list", [ p ])
     | { descriptor = Map _; _ } -> None
-    | { descriptor = Mapping p; _ } ->
-      let+ p = of_schema p in
+    | { descriptor = Mapping { item; _ }; _ } ->
+      let+ p = of_schema item in
       Name.Parametric ("mapping", [ p ])
     | { descriptor = Null; _ } -> Some (Id "null")
     | { descriptor = Nullable p; _ } ->
       let+ p = of_schema p in
       Name.Parametric ("option", [ p ])
     | { descriptor = Object _; _ } -> None
+    | { descriptor = Sequence { item; _ }; _ } ->
+      let+ p = of_schema item in
+      Name.Parametric ("list", [ p ])
     | { descriptor = String; _ } -> Some (Id "string")
     | { descriptor = String_const _; _ } -> None
     | { descriptor = Time; _ } -> Some (Id "time")
@@ -814,8 +834,9 @@ and descriptor_to_sexp : type a. a descriptor -> Sexp.t = function
   | Int64 -> Atom "Int64"
   | Json -> Atom "Json"
   | List s -> List [ Atom "List"; to_sexp s ]
+  | Sequence { item; _ } -> List [ Atom "List"; to_sexp item ]
   | Map { descriptor; _ } -> List [ Atom "Map"; descriptor_to_sexp descriptor ]
-  | Mapping s -> List [ Atom "Mapping"; to_sexp s ]
+  | Mapping { item; _ } -> List [ Atom "Mapping"; to_sexp item ]
   | Null -> Atom "Null"
   | Nullable s -> List [ Atom "Nullable"; to_sexp s ]
   | Object { fields; _ } -> List (Atom "Object" :: fields_to_sexp fields)

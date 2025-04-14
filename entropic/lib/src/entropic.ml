@@ -169,15 +169,21 @@ module Make (Entropy : Entropy.S) = struct
         let*! len = range 0 (Size.to_int size) in
         List.init len ~f:(fun _ -> of_descriptor Size.(size / len) d.descriptor)
         |> all >>| Result.all
+      | Sequence { construct; item; _ } ->
+        of_descriptor size (List item)
+        >>|! Base.Sequence.of_list
+        >>=! Fn.compose Monad.return construct
       | Map { decode; descriptor; _ } ->
         of_descriptor size descriptor >>=! fun v -> return (decode v)
-      | Mapping d ->
-        let*! len = range 0 (Size.to_int size) in
-        List.init len ~f:(fun _ ->
-            let+! key = string
-            and+! data = of_descriptor Size.(size / len) d.descriptor in
-            (key, data))
-        |> all >>| Result.all
+      | Mapping { construct; deconstruct; item; length } ->
+        of_descriptor size
+          (Sequence
+             {
+               construct;
+               deconstruct;
+               item = Schematic.Schemas.(Pair.schema string_schema item);
+               length;
+             })
       | Null -> return (Result.return ())
       | Nullable d ->
         let*! some = bool in

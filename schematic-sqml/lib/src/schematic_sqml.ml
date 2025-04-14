@@ -26,6 +26,7 @@ let rec atomic_type_of_descriptor :
   | Int64 -> Bigint
   | Json -> Json
   | List _ -> fail "List"
+  | Sequence _ -> fail "Sequence"
   | Null -> fail "Null"
   | String -> Text
   | Time ->
@@ -86,8 +87,8 @@ let rec type_of_descriptor :
  fun ?id descriptor ->
   match descriptor with
   | Any _ | Bool | Float | Date | Int | Ignore | Int64 | Json | List _ | Map _
-  | Mapping _ | Null | Nullable _ | String | Time | Time_local | String_const _
-  | Tuple _ | Union _ ->
+  | Mapping _ | Null | Nullable _ | Sequence _ | String | Time | Time_local
+  | String_const _ | Tuple _ | Union _ ->
     Atomic (atomic_type_of_descriptor descriptor)
   | Coding { f } -> type_of_descriptor ?id (f None)
   | Fixpoint s -> type_of_descriptor ?id (Lazy.force s)
