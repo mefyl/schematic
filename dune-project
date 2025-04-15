@@ -116,6 +116,8 @@
  (synopsis "Derive sexps from Ocaml objects")
  (description "Encode to and from s-expressions via a schema.")
  (depends
+  (csexp
+   (>= 1.5.2))
   (alcotest
    (and
     (>= 1.1.0)
