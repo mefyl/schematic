@@ -64,6 +64,27 @@ module Opt = struct
   [@@deriving eq, schema, show]
 end
 
+module Mapping = struct
+  type t = (string, int, String.comparator_witness) Map.t
+
+  let schema =
+    Schematic.Schema.make
+    @@ Mapping
+         {
+           construct =
+             Fn.compose Result.return
+             @@ Base.Map.of_sequence_exn (module String);
+           deconstruct = Base.Map.to_sequence;
+           item = [%schema: int];
+           length = Map.length;
+         }
+
+  let pp =
+    Fmt.(using Map.to_alist @@ list ~sep:semi @@ pair ~sep:comma string int)
+
+  let equal = Map.equal Int.equal
+end
+
 let () =
   let test_case name = Alcotest.test_case name `Quick in
   Alcotest.run "Schematic.Marshal"
@@ -133,6 +154,19 @@ let () =
                (module Opt)
                Opt.schema
                { a = Some 0; b = None; c = Some 1 };
+          test_case "empty dictionary"
+          @@ roundtrip ~here:[%here]
+               (module Mapping)
+               Mapping.schema
+               (Base.Map.empty (module String));
+          test_case "dictionary"
+          @@ roundtrip ~here:[%here]
+               (module Mapping)
+               Mapping.schema
+               (Base.Map.empty (module String)
+               |> Base.Map.set ~key:"one" ~data:1
+               |> Base.Map.set ~key:"two" ~data:2
+               |> Base.Map.set ~key:"three" ~data:3);
         ] );
       ("serialization data", [ test_case "trailing garbage" trailing_garbage ]);
     ]

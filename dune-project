@@ -74,7 +74,9 @@
   (dune
    (or
     (= 3.7.0)
-    (= 3.7.1)))))
+    (= 3.7.1)))
+  (acid
+   (< 0.13.0))))
 
 (package
  (name schematic-jsoo)

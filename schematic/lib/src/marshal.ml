@@ -404,10 +404,6 @@ module Output = struct
       | List items_schema ->
         int (List.length v) writer;
         List.iter v ~f:(fun item -> write_schema items_schema item writer)
-      | Sequence { deconstruct; item; length; _ } ->
-        int (length v) writer;
-        deconstruct v
-        |> Base.Sequence.iter ~f:(fun v -> write_schema item v writer)
       | Map { encode; descriptor; _ } ->
         write_descriptor descriptor (encode v) writer
       | Null -> ()
@@ -417,12 +413,10 @@ module Output = struct
         | Some v ->
           bool true writer;
           write_schema schema v writer)
-      | Mapping { deconstruct; item; _ } ->
-        v
-        |> deconstruct
-        |> Base.Sequence.iter ~f:(fun (key, data) ->
-               string key writer;
-               write_schema item data writer)
+      | Mapping { deconstruct; item; length; _ } ->
+        write_sequence
+          Schemas.(Pair.schema string_schema item)
+          (length v) (deconstruct v) writer
       | Object { fields; encode; _ } ->
         let rec write_fields :
             type a. a Hlist.t Schema.fields -> a Hlist.t -> t -> unit =
@@ -449,6 +443,8 @@ module Output = struct
             write_fields rest tail writer
         in
         write_fields fields (encode v) writer
+      | Sequence { deconstruct; item; length; _ } ->
+        write_sequence item (length v) (deconstruct v) writer
       | Tuple { items; encode; decode = _ } ->
         let rec write_items : type a. a Schema.tuple -> a -> t -> unit =
          fun items v writer ->
@@ -478,6 +474,11 @@ module Output = struct
         search 0 cases
     and write_schema : type a. a Schema.t -> a -> t -> unit =
      fun schema writer -> write_descriptor schema.descriptor writer
+    and[@inline] write_sequence :
+        type a. a Schema.t -> int -> a Sequence.t -> t -> unit =
+     fun item size v writer ->
+      let () = int size writer in
+      Base.Sequence.iter v ~f:(fun v -> write_schema item v writer)
     in
     let () = write_schema schema v writer in
     eof writer

@@ -25,3 +25,5 @@ module V0_20_2 = struct
   module Streaming = Streaming
   module Swift = Swift
 end
+
+module V0_19_9 = V0_19_8

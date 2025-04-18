@@ -39,6 +39,7 @@ depends: [
 ]
 conflicts: [
   "dune" {= "3.7.0" | = "3.7.1"}
+  "acid" {< "0.13.0"}
 ]
 build: [
   ["dune" "subst"] {dev}
