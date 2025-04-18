@@ -34,3 +34,5 @@ module V0_19_8 = struct
   module Marshal = Marshal
   module Streaming = Streaming
 end
+
+module V0_19_9 = V0_19_8
