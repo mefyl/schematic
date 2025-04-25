@@ -11,7 +11,7 @@
     The ocamlformat version (formatted as Nix wants it).
     To keep in sync with the one in .ocamlformat
   */
-, ocamlformatVersion ? "0_26_2"
+, ocamlformatVersion ? "0_27_0"
   /**
     Extra arguments passed directly to `mkShell`
   */

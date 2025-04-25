@@ -36,7 +36,7 @@ check:
 package:
 	$(DUNE) subst
 	$(DUNE) install $(if ${DUNE_PACKAGES},--only-packages="${DUNE_PACKAGES}") --prefix=_install
-	if ! test -e Dockerfile; then echo "FROM alpine" > Dockerfile; fi
+	if ! test -e Dockerfile; then echo "FROM alpine:3.21.0" > Dockerfile; fi
 	sed '1aADD _install/ /usr/' Dockerfile > Dockerfile.package
 	docker buildx build --cache-to type=inline -f "Dockerfile.package" . -t "$(IMAGE):$$(git describe --always)"
 	echo "$(IMAGE):$$(git describe --always)"
