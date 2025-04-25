@@ -52,7 +52,7 @@
     --cross-both
     bake,fmt,landmarks-ppx,ppx_deriving,ppx_hash,ppx_here,semver2
     --cross
-    base,base64,cohttp-lwt,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
+    base,base64,cohttp-lwt,csexp,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
     --local
     acid,acid-lwt,bake,hlist,metaversion,nofuture,nofuture-eio,nofuture-lwt,nofuture-lwt-unix,sqml,timmy,timmy-lwt,timmy-unix))))
 
