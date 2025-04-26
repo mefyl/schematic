@@ -146,7 +146,7 @@
   ppx_here
   (sqml
    (and
-    (>= 0.11.0)
+    (>= 0.11.1)
     (< 0.12.0)))
   (schematic
    (= :version))))

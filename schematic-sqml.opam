@@ -14,7 +14,7 @@ depends: [
   "base"
   "ppx_deriving" {with-test}
   "ppx_here"
-  "sqml" {>= "0.11.0" & < "0.12.0"}
+  "sqml" {>= "0.11.1" & < "0.12.0"}
   "schematic" {= version}
   "odoc" {with-doc}
 ]
