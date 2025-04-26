@@ -164,8 +164,8 @@ and 't parametric =
               ]}
 
               For a given [schema] with a [Some parametric], we have
-              [schema.descriptor = plain_descriptor_of_parametric schema.parametric]
-              (modulo [option] wrapping). *)
+              [schema.descriptor = plain_descriptor_of_parametric
+               schema.parametric] (modulo [option] wrapping). *)
     }
       -> 't parametric
 

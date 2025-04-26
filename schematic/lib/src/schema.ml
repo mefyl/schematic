@@ -130,8 +130,8 @@ let pp_descriptor descriptor = pp_descriptor Marks.empty descriptor
 
 type 'res walk_fields = { f : 't. 't Hlist.t fields -> 'res }
 
-let rec walk_fields :
-    type t res. t descriptor -> res walk_fields -> (res list, string) Result.t =
+let rec walk_fields : type t res.
+    t descriptor -> res walk_fields -> (res list, string) Result.t =
  fun d f ->
   match d with
   | Ignore -> Result.return [ f.f FieldEnd ]
@@ -213,8 +213,7 @@ module Make_inline (M : Base.Monad.S) = struct
     | Outline schema -> outline schema
 
   let schema desc f =
-    let rec inline :
-        type req res t.
+    let rec inline : type req res t.
         t descriptor ->
         (t, req) requirement ->
         res inline ->
@@ -232,108 +231,107 @@ module Make_inline (M : Base.Monad.S) = struct
         | Required -> inline descriptor Required f)
       | Nullable d -> inline d.descriptor Optional f
       | Object { fields; encode; _ } -> (
-        let rec inline_fields :
-            type req f.
+        let rec inline_fields : type req f.
             (f Hlist.t, req) requirement ->
             f Hlist.t fields ->
             (res list list M.t, string) Result.t =
          fun req -> function
-          | FieldEnd -> M.return [ [] ] |> Result.return
-          | Field { field; rest } when field_ignored field -> (
-            match req with
-            | Computed -> inline_fields Computed rest
-            | Computed_optional -> inline_fields Computed_optional rest
-            | Default Hlist.(_ :: tail) -> inline_fields (Default tail) rest
-            | Optional -> inline_fields Optional rest
-            | Required -> inline_fields Required rest)
-          | Field { field; rest } ->
-            let+ head =
-              let outline _schema =
-                Result.return
-                @@ let++ head =
-                     match (field.requirement, req) with
-                     | (Computed | Computed_optional | Default _ | Optional), _
-                     | Required, Required ->
-                       f.f field
-                     | Required, ((Computed | Optional) as requirement) ->
-                       f.f
-                         {
-                           description = field.description;
-                           examples = field.examples;
-                           maximum = field.maximum;
-                           minimum = field.minimum;
-                           name = field.name;
-                           omit = field.omit;
-                           requirement;
-                           schema = field.schema;
-                           title = field.title;
-                         }
-                     | Required, (Computed_optional as requirement) ->
-                       f.f
-                         {
-                           description = field.description;
-                           examples = field.examples;
-                           maximum = field.maximum;
-                           minimum = field.minimum;
-                           name = field.name;
-                           omit = field.omit;
-                           requirement;
-                           schema = field.schema;
-                           title = field.title;
-                         }
-                     | Required, Default Hlist.(head :: _) ->
-                       f.f
-                         {
-                           description = field.description;
-                           examples = field.examples;
-                           maximum = field.maximum;
-                           minimum = field.minimum;
-                           name = field.name;
-                           omit = field.omit;
-                           requirement = Default head;
-                           schema = field.schema;
-                           title = field.title;
-                         }
-                   in
-                   [ [ head ] ]
-              and inline schema =
-                let next () =
-                  match (field.requirement, req) with
-                  | (Computed | Computed_optional | Default _ | Optional), _
-                  | Required, Required ->
-                    inline schema.descriptor field.requirement f
-                  | Required, Default Hlist.(head :: _) ->
-                    inline schema.descriptor (Default head) f
-                  | Required, ((Computed | Optional) as requirement) ->
-                    inline schema.descriptor requirement f
-                  | Required, Computed_optional ->
-                    inline schema.descriptor Computed_optional f
-                in
-                match f.filter with
-                | None -> next ()
-                | Some filter -> (
-                  match filter field with
-                  | None -> next ()
-                  | Some res ->
-                    Result.return
-                    @@ let++ res in
-                       [ [ res ] ])
-              in
-              inline_try ~inline ~outline field.schema
-            and+ tail =
-              match req with
-              | Computed -> inline_fields Computed rest
-              | Computed_optional -> inline_fields Computed_optional rest
-              | Default Hlist.(_ :: tail) -> inline_fields (Default tail) rest
-              | Optional -> inline_fields Optional rest
-              | Required -> inline_fields Required rest
-            in
-            let++ head
-            and++ tail in
-            Sequence.(
-              cartesian_product (of_list head) (of_list tail)
-              |> map ~f:(fun (h, t) -> h @ t)
-              |> to_list)
+           | FieldEnd -> M.return [ [] ] |> Result.return
+           | Field { field; rest } when field_ignored field -> (
+             match req with
+             | Computed -> inline_fields Computed rest
+             | Computed_optional -> inline_fields Computed_optional rest
+             | Default Hlist.(_ :: tail) -> inline_fields (Default tail) rest
+             | Optional -> inline_fields Optional rest
+             | Required -> inline_fields Required rest)
+           | Field { field; rest } ->
+             let+ head =
+               let outline _schema =
+                 Result.return
+                 @@ let++ head =
+                      match (field.requirement, req) with
+                      | (Computed | Computed_optional | Default _ | Optional), _
+                      | Required, Required ->
+                        f.f field
+                      | Required, ((Computed | Optional) as requirement) ->
+                        f.f
+                          {
+                            description = field.description;
+                            examples = field.examples;
+                            maximum = field.maximum;
+                            minimum = field.minimum;
+                            name = field.name;
+                            omit = field.omit;
+                            requirement;
+                            schema = field.schema;
+                            title = field.title;
+                          }
+                      | Required, (Computed_optional as requirement) ->
+                        f.f
+                          {
+                            description = field.description;
+                            examples = field.examples;
+                            maximum = field.maximum;
+                            minimum = field.minimum;
+                            name = field.name;
+                            omit = field.omit;
+                            requirement;
+                            schema = field.schema;
+                            title = field.title;
+                          }
+                      | Required, Default Hlist.(head :: _) ->
+                        f.f
+                          {
+                            description = field.description;
+                            examples = field.examples;
+                            maximum = field.maximum;
+                            minimum = field.minimum;
+                            name = field.name;
+                            omit = field.omit;
+                            requirement = Default head;
+                            schema = field.schema;
+                            title = field.title;
+                          }
+                    in
+                    [ [ head ] ]
+               and inline schema =
+                 let next () =
+                   match (field.requirement, req) with
+                   | (Computed | Computed_optional | Default _ | Optional), _
+                   | Required, Required ->
+                     inline schema.descriptor field.requirement f
+                   | Required, Default Hlist.(head :: _) ->
+                     inline schema.descriptor (Default head) f
+                   | Required, ((Computed | Optional) as requirement) ->
+                     inline schema.descriptor requirement f
+                   | Required, Computed_optional ->
+                     inline schema.descriptor Computed_optional f
+                 in
+                 match f.filter with
+                 | None -> next ()
+                 | Some filter -> (
+                   match filter field with
+                   | None -> next ()
+                   | Some res ->
+                     Result.return
+                     @@ let++ res in
+                        [ [ res ] ])
+               in
+               inline_try ~inline ~outline field.schema
+             and+ tail =
+               match req with
+               | Computed -> inline_fields Computed rest
+               | Computed_optional -> inline_fields Computed_optional rest
+               | Default Hlist.(_ :: tail) -> inline_fields (Default tail) rest
+               | Optional -> inline_fields Optional rest
+               | Required -> inline_fields Required rest
+             in
+             let++ head
+             and++ tail in
+             Sequence.(
+               cartesian_product (of_list head) (of_list tail)
+               |> map ~f:(fun (h, t) -> h @ t)
+               |> to_list)
         in
         match req with
         | Computed -> inline_fields Computed fields
@@ -379,8 +377,8 @@ module Make_inline (M : Base.Monad.S) = struct
     inline desc Required f
 
   let value (f : 'res inline_v) fields =
-    let rec inline_field :
-        type req t. (t, req) field -> (req -> 'res list M.t, string) Result.t =
+    let rec inline_field : type req t.
+        (t, req) field -> (req -> 'res list M.t, string) Result.t =
      fun field ->
       let outline _schema =
         Result.return
@@ -401,8 +399,7 @@ module Make_inline (M : Base.Monad.S) = struct
         | Optional -> ( function Some v -> f v | None -> M.return [])
       in
       inline_try ~inline ~outline field.schema
-    and inline_fields :
-        type t.
+    and inline_fields : type t.
         t Hlist.t fields -> (t Hlist.t -> 'res list M.t, string) Result.t =
       function
       | FieldEnd -> Result.return (fun Hlist.[] -> M.return [])
@@ -416,8 +413,8 @@ module Make_inline (M : Base.Monad.S) = struct
             let++ head = head hd
             and++ tail = tail tl in
             head @ tail
-    and inline_descriptor :
-        type t. t descriptor -> (t -> 'res list M.t, string) Result.t = function
+    and inline_descriptor : type t.
+        t descriptor -> (t -> 'res list M.t, string) Result.t = function
       | Ignore -> Result.return (fun () -> M.return [])
       | Fixpoint d ->
         (* Break infinite recursion. Would be better to have a fixpoint here
@@ -557,9 +554,9 @@ module Walk (W : WALK) = struct
     in
     W.schema id parametric schema
 
-  and parametric :
-      type t. t parametric -> string * string list * W.t W.M.t list * W.t W.M.t
-      = function
+  and parametric : type t.
+      t parametric -> string * string list * W.t W.M.t list * W.t W.M.t =
+    function
     | Plain { name; descriptor = d } -> (name, [], [], descriptor ~id:None d)
     | Parametric { name; parameter; next } ->
       let template_name, args, eff_args, t =
@@ -668,8 +665,8 @@ let compare schema =
       fun (l, lz) (r, rz) ->
         match Int.compare lz rz with 0 -> Ptime.compare l r | v -> v)
     | Object { fields; encode; decode = _ } ->
-      let rec compare_fields :
-          type u. u Hlist.t fields -> u Hlist.t -> u Hlist.t -> int = function
+      let rec compare_fields : type u.
+          u Hlist.t fields -> u Hlist.t -> u Hlist.t -> int = function
         | Field { field = { schema; requirement; _ }; rest } ->
           let schema = field_schema schema in
           let f (type field req) (schema : field t)

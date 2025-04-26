@@ -150,15 +150,15 @@ module Make (Impl : IMPL) = struct
           let items =
             let rec decode_tuple : type t. int -> t Schema.tuple -> t =
              fun i -> function
-              | ItemEnd ->
-                let () = R.tuple_pop reader in
-                Hlist.[]
-              | Item { schema; rest } ->
-                let () = R.tuple_item_push reader in
-                let head = read_schema schema reader in
-                let () = R.tuple_item_pop reader in
-                let tail = decode_tuple (i + 1) rest in
-                Hlist.(head :: tail)
+               | ItemEnd ->
+                 let () = R.tuple_pop reader in
+                 Hlist.[]
+               | Item { schema; rest } ->
+                 let () = R.tuple_item_push reader in
+                 let head = read_schema schema reader in
+                 let () = R.tuple_item_pop reader in
+                 let tail = decode_tuple (i + 1) rest in
+                 Hlist.(head :: tail)
             in
             decode_tuple 0 items
           in
@@ -211,8 +211,8 @@ module Make (Impl : IMPL) = struct
 
   let write schema =
     let module W = Impl.Output in
-    let rec write_descriptor :
-        type t. E.decoding -> t Schema.descriptor -> t writer =
+    let rec write_descriptor : type t.
+        E.decoding -> t Schema.descriptor -> t writer =
      fun context descriptor v writer ->
       match descriptor with
       | Any (module Any) ->
@@ -272,8 +272,8 @@ module Make (Impl : IMPL) = struct
       | Object { fields; encode; _ } ->
         let () = W.object_push writer in
         let () =
-          let rec write_fields :
-              type t. t Hlist.t Schema.fields -> t Hlist.t -> unit =
+          let rec write_fields : type t.
+              t Hlist.t Schema.fields -> t Hlist.t -> unit =
            fun fields v ->
             match fields with
             | FieldEnd -> ()

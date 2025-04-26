@@ -95,8 +95,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
 
   let decode schema =
     let decode =
-      let rec decode_field :
-          type t r.
+      let rec decode_field : type t r.
           bool ->
           E.decoding ->
           string ->
@@ -141,8 +140,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           | Some v -> decode schema v
           | None -> Result.fail (fail context "missing required field %S" field)
           )
-      and decode_descriptor :
-          type t.
+      and decode_descriptor : type t.
           E.decoding ->
           t Schema.descriptor ->
           Coding.t ->
@@ -207,8 +205,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           | None -> type_error "option" None)
         | Object { fields = fields_schema; decode = o_decode; _ } ->
           let* fields = Coding.to_fields v |> type_error "object" in
-          let rec decode_object :
-              type t.
+          let rec decode_object : type t.
               t Hlist.t Schema.fields -> (t Hlist.t, E.decoding) Result.t =
             function
             | FieldEnd -> Result.return Hlist.[]
@@ -278,8 +275,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           | Result.Error (Some e) -> Result.fail (error "%s" e))
         | Tuple { items; decode = t_decode; _ } ->
           let* v = Coding.to_list v |> type_error "list" in
-          let rec decode_tuple :
-              type t.
+          let rec decode_tuple : type t.
               t Schema.tuple -> Coding.t list -> (t, E.decoding) Result.t =
            fun t v ->
             match (t, v) with
@@ -340,8 +336,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
             | Some res -> res
             | None ->
               Result.fail (error "invalid key field %S = %S" key key_value)))
-      and decode_schema :
-          type t.
+      and decode_schema : type t.
           E.decoding -> t Schema.t -> Coding.t -> (t, E.decoding) Result.t =
        fun context schema v ->
         decode_descriptor
@@ -355,8 +350,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
 
   let encode schema =
     let encode =
-      let rec encode_field :
-          type req t.
+      let rec encode_field : type req t.
           E.decoding ->
           (t, req) Schema.field ->
           req ->
@@ -376,8 +370,8 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           fun v -> if compare v default = 0 then None else Some (name, encode v)
         | Optional -> optional
         | Required -> fun v -> Some (name, encode v)
-      and encode_descriptor :
-          type t. E.decoding -> t Schema.descriptor -> t -> Coding.t =
+      and encode_descriptor : type t.
+          E.decoding -> t Schema.descriptor -> t -> Coding.t =
        fun context schema ->
         match schema with
         | Any (module Any) -> (

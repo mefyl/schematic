@@ -139,136 +139,133 @@ module Make (Entropy : Entropy.S) = struct
         (* Not a correct distribution; sue me. *)
         (n % max) + min
     in
-    let rec of_descriptor :
-        type t.
+    let rec of_descriptor : type t.
         Size.t ->
         t Schematic.Schema.descriptor ->
         Entropy.t ->
         Entropy.t * (t, string) Result.t =
      fun size -> function
-      | Bool -> bool
-      | Coding { f } -> of_descriptor size (f None)
-      | Date ->
-        let+! days = range 0 (365 * 60) in
-        Ptime.(
-          add_span epoch
-            (Span.of_d_ps (days, 0L) |> Option.value_exn ~here:[%here])
-          |> Option.value_exn ~here:[%here]
-          |> to_date_time
-          |> fst)
-      | Fixpoint d -> of_descriptor size @@ Lazy.force d
-      | Float -> float
-      | Ignore -> return (Result.return ())
-      | Int -> int
-      | Int64 -> int64
-      | Json -> of_descriptor size json_schema.descriptor
-      | List d ->
-        let*! len = range ~fixed:true 0 (Size.to_int size) in
-        List.init len ~f:(fun _ -> of_descriptor Size.(size / len) d.descriptor)
-        |> all
-        >>| Result.all
-      | Map { decode; descriptor; _ } ->
-        of_descriptor size descriptor >>=! fun v -> return (decode v)
-      | Mapping { construct; deconstruct; item; length } ->
-        of_descriptor size
-          (Sequence
-             {
-               construct;
-               deconstruct;
-               item = Schematic.Schemas.(Pair.schema string_schema item);
-               length;
-             })
-      | Null -> return (Result.return ())
-      | Nullable d ->
-        let*! some = bool in
-        if some then
-          of_descriptor (Size.decr size) d.descriptor >>|! Option.return
-        else return (Result.return None)
-      | Object { decode; fields; _ } ->
-        let size =
-          let rec fields_length :
-              type fields. fields Schematic.Schema.fields -> int = function
-            | FieldEnd -> 0
-            | Field { rest; _ } -> 1 + fields_length rest
-          in
-          Size.(size / fields_length fields)
-        in
-        let+! fields =
-          let rec decode_fields :
-              type fields.
-              fields Hlist.t Schematic.Schema.fields ->
-              (fields Hlist.t, string) Result.t Monad.t = function
-            | FieldEnd -> return (Result.return Hlist.[])
-            | Field { field; rest } ->
-              let+! field = decode_field field
-              and+! rest = decode_fields rest in
-              Hlist.(field :: rest)
-          and decode_field :
-              type t req.
-              (t, req) Schematic.Schema.field -> (req, string) Result.t Monad.t
-              = function
-            | { requirement = Default _; schema; _ } ->
-              of_descriptor size
-                (Schematic.Schema.field_schema schema).descriptor
-            | { requirement = Optional; schema; _ } ->
-              let*! some = bool in
-              if some then
-                of_descriptor size
-                  (Schematic.Schema.field_schema schema).descriptor
-                >>|! Option.return
-              else return (Result.return None)
-            | { requirement = Required; schema; _ } ->
-              of_descriptor size
-                (Schematic.Schema.field_schema schema).descriptor
-            | { requirement = Computed; _ } -> return (Result.Ok None)
-            | { requirement = Computed_optional; _ } -> return (Result.Ok None)
-          in
-          decode_fields fields
-        in
-        decode fields
-      | Sequence { construct; item; _ } ->
-        of_descriptor size (List item)
-        >>|! Base.Sequence.of_list
-        >>=! Fn.compose Monad.return construct
-      | String -> string
-      | String_const _ -> return (Result.return ())
-      | Time -> time
-      | Time_local ->
-        let+! time
-        and+! offset =
-          (* FIXME: some timezone have half hours offset *) range (-12) 12
-        in
-        (time, offset * 3600)
-      | Tuple { decode; items; _ } ->
-        let size =
-          let rec items_length : type items. items Schematic.Schema.tuple -> int
-              = function
-            | ItemEnd -> 0
-            | Item { rest; _ } -> 1 + items_length rest
-          in
-          Size.(size / items_length items)
-        in
-        let+! items =
-          let rec decode_items :
-              type items.
-              items Hlist.t Schematic.Schema.tuple ->
-              (items Hlist.t, string) Result.t Monad.t = function
-            | ItemEnd -> return (Result.return Hlist.[])
-            | Item { schema; rest } ->
-              let+! item = of_descriptor size schema.descriptor
-              and+! rest = decode_items rest in
-              Hlist.(item :: rest)
-          in
-          decode_items items
-        in
-        decode items
-      | Union { cases; _ } ->
-        let*! pick = range 0 List.(length cases) in
-        let (Case { schema; decoder; _ }) = List.nth_exn cases pick in
-        let+! value = of_descriptor (Size.decr size) schema.descriptor in
-        decoder value
-      | Any (module Coding) ->
-        (* FIXME *) return (Result.return (Coding.null ()))
+       | Bool -> bool
+       | Coding { f } -> of_descriptor size (f None)
+       | Date ->
+         let+! days = range 0 (365 * 60) in
+         Ptime.(
+           add_span epoch
+             (Span.of_d_ps (days, 0L) |> Option.value_exn ~here:[%here])
+           |> Option.value_exn ~here:[%here]
+           |> to_date_time
+           |> fst)
+       | Fixpoint d -> of_descriptor size @@ Lazy.force d
+       | Float -> float
+       | Ignore -> return (Result.return ())
+       | Int -> int
+       | Int64 -> int64
+       | Json -> of_descriptor size json_schema.descriptor
+       | List d ->
+         let*! len = range ~fixed:true 0 (Size.to_int size) in
+         List.init len ~f:(fun _ ->
+             of_descriptor Size.(size / len) d.descriptor)
+         |> all
+         >>| Result.all
+       | Map { decode; descriptor; _ } ->
+         of_descriptor size descriptor >>=! fun v -> return (decode v)
+       | Mapping { construct; deconstruct; item; length } ->
+         of_descriptor size
+           (Sequence
+              {
+                construct;
+                deconstruct;
+                item = Schematic.Schemas.(Pair.schema string_schema item);
+                length;
+              })
+       | Null -> return (Result.return ())
+       | Nullable d ->
+         let*! some = bool in
+         if some then
+           of_descriptor (Size.decr size) d.descriptor >>|! Option.return
+         else return (Result.return None)
+       | Object { decode; fields; _ } ->
+         let size =
+           let rec fields_length : type fields.
+               fields Schematic.Schema.fields -> int = function
+             | FieldEnd -> 0
+             | Field { rest; _ } -> 1 + fields_length rest
+           in
+           Size.(size / fields_length fields)
+         in
+         let+! fields =
+           let rec decode_fields : type fields.
+               fields Hlist.t Schematic.Schema.fields ->
+               (fields Hlist.t, string) Result.t Monad.t = function
+             | FieldEnd -> return (Result.return Hlist.[])
+             | Field { field; rest } ->
+               let+! field = decode_field field
+               and+! rest = decode_fields rest in
+               Hlist.(field :: rest)
+           and decode_field : type t req.
+               (t, req) Schematic.Schema.field -> (req, string) Result.t Monad.t
+               = function
+             | { requirement = Default _; schema; _ } ->
+               of_descriptor size
+                 (Schematic.Schema.field_schema schema).descriptor
+             | { requirement = Optional; schema; _ } ->
+               let*! some = bool in
+               if some then
+                 of_descriptor size
+                   (Schematic.Schema.field_schema schema).descriptor
+                 >>|! Option.return
+               else return (Result.return None)
+             | { requirement = Required; schema; _ } ->
+               of_descriptor size
+                 (Schematic.Schema.field_schema schema).descriptor
+             | { requirement = Computed; _ } -> return (Result.Ok None)
+             | { requirement = Computed_optional; _ } -> return (Result.Ok None)
+           in
+           decode_fields fields
+         in
+         decode fields
+       | Sequence { construct; item; _ } ->
+         of_descriptor size (List item)
+         >>|! Base.Sequence.of_list
+         >>=! Fn.compose Monad.return construct
+       | String -> string
+       | String_const _ -> return (Result.return ())
+       | Time -> time
+       | Time_local ->
+         let+! time
+         and+! offset =
+           (* FIXME: some timezone have half hours offset *) range (-12) 12
+         in
+         (time, offset * 3600)
+       | Tuple { decode; items; _ } ->
+         let size =
+           let rec items_length : type items.
+               items Schematic.Schema.tuple -> int = function
+             | ItemEnd -> 0
+             | Item { rest; _ } -> 1 + items_length rest
+           in
+           Size.(size / items_length items)
+         in
+         let+! items =
+           let rec decode_items : type items.
+               items Hlist.t Schematic.Schema.tuple ->
+               (items Hlist.t, string) Result.t Monad.t = function
+             | ItemEnd -> return (Result.return Hlist.[])
+             | Item { schema; rest } ->
+               let+! item = of_descriptor size schema.descriptor
+               and+! rest = decode_items rest in
+               Hlist.(item :: rest)
+           in
+           decode_items items
+         in
+         decode items
+       | Union { cases; _ } ->
+         let*! pick = range 0 List.(length cases) in
+         let (Case { schema; decoder; _ }) = List.nth_exn cases pick in
+         let+! value = of_descriptor (Size.decr size) schema.descriptor in
+         decoder value
+       | Any (module Coding) ->
+         (* FIXME *) return (Result.return (Coding.null ()))
     in
     of_descriptor (Size.of_int size) schema.Schematic.Schema.descriptor entropy
     |> snd
@@ -291,8 +288,8 @@ module Make (Entropy : Entropy.S) = struct
       let () = byte buffer @@ Char.of_int_exn @@ String.length v in
       Buffer.add_string buffer v
     and time buffer v = float buffer @@ Ptime.to_float_s v in
-    let rec of_descriptor :
-        type t. Buffer.t -> t Schematic.Schema.descriptor -> t -> unit =
+    let rec of_descriptor : type t.
+        Buffer.t -> t Schematic.Schema.descriptor -> t -> unit =
      fun buffer descriptor value ->
       match descriptor with
       | Bool -> bool buffer value
@@ -337,8 +334,7 @@ module Make (Entropy : Entropy.S) = struct
           let () = bool buffer true in
           of_descriptor buffer d.descriptor value)
       | Object { encode; fields; _ } ->
-        let rec write_fields :
-            type fields.
+        let rec write_fields : type fields.
             fields Hlist.t Schematic.Schema.fields -> fields Hlist.t -> unit =
          fun descriptor fields ->
           match (descriptor, fields) with
@@ -346,8 +342,8 @@ module Make (Entropy : Entropy.S) = struct
           | Field { field; rest }, head :: tail ->
             let () = write_field field head in
             write_fields rest tail
-        and write_field :
-            type t req. (t, req) Schematic.Schema.field -> req -> unit =
+        and write_field : type t req.
+            (t, req) Schematic.Schema.field -> req -> unit =
          fun descriptor field ->
           match descriptor with
           | { requirement = Default _; schema; _ } ->
@@ -379,8 +375,7 @@ module Make (Entropy : Entropy.S) = struct
         let () = time buffer @@ fst value in
         byte buffer @@ Char.of_int_exn (snd value / 3600)
       | Tuple { encode; items; _ } ->
-        let rec write_items :
-            type items.
+        let rec write_items : type items.
             items Hlist.t Schematic.Schema.tuple -> items Hlist.t -> unit =
          fun items value ->
           match (items, value) with

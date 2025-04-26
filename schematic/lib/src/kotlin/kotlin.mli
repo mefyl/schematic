@@ -8,7 +8,8 @@ val of_packed_schemas : Schema.pack list -> t list
 (** [pp fmt t] outputs the Kotlin type declarations, annotated with Kotlinx
     serialization support, for [t] to [fmt].
 
-    This only prints the type declarations in itself, not the required imports. *)
+    This only prints the type declarations in itself, not the required imports.
+*)
 val pp : Format.formatter -> t -> unit
 
 (** [pp_file ?package fmt ts] outputs a full, compiling Kotlin file content,
@@ -17,7 +18,8 @@ val pp : Format.formatter -> t -> unit
 
     All basic type imports are also included (e.g. [LocalDate]).
 
-    If [package] is provided, the file content includes a [package] statement. *)
+    If [package] is provided, the file content includes a [package] statement.
+*)
 val pp_file : ?package:string -> Format.formatter -> t list -> unit
 
 (** [to_json schema a] encodes [a] into JSON using [schema]. Compatibility is

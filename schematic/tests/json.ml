@@ -52,9 +52,9 @@ module Pretty_print = struct
 }|};
     check ~here:[%here] "overflow-item"
       (`O
-        [
-          ("a", `Float 0.123); ("b", `String "1.123456789"); ("c", `Bool false);
-        ])
+         [
+           ("a", `Float 0.123); ("b", `String "1.123456789"); ("c", `Bool false);
+         ])
       {|{
    "a": 0.123,
    "b":

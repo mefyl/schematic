@@ -47,7 +47,8 @@ let to_pascal_case s =
 let to_camel_case s = to_pascal_case s |> String.uncapitalize
 
 (** Reserved keywords in Swift. See
-    https://docs.swift.org/swift-book/documentation/the-swift-programming-language/lexicalstructure/#Keywords-and-Punctuation *)
+    https://docs.swift.org/swift-book/documentation/the-swift-programming-language/lexicalstructure/#Keywords-and-Punctuation
+*)
 let swift_reserved_words =
   Set.of_list
     (module String)
@@ -181,8 +182,8 @@ type swift_type =
   | Simple of string  (** E.g. [Foo] *)
   | Generic of string * swift_type list
       (** E.g.
-          [Generic ("Bar", [Generic ("List", [Simple "Boolean"]); Simple "String"])]
-          is [Bar<List<Boolean>, String>] *)
+          [Generic ("Bar", [Generic ("List", [Simple "Boolean"]); Simple
+           "String"])] is [Bar<List<Boolean>, String>] *)
 [@@deriving show]
 
 type swift_struct = {
@@ -267,8 +268,8 @@ module Parser = struct
       - the Swift type expression of this [schema]
       - the input [marks] enhanced with additional Swift type expressions found
         while parsing [schema]. *)
-  let rec schema_to_swift_marks :
-      type a. Marks.t -> a Schema.t -> string option * swift * Marks.t =
+  let rec schema_to_swift_marks : type a.
+      Marks.t -> a Schema.t -> string option * swift * Marks.t =
    fun marks ({ id; descriptor; parametric } as schema) ->
     let () =
       Logs.debug (fun m ->
@@ -329,8 +330,8 @@ module Parser = struct
       failwith
       @@ Fmt.str "Not yet supported: %s for schema %a" s Schema.pp schema
 
-  and descriptor_to_swift_marks :
-      type a. Marks.t -> a Schema.descriptor -> swift * Marks.t =
+  and descriptor_to_swift_marks : type a.
+      Marks.t -> a Schema.descriptor -> swift * Marks.t =
    fun marks descriptor ->
     match descriptor with
     | Any (module Coding) -> raise (NotYetImplemented "Any")
@@ -457,8 +458,8 @@ module Parser = struct
     let swift = Atom (Generic ("Swift.Array", [ swift_type ])) in
     (swift, marks)
 
-  and tuple_to_swift_marks :
-      type a. Marks.t -> a Schema.tuple -> swift_type * Marks.t =
+  and tuple_to_swift_marks : type a.
+      Marks.t -> a Schema.tuple -> swift_type * Marks.t =
     let tuple_element_to_swift_type marks schema =
       let type_name, swift, marks = schema_to_swift_marks marks schema in
       let swift_type = type_name_and_swift_to_swift_type_exn type_name swift in
@@ -493,8 +494,8 @@ module Parser = struct
       | _ ->
         raise (NotYetImplemented "Only tuples of 2 or 3 elements are supported")
 
-  and parametric_to_swift_marks :
-      type a. Marks.t -> a Schema.parametric -> swift_type list * Marks.t =
+  and parametric_to_swift_marks : type a.
+      Marks.t -> a Schema.parametric -> swift_type list * Marks.t =
    fun marks parametric ->
     match parametric with
     | Plain { name; descriptor } ->
@@ -511,8 +512,7 @@ module Parser = struct
       in
       (Simple name :: other_types, marks)
 
-  and object_fields_to_swift_marks :
-      type a.
+  and object_fields_to_swift_marks : type a.
       Marks.t -> a Hlist.t Schema.fields -> (string * swift_type) list * Marks.t
       =
    fun marks fields ->
@@ -541,8 +541,7 @@ module Parser = struct
       let swift_fields, marks = object_fields_to_swift_marks marks rest in
       (swift_field :: swift_fields, marks)
 
-  and object_field_to_swift_marks :
-      type t req.
+  and object_field_to_swift_marks : type t req.
       Marks.t -> (t, req) Schema.field -> (string * swift_type) * Marks.t =
    fun marks
        {
@@ -616,7 +615,8 @@ module Parser = struct
     Marks.Done (Enum { generics = []; cases })
 end
 
-(** Module responsible for generating actual Swift code from the parser result. *)
+(** Module responsible for generating actual Swift code from the parser result.
+*)
 module Generator = struct
   let original_pp_swift_type = pp_swift_type
 
@@ -909,8 +909,8 @@ module Json = struct
           | Some res -> res
           | None -> Fmt.failwith "unmatched variant case in schema")
 
-    and encode_tuple :
-        type t. t Hlist.t Schema.tuple -> t Hlist.t -> Ezjsonm.value =
+    and encode_tuple : type t.
+        t Hlist.t Schema.tuple -> t Hlist.t -> Ezjsonm.value =
      fun items items_hlist ->
       match (items, items_hlist) with
       | ( Item
@@ -940,8 +940,7 @@ module Json = struct
       | _, _ ->
         raise (NotYetImplemented "Only tuples of 2 or 3 elements are supported")
 
-    and encode_fields :
-        type t.
+    and encode_fields : type t.
         t Hlist.t Schema.fields -> t Hlist.t -> (string * Ezjsonm.value) list =
      fun fields fields_hlist ->
       match (fields, fields_hlist) with
@@ -973,8 +972,8 @@ module Json = struct
         let encoded_tail = encode_fields rest fields_hlist_rest in
         encoded_head :: encoded_tail
 
-    and encode_field :
-        type t req. (t, req) Schema.field -> req -> string * Ezjsonm.value =
+    and encode_field : type t req.
+        (t, req) Schema.field -> req -> string * Ezjsonm.value =
      fun { name; requirement; schema; _ } ->
       let name = to_object_field_name name in
       let encode = encode (Schema.field_schema schema) in
@@ -1012,14 +1011,12 @@ module Json = struct
       | Optional -> Some v
       | Required -> v
 
-    let rec decode :
-        type t.
+    let rec decode : type t.
         E.decoding -> t Schema.t -> Ezjsonm.value -> (t, E.decoding) Result.t =
      fun context { id; descriptor; _ } json ->
       decode_descriptor { context with schema = id } descriptor json
 
-    and decode_descriptor :
-        type t.
+    and decode_descriptor : type t.
         E.decoding ->
         t Schema.descriptor ->
         Ezjsonm.value ->
@@ -1063,10 +1060,12 @@ module Json = struct
       | Ignore -> Fn.const (Ok ())
       | Int -> (
         function
-        | `Float f -> Ok (Float.to_int f) | json -> type_error "int" json)
+        | `Float f -> Ok (Float.to_int f)
+        | json -> type_error "int" json)
       | Int64 -> (
         function
-        | `Float f -> Ok (Float.to_int64 f) | json -> type_error "int64" json)
+        | `Float f -> Ok (Float.to_int64 f)
+        | json -> type_error "int64" json)
       | Json -> fun json -> Ok json
       | List sub_schema -> (
         function
@@ -1111,7 +1110,8 @@ module Json = struct
              })
       | Null -> (
         function
-        | `O [ ("Unit", `O []) ] -> Ok () | json -> type_error "null" json)
+        | `O [ ("Unit", `O []) ] -> Ok ()
+        | json -> type_error "null" json)
       | Nullable schema -> (
         function
         | `O [ ("value", `Null) ] -> Ok None
@@ -1190,8 +1190,7 @@ module Json = struct
           Ok (decoder decoded_value)
         | json -> type_error "object with a type matching the enum case" json)
 
-    and decode_tuple :
-        type t tuple.
+    and decode_tuple : type t tuple.
         E.decoding ->
         (tuple Hlist.t -> t) ->
         tuple Hlist.t Schema.tuple ->
@@ -1247,8 +1246,7 @@ module Json = struct
                 Json.pp json;
           }
 
-    and decode_fields :
-        type t.
+    and decode_fields : type t.
         E.decoding ->
         t Hlist.t Schema.fields ->
         (string * Ezjsonm.value) list ->
@@ -1270,8 +1268,7 @@ module Json = struct
           let* decoded_rest = decode_fields context rest_fields json_fields in
           Ok Hlist.(decoded_head :: decoded_rest))
 
-    and decode_field :
-        type t req.
+    and decode_field : type t req.
         E.decoding ->
         (t, req) Schema.field ->
         (string * Ezjsonm.value) list ->
