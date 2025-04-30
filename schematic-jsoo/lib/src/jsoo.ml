@@ -12,7 +12,10 @@ let date_of_js (date : Js.Unsafe.any) =
 let js_of_date (y, m, d) : Js.Unsafe.any =
   new%js Js.date_day y (m - 1) d |> Js.Unsafe.coerce
 
-let js_of_ptime t = new%js Js.date_fromTimeValue (Ptime.to_float_s t *. 1000.)
+let js_of_ptime t =
+  new%js Js.date_fromTimeValue
+    (Js.number_of_float (Ptime.to_float_s t *. 1000.))
+
 let ( == ) = Base.phys_equal
 let ( let+ ) = Option.( >>| )
 

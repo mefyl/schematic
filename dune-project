@@ -95,11 +95,11 @@
   (js_of_ocaml
    (and
     (>= 4.0.0)
-    (< 6.0.0)))
+    (< 7.0.0)))
   (js_of_ocaml-ppx
    (and
     (>= 4.0.0)
-    (< 6.0.0)))
+    (< 7.0.0)))
   landmarks
   landmarks-ppx
   (ppx_deriving :with-test)
