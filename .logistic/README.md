@@ -16,6 +16,8 @@ To `dune pkg`-ify a repository, both for local builds and the CI, one only need 
 * Add  `(include .logistic/dune.inc)` in the root `dune` file.
 * Touch a `cross.flags` at the root. This file may contain flags to be
   passed to `dune_sak` for cross compilation.
+* Symlink `.logistic/dune-workspace` to `dune-workspace` if access to
+  Routine's internal opam repository is needed.
 
 
 ## Releasing a new version

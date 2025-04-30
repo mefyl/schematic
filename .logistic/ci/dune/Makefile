@@ -37,9 +37,7 @@ package:
 	docker push "$(IMAGE):$$(git describe --always)"
 	docker tag "$(IMAGE):$$(git describe --always)" "$(IMAGE):$$SLUG"
 	docker push "$(IMAGE):$$SLUG"
-	echo "docker-image \"$(IMAGE):$$(git describe --always)\"" > metrics.txt
-
-package/clean:
+	echo "Pushed Docker image: \"$(IMAGE):$$(git describe --always)\"" 
 	docker rmi "$(IMAGE):$$(git describe --always)" "$(IMAGE):$$SLUG"
 
 image/%:
