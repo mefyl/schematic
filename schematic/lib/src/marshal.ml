@@ -96,7 +96,10 @@ module Input = struct
     let () = t.position <- t.position + 8 in
     Bytes.unsafe_get_int64 t.buffer (t.position - 8)
 
-  let[@inline] int t = Int64.to_int_exn (int64 t)
+  let[@inline] int t =
+    match Int64.to_int_exn (int64 t) with
+    | res -> res
+    | exception Failure reason -> fail reason
 
   let string t =
     let[@inline] int16 t =
