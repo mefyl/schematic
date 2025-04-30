@@ -24,10 +24,12 @@ depends: [
   "base-unix" {= "base"}
   "base64" {= "3.5.1"}
   "bigstringaf" {= "0.10.0"}
+  "camlp-streams" {= "5.0.1" & with-doc}
   "cmdliner" {= "1.3.0"}
   "cohttp" {= "6.1.0"}
   "cohttp-eio" {= "6.1.0"}
   "cppo" {= "1.8.0"}
+  "crunch" {= "4.0.0" & with-doc}
   "csexp" {= "1.5.2"}
   "cstruct" {= "6.2.0"}
   "domain-local-await" {= "1.0.1"}
@@ -39,14 +41,13 @@ depends: [
   "eio_posix" {= "1.2" & with-test}
   "ezjsonm" {= "1.3.0"}
   "fmt" {= "0.10.0"}
+  "fpath" {= "0.7.3" & with-doc}
   "gen" {= "1.1"}
   "hex" {= "1.5.0"}
   "hmap" {= "0.8.1"}
   "http" {= "6.1.0"}
   "iomux" {= "0.3" & with-test}
-  "js_of_ocaml" {= "5.9.1"}
-  "js_of_ocaml-compiler" {= "5.9.1"}
-  "js_of_ocaml-ppx" {= "5.9.1"}
+  "js_of_ocaml-compiler" {= "6.0.1"}
   "jsonm" {= "1.0.2"}
   "landmarks" {= "1.5"}
   "landmarks-ppx" {= "1.5"}
@@ -68,6 +69,8 @@ depends: [
   "ocamlbuild" {= "0.16.1"}
   "ocamlfind" {= "1.9.8"}
   "ocplib-endian" {= "1.2"}
+  "odoc" {= "3.0.0" & with-doc}
+  "odoc-parser" {= "3.0.0" & with-doc}
   "optint" {= "0.3.0"}
   "ppx_derivers" {= "1.2.1"}
   "ppx_deriving" {= "6.0.3"}
@@ -78,6 +81,7 @@ depends: [
   "psq" {= "0.2.1"}
   "ptime" {= "1.2.0"}
   "re" {= "1.12.0"}
+  "result" {= "1.5" & with-doc}
   "sedlex" {= "3.4"}
   "semver2" {= "1.2.0"}
   "seq" {= "base"}
@@ -86,6 +90,7 @@ depends: [
   "stringext" {= "1.6.0"}
   "thread-table" {= "1.0.0"}
   "topkg" {= "1.0.8"}
+  "tyxml" {= "4.6.0" & with-doc}
   "uri" {= "4.4.0"}
   "uri-sexp" {= "4.4.0"}
   "uring" {= "0.9" & with-test}
