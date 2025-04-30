@@ -90,6 +90,13 @@ let () =
   let open Cmdliner in
   let generate =
     let generate name local cross_both cross_exclude cross_only =
+      let cross_enabled =
+        not
+          (List.is_empty cross_both
+          && List.is_empty cross_exclude
+          && List.is_empty cross_only
+          && List.is_empty local)
+      in
       let* repository, packages =
         let* description = run [| "dune"; "describe"; "opam-files" |] in
         match Sexplib.Sexp.parse description with
@@ -194,17 +201,13 @@ let () =
                 ];
             ]
         in
-
-        List
-          [
-            Atom "alias";
-            List [ Atom "name"; Atom "default" ];
-            List [ Atom "deps" ];
-          ]
-        :: opam_rule ~source:"../" ""
-        :: List.concat
-             (List.map cross_toolchains ~f:(fun toolchain ->
-                  [ cross_rule toolchain; opam_rule ("-" ^ toolchain) ]))
+        let host_opam_rule = opam_rule ~source:"../" "" in
+        if cross_enabled then
+          host_opam_rule
+          :: List.concat
+               (List.map cross_toolchains ~f:(fun toolchain ->
+                    [ cross_rule toolchain; opam_rule ("-" ^ toolchain) ]))
+        else [ host_opam_rule ]
       in
       List.map ~f:generate packages
       |> List.concat
