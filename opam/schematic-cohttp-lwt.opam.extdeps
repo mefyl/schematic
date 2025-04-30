@@ -28,6 +28,7 @@ depends: [
   "bigstringaf" {= "0.10.0"}
   "bos" {= "0.2.1" & with-test}
   "ca-certs" {= "1.0.1" & with-test}
+  "camlp-streams" {= "5.0.1" & with-doc}
   "cmdliner" {= "1.3.0"}
   "cohttp" {= "6.1.0"}
   "cohttp-eio" {= "6.1.0" & with-test}
@@ -40,6 +41,7 @@ depends: [
   "conf-gmp-powm-sec" {= "4" & with-test}
   "conf-pkg-config" {= "4" & with-test}
   "cppo" {= "1.8.0"}
+  "crunch" {= "4.0.0" & with-doc}
   "csexp" {= "1.5.2"}
   "cstruct" {= "6.2.0"}
   "digestif" {= "1.3.0" & with-test}
@@ -64,9 +66,7 @@ depends: [
   "iomux" {= "0.3" & with-test}
   "ipaddr" {= "5.6.0"}
   "ipaddr-sexp" {= "5.6.0" & with-test}
-  "js_of_ocaml" {= "5.9.1"}
-  "js_of_ocaml-compiler" {= "5.9.1"}
-  "js_of_ocaml-ppx" {= "5.9.1"}
+  "js_of_ocaml-compiler" {= "6.0.1"}
   "jsonm" {= "1.0.2"}
   "kdf" {= "1.0.0" & with-test}
   "landmarks" {= "1.5"}
@@ -96,6 +96,8 @@ depends: [
   "ocamlbuild" {= "0.16.1"}
   "ocamlfind" {= "1.9.8"}
   "ocplib-endian" {= "1.2"}
+  "odoc" {= "3.0.0" & with-doc}
+  "odoc-parser" {= "3.0.0" & with-doc}
   "ohex" {= "0.2.0" & with-test}
   "optint" {= "0.3.0" & with-test}
   "ppx_derivers" {= "1.2.1"}
@@ -107,6 +109,7 @@ depends: [
   "psq" {= "0.2.1" & with-test}
   "ptime" {= "1.2.0"}
   "re" {= "1.12.0"}
+  "result" {= "1.5" & with-doc}
   "rresult" {= "0.7.0" & with-test}
   "sedlex" {= "3.4"}
   "semver2" {= "1.2.0"}
@@ -116,6 +119,7 @@ depends: [
   "stringext" {= "1.6.0"}
   "thread-table" {= "1.0.0" & with-test}
   "topkg" {= "1.0.8"}
+  "tyxml" {= "4.6.0" & with-doc}
   "uri" {= "4.4.0"}
   "uri-sexp" {= "4.4.0"}
   "uring" {= "0.9" & with-test}

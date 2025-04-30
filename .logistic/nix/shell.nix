@@ -19,14 +19,14 @@
 }:
 let
   ci-packages = import ./ci-packages.nix { inherit pkgs; };
+
+  dune-preview = (import srcs.flake-compat { src = srcs.dune; }).outputs.packages.${pkgs.system}.dune-experimental;
 in
 pkgs.mkShell
   ({
     packages = [
       # Base OCaml tooling
-      pkgs.ocaml
-      pkgs.dune_3
-      pkgs.opam
+      dune-preview
 
       # Dev tooling
       pkgs."ocamlformat_${ocamlformatVersion}"

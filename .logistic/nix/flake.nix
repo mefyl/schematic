@@ -51,7 +51,9 @@
           # { acid = "*"; logs = "0.7.0"; }
         , extraDevPackagesQuery ? { }
         , extraDevPackages ? (pkgs: [ ])
-        , extraOverlay ? (final: prev: { })
+        # An extra overlay applied to the OCaml packages set.
+        # The first argument is the global pkgs set, the two other ones are the standard overlay arguments for the OCaml pkg set.
+        , extraOCamlOverlay ? (pkgs: final: prev: { })
           # Regexes to filter in the opam files to pick
         , opamFilesRegexes ? [ "^.*\\.opam$" ]
         , resolveArgsOverride ? (args: args)
@@ -132,7 +134,7 @@
                 query;
 
             overlay = final: prev: {
-              # You can add overrides here or pass them from each individual `shell.nix` via `extraOverlay`.
+              # You can add overrides here or pass them from each individual `shell.nix` via `extraOCamlOverlay`.
               # To add a local, development repo (e.g. your hacked `schematic` rather than the one from Routine's `opam` repo), you can `overrideAttrs` to replace the source like this:
               #
               # schematic = prev.schematic.overrideAttrs (a: {
@@ -235,9 +237,12 @@
               routine-metrics = prev.routine-metrics.overrideAttrs (a: {
                 doCheck = false;
               });
+              routine-crdt = prev.routine-crdt.overrideAttrs (a: {
+                doCheck = false;
+              });
             };
 
-            scope' = scope.overrideScope (pkgs.lib.composeExtensions overlay extraOverlay);
+            scope' = scope.overrideScope (pkgs.lib.composeExtensions overlay (extraOCamlOverlay pkgs));
 
             devPackages = [
               # For some reason, these packages cannot be installed via `opam-nix` as it leads to resolution conflicts 🤷 So we use the Nix packages instead.
