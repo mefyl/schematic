@@ -23,15 +23,15 @@ module Tests = Test_utils.Tests.Make (struct
   (** In a later MR we will call the roundtrip test here *)
   let extra_test
       (Test_utils.Tests.Test
-        {
-          here;
-          schema;
-          kotlin_class_name;
-          is_kotlin_roundtrip_enabled;
-          value;
-          value_testable;
-          _;
-        }) _encoded =
+         {
+           here;
+           schema;
+           kotlin_class_name;
+           is_kotlin_roundtrip_enabled;
+           value;
+           value_testable;
+           _;
+         }) _encoded =
     if is_kotlin_roundtrip_enabled then
       let kotlin_datatype =
         Option.map schema.id ~f:(fun schema_id ->

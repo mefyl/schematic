@@ -19,7 +19,9 @@ let safety_checks_for name ~fname ~argname =
              ])
       in
       const pp_statements [ Fmt.str "%s = true" checking ]
-      ++ cut ++ if_inner ++ cut
+      ++ cut
+      ++ if_inner
+      ++ cut
       ++ const pp_statements
            [
              Fmt.str {|printf("checking type %a\n")|} Identifier.pp name;
@@ -70,7 +72,11 @@ let pp_of_caml_converter ?(safety_checks = false) ((name : Identifier.t), ast) =
       | [ x ] -> const pp_statements [ l1 x ] ++ cut
       | _ -> failwith "CAMLlocalN with n > 1 unsupported yet"
     in
-    caml_params ++ caml_locals ++ const safety_checks () ++ body ++ cut
+    caml_params
+    ++ caml_locals
+    ++ const safety_checks ()
+    ++ body
+    ++ cut
     ++ const pp_statements [ return_t return_type "res" ]
   in
   let decl = signature ~return_type ~fname ~argtype:"value" ~argname in

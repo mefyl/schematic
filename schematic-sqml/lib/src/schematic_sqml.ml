@@ -1,7 +1,6 @@
 open Acid
 
-let rec atomic_type_of_descriptor :
-    type t.
+let rec atomic_type_of_descriptor : type t.
     ?id:string ->
     t Schematic.Schema.descriptor ->
     t Sqml.Expression.Column.Type.atomic =
@@ -26,6 +25,7 @@ let rec atomic_type_of_descriptor :
   | Int64 -> Bigint
   | Json -> Json
   | List _ -> fail "List"
+  | Sequence _ -> fail "Sequence"
   | Null -> fail "Null"
   | String -> Text
   | Time ->
@@ -48,8 +48,7 @@ let rec atomic_type_of_descriptor :
 and atomic_type_of_schema Schematic.Schema.{ descriptor; id; _ } =
   atomic_type_of_descriptor ?id descriptor
 
-let rec types_of_fields :
-    type l.
+let rec types_of_fields : type l.
     l Hlist.t Schematic.Schema.fields -> l Sqml.Expression.Column.Type.List.t =
   function
   | Field { field = { name; requirement; schema; _ }; rest } -> (
@@ -70,24 +69,22 @@ let rec types_of_fields :
       Fmt.failwith "sqml: cannot bind computed field %S" name)
   | FieldEnd -> []
 
-let rec hlist_of_fields :
-    type l. l Hlist.t Schematic.Schema.fields -> l Hlist.t -> l Hlist.t =
-  function
+let rec hlist_of_fields : type l.
+    l Hlist.t Schematic.Schema.fields -> l Hlist.t -> l Hlist.t = function
   | Field { field = _; rest } ->
     let rest = hlist_of_fields rest in
     fun (hd :: tl) -> hd :: rest tl
   | FieldEnd -> fun [] -> []
 
-let rec type_of_descriptor :
-    type t.
+let rec type_of_descriptor : type t.
     ?id:string ->
     t Schematic.Schema.descriptor ->
     t Sqml.Expression.Column.Type.t =
  fun ?id descriptor ->
   match descriptor with
   | Any _ | Bool | Float | Date | Int | Ignore | Int64 | Json | List _ | Map _
-  | Mapping _ | Null | Nullable _ | String | Time | Time_local | String_const _
-  | Tuple _ | Union _ ->
+  | Mapping _ | Null | Nullable _ | Sequence _ | String | Time | Time_local
+  | String_const _ | Tuple _ | Union _ ->
     Atomic (atomic_type_of_descriptor descriptor)
   | Coding { f } -> type_of_descriptor ?id (f None)
   | Fixpoint s -> type_of_descriptor ?id (Lazy.force s)

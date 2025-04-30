@@ -409,7 +409,7 @@ struct
     minor : int;
     subminor : int;
   }
-  [@@deriving schema]
+  [@@deriving eq, schema]
 
   let pp_version fmt { major; minor; subminor } =
     Fmt.pf fmt "%i.%i.%i" major minor subminor
@@ -797,13 +797,118 @@ struct
   module List = struct
     let objects =
       let mk_test name value expected =
+        let test schema =
+          Test
+            {
+              name;
+              here = [%here];
+              decoded = None;
+              value_testable = Alcotest.list test_version;
+              schema;
+              value;
+              expected;
+              kotlin_class_name = None;
+              is_kotlin_roundtrip_enabled =
+                false
+                (* Cannot find by reflection the class name for a list of X *);
+              swift_class_name = None;
+              is_swift_roundtrip_enabled = false;
+            }
+        in
+        [
+          test @@ list_schema version_schema;
+          test
+          @@ Schematic.Schema.make
+          @@ Sequence
+               {
+                 construct = Fn.compose Result.return Base.Sequence.to_list;
+                 deconstruct = Base.Sequence.of_list;
+                 item = version_schema;
+                 length = List.length;
+               };
+        ]
+      in
+      {
+        name = "list";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          List.concat
+            [
+              mk_test "list" [] [%ezjsonm []];
+              mk_test "list"
+                [ { major = 0; minor = 1; subminor = 2 } ]
+                [%ezjsonm [ { major = 0; minor = 1; subminor = 2 } ]];
+              mk_test "list"
+                [
+                  { major = 0; minor = 1; subminor = 2 };
+                  { major = 3; minor = 4; subminor = 5 };
+                  { major = 6; minor = 7; subminor = 8 };
+                ]
+                [%ezjsonm
+                  [
+                    { major = 0; minor = 1; subminor = 2 };
+                    { major = 3; minor = 4; subminor = 5 };
+                    { major = 6; minor = 7; subminor = 8 };
+                  ]];
+            ];
+      }
+
+    let option =
+      let mk_test name value expected =
         Test
           {
             name;
             here = [%here];
             decoded = None;
-            value_testable = Alcotest.list test_version;
-            schema = list_schema version_schema;
+            value_testable = Alcotest.(list (option int));
+            schema = list_schema (option_schema int_schema);
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled =
+              false
+              (* Cannot find by reflection the class name for a list of X *);
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = false;
+          }
+      in
+      {
+        name = "option list";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            mk_test "empty" [] [%ezjsonm []];
+            mk_test "some" [ Some 1; Some 2; Some 3 ] [%ezjsonm [ 1; 2; 3 ]];
+            mk_test "none" [ None; None; None ] [%ezjsonm [ None; None; None ]];
+            mk_test "mixed" [ Some 1; None; Some 3 ] [%ezjsonm [ 1; None; 3 ]];
+          ];
+      }
+  end
+
+  module Mapping = struct
+    module T = struct
+      type t = (string * version) list [@@deriving eq, schema, show]
+    end
+
+    let objects =
+      let mk_test name value expected =
+        Test
+          {
+            name;
+            here = [%here];
+            decoded = None;
+            value_testable = (module T);
+            schema =
+              Schema.make
+              @@ Mapping
+                   {
+                     construct = Fn.compose Result.return Base.Sequence.to_list;
+                     deconstruct = Base.Sequence.of_list;
+                     item = version_schema;
+                     length = Stdlib.List.length;
+                   };
             value;
             expected;
             kotlin_class_name = None;
@@ -820,22 +925,17 @@ struct
         additional_test = None;
         tests =
           [
-            mk_test "list" [] [%ezjsonm []];
-            mk_test "list"
-              [ { major = 0; minor = 1; subminor = 2 } ]
-              [%ezjsonm [ { major = 0; minor = 1; subminor = 2 } ]];
-            mk_test "list"
+            mk_test "empty" [] (`O []);
+            mk_test "filled"
               [
-                { major = 0; minor = 1; subminor = 2 };
-                { major = 3; minor = 4; subminor = 5 };
-                { major = 6; minor = 7; subminor = 8 };
+                ("one", { major = 0; minor = 1; subminor = 2 });
+                ("two", { major = 3; minor = 4; subminor = 5 });
               ]
               [%ezjsonm
-                [
-                  { major = 0; minor = 1; subminor = 2 };
-                  { major = 3; minor = 4; subminor = 5 };
-                  { major = 6; minor = 7; subminor = 8 };
-                ]];
+                {
+                  one = { major = 0; minor = 1; subminor = 2 };
+                  two = { major = 3; minor = 4; subminor = 5 };
+                }];
           ];
       }
 
@@ -1607,12 +1707,14 @@ struct
   let test_time_local = Alcotest.testable pp_event_local ( = )
 
   let make_time s =
-    Ptime.of_rfc3339 s |> Result.ok
+    Ptime.of_rfc3339 s
+    |> Result.ok
     |> Option.value_exn ?here:None ?error:None ?message:None
     |> fun (t, _, _) -> t
 
   let make_time_local s =
-    Ptime.of_rfc3339 s |> Result.ok
+    Ptime.of_rfc3339 s
+    |> Result.ok
     |> Option.value_exn ?here:None ?error:None ?message:None
     |> fun (t, tz, _) -> (t, Option.value_exn tz)
 
@@ -2103,7 +2205,7 @@ struct
             (fun () ->
               test ~here:[%here] "missing" Recursive.schema
                 {|{"value":0,"next":{"value":1,"next":{"value":"nope"}}}|}
-                {|path next.next.value: expected integer, got string|});
+                {|path next.next.value: expected integer, got "nope"|});
       }
   end
 
@@ -2624,6 +2726,7 @@ struct
             alias;
             List.objects;
             List.option;
+            Mapping.objects;
             Parametric.simple;
             Parametric.anonymous;
             Gadt.simple;

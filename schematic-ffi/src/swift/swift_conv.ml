@@ -160,11 +160,14 @@ let of_c_case ~all_basic ~swift_type_name ~c_variant_name ~c_constructor_name
         if List.is_empty intermediate_stmts then nop
         else const (list ~sep:cut string) intermediate_stmts ++ cut
       in
-      payload_let pointee ++ cut ++ inter
+      payload_let pointee
+      ++ cut
+      ++ inter
       ++ const string (Fmt.str "let res = %s(%s)" qualified_swift_constr params)
       ++ cut
       ++ const string "free(UnsafeMutableRawPointer(c.payload))"
-      ++ cut ++ const string "return res"
+      ++ cut
+      ++ const string "return res"
   in
   (c_case |> Identifier.to_string, pp)
 
@@ -228,7 +231,8 @@ let array_conv_decl ?(always_specialize = false) c : unit Fmt.t * unit Fmt.t =
            (const string
               (Fmt.str "data.advanced(by: i).initialize(to: %s)"
                  (to_c_expr ~c_type:c ~c_expr:"x")))
-      ++ cut ++ const string "return "
+      ++ cut
+      ++ const string "return "
       ++ invoke_named tname
            [ ("len", const string "x.count"); ("data", const string "data") ]
     else const string @@ to_c_expr ~c_type:(`Array c) ~c_expr:"x"
@@ -236,7 +240,8 @@ let array_conv_decl ?(always_specialize = false) c : unit Fmt.t * unit Fmt.t =
   let of_c_body =
     if (not always_specialize) && (is_tuple c || is_array c) then
       const string "typealias Element = "
-      ++ const pp_swift_type c ++ cut
+      ++ const pp_swift_type c
+      ++ cut
       ++ swift_statements
            [ {|assert(c.len >= 0)|}; {|if c.len == 0 { return [] }|} ]
       ++ cut
@@ -266,7 +271,8 @@ let option_conv_decl c =
         const string
           (Fmt.str "let c: %s = %s" (Swiftify.C_type.c c)
              (to_c_expr ~c_type:c ~c_expr:"x"))
-        ++ cut ++ const string "return "
+        ++ cut
+        ++ const string "return "
         ++ invoke_named constructor_name
              [
                ("tag", const string (some_tag |> Identifier.to_string));

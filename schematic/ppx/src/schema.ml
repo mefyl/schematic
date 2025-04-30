@@ -67,10 +67,11 @@ let rec encode_type ~context ~type_context core_type =
     | [%type: (string * [%t? t]) list] ->
       expanded_of_descriptor ~loc
         [%expr
-          Schema.Mapping
-            [%e
-              schema_of_expanded ~context ~loc
-              @@ encode_type ~context ~type_context t]]
+          (mapping_schema
+             [%e
+               schema_of_expanded ~context ~loc
+               @@ encode_type ~context ~type_context t])
+            .descriptor]
     (* Plain type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
       Expression
@@ -157,8 +158,7 @@ and tuple_items ~context ~type_context types =
   in
   [%expr [%e items]]
 
-and combinator :
-    type f.
+and combinator : type f.
     loc:location ->
     f list ->
     (int -> f -> location * label) ->
@@ -552,8 +552,7 @@ let close ~configuration:_ ~context ~type_context schema =
                   {
                     txt = param_prefix ^ schema_anonymous_name_versioned i;
                     loc;
-                  }] ->
-            [%e exp]]
+                  }] -> [%e exp]]
       | t, _ ->
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: unsupported type parameter B %a" Pprintast.core_type t

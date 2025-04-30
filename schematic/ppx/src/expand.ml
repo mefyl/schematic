@@ -245,12 +245,11 @@ let add ~inside ~jsoo ~version =
           |> Schema.schema_of_expanded ~context ~loc
         in
         [%expr
-          begin
+          begin [@warning "-unused-open"]
             let open Schematic.Schemas in
             let __schematic_version _ = None in
             [%e schema]
-          end
-          [@warning "-unused-open"]]
+          end]
       in
       Extension.V3.declare "schema" Extension.Context.expression extracter
         expand

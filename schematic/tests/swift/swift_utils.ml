@@ -23,15 +23,15 @@ module Tests = Test_utils.Tests.Make (struct
   (** In a later MR we will call the roundtrip test here *)
   let extra_test
       (Test_utils.Tests.Test
-        {
-          here;
-          schema;
-          swift_class_name;
-          is_swift_roundtrip_enabled;
-          value;
-          value_testable;
-          _;
-        }) _encoded =
+         {
+           here;
+           schema;
+           swift_class_name;
+           is_swift_roundtrip_enabled;
+           value;
+           value_testable;
+           _;
+         }) _encoded =
     if is_swift_roundtrip_enabled then
       let swift_datatype =
         schema.id

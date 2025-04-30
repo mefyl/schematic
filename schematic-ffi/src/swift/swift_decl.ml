@@ -114,8 +114,15 @@ let type_decl fmt (c_name, ts) =
           of_c body
         in
         let body =
-          associated_typealias ++ cut ++ fields_decl ++ cut
-          ++ public_initializer ++ cut ++ to_c ++ cut ++ of_c
+          associated_typealias
+          ++ cut
+          ++ fields_decl
+          ++ cut
+          ++ public_initializer
+          ++ cut
+          ++ to_c
+          ++ cut
+          ++ of_c
         in
         block ~indent
           (Fmt.str "public struct %s: CConvertible" swift_type_name)
@@ -168,8 +175,13 @@ let type_decl fmt (c_name, ts) =
           |> of_c
         in
         let body : unit Fmt.t =
-          associated_typealias ++ cut ++ case_decls basic rich ++ cut ++ to_c
-          ++ cut ++ of_c
+          associated_typealias
+          ++ cut
+          ++ case_decls basic rich
+          ++ cut
+          ++ to_c
+          ++ cut
+          ++ of_c
         in
         block ~indent
           (Fmt.str "public enum %s: CConvertible" swift_type_name)

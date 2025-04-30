@@ -21,5 +21,7 @@ module V0_20_1 = V0_20_0
 
 module V0_20_2 = struct
   include V0_20_1
+  module Marshal = Marshal
+  module Streaming = Streaming
   module Swift = Swift
 end

@@ -59,7 +59,8 @@ let payload_variant_of_caml
       (Some
          (const pp_statements
             (assert_block_size "v" (List.length accessor_stmts)
-            @ accessor_stmts @ [ "break" ])))
+            @ accessor_stmts
+            @ [ "break" ])))
       fmt ()
   in
   let rich_case =
@@ -69,7 +70,8 @@ let payload_variant_of_caml
         (const string "switch (Tag_val(v)) {"
         ++ cut
         ++ const (list ~sep:cut case) x)
-      ++ cut ++ const char '}'
+      ++ cut
+      ++ const char '}'
     in
     const pp_statements
       [
@@ -77,7 +79,8 @@ let payload_variant_of_caml
         "res.tag = n_basic + Tag_val(v)";
         "res.payload = malloc(sizeof(*res.payload))";
       ]
-    ++ cut ++ switch
+    ++ cut
+    ++ switch
   in
   let open Fmt in
   ( [],
@@ -92,7 +95,8 @@ let payload_variant_of_caml
       ++ vbox ~indent (const string "if (Is_long(v)) {" ++ cut ++ plain_case)
       ++ cut
       ++ vbox ~indent (const string "} else {" ++ cut ++ rich_case)
-      ++ cut ++ const char '}') )
+      ++ cut
+      ++ const char '}') )
 
 let plain_variant_of_caml name (`Variant ({ basic; _ } : regular_variant)) =
   let pp =
@@ -150,20 +154,27 @@ let poly_variant_of_caml name
               "res.payload = malloc(sizeof(*res.payload))";
             ])
         ++ cut
-        ++ (const string "if (0) {}" ++ cut ++ elses ++ cut
+        ++ (const string "if (0) {}"
+           ++ cut
+           ++ elses
+           ++ cut
            ++ const string "else assert(0);")
       in
       let rich = block ~indent "else if (Is_block(v))" body in
       basic ++ cut ++ rich
   in
   let if_else_chain =
-    const string "if (0) {}" ++ cut ++ elses ++ cut
+    const string "if (0) {}"
+    ++ cut
+    ++ elses
+    ++ cut
     ++ const string "else assert(0);"
   in
   let init = if basic_only then "-1" else "{.tag = -1, .payload = NULL}" in
   let pp =
     const pp_statements [ Fmt.str "%a res = %s" Identifier.pp name init ]
-    ++ cut ++ if_else_chain
+    ++ cut
+    ++ if_else_chain
   in
   ([], pp)
 
@@ -187,7 +198,8 @@ let array_of_caml (`Array elem_type) =
   in
   let set_for =
     block ~indent "for (int64_t i = 0; i < res.len; i++)"
-      (const pp_statements @@ assert_block_size "l" 2
+      (const pp_statements
+      @@ assert_block_size "l" 2
       @ [
           Fmt.str "res.data[i] = %a(%s)" Identifier.pp
             (of_caml_name_for_c elem_type)
@@ -202,10 +214,13 @@ let array_of_caml (`Array elem_type) =
           (array_name elem_type);
         "l = v";
       ]
-    ++ cut ++ length_while ++ cut
+    ++ cut
+    ++ length_while
+    ++ cut
     ++ const pp_statements
          [ "l = v"; "res.data = malloc(sizeof(*res.data) * res.len)" ]
-    ++ cut ++ set_for
+    ++ cut
+    ++ set_for
   in
   ([ "l" ], pp)
 
@@ -231,7 +246,9 @@ let mapped_of_caml name (`Mapped front_facing) =
   in
   let pp =
     const pp_statements [ {|static const value* encode = NULL|} ]
-    ++ cut ++ if_encode ++ cut
+    ++ cut
+    ++ if_encode
+    ++ cut
     ++ const pp_statements
          [
            "assert(encode != NULL)";

@@ -29,6 +29,7 @@ let pp_debug_descriptor : type a. a Schema.descriptor Fmt.t =
   | Null -> "Null"
   | Nullable _ -> "Nullable"
   | Object _ -> "Object"
+  | Sequence _ -> "Sequence"
   | String -> "String"
   | String_const _ -> "String_const"
   | Time -> "Time"
@@ -97,8 +98,8 @@ type kotlin_type =
   | Simple of string  (** E.g. [Foo] *)
   | Generic of string * kotlin_type list
       (** E.g.
-          [Generic ("Bar", [Generic ("List", [Simple "Boolean"]); Simple "String"])]
-          is [Bar<List<Boolean>, String>] *)
+          [Generic ("Bar", [Generic ("List", [Simple "Boolean"]); Simple
+           "String"])] is [Bar<List<Boolean>, String>] *)
 [@@deriving show]
 
 type kotlin_data_class = {
@@ -186,8 +187,8 @@ module Parser = struct
       - the Kotlin type expression of this [schema]
       - the input [marks] enhanced with additional Kotlin type expressions found
         while parsing [schema]. *)
-  let rec schema_to_kotlin_marks :
-      type a. Marks.t -> a Schema.t -> string option * kotlin * Marks.t =
+  let rec schema_to_kotlin_marks : type a.
+      Marks.t -> a Schema.t -> string option * kotlin * Marks.t =
    fun marks ({ id; descriptor; parametric } as schema) ->
     let () =
       Logs.debug (fun m ->
@@ -248,8 +249,8 @@ module Parser = struct
       failwith
       @@ Fmt.str "Not yet supported: %s for schema %a" s Schema.pp schema
 
-  and descriptor_to_kotlin_marks :
-      type a. Marks.t -> a Schema.descriptor -> kotlin * Marks.t =
+  and descriptor_to_kotlin_marks : type a.
+      Marks.t -> a Schema.descriptor -> kotlin * Marks.t =
    fun marks descriptor ->
     match descriptor with
     | Any (module Coding) -> raise (NotYetImplemented "Any")
@@ -266,22 +267,16 @@ module Parser = struct
     | Int -> (Atom (Simple "Int"), marks)
     | Int64 -> (Atom (Simple "Long"), marks)
     | Json -> (Atom (Simple "JsonElement"), marks)
-    | List sub_schema ->
+    | List item_schema ->
       (* TODO We will probably need [kotlin] to support generics *)
-      let type_name, kotlin, marks = schema_to_kotlin_marks marks sub_schema in
-      let kotlin_type =
-        type_name_and_kotlin_to_kotlin_type_exn type_name kotlin
-      in
-      let kotlin =
-        Atom (Generic ("kotlin.collections.List", [ kotlin_type ]))
-      in
-      (kotlin, marks)
+      list_to_kotlin_marks marks item_schema
+    | Sequence { item; _ } ->
+      (* TODO We will probably need [kotlin] to support generics *)
+      list_to_kotlin_marks marks item
     | Map { descriptor; _ } -> descriptor_to_kotlin_marks marks descriptor
-    | Mapping value_schema ->
+    | Mapping { item; _ } ->
       (* TODO We will probably need [kotlin] to support generics *)
-      let type_name, kotlin, marks =
-        schema_to_kotlin_marks marks value_schema
-      in
+      let type_name, kotlin, marks = schema_to_kotlin_marks marks item in
       let kotlin_type =
         type_name_and_kotlin_to_kotlin_type_exn type_name kotlin
       in
@@ -369,8 +364,17 @@ module Parser = struct
       in
       (kotlin, marks)
 
-  and tuple_to_kotlin_marks :
-      type a. Marks.t -> a Schema.tuple -> kotlin_type * Marks.t =
+  and list_to_kotlin_marks : type a. Marks.t -> a Schema.t -> kotlin * Marks.t =
+   fun marks item_schema ->
+    let type_name, kotlin, marks = schema_to_kotlin_marks marks item_schema in
+    let kotlin_type =
+      type_name_and_kotlin_to_kotlin_type_exn type_name kotlin
+    in
+    let kotlin = Atom (Generic ("kotlin.collections.List", [ kotlin_type ])) in
+    (kotlin, marks)
+
+  and tuple_to_kotlin_marks : type a.
+      Marks.t -> a Schema.tuple -> kotlin_type * Marks.t =
     let tuple_element_to_kotlin_type marks schema =
       let type_name, kotlin, marks = schema_to_kotlin_marks marks schema in
       let kotlin_type =
@@ -416,8 +420,8 @@ module Parser = struct
       | _ ->
         raise (NotYetImplemented "Only tuples of 2 or 3 elements are supported")
 
-  and parametric_to_kotlin_marks :
-      type a. Marks.t -> a Schema.parametric -> kotlin_type list * Marks.t =
+  and parametric_to_kotlin_marks : type a.
+      Marks.t -> a Schema.parametric -> kotlin_type list * Marks.t =
    fun marks parametric ->
     match parametric with
     | Plain { name; descriptor } ->
@@ -434,8 +438,7 @@ module Parser = struct
       in
       (Simple name :: other_types, marks)
 
-  and object_fields_to_kotlin_marks :
-      type a.
+  and object_fields_to_kotlin_marks : type a.
       Marks.t ->
       a Hlist.t Schema.fields ->
       (string * kotlin_type) list * Marks.t =
@@ -465,8 +468,7 @@ module Parser = struct
       let kotlin_fields, marks = object_fields_to_kotlin_marks marks rest in
       (kotlin_field :: kotlin_fields, marks)
 
-  and object_field_to_kotlin_marks :
-      type t req.
+  and object_field_to_kotlin_marks : type t req.
       Marks.t -> (t, req) Schema.field -> (string * kotlin_type) * Marks.t =
    fun marks
        {
@@ -504,7 +506,8 @@ module Parser = struct
         let id =
           nested_data_classes
           |> List.map ~f:(fun (case_name, _kotlin_case) -> case_name)
-          |> String.concat ~sep:"-or-" |> to_pascal_case
+          |> String.concat ~sep:"-or-"
+          |> to_pascal_case
         in
         let kotlin_type_name, _kotlin, marks =
           schema_to_kotlin_marks marks { schema with id = Some id }
@@ -529,7 +532,8 @@ module Parser = struct
       packed_schema
 end
 
-(** Module responsible for generating actual Kotlin code from the parser result. *)
+(** Module responsible for generating actual Kotlin code from the parser result.
+*)
 module Generator = struct
   let original_pp_kotlin_type = pp_kotlin_type
 
@@ -652,7 +656,8 @@ module Generator = struct
       Fmt.pf f "<%a>" Fmt.(list ~sep:comma pp_kotlin_type) kotlin_types
 end
 
-(** Module responsible for encoding into/decoding from Kotlin-compatible JSON. *)
+(** Module responsible for encoding into/decoding from Kotlin-compatible JSON.
+*)
 module Json = struct
   module Encode = struct
     let rec encode : type t. t Schema.t -> t -> Ezjsonm.value =
@@ -693,14 +698,25 @@ module Json = struct
         fun v ->
           let sub_values = List.map ~f v in
           `A sub_values
+      | Sequence { deconstruct; item; _ } ->
+        let f = encode item in
+        fun v ->
+          let sub_values =
+            v |> deconstruct |> Base.Sequence.map ~f |> Base.Sequence.to_list
+          in
+          `A sub_values
       | Map { descriptor; encode = decons; _ } ->
         let encode = encode_descriptor descriptor in
         fun v -> encode (decons v)
-      | Mapping value_schema ->
-        let encode = encode value_schema in
-        fun v ->
-          let pairs = List.map ~f:(fun (k, v) -> (k, encode v)) v in
-          `O pairs
+      | Mapping { construct; deconstruct; item; length } ->
+        encode_descriptor
+          (Sequence
+             {
+               construct;
+               deconstruct;
+               item = Schemas.(Pair.schema string_schema item);
+               length;
+             })
       | Null -> Fn.const (`O [])
       | Nullable schema ->
         let f = encode schema in
@@ -730,10 +746,10 @@ module Json = struct
               | Some v ->
                 Some
                   (`O
-                    [
-                      (union_type_discriminator, `String (to_pascal_case name));
-                      (union_type_value, encode v);
-                    ])
+                     [
+                       (union_type_discriminator, `String (to_pascal_case name));
+                       (union_type_value, encode v);
+                     ])
               | None -> None
           in
           List.map ~f cases
@@ -743,8 +759,8 @@ module Json = struct
           | Some res -> res
           | None -> Fmt.failwith "unmatched variant case in schema")
 
-    and encode_tuple :
-        type t. t Hlist.t Schema.tuple -> t Hlist.t -> Ezjsonm.value =
+    and encode_tuple : type t.
+        t Hlist.t Schema.tuple -> t Hlist.t -> Ezjsonm.value =
      fun items items_hlist ->
       match (items, items_hlist) with
       | ( Item
@@ -774,8 +790,7 @@ module Json = struct
       | _, _ ->
         raise (NotYetImplemented "Only tuples of 2 or 3 elements are supported")
 
-    and encode_fields :
-        type t.
+    and encode_fields : type t.
         t Hlist.t Schema.fields -> t Hlist.t -> (string * Ezjsonm.value) list =
      fun fields fields_hlist ->
       match (fields, fields_hlist) with
@@ -807,8 +822,8 @@ module Json = struct
         let encoded_tail = encode_fields rest fields_hlist_rest in
         encoded_head :: encoded_tail
 
-    and encode_field :
-        type t req. (t, req) Schema.field -> req -> string * Ezjsonm.value =
+    and encode_field : type t req.
+        (t, req) Schema.field -> req -> string * Ezjsonm.value =
      fun { name; requirement; schema; _ } ->
       let name = to_object_field_name name in
       let encode = encode (Schema.field_schema schema) in
@@ -832,8 +847,10 @@ module Json = struct
   end
 
   module Decode = struct
-    let ( let+ ) = Result.( >>| )
-    let ( let* ) = Result.( >>= )
+    let ( >>= ) = Result.( >>= )
+    let ( >>| ) = Result.( >>| )
+    let ( let* ) = ( >>= )
+    let ( let+ ) = ( >>| )
 
     let requirement_return : type a req. (a, req) Schema.requirement -> a -> req
         =
@@ -845,27 +862,22 @@ module Json = struct
       | Optional -> Some v
       | Required -> v
 
-    let rec decode :
-        type t.
+    let rec decode : type t.
         E.decoding -> t Schema.t -> Ezjsonm.value -> (t, E.decoding) Result.t =
      fun context { id; descriptor; _ } json ->
       decode_descriptor { context with schema = id } descriptor json
 
-    and decode_descriptor :
-        type t.
+    and decode_descriptor : type t.
         E.decoding ->
         t Schema.descriptor ->
         Ezjsonm.value ->
         (t, E.decoding) Result.t =
      fun context descriptor ->
+      let fail reason = Error { context with reason } in
+      let failf fmt = Fmt.kstr fail fmt in
       let type_error expected json =
-        Error
-          {
-            context with
-            reason = Fmt.str "Expected a %s but got %a" expected Json.pp json;
-          }
+        failf "expected a %s but got %a" expected Json.pp json
       in
-
       match descriptor with
       | Any (module Coding) ->
         fun json ->
@@ -904,10 +916,12 @@ module Json = struct
       | Ignore -> Fn.const (Ok ())
       | Int -> (
         function
-        | `Float f -> Ok (Float.to_int f) | json -> type_error "int" json)
+        | `Float f -> Ok (Float.to_int f)
+        | json -> type_error "int" json)
       | Int64 -> (
         function
-        | `Float f -> Ok (Float.to_int64 f) | json -> type_error "int64" json)
+        | `Float f -> Ok (Float.to_int64 f)
+        | json -> type_error "int64" json)
       | Json -> fun json -> Ok json
       | List sub_schema -> (
         function
@@ -920,28 +934,36 @@ module Json = struct
             jsons
           |> Result.all
         | json -> type_error "array" json)
+      | Sequence { construct; item; _ } -> (
+        function
+        | `A v ->
+          let* items =
+            v
+            |> List.map ~f:(fun json ->
+                   decode
+                     { context with path = context.path @ [ "[]" ] }
+                     item json)
+            |> Result.all
+          in
+          items
+          |> Base.Sequence.of_list
+          |> construct
+          |> Result.map_error ~f:(function reason -> { context with reason })
+        | json -> type_error "array" json)
       | Map { descriptor; decode = cons; _ } ->
         fun json ->
           let* underlying = decode_descriptor context descriptor json in
           cons underlying
           |> Result.map_error ~f:(fun reason -> { context with reason })
-      | Mapping value_schema ->
-        fun json ->
-          let* fields =
-            match json with
-            | `O fields -> Ok fields
-            | json -> type_error "mapping" json
-          in
-          List.map
-            ~f:(fun (key, value) ->
-              let+ decoded_value =
-                decode
-                  { context with path = context.path @ [ key ] }
-                  value_schema value
-              in
-              (key, decoded_value))
-            fields
-          |> Result.all
+      | Mapping { construct; deconstruct; item; length } ->
+        decode_descriptor context
+          (Sequence
+             {
+               construct;
+               deconstruct;
+               item = Schemas.(Pair.schema string_schema item);
+               length;
+             })
       | Null -> ( function `O [] -> Ok () | json -> type_error "null" json)
       | Nullable schema -> (
         function
@@ -1031,8 +1053,7 @@ module Json = struct
           Ok (decoder decoded_value)
         | json -> type_error "object with 2 fields #type and value" json)
 
-    and decode_tuple :
-        type t tuple.
+    and decode_tuple : type t tuple.
         E.decoding ->
         (tuple Hlist.t -> t) ->
         tuple Hlist.t Schema.tuple ->
@@ -1097,8 +1118,7 @@ module Json = struct
                 Json.pp json;
           }
 
-    and decode_fields :
-        type t.
+    and decode_fields : type t.
         E.decoding ->
         t Hlist.t Schema.fields ->
         (string * Ezjsonm.value) list ->
@@ -1120,8 +1140,7 @@ module Json = struct
           let* decoded_rest = decode_fields context rest_fields json_fields in
           Ok Hlist.(decoded_head :: decoded_rest))
 
-    and decode_field :
-        type t req.
+    and decode_field : type t req.
         E.decoding ->
         (t, req) Schema.field ->
         (string * Ezjsonm.value) list ->

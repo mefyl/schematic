@@ -14,7 +14,7 @@
 
 (authors "mefyl <mefyl@gruntech.org>")
 
-(version 0.20.1)
+(version 0.20.2)
 
 (homepage https://gitlab.routine.co/routine/schematic)
 
@@ -46,8 +46,10 @@
    (and
     (>= 0.2.0)
     (< 0.3.0)))
-  landmarks
-  landmarks-ppx
+  (landmarks
+   (>= 1.5))
+  (landmarks-ppx
+   (>= 1.5))
   logs
   (ocaml
    (>= 4.14.0))
@@ -72,7 +74,9 @@
   (dune
    (or
     (= 3.7.0)
-    (= 3.7.1)))))
+    (= 3.7.1)))
+  (acid
+   (< 0.13.0))))
 
 (package
  (name schematic-jsoo)
@@ -89,14 +93,22 @@
   ezjsonm
   fmt
   (js_of_ocaml
-   (>= 4.0.0))
+   (and
+    (>= 4.0.0)
+    (< 6.0.0)))
   (js_of_ocaml-ppx
-   (>= 4.0.0))
+   (and
+    (>= 4.0.0)
+    (< 6.0.0)))
   landmarks
   landmarks-ppx
   (ppx_deriving :with-test)
   ppx_here
   ptime
+  (ppx_yojson
+   (and
+    (>= 1.2.0)
+    :with-test))
   (schematic
    (= :version))
   uri))
@@ -106,14 +118,16 @@
  (synopsis "Derive sexps from Ocaml objects")
  (description "Encode to and from s-expressions via a schema.")
  (depends
+  (csexp
+   (>= 1.5.2))
   (alcotest
    (and
     (>= 1.1.0)
     :with-test))
   base
   fmt
-  (ppx_here :with-test)
   (ppx_deriving :with-test)
+  (ppx_here :with-test)
   (schematic
    (= :version))
   sexplib))
@@ -132,7 +146,7 @@
   ppx_here
   (sqml
    (and
-    (>= 0.11.0)
+    (>= 0.11.1)
     (< 0.12.0)))
   (schematic
    (= :version))))

@@ -48,8 +48,11 @@ let pp fmt (ts : c) =
       let array =
         (* We're not using the `struct_` formatter, on purpose. *)
         block ~indent "struct"
-          (const string "size_t len" ++ semi ++ pp ++ const string "* "
-         ++ const string "data;")
+          (const string "size_t len"
+          ++ semi
+          ++ pp
+          ++ const string "* "
+          ++ const string "data;")
       in
       match ts with
       | `Option c -> const pp (reified_option_c c)

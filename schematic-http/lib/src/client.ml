@@ -77,7 +77,9 @@ module Make (Handler : HANDLER) = struct
       {
         f =
           (fun ({ handler; scope; timeout; headers; body; id; method'; url } as
-                request) f ->
+                request)
+            f
+          ->
             raw handler ~scope ?timeout ~headers ?body id method' url
             >>| Result.map_error (error_context request)
             >>=! f);
@@ -175,7 +177,8 @@ module Make (Handler : HANDLER) = struct
         let pp_retry =
           let open Fmt in
           using (fun i -> if i <= 1 then None else Some i)
-          @@ option ~none:nop @@ fmt " (%i retries)"
+          @@ option ~none:nop
+          @@ fmt " (%i retries)"
         and retry_after = "retry-after" in
         let backoff errors uri resp =
           let log pv v =
@@ -232,10 +235,10 @@ module Make (Handler : HANDLER) = struct
           -> ('value, 'final, 'result, 'error) t
 
     let rec apply :
-          'value 'next 'result 'error.
-          ('value, 'next, 'result, 'error) t ->
-          ('next, 'result, 'error) protocol ->
-          ('value, 'result, 'error) protocol =
+        'value 'next 'result 'error.
+        ('value, 'next, 'result, 'error) t ->
+        ('next, 'result, 'error) protocol ->
+        ('value, 'result, 'error) protocol =
      fun (type value next result error)
          (protocols : (value, next, result, error) t)
          (base : (next, result, error) protocol) :

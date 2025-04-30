@@ -7,6 +7,6 @@ module Make
       include Nofuture_lwt.S with type 'a Blocking.t = 'a Lwt.t
       include Nofuture.TIME with module Blocking = Blocking
     end)
-    (Client : Cohttp_lwt.S.Client)
-    (Coding : Schematic.Coding.STR with type t = string) :
+    (_ : Cohttp_lwt.S.Client)
+    (_ : Schematic.Coding.STR with type t = string) :
   Schematic_http.HANDLER with type t = t and module Future = Future
