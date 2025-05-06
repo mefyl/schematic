@@ -257,9 +257,13 @@ let combine ~loc { functions } items =
                 Js_of_ocaml.Js_error.raise_
                   (Js_of_ocaml.Js_error.of_error
                      ((fun (type res t0)
-                           (t1 :
-                             (t0 -> res Js_of_ocaml.Js.t) Js_of_ocaml.Js.constr)
-                           (t0 : t0) (_ : unit) : res Js_of_ocaml.Js.t ->
+                        (t1 :
+                          (t0 -> res Js_of_ocaml.Js.t) Js_of_ocaml.Js.constr)
+                        (t0 : t0)
+                        (_ : unit)
+                        :
+                        res Js_of_ocaml.Js.t
+                      ->
                         Js_of_ocaml.Js.Unsafe.new_obj t1
                           [| Js_of_ocaml.Js.Unsafe.inject t0 |])
                         Js_of_ocaml.Js.error_constr

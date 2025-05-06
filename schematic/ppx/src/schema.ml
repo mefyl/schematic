@@ -152,8 +152,7 @@ and tuple_items ~context ~type_context types =
   in
   [%expr [%e items]]
 
-and combinator :
-    type f.
+and combinator : type f.
     loc:location ->
     f list ->
     (int -> f -> location * label) ->
@@ -547,8 +546,7 @@ let close ~configuration:_ ~context ~type_context schema =
                   {
                     txt = param_prefix ^ schema_anonymous_name_versioned i;
                     loc;
-                  }] ->
-            [%e exp]]
+                  }] -> [%e exp]]
       | t, _ ->
         Ppxlib.Location.raise_errorf ~loc
           "schematic-ppx: unsupported type parameter B %a" Pprintast.core_type t

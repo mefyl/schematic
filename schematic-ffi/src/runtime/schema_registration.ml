@@ -14,8 +14,8 @@ let register_map id ~serialized ~encode ~decode =
   Stdlib.Callback.register encode_name encode;
   Stdlib.Callback.register decode_name (Fn.compose Result.ok_or_failwith decode)
 
-let rec traverse_descriptor :
-    type t. string option -> t Schema.descriptor -> unit =
+let rec traverse_descriptor : type t.
+    string option -> t Schema.descriptor -> unit =
  fun id d ->
   match d with
   (* Shallow types *)

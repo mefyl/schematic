@@ -246,11 +246,11 @@ module Input = struct
           let items =
             let rec decode_tuple : type t. int -> t Schema.tuple -> t =
              fun i -> function
-              | ItemEnd -> Hlist.[]
-              | Item { schema; rest } ->
-                let head = read_schema schema reader in
-                let tail = decode_tuple (i + 1) rest in
-                Hlist.(head :: tail)
+               | ItemEnd -> Hlist.[]
+               | Item { schema; rest } ->
+                 let head = read_schema schema reader in
+                 let tail = decode_tuple (i + 1) rest in
+                 Hlist.(head :: tail)
             in
             decode_tuple 0 items
           in
@@ -421,8 +421,8 @@ module Output = struct
           Schemas.(Pair.schema string_schema item)
           (length v) (deconstruct v) writer
       | Object { fields; encode; _ } ->
-        let rec write_fields :
-            type a. a Hlist.t Schema.fields -> a Hlist.t -> t -> unit =
+        let rec write_fields : type a.
+            a Hlist.t Schema.fields -> a Hlist.t -> t -> unit =
          fun fields v writer ->
           match fields with
           | FieldEnd -> ()
@@ -477,8 +477,8 @@ module Output = struct
         search 0 cases
     and write_schema : type a. a Schema.t -> a -> t -> unit =
      fun schema writer -> write_descriptor schema.descriptor writer
-    and[@inline] write_sequence :
-        type a. a Schema.t -> int -> a Sequence.t -> t -> unit =
+    and[@inline] write_sequence : type a.
+        a Schema.t -> int -> a Sequence.t -> t -> unit =
      fun item size v writer ->
       let () = int size writer in
       Base.Sequence.iter v ~f:(fun v -> write_schema item v writer)

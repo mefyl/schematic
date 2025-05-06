@@ -13,15 +13,8 @@ type t
     For instance, if [types] corresponds to two types called [Type1] and
     [Type2], then [union_of types "All"] will be a type of the form
 
-    [[
-  enum All {
-    case Int(Int)
-    case String(String)
-    …
-    case Type1(Type1)
-    case Type2(Type2)
-  }
-  ]]
+    [[ enum All { case Int(Int) case String(String) … case Type1(Type1) case
+     Type2(Type2) } ]]
 
     This is moslty used in the tests to provide something similar to dynamic
     dispatch on the universe of known types. *)
@@ -34,7 +27,8 @@ val of_packed_schemas : Schema.pack list -> t list
 (** [pp fmt t] outputs the Swift type declarations, annotated with Swift
     serialization support, for [t] to [fmt].
 
-    This only prints the type declarations in itself, not the required imports. *)
+    This only prints the type declarations in itself, not the required imports.
+*)
 val pp : Format.formatter -> t -> unit
 
 (** [pp_file fmt ts] outputs a full, compiling Swift file content, including
