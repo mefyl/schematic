@@ -171,30 +171,6 @@
    (= :version))))
 
 (package
- (name schematic-ffi)
- (synopsis "Generate FFI types and converters based on schemas")
- (authors "Yohaï-Eliel BERREBY <yberreby@pm.me>")
- (depends
-  (stdio :with-test)
-  (alcotest :with-test)
-  uri
-  semver2
-  ptime
-  ppxlib
-  ppx_here
-  ppx_deriving
-  fmt
-  ezjsonm
-  base64
-  base
-  bake
-  logs
-  ppx_hash
-  (schematic
-   (= :version))
-  metapp))
-
-(package
  (name schematic-cli)
  (synopsis "Schematic CLI tools")
  (depends
