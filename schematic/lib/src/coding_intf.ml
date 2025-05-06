@@ -1,6 +1,5 @@
 type _ coding = ..
 type 'a t = 'a coding
-type any = ..
 
 type 'a customizable =
   [ `Generic
@@ -20,7 +19,7 @@ module type IMPL = sig
   val key_get : t key_get
   val key_set : t key_set
   val null : unit -> t
-  val of_any : any -> t option
+  val of_any : 'any coding -> 'any -> t option
   val of_bool : bool -> t
   val of_date : (Ptime.date -> t) customizable
   val of_fields : (string * t) list -> t
@@ -33,7 +32,6 @@ module type IMPL = sig
   val of_string : string -> t
   val of_time : Ptime.t -> t
   val of_time_local : Ptime.t * int -> t
-  val to_any : t -> any
   val to_bool : t -> bool option
   val to_date : (t -> Ptime.date option) customizable
   val to_fields : t -> (string * t) list option

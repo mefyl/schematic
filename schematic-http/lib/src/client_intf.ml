@@ -1,104 +1,107 @@
-module type BODY = sig
-  type t
-
-  val drain : t -> unit Lwt.t
-  val to_string : t -> (string, [> `Networking ] Error.t) Result.t Lwt.t
-  val to_stream : t -> (string, [> `Networking ] Error.t) Result.t Lwt_stream.t
-  val of_string : Cohttp.Code.meth -> Uri.t -> string -> t
-  val of_stream : Cohttp.Code.meth -> Uri.t -> string Lwt_stream.t -> t
-end
-
 type 'a response = {
   body : 'a;
   headers : (string * string) list;
-  status : Cohttp.Code.status_code;
+  status : Http.Status.t;
 }
 
-type ('a, 'body, 'response) request =
-  ?timeout:Timmy.Span.t ->
-  ?headers:(string * string) list ->
-  ?body:'body Schematic.Schema.t * 'body ->
-  'response Schematic.Schema.t ->
-  'a
+type exn += Channel of [ `Networking ] Error.t
 
 module type REQUESTS = sig
-  type 'a res
-  type error
+  type ('a, 'body, 'response, 'result, 'error) t
+
+  module Future : Nofuture.S_IO_TIME
 
   val call :
-    ( Cohttp.Code.meth ->
+    ( Http.Method.t ->
       Uri.t ->
-      ('response res, [> error Error.reason ] Error.t) Lwt_result.t,
+      ( 'result,
+        ([> `Decoding of Schematic.Error.decoding | `Networking ] as 'error)
+        Error.t )
+      Result.t
+      Future.t,
       'body,
-      'response )
-    request
+      'response,
+      'result,
+      'error )
+    t
 
   val delete :
-    ( Uri.t -> ('response res, [> error Error.reason ] Error.t) Lwt_result.t,
+    ( Uri.t ->
+      ( 'result,
+        ([> `Decoding of Schematic.Error.decoding | `Networking ] as 'error)
+        Error.t )
+      Result.t
+      Future.t,
       'body,
-      'response )
-    request
+      'response,
+      'result,
+      'error )
+    t
 
   val get :
-    ( Uri.t -> ('response res, [> error Error.reason ] Error.t) Lwt_result.t,
+    ( Uri.t ->
+      ( 'result,
+        ([> `Decoding of Schematic.Error.decoding | `Networking ] as 'error)
+        Error.t )
+      Result.t
+      Future.t,
       'body,
-      'response )
-    request
+      'response,
+      'result,
+      'error )
+    t
 
   val head :
-    ( Uri.t -> ('response res, [> error Error.reason ] Error.t) Lwt_result.t,
+    ( Uri.t ->
+      ( 'result,
+        ([> `Decoding of Schematic.Error.decoding | `Networking ] as 'error)
+        Error.t )
+      Result.t
+      Future.t,
       'body,
-      'response )
-    request
+      'response,
+      'result,
+      'error )
+    t
 
   val patch :
-    ( Uri.t -> ('response res, [> error Error.reason ] Error.t) Lwt_result.t,
+    ( Uri.t ->
+      ( 'result,
+        ([> `Decoding of Schematic.Error.decoding | `Networking ] as 'error)
+        Error.t )
+      Result.t
+      Future.t,
       'body,
-      'response )
-    request
+      'response,
+      'result,
+      'error )
+    t
 
   val post :
-    ( Uri.t -> ('response res, [> error Error.reason ] Error.t) Lwt_result.t,
+    ( Uri.t ->
+      ( 'result,
+        ([> `Decoding of Schematic.Error.decoding | `Networking ] as 'error)
+        Error.t )
+      Result.t
+      Future.t,
       'body,
-      'response )
-    request
+      'response,
+      'result,
+      'error )
+    t
 
   val put :
-    ( Uri.t -> ('response res, [> error Error.reason ] Error.t) Lwt_result.t,
+    ( Uri.t ->
+      ( 'result,
+        ([> `Decoding of Schematic.Error.decoding | `Networking ] as 'error)
+        Error.t )
+      Result.t
+      Future.t,
       'body,
-      'response )
-    request
-end
-
-module type S = sig
-  type 'a t
-  type error
-
-  module Body : BODY
-
-  val empty : unit Schematic.Schema.t
-  val string : string Schematic.Schema.t
-  val stream : string Lwt_stream.t Schematic.Schema.t
-
-  module Response : sig
-    val stream :
-      (string, [ `Networking ] Error.t) result Lwt_stream.t Schematic.Schema.t
-
-    include REQUESTS with type 'a res := 'a response t and type error := error
-  end
-
-  include REQUESTS with type 'a res := 'a t and type error := error
-end
-
-module type RATE_LIMIT = sig
-  val backoff : int -> int
-  val sleep : float -> unit Lwt.t
-end
-
-module type RATE_LIMIT' = sig
-  include RATE_LIMIT
-
-  val rate_limited : Cohttp.Response.t -> bool
+      'response,
+      'result,
+      'error )
+    t
 end
 
 type 'error body_decoder =
@@ -108,27 +111,22 @@ type 'error body_decoder =
     }
       -> 'error body_decoder
 
-module type STATUS = sig
-  type error
-
-  val check :
-    Cohttp.Code.status_code ->
-    [ `Body_error of error Schematic.Schema.t
-    | `Body_decoder of error body_decoder
-    | `Error of error
-    | `Ok
-    ]
-end
-
 module type HANDLER = sig
-  type 'a response
-  type error
+  type t
 
-  module Body : BODY
+  module Future : Nofuture.S_IO_TIME
+
+  module Body : sig
+    type t
+
+    val drain : t -> unit Future.t
+    val to_string : t -> (string, [> `Networking ]) Result.t Future.t
+    val to_channel : t -> Future.In_channel.t
+    val of_string : Http.Method.t -> Uri.t -> string -> t
+    val of_channel : Http.Method.t -> Uri.t -> Future.In_channel.t -> t
+  end
+
   module Coding : Schematic.Coding.STR with type t = string
-
-  module Monad :
-    Base.Monad.S2 with type ('a, 'error) t = ('a response, 'error) Lwt_result.t
 
   (** Whether to send content length headers.
 
@@ -137,12 +135,124 @@ module type HANDLER = sig
   val send_content_length : bool
 
   val raw :
+    t ->
+    scope:Future.Scope.t ->
     ?timeout:Timmy.Span.t ->
-    ?headers:(string * string) list ->
+    headers:Http.Header.t ->
     ?body:Body.t ->
-    Cohttp.Code.meth ->
+    Id.t ->
+    Http.Method.t ->
     Uri.t ->
-    ( (Cohttp.Response.t * Body.t) response,
-      [> error Error.reason ] Error.t )
-    Lwt_result.t
+    (Http.Response.t * Body.t, [> `Networking ]) Result.t Future.t
+end
+
+module type S = sig
+  type ('value, 'result, !'error) t
+
+  module Handler : HANDLER
+
+  module Protocol : sig
+    type ('value, 'next, 'result, 'error) rule
+
+    type ('value, 'next, 'result, 'error) t =
+      | [] : ('value, 'value, 'result, 'error) t
+      | ( :: ) :
+          ('value, 'next, 'result, 'error) rule
+          * ('next, 'final, 'result, 'error) t
+          -> ('value, 'final, 'result, 'error) t
+
+    module Retry : sig
+      type nonrec 'error rule = {
+        rule : 'value. ('value, 'value, 'value, 'error) rule;
+      }
+    end
+
+    module Error : sig
+      type nonrec 'error rule = {
+        rule : 'result 'value. ('value, 'value, 'result, 'error) rule;
+      }
+    end
+
+    val rewrite :
+      (Http.Response.t ->
+      Handler.Body.t ->
+      (Http.Response.t * Handler.Body.t, 'a) Result.t Handler.Future.t) ->
+      'a Error.rule
+
+    val check_status :
+      (Http.Status.t ->
+      [< `Body_decoder of
+         ([> `Decoding of Schematic.Error.decoding | `Networking ] as 'error)
+         body_decoder
+      | `Body of 'error Schematic.Schema.t
+      | `Error of 'error
+      | `Ok
+      ]) ->
+      'error Error.rule
+
+    val optional : ('value, 'value option, 'result, 'error) rule
+
+    val rate_limit :
+      ?backoff:(int -> int) -> (Http.Response.t -> bool) -> 'error Retry.rule
+  end
+
+  val make :
+    ?headers:Http.Header.t ->
+    ?timeout:Timmy.Span.t ->
+    Handler.t ->
+    ('value, 'value, [> Error.reason ]) t
+
+  module Make (Protocol : sig
+    type error
+    type 'a t
+
+    val headers : Http.Header.t
+    val timeout : Timmy.Span.t option
+    val handler : Handler.t
+    val protocol : ('value, 'value t, 'value t, error) Protocol.t
+  end) : sig
+    val v : ('value, 'value Protocol.t, Protocol.error) t
+  end
+
+  val make_protocol :
+    ?headers:Http.Header.t ->
+    ?timeout:Timmy.Span.t ->
+    Handler.t ->
+    ('value, 'result, 'result, 'error) Protocol.t ->
+    ('value, 'result, 'error) t
+
+  val with_protocol :
+    ('value, 'result, 'error) t ->
+    ('next, 'value, 'result, 'error) Protocol.rule ->
+    ('next, 'result, 'error) t
+
+  type 'a body =
+    | Empty : unit body
+    | Channel : Handler.Future.Scope.t -> Handler.Future.In_channel.t body
+    | Schema : 'a Schematic.Schema.t -> 'a body
+    | String : string body
+
+  module Response : sig
+    include
+      REQUESTS
+        with type ('a, 'body, 'response, 'result, 'error) t :=
+          ('response response, 'result, 'error) t ->
+          ?timeout:Timmy.Span.t ->
+          ?headers:(string * string) list ->
+          ?body:'body body * 'body ->
+          'response body ->
+          'a
+         and module Future := Handler.Future
+  end
+
+  include
+    REQUESTS
+      with type ('a, 'body, 'response, 'result, 'error) t :=
+        ('response, 'result, 'error) t ->
+        ?timeout:Timmy.Span.t ->
+        ?headers:(string * string) list ->
+        ?body:'body body * 'body ->
+        'response body ->
+        'a
+       and module Future := Handler.Future
 end

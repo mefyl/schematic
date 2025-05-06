@@ -1,0 +1,4 @@
+(library
+ (name schematic_cohttp_eio)
+ (public_name schematic-cohttp-eio)
+ (libraries cohttp-eio logs nofuture-eio schematic-http))

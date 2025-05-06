@@ -1,4 +1,4 @@
-module V0_19_0 = struct
+module V0_20_0 = struct
   module Error = Error
   module Base64 = B64
 
@@ -17,23 +17,11 @@ module V0_19_0 = struct
   module Version = Version
 end
 
-module V0_19_1 = V0_19_0
-module V0_19_2 = V0_19_1
-module V0_19_3 = V0_19_2
-module V0_19_4 = V0_19_3
-module V0_19_5 = V0_19_4
-module V0_19_6 = V0_19_5
+module V0_20_1 = V0_20_0
 
-module V0_19_7 = struct
-  include V0_19_6
-  module Swift = Swift
-end
-
-module V0_19_8 = struct
-  include V0_19_7
+module V0_20_2 = struct
+  include V0_20_1
   module Marshal = Marshal
   module Streaming = Streaming
+  module Swift = Swift
 end
-
-module V0_19_9 = V0_19_8
-module V0_19_10 = V0_19_9

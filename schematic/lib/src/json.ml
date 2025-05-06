@@ -34,8 +34,6 @@ let rec pp f json =
   in
   pp f ()
 
-type Coding.any += Json of Ezjsonm.value
-
 module Impl : Coding.IMPL with type t = Ezjsonm.value = struct
   let coding = Coding
 
@@ -58,7 +56,10 @@ module Impl : Coding.IMPL with type t = Ezjsonm.value = struct
   let ( >>= ) = Result.( >>= )
   let ( >>| ) = Result.( >>| )
   let null () = `Null
-  let of_any = function Json v -> Some v | _ -> None
+
+  let of_any (type any) (coding : any Coding.t) (v : any) : t option =
+    match coding with Coding -> Some v | _ -> None
+
   let of_bool b = `Bool b
   let of_fields f = `O f
   let of_float f = `Float f
@@ -70,7 +71,6 @@ module Impl : Coding.IMPL with type t = Ezjsonm.value = struct
   let of_string s = `String s
   let of_time t = `String (Ptime.to_rfc3339 t)
   let of_time_local (t, tz_offset_s) = `String (Ptime.to_rfc3339 ~tz_offset_s t)
-  let to_any = function v -> Json v
   let to_bool = function `Bool v -> Some v | _ -> None
   let to_fields = function `O fields -> Some fields | _ -> None
   let to_float = function `Float v -> Some v | _ -> None

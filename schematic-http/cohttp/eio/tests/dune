@@ -1,0 +1,12 @@
+(test
+ (name test)
+ (package schematic-cohttp-eio)
+ (libraries
+  alcotest
+  cohttp-eio
+  eio_main
+  logs.fmt
+  schematic_cohttp_eio
+  schematic_http_tests)
+ (preprocess
+  (pps ppx_here)))

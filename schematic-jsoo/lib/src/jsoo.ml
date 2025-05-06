@@ -14,12 +14,12 @@ let js_of_date (y, m, d) : Js.Unsafe.any =
 
 let js_of_ptime t =
   new%js Js.date_fromTimeValue
-    (Js_of_ocaml.Js.number_of_float (Ptime.to_float_s t *. 1000.))
+    (Js.number_of_float (Ptime.to_float_s t *. 1000.))
 
 let ( == ) = Base.phys_equal
 let ( let+ ) = Option.( >>| )
 
-type Schematic.Coding.any += Jsoo of Js.Unsafe.any
+type _ Schematic.Coding.coding += Coding : Js.Unsafe.any Schematic.Coding.coding
 
 module Impl : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
   let coding = Coding
@@ -57,7 +57,10 @@ module Impl : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
     `Custom f
 
   let null () = Js.Unsafe.pure_js_expr "null"
-  let of_any = function Jsoo v -> Some v | _ -> None
+
+  let of_any (type any) (coding : any Schematic.Coding.t) (v : any) : t option =
+    match coding with Coding -> Some v | _ -> None
+
   let of_bool v = Js.Unsafe.coerce @@ Js.bool v
   let of_date = `Custom js_of_date
 
@@ -78,7 +81,6 @@ module Impl : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
   let of_string v = Js.Unsafe.coerce @@ Js.string v
   let of_time v = Js.Unsafe.coerce @@ js_of_ptime v
   let of_time_local v = Js.Unsafe.coerce @@ js_of_ptime (fst v)
-  let to_any = function v -> Jsoo v
 
   let to_bool v =
     if Js.typeof v == Js.string "boolean" then
