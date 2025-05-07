@@ -1,7 +1,6 @@
 (dirs
  entropic
  schematic
- schematic-ffi
  schematic-http
  schematic-jsoo
  schematic-sexp
@@ -22,7 +21,6 @@
  (deps
   entropic.opam
   schematic-cli.opam
-  schematic-ffi.opam
   schematic-http.opam
   schematic-jsoo.opam
   schematic-sexp.opam
@@ -33,8 +31,7 @@
   (alias_rec schematic-http/default)
   (alias_rec schematic-jsoo/default)
   (alias_rec schematic-sexp/default)
-  (alias_rec schematic-sqml/default)
-  (alias_rec schematic-ffi/default)))
+  (alias_rec schematic-sqml/default)))
 
 (rule
  (target dune.inc)

@@ -1,4 +1,3 @@
-DOCKERFILE_BASE=ubuntu
 OCAML_VERSION=5.2.0
 # Opam does not install these with `--deps-only` because they depend
 # (optionally) on schematic.
