@@ -1319,7 +1319,6 @@ class CustomOptionSerializer<T>(dataSerializer: KSerializer<T>) : KSerializer<Op
       }
 }
 
-@OptIn(ExperimentalSerializationApi::class)
 private val <T> KSerializer<T>.nullable get() =
   @Suppress("UNCHECKED_CAST")
   if (descriptor.isNullable) (this as KSerializer<T?>)
