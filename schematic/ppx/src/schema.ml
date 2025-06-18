@@ -115,7 +115,6 @@ let rec encode_type ~context ~type_context core_type =
                 items = [%e tuple_items ~context ~type_context types];
               }]
         in
-
         combinator ~loc types field_name field_value constructed deconstructed
           mapper
       in

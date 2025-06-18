@@ -11,6 +11,7 @@
   jsoo
   plugin
   schema
+  schematic_deriver
   utils)
  (public_name schematic.deriver)
  (libraries base fmt ppxlib semver2)

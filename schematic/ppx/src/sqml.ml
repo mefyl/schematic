@@ -1,8 +1,6 @@
 open Base
 open Ppxlib
 open Schematic_deriver
-open Utils
-open Intf
 
 module Sqml = struct
   let key = "sqml"
