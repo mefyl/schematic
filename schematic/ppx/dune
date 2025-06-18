@@ -2,7 +2,16 @@
 
 (library
  (name schematic_ppx_expand)
- (modules attributes attributes_intf expand intf jsoo schema sqml utils)
+ (modules
+  attributes
+  attributes_intf
+  expand
+  expansion
+  intf
+  jsoo
+  plugin
+  schema
+  utils)
  (public_name schematic.ppx_expand)
  (libraries base fmt ppxlib semver2)
  (preprocess
@@ -21,6 +30,15 @@
  (modules ppx_inside)
  (kind ppx_deriver)
  (libraries ppxlib schematic_ppx_expand))
+
+(library
+ (name schematic_ppx_sqml)
+ (modules sqml)
+ (public_name schematic.ppx_sqml)
+ (kind ppx_deriver)
+ (libraries ppxlib schematic schematic_ppx_expand)
+ (preprocess
+  (pps ppxlib.metaquot)))
 
 (executable
  (name pp)

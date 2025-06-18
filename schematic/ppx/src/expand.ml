@@ -2,59 +2,8 @@ open Base
 open Utils
 open Ppxlib
 open Intf
-
-module type EXPANSION = sig
-  type closed
-  type configuration
-  type expanded
-
-  val close :
-    configuration:configuration ->
-    context:context ->
-    type_context:type_context ->
-    expanded ->
-    closed
-
-  val combine :
-    loc:location -> configuration -> closed list -> structure_item list
-
-  val expand_abstract_type :
-    context:context -> type_context:type_context -> core_type -> expanded
-
-  val expand_record :
-    context:context ->
-    type_context:type_context ->
-    Attributes.field list ->
-    expanded
-
-  val expand_variant :
-    context:context ->
-    type_context:type_context ->
-    constructor_declaration list ->
-    expanded
-end
-
-module Expander (Expansion : EXPANSION) = struct
-  let expand ~configuration ~context types =
-    let f (type_, type_context) =
-      let body =
-        match type_ with
-        | Abstract -> failwith "no manifest on abstract type"
-        | Core core ->
-          Expansion.expand_abstract_type ~context ~type_context core
-        | Record fields -> Expansion.expand_record ~context ~type_context fields
-        | Variant options ->
-          Expansion.expand_variant ~context ~type_context options
-      in
-      Expansion.close ~configuration ~context ~type_context body
-    in
-    let expanded = List.map ~f types in
-    Expansion.combine ~loc:context.loc configuration expanded
-end
-
-module Jsoo_type_expander = Expander (Jsoo)
-module Schema_expander = Expander (Schema)
-module Sqml_binding_expander = Expander (Sqml)
+module Jsoo_type_expander = Expansion.M (Jsoo)
+module Schema_expander = Expansion.M (Schema)
 
 let type_context (t : type_declaration) =
   let computed = match t.ptype_kind with Ptype_record _ -> true | _ -> false
@@ -125,12 +74,16 @@ let expand ~context types gadt jsoo plugins =
             ~context types
       in
       let contents =
-        match List.Assoc.find ~equal:String.equal plugins "sqml" with
-        | None -> contents
-        | Some payload ->
-          Ast_pattern.(parse (estring __)) loc payload @@ fun name ->
-          Sqml_binding_expander.expand ~configuration:{ name } ~context types
-          @ contents
+        let detect_plugin contents (module Plugin : Plugin.S) =
+          match List.Assoc.find ~equal:String.equal plugins Plugin.key with
+          | None -> contents
+          | Some payload ->
+            Ast_pattern.parse (Plugin.configuration_pattern ()) loc payload
+            @@ fun configuration ->
+            let module Expander = Expansion.M (Plugin.Expansion) in
+            Expander.expand ~configuration ~context types @ contents
+        in
+        List.fold !Plugin.plugins ~init:contents ~f:detect_plugin
       in
       Schema_expander.expand ~configuration:() ~context types @ contents
     in
