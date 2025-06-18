@@ -1,7 +1,7 @@
 (include_subdirs unqualified)
 
 (library
- (name schematic_ppx_expand)
+ (name schematic_deriver)
  (modules
   attributes
   attributes_intf
@@ -12,7 +12,7 @@
   plugin
   schema
   utils)
- (public_name schematic.ppx_expand)
+ (public_name schematic.deriver)
  (libraries base fmt ppxlib semver2)
  (preprocess
   (pps ppx_deriving.make ppxlib.metaquot)))
@@ -22,21 +22,21 @@
  (modules ppx)
  (public_name schematic.ppx)
  (kind ppx_deriver)
- (libraries ppxlib schematic schematic_ppx_expand))
+ (libraries ppxlib schematic schematic_deriver))
 
 (library
  (name schematic_ppx_inside)
  (package schematic)
  (modules ppx_inside)
  (kind ppx_deriver)
- (libraries ppxlib schematic_ppx_expand))
+ (libraries ppxlib schematic_deriver))
 
 (library
- (name schematic_ppx_sqml)
+ (name schematic_deriver_sqml)
  (modules sqml)
  (public_name schematic.ppx_sqml)
  (kind ppx_deriver)
- (libraries ppxlib schematic schematic_ppx_expand)
+ (libraries ppxlib schematic schematic_deriver)
  (preprocess
   (pps ppxlib.metaquot)))
 

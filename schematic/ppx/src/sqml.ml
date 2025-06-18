@@ -1,6 +1,6 @@
 open Base
 open Ppxlib
-open Schematic_ppx_expand
+open Schematic_deriver
 open Utils
 open Intf
 
