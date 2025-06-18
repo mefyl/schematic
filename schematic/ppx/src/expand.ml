@@ -100,9 +100,10 @@ let type_ ~context ~type_context t =
     Ppxlib.Location.raise_errorf ~loc "schematic-ppx: unsupported Ptype_open"
   | Ptype_variant options -> Variant options
 
-let expand ~context types gadt jsoo sqml =
+let expand ~context types gadt jsoo plugins =
   let jsoo = jsoo_flag ~context jsoo
-  and loc = context.loc in
+  and loc = context.loc
+  and plugins = Option.value ~default:[] plugins in
   let expand context =
     let types =
       let f t =
@@ -124,9 +125,10 @@ let expand ~context types gadt jsoo sqml =
             ~context types
       in
       let contents =
-        match sqml with
+        match List.Assoc.find ~equal:String.equal plugins "sqml" with
         | None -> contents
-        | Some name ->
+        | Some payload ->
+          Ast_pattern.(parse (estring __)) loc payload @@ fun name ->
           Sqml_binding_expander.expand ~configuration:{ name } ~context types
           @ contents
       in
@@ -174,7 +176,7 @@ let add ~inside ~jsoo ~version =
          | Some version ->
            Fmt.failwith
              "schematic ppx version mismatch: expecting 0.15.x, got %a"
-             Semver.pp version Ast_pattern.parse
+             Semver.pp version
        in
        { inside; enable_jsoo = !jsoo; version = !version })
   in
@@ -212,8 +214,11 @@ let add ~inside ~jsoo ~version =
         let fixpoint = flag "fixpoint"
         and gadt = arg "gadt" (elist (pexp_ident (lident __)))
         and jsoo = arg "jsoo" __
-        and sqml = arg "sqml" (estring __) in
-        empty +> fixpoint +> gadt +> jsoo +> sqml
+        and plugins =
+          arg "plugins"
+          @@ pexp_record (many @@ pack2 @@ pair (loc (lident __)) __) none
+        in
+        empty +> fixpoint +> gadt +> jsoo +> plugins
       in
       Deriving.Generator.V2.make arg (fun ~ctxt (recursive, types) fixpoint ->
           expand ~context:(context ~ctxt ~fixpoint recursive types) types)

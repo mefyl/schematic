@@ -15,7 +15,7 @@ type t = {
   name : string;
   description : string option;
 }
-[@@deriving schema ~sqml:"entries"]
+[@@deriving schema ~plugins:{ sqml = "entries" }]
 
 module Entries = Sqml_meta_entries.Import (Model.BindTable (Sqml_meta_entries))
 
