@@ -59,9 +59,8 @@ module Sqml = struct
             [%expr
               Schematic_sqml.type_of_schema
                 [%e
-                  Schema.(
-                    schema_of_expanded ~context ~loc:field.loc
-                    @@ encode_type ~context ~type_context field.type_)]]
+                  schema_of_type ~context ~type_context ~loc:field.loc
+                    field.type_]]
         and fk =
           match field.sqml_foreign with
           | [] -> [%expr None]

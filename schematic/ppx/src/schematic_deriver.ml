@@ -3,4 +3,7 @@ include Utils
 module Attributes = Attributes
 module Expand = Expand
 module Plugin = Plugin
-module Schema = Schema
+
+let schema_of_type ~context ~type_context ~loc t =
+  Schema.(
+    schema_of_expanded ~context ~loc @@ encode_type ~context ~type_context t)
