@@ -130,25 +130,6 @@
   sexplib))
 
 (package
- (name schematic-sqml)
- (synopsis "Derive SQML bindings from Ocaml types")
- (description "Deduce SQML bindings from schematic type metadata.")
- (depends
-  (ppx_deriving :with-test)
-  ppx_here
-  base
-  (alcotest
-   (and
-    (>= 1.1.0)
-    :with-test))
-  (sqml
-   (and
-    (>= 0.10.0)
-    (< 0.12.0)))
-  (schematic
-   (= :version))))
-
-(package
  (name schematic-http)
  (synopsis "HTTP client with schematic encoding")
  (depends

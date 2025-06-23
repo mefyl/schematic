@@ -4,7 +4,6 @@
  schematic-http
  schematic-jsoo
  schematic-sexp
- schematic-sqml
  .logistic
  opam)
 
@@ -24,14 +23,12 @@
   schematic-http.opam
   schematic-jsoo.opam
   schematic-sexp.opam
-  schematic-sqml.opam
   schematic.opam
   (alias_rec entropic/default)
   (alias_rec schematic/default)
   (alias_rec schematic-http/default)
   (alias_rec schematic-jsoo/default)
-  (alias_rec schematic-sexp/default)
-  (alias_rec schematic-sqml/default)))
+  (alias_rec schematic-sexp/default)))
 
 (rule
  (target dune.inc)
@@ -51,6 +48,6 @@
     --cross
     base,base64,cohttp-lwt,csexp,ezjsonm,fmt,hlist,logs,lwt,ptime,sexplib,uri
     --local
-    acid,acid-lwt,bake,hlist,metaversion,sqml,timmy,timmy-lwt))))
+    acid,acid-lwt,bake,hlist,metaversion,timmy,timmy-lwt))))
 
 (include dune.inc)

@@ -1,5 +1,5 @@
 OCAML_VERSION=5.2.0
 # Opam does not install these with `--deps-only` because they depend
 # (optionally) on schematic.
-OPAM_PACKAGES=timmy.1.0.4 timmy-lwt.1.0.4 sqml.0.10.6
+OPAM_PACKAGES=timmy.1.0.4 timmy-lwt.1.0.4
 PACKAGES=autoconf
