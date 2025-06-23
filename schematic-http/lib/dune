@@ -1,8 +1,0 @@
-(include_subdirs unqualified)
-
-(library
- (name schematic_http)
- (public_name schematic-http)
- (libraries cohttp-lwt schematic timmy timmy-lwt unix)
- (preprocess
-  (pps ppx_deriving.eq ppx_deriving.make)))
