@@ -47,11 +47,9 @@ type field = {
   loc : location;
   mutable_ : bool; [@default false]
   name : string; [@main]
+  plugins : Hmap.t; [@default Hmap.empty]
   schema : expression versioned; [@default []]
   specs : specs; [@default make_specs ()]
-  sqml_foreign : expression list;
-  sqml_primary : bool option;
-  sqml_type : expression option;
   type_ : core_type;
 }
 [@@deriving make]

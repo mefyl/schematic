@@ -11,8 +11,8 @@ module Model = struct
 end
 
 type t = {
-  id : int;
-  name : string;
+  id : int; [@schematic.sqml.primary]
+  name : string; [@schematic.sqml.type Varchar 16]
   description : string option;
 }
 [@@deriving schema ~plugins:{ sqml = "entries" }]

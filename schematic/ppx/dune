@@ -14,7 +14,7 @@
   schematic_deriver
   utils)
  (public_name schematic.deriver)
- (libraries base fmt ppxlib semver2)
+ (libraries base fmt hmap ppxlib semver2)
  (preprocess
   (pps ppx_deriving.make ppxlib.metaquot)))
 

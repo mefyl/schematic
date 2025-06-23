@@ -439,7 +439,8 @@ and expand_any_variant ~context ~type_context poly options =
           | [], Pcstr_record fields ->
             let computed_fields = Attributes.fields_of_computed ~loc computed in
             _expand_record true ~context ~type_context
-              (List.map ~f:(expand_field context) fields @ computed_fields)
+              (List.map ~f:(Plugin.expand_field context) fields
+              @ computed_fields)
           | [], _ -> encode_type ~context ~type_context type_
         in
         ( schema,

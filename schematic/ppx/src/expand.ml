@@ -38,7 +38,7 @@ let type_ ~context ~type_context t =
   let loc = type_context.loc in
   match t.ptype_kind with
   | Ptype_record fields ->
-    let fields = List.map ~f:(expand_field context) fields
+    let fields = List.map ~f:(Plugin.expand_field context) fields
     and computed =
       Attributes.fields_of_computed ~loc type_context.attributes.computed
     in

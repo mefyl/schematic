@@ -2,6 +2,10 @@ open Base
 open Ppxlib
 open Schematic_deriver
 
+let key_foreign = Hmap.Key.create ()
+let key_primary = Hmap.Key.create ()
+let key_type = Hmap.Key.create ()
+
 module Sqml = struct
   let key = "sqml"
   let name = "SQML"
@@ -53,7 +57,7 @@ module Sqml = struct
         let module Ast = (val Ast_builder.make field.loc) in
         let loc = field.loc in
         let column_type =
-          match field.sqml_type with
+          match Hmap.find key_type field.plugins with
           | Some t -> [%expr Atomic [%e t]]
           | None ->
             [%expr
@@ -62,9 +66,9 @@ module Sqml = struct
                   schema_of_type ~context ~type_context ~loc:field.loc
                     field.type_]]
         and fk =
-          match field.sqml_foreign with
-          | [] -> [%expr None]
-          | keys -> [%expr Some [%e Ast.elist keys]]
+          match Hmap.find key_foreign field.plugins with
+          | None -> [%expr None]
+          | Some keys -> [%expr Some [%e Ast.elist keys]]
         in
         [%stri
           let [%p Ast.pvar (column_name field.name)] =
@@ -88,9 +92,8 @@ module Sqml = struct
           Ast_builder.Default.pvar ~loc:field.loc (column_name field.name) )
       in
       let primary =
-        List.filter fields ~f:(function
-          | { sqml_primary = Some true; _ } -> true
-          | _ -> false)
+        List.filter fields ~f:(fun field ->
+            Hmap.find key_primary field.plugins |> Option.value ~default:false)
       in
       {
         columns = List.map ~f:column_of_field fields;
@@ -220,6 +223,53 @@ module Sqml = struct
 
     let combine ~loc:_ _ items = List.concat items
   end
+
+  let read_attribute ~loc name payload
+      (attributes : Schematic_deriver.Attributes.field) :
+      Schematic_deriver.Attributes.field =
+    match name with
+    | "foreign_key" ->
+      let keys =
+        Hmap.find key_foreign attributes.plugins |> Option.value ~default:[]
+      in
+      Ast_pattern.(parse (single_expr_payload __)) loc payload (fun pl ->
+          {
+            attributes with
+            plugins =
+              Hmap.add key_foreign
+                ([%expr
+                   let open Sqml.Table.Column.Foreign_key in
+                   [%e pl]]
+                :: keys)
+                attributes.plugins;
+          })
+    | "primary" -> (
+      match Hmap.find key_primary attributes.plugins with
+      | Some _ ->
+        Ppxlib.Location.raise_errorf ~loc
+          "schematic-sqml: duplicate %S attribute" name
+      | None ->
+        ( Ast_pattern.(parse (pstr nil)) loc payload @@ fun () ->
+          {
+            attributes with
+            plugins = Hmap.add key_primary true attributes.plugins;
+          } )
+          ())
+    | "type" -> (
+      match Hmap.find key_type attributes.plugins with
+      | Some _ ->
+        Ppxlib.Location.raise_errorf ~loc
+          "schematic-sqml: duplicate %S attribute" name
+      | None ->
+        Ast_pattern.(parse (single_expr_payload __)) loc payload
+          (fun sqml_type ->
+            {
+              attributes with
+              plugins = Hmap.add key_type sqml_type attributes.plugins;
+            }))
+    | _ ->
+      Ppxlib.Location.raise_errorf ~loc "schematic-sqml: unknown attribute: %S"
+        name
 end
 
 let () = Plugin.register (module Sqml)
