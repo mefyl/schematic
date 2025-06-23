@@ -1,4 +1,4 @@
-(lang dune 3.15)
+(lang dune 3.20)
 
 (using directory-targets 0.1)
 
@@ -43,6 +43,7 @@
   (ezjsonm
    (>= 1.1.0))
   fmt
+  hmap
   (hlist
    (and
     (>= 0.2.0)

@@ -1,0 +1,64 @@
+(rule
+ (target entropic.%{version:entropic}.opam)
+ (deps
+  (:opam ../entropic.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/entropic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic.%{version:schematic}.opam)
+ (deps
+  (:opam ../schematic.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/entropic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-cli.%{version:schematic-cli}.opam)
+ (deps
+  (:opam ../schematic-cli.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/entropic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-jsoo.%{version:schematic-jsoo}.opam)
+ (deps
+  (:opam ../schematic-jsoo.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/entropic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-sexp.%{version:schematic-sexp}.opam)
+ (deps
+  (:opam ../schematic-sexp.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/entropic#%H\" }"
+     -n1)))))
