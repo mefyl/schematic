@@ -47,6 +47,7 @@
    (and
     (>= 0.2.0)
     (< 0.3.0)))
+  hmap
   (landmarks
    (>= 1.5))
   (landmarks-ppx

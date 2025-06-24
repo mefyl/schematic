@@ -25,6 +25,7 @@ depends: [
   "ezjsonm" {>= "1.1.0"}
   "fmt"
   "hlist" {>= "0.2.0" & < "0.3.0"}
+  "hmap"
   "landmarks" {>= "1.5"}
   "landmarks-ppx" {>= "1.5"}
   "ocaml" {>= "5.2.0"}
