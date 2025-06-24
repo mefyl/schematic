@@ -31,13 +31,12 @@
  (description
   "Schematic lets you derive type meta informations using a ppx_deriving\ndriver and provide functionalities on top of it:\n\n* Conversion to and from JSON.\n* Deduction of JSON schema specification.\n* Conversion to and from js_of_ocaml FFI using schematic-jsoo.\n* Deduction of typescript definitions.\n")
  (depends
-  logs
   (alcotest
    (and
     (>= 1.1.0)
     :with-test))
   (base
-   (>= v0.17.0))
+   (>= v0.15.0))
   (base64
    (>= 3.5.0))
   (ezjsonm
@@ -52,8 +51,9 @@
    (>= 1.5))
   (landmarks-ppx
    (>= 1.5))
+  logs
   (ocaml
-   (>= 5.2.0))
+   (>= 4.14.0))
   ppxlib
   ppx_deriving
   ppx_here
@@ -75,7 +75,9 @@
   (dune
    (or
     (= 3.7.0)
-    (= 3.7.1)))))
+    (= 3.7.1)))
+  (acid
+   (< 0.13.0))))
 
 (package
  (name schematic-jsoo)
@@ -83,18 +85,14 @@
  (description
   "Deduce js_of_ocaml FFI types\n and conversion functions from schematic type metadata.")
  (depends
-  (ppx_deriving :with-test)
-  uri
-  ptime
-  ppx_here
-  fmt
-  ezjsonm
-  base
   (alcotest
    (and
     (>= 1.1.0)
     :with-test))
+  base
   (conf-npm :with-test)
+  ezjsonm
+  fmt
   (js_of_ocaml
    (and
     (>= 4.0.0)
@@ -105,24 +103,29 @@
     (< 7.0.0)))
   landmarks
   landmarks-ppx
+  (ppx_deriving :with-test)
+  ppx_here
+  ptime
   (ppx_yojson
    (and
     (>= 1.2.0)
     :with-test))
   (schematic
-   (= :version))))
+   (= :version))
+  uri))
 
 (package
  (name schematic-sexp)
  (synopsis "Derive sexps from Ocaml objects")
  (description "Encode to and from s-expressions via a schema.")
  (depends
+  (csexp
+   (>= 1.5.2))
   (alcotest
    (and
     (>= 1.1.0)
     :with-test))
   base
-  csexp
   fmt
   (ppx_deriving :with-test)
   (ppx_here :with-test)
@@ -143,8 +146,8 @@
  (synopsis "Random dataset generation based on schematic")
  (depends
   (alcotest :with-test)
-  ppx_here
   base
   cryptokit
+  ppx_here
   (schematic
    (= :version))))

@@ -12,21 +12,21 @@ homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "dune" {>= "3.20"}
-  "ppx_deriving" {with-test}
-  "uri"
-  "ptime"
-  "ppx_here"
-  "fmt"
-  "ezjsonm"
-  "base"
   "alcotest" {>= "1.1.0" & with-test}
+  "base"
   "conf-npm" {with-test}
+  "ezjsonm"
+  "fmt"
   "js_of_ocaml" {>= "4.0.0" & < "7.0.0"}
   "js_of_ocaml-ppx" {>= "4.0.0" & < "7.0.0"}
   "landmarks"
   "landmarks-ppx"
+  "ppx_deriving" {with-test}
+  "ppx_here"
+  "ptime"
   "ppx_yojson" {>= "1.2.0" & with-test}
   "schematic" {= version}
+  "uri"
   "odoc" {with-doc}
 ]
 build: [

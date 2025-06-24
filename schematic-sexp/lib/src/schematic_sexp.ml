@@ -5,7 +5,6 @@ include Sexp
 include Schematic_sexp_intf
 
 type _ Coding.coding += Coding : t Coding.coding
-type Coding.any += Sexp of t
 
 module Json_conv (Sexp : sig
   type t =
@@ -74,7 +73,10 @@ module Coding : Coding.IMPL with type t = t = struct
 
   (* Interface *)
   let null () = Sexp.unit
-  let of_any = function Sexp v -> Some v | _ -> None
+
+  let of_any (type any) (coding : any Coding.t) (v : any) : t option =
+    match coding with Coding -> Some v | _ -> None
+
   let of_bool b = Sexp.Atom (Bool.to_string b)
 
   let of_fields fields =
@@ -92,7 +94,6 @@ module Coding : Coding.IMPL with type t = t = struct
   let of_time_local (t, tz_offset_s) =
     Sexp.Atom (Ptime.to_rfc3339 ~tz_offset_s t)
 
-  let to_any = function v -> Sexp v
   let to_bool = of_atom Bool.of_string
 
   let to_fields = function

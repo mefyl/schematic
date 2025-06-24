@@ -18,9 +18,8 @@ homepage: "https://gitlab.routine.co/routine/schematic"
 bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "dune" {>= "3.20"}
-  "logs"
   "alcotest" {>= "1.1.0" & with-test}
-  "base" {>= "v0.17.0"}
+  "base" {>= "v0.15.0"}
   "base64" {>= "3.5.0"}
   "ezjsonm" {>= "1.1.0"}
   "fmt"
@@ -28,7 +27,8 @@ depends: [
   "hlist" {>= "0.2.0" & < "0.3.0"}
   "landmarks" {>= "1.5"}
   "landmarks-ppx" {>= "1.5"}
-  "ocaml" {>= "5.2.0"}
+  "logs"
+  "ocaml" {>= "4.14.0"}
   "ppxlib"
   "ppx_deriving"
   "ppx_here"
@@ -40,6 +40,7 @@ depends: [
 ]
 conflicts: [
   "dune" {= "3.7.0" | = "3.7.1"}
+  "acid" {< "0.13.0"}
 ]
 build: [
   ["dune" "subst"] {dev}

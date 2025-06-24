@@ -54,6 +54,10 @@ val make : ?id:string -> ?parametric:'t parametric -> 't descriptor -> 't t
 val name_combine : _ t -> string -> string
 val fixpoint : ('a descriptor -> 'a descriptor) -> 'a descriptor
 
+(** [Walk W] takes care of parsing a Schematic schema into the intermediary type
+    [W.t]. Its main benefit compared to pattern matching on the schema itself is
+    to take care of inlining and some other subtleties, to avoid each language
+    having to take care of the same shenanigans. *)
 module Walk (W : WALK) : sig
   val descriptor : id:string option -> 't descriptor -> W.t W.M.t
   val parametric : 't parametric -> W.t W.M.t

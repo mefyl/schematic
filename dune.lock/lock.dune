@@ -1,6 +1,6 @@
 (lang package 0.1)
 
-(dependency_hash b6e546e105dc1f7ab642aedeabc8af4e)
+(dependency_hash b438ec1e275bf5f8d0b376b43b54758e)
 
 (ocaml ocaml-base-compiler)
 
@@ -10,7 +10,7 @@
   ((source
     https://github.com/ocaml-dune/opam-overlays.git#2a9543286ff0e0656058fee5c0da7abc16b8717d))
   ((source
-    https://github.com/ocaml/opam-repository.git#9b213cf26504b07a2adffa89ef2ad98284d7cb65))
+    https://github.com/ocaml/opam-repository.git#8c282ddb114131d3ac2b116d53954c7346be70c3))
   ((source
     ssh://git@gitlab.routine.co/routine/opam#10e6a83ef3d3cb2252e34321308cd40fd953a51f))))
 

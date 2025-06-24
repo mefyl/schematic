@@ -95,7 +95,7 @@ module Make (S : MARK) = struct
       pp f l
   end
 
-  (** [of_marks marks mark] returns a tuple:
+  (** [of_mark marks mark] returns a tuple:
 
       - The list of newly-emitted values derived from Mark.t
       - The merged state corresponding to the addition of [mark] to [marks] *)

@@ -15,7 +15,7 @@ type _ case =
           (** Whether the tuple or record argument is inlined in the OCaml
               memory representation of the constructor. *)
       name : string;
-      raw_name : string;
+      raw_name : string;  (** Only used for the C ABI. *)
       schema : 'a t;
     }
       -> 't case
@@ -25,7 +25,7 @@ and 'a field_schema =
   | Inline of 'a t
   | Inline_try of 'a t
 
-(** A [_ field] can describe any number of object fields. *)
+(** [_ fields] is an heterogeneous list of fields. *)
 and 't fields =
   | FieldEnd : unit Hlist.t fields
   | Field : {
@@ -34,6 +34,7 @@ and 't fields =
     }
       -> ('req -> 'tail) Hlist.t fields
 
+(** A [_ field] describes any object field. *)
 and ('t, 'req) field = {
   description : string option;
   examples : 't list;
@@ -54,7 +55,7 @@ and _ tuple =
     }
       -> ('a -> 'b) Hlist.t tuple
 
-(** A descriptor describes the structure of a type. *)
+(** A [_ descriptor] describes the structure of a type. *)
 and _ descriptor =
   | Any : (module Coding_intf.IMPL with type t = 't) -> 't descriptor
   | Bool : bool descriptor
@@ -117,16 +118,18 @@ and _ descriptor =
   | Union : {
       key : string option;
       cases : 't case list;
-      polymorphic : bool;
+      polymorphic : bool;  (** Whether this is a polymorphic variant in OCaml. *)
     }
       -> 't descriptor
 
+(** A Schematic schema. *)
 and 't t = {
   id : string option;
   descriptor : 't descriptor;
   parametric : 't parametric option;
 }
 
+(** Convenient alias when this module is [open]. *)
 and 't schema = 't t
 
 and 't parametric =
@@ -138,9 +141,35 @@ and 't parametric =
       name : string;
       parameter : 'p t;
       next : 'p t -> 't parametric;
+          (** [next] is of type ['p t -> 't parametric] rather than
+              ['t parametric] to allow schema parsers to extract parametric
+              information.
+
+              Consider the types [type 'a t = int * 'a] and [type u = int t] and
+              their associated schemas. If [next] had type ['t parametric], then
+              [parameter] would be [schema_int] and it would be impossible to
+              know which [int] in the tuple is generic and which is hard-coded.
+
+              Note that calling successively [next parameter] until getting back
+              a [Plain {descriptor; _}] will return the same [descriptor] as in
+              the original schema.
+
+              That is, considering this function:
+              {[
+                let rec plain_descriptor_of_parametric (param : 't parametric) :
+                    't descriptor =
+                  match param with
+                  | Plain { descriptor; _ } -> descriptor
+                  | Parametric { parameter; next; _ } -> next parameter
+              ]}
+
+              For a given [schema] with a [Some parametric], we have
+              [schema.descriptor = plain_descriptor_of_parametric
+               schema.parametric] (modulo [option] wrapping). *)
     }
       -> 't parametric
 
+(** Convenient alias when this module is [open]. *)
 type ('t, 'req) schema_field = ('t, 'req) field
 
 module type WALK = sig

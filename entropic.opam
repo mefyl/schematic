@@ -10,9 +10,9 @@ bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "dune" {>= "3.20"}
   "alcotest" {with-test}
-  "ppx_here"
   "base"
   "cryptokit"
+  "ppx_here"
   "schematic" {= version}
   "odoc" {with-doc}
 ]
