@@ -1,14 +1,17 @@
-(version
- 0.27.0+binary-ocaml-5.2.1-built-2024-12-04.0-x86_64-unknown-linux-musl)
+(version 0.27.0)
 
-(install
+(build
  (progn
-  (run find . -type d -exec mkdir -p %{prefix}/{} ";")
-  (run find . -type f -exec cp {} %{prefix}/{} ";")))
+  (when
+   %{pkg-self:dev}
+   (run dune subst))
+  (run dune build -p %{pkg-self:name} -j %{jobs} @install)))
+
+(depends ocaml cmdliner csexp dune ocamlformat-lib re)
 
 (source
  (fetch
   (url
-   https://github.com/ocaml-dune/ocaml-binary-packages/releases/download/2024-12-04.0/ocamlformat.0.27.0+binary-ocaml-5.2.1-built-2024-12-04.0-x86_64-unknown-linux-musl.tar.gz)
+   https://github.com/ocaml-ppx/ocamlformat/releases/download/0.27.0/ocamlformat-0.27.0.tbz)
   (checksum
-   sha256=d6b7512cda51e2cce08b3416a9231cd07f884c0e41f773905251a571010fbc75)))
+   sha256=ddbf484c076d08f99400ee84b790ec231f5c8fcbd5d3324a6400d5388e846d15)))

@@ -2,15 +2,15 @@
 
 (dependency_hash 4975d452cf5da35cb44009497ea6cff5)
 
+(ocaml ocaml-base-compiler)
+
 (repositories
  (complete true)
  (used
   ((source
-    https://github.com/ocaml-dune/ocaml-binary-packages.git#fb7b39863a4d229e2cd3ac212459e15650c75d4d))
-  ((source
     https://github.com/ocaml-dune/opam-overlays.git#2a9543286ff0e0656058fee5c0da7abc16b8717d))
   ((source
-    https://github.com/ocaml/opam-repository.git#9b213cf26504b07a2adffa89ef2ad98284d7cb65))
+    https://github.com/ocaml/opam-repository.git#70ed6dc3809eac914120062fdc7a82492f5c3ef9))
   ((source
     ssh://git@gitlab.routine.co/routine/opam#10e6a83ef3d3cb2252e34321308cd40fd953a51f))))
 
@@ -18,6 +18,7 @@
  (variable_values
   (with-doc false)
   (with-dev-setup false)
+  (sys-ocaml-version 4.14.2)
   (post true)
   (os-distribution gentoo)
   (os linux)
@@ -25,8 +26,9 @@
   (arch x86_64))
  (unset_variables
   with-test
-  sys-ocaml-version
   sys-ocaml-libc
+  sys-ocaml-cc
+  sys-ocaml-arch
   enable-ocaml-beta-repository
   dev
   build))
