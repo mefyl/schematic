@@ -23,15 +23,6 @@
  (kind ppx_deriver)
  (libraries ppxlib schematic_deriver))
 
-(library
- (name schematic_deriver_sqml)
- (modules sqml)
- (public_name schematic.ppx_sqml)
- (kind ppx_deriver)
- (libraries ppxlib schematic schematic_deriver)
- (preprocess
-  (pps ppxlib.metaquot)))
-
 (executable
  (name pp)
  (package schematic-cli)
