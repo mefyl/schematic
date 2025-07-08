@@ -184,7 +184,8 @@ let () =
                       List
                         [
                           Atom "run";
-                          Atom "%{dep:../.logistic/ci/dune/dune_sak.exe}";
+                          Atom
+                            "%{workspace_root}/.logistic/ci/dune/dune_sak.exe";
                           Atom ("rewrite-" ^ toolchain);
                           Atom "--input";
                           Atom ("%{dep:../" ^ package ^ ".opam}");
