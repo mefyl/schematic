@@ -7,7 +7,8 @@
   (pps ppx_deriving.eq ppx_deriving.make ppx_deriving.show ppx_deriving.ord
    ppx_here ppx_yojson schematic_ppx -- --cookie
    "schematic-version=\"0.15.0\""))
- (libraries alcotest schematic base ezjsonm fmt logs logs.fmt test_utils unix))
+ (libraries alcotest schematic base ezjsonm fmt logs logs.fmt test_utils
+  unix))
 
 (tests
  (names kotlin)
