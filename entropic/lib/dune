@@ -2,7 +2,7 @@
 
 (library
  (name entropic)
- (libraries base schematic)
+ (libraries base hlist ptime schematic)
  (public_name entropic)
  (preprocess
   (pps ppx_here schematic.ppx)))

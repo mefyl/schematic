@@ -2,4 +2,4 @@
  (name json)
  (package entropic)
  (public_name entropic-json)
- (libraries cryptokit entropic schematic))
+ (libraries cryptokit entropic fmt schematic unix))

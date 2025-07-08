@@ -1,6 +1,6 @@
 (test
  (name entropic)
  (package entropic)
- (libraries alcotest cryptokit schematic entropic)
+ (libraries alcotest base cryptokit hlist schematic entropic)
  (preprocess
   (pps ppx_here schematic.ppx)))
