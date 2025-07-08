@@ -22,6 +22,8 @@
 
 (executables_implicit_empty_intf true)
 
+(implicit_transitive_deps false)
+
 (source
  (uri git+https://gitlab.routine.co/routine/schematic.git))
 

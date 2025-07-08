@@ -3,6 +3,6 @@
 (test
  (name test)
  (package schematic-sexp)
- (libraries alcotest schematic schematic-sexp)
+ (libraries alcotest base fmt hlist schematic schematic-sexp sexplib)
  (preprocess
   (pps ppx_deriving.eq ppx_deriving.show ppx_here schematic.ppx)))
