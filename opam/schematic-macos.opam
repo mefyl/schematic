@@ -1,0 +1,52 @@
+opam-version: "2.0"
+version: "0.21.0"
+synopsis: "Derive schemas from Ocaml types"
+description: """
+Schematic lets you derive type meta informations using a ppx_deriving
+driver and provide functionalities on top of it:
+
+* Conversion to and from JSON.
+* Deduction of JSON schema specification.
+* Conversion to and from js_of_ocaml FFI using schematic-jsoo.
+* Deduction of typescript definitions.
+"""
+maintainer: ["mefyl <mefyl@gruntech.org>"]
+authors: ["mefyl <mefyl@gruntech.org>"]
+license: "LGPL-3.0-or-later"
+homepage: "https://gitlab.routine.co/routine/schematic"
+bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
+depends: [
+  "dune" {>= "3.20"}
+  "base-macos" {>= "v0.15.0"}
+  "base64-macos" {>= "3.5.0"}
+  "ezjsonm-macos" {>= "1.1.0"}
+  "fmt"
+  "fmt-macos"
+  "hmap"
+  "hlist-macos" {>= "0.2.0" & < "0.3.0"}
+  "hmap"
+  "landmarks" {>= "1.5"}
+  "landmarks-ppx" {>= "1.5"}
+  "landmarks-ppx-macos" {>= "1.5"}
+  "logs-macos"
+  "ocaml-macos" {>= "4.14.0"}
+  "ppxlib"
+  "ppx_deriving"
+  "ppx_deriving-macos"
+  "ppx_here"
+  "ppx_here-macos"
+  "ptime-macos" {>= "1.0.0"}
+  "semver2" {>= "1.2.0"}
+  "semver2-macos" {>= "1.2.0"}
+  "uri-macos"
+]
+conflicts: [
+  "dune" {= "3.7.0" | = "3.7.1"}
+  "acid" {< "0.13.0"}
+]
+build: [
+  ["dune" "subst"] {dev}
+  ["dune" "build" "-x" "macos" "-p" "schematic" "-j" jobs "@install"]
+]
+dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"
+x-maintenance-intent: ["(latest)"]

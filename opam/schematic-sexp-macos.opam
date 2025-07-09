@@ -1,0 +1,24 @@
+opam-version: "2.0"
+version: "0.21.0"
+synopsis: "Derive sexps from Ocaml objects"
+description: "Encode to and from s-expressions via a schema."
+maintainer: ["mefyl <mefyl@gruntech.org>"]
+authors: ["mefyl <mefyl@gruntech.org>"]
+license: "LGPL-3.0-or-later"
+homepage: "https://gitlab.routine.co/routine/schematic"
+bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
+depends: [
+  "dune" {>= "3.20"}
+  "csexp-macos" {>= "1.5.2"}
+  "base-macos"
+  "fmt"
+  "fmt-macos"
+  "schematic-macos" {= version}
+  "sexplib-macos"
+]
+build: [
+  ["dune" "subst"] {dev}
+  ["dune" "build" "-x" "macos" "-p" "schematic-sexp" "-j" jobs "@install"]
+]
+dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"
+x-maintenance-intent: ["(latest)"]

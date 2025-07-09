@@ -1,0 +1,34 @@
+opam-version: "2.0"
+version: "0.21.0"
+synopsis: "Derive js_of_ocaml types and values from Ocaml types"
+description: """
+Deduce js_of_ocaml FFI types
+ and conversion functions from schematic type metadata."""
+maintainer: ["mefyl <mefyl@gruntech.org>"]
+authors: ["mefyl <mefyl@gruntech.org>"]
+license: "LGPL-3.0-or-later"
+homepage: "https://gitlab.routine.co/routine/schematic"
+bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
+depends: [
+  "dune" {>= "3.20"}
+  "base-windows"
+  "ezjsonm-windows"
+  "fmt"
+  "fmt-windows"
+  "js_of_ocaml" {>= "4.0.0" & < "7.0.0"}
+  "js_of_ocaml-ppx" {>= "4.0.0" & < "7.0.0"}
+  "landmarks"
+  "landmarks-ppx"
+  "landmarks-ppx-windows"
+  "ppx_here"
+  "ppx_here-windows"
+  "ptime-windows"
+  "schematic-windows" {= version}
+  "uri-windows"
+]
+build: [
+  ["dune" "subst"] {dev}
+  ["dune" "build" "-x" "windows" "-p" "schematic-jsoo" "-j" jobs "@install"]
+]
+dev-repo: "git+https://gitlab.routine.co/routine/schematic.git"
+x-maintenance-intent: ["(latest)"]
