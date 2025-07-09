@@ -8,7 +8,111 @@
    (progn
     (cat %{opam})
     (run git log
-     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/entropic#%H\" }"
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target entropic-ios.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-ios --input
+    %{dep:../entropic.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target entropic-ios.%{version:entropic}.opam)
+ (deps
+  (:opam entropic-ios.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target entropic-macos.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-macos
+    --input %{dep:../entropic.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target entropic-macos.%{version:entropic}.opam)
+ (deps
+  (:opam entropic-macos.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target entropic-windows.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-windows
+    --input %{dep:../entropic.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target entropic-windows.%{version:entropic}.opam)
+ (deps
+  (:opam entropic-windows.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target entropic-android.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-android
+    --input %{dep:../entropic.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target entropic-android.%{version:entropic}.opam)
+ (deps
+  (:opam entropic-android.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
      -n1)))))
 
 (rule
@@ -21,7 +125,111 @@
    (progn
     (cat %{opam})
     (run git log
-     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/entropic#%H\" }"
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-ios.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-ios --input
+    %{dep:../schematic.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target schematic-ios.%{version:schematic}.opam)
+ (deps
+  (:opam schematic-ios.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-macos.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-macos
+    --input %{dep:../schematic.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target schematic-macos.%{version:schematic}.opam)
+ (deps
+  (:opam schematic-macos.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-windows.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-windows
+    --input %{dep:../schematic.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target schematic-windows.%{version:schematic}.opam)
+ (deps
+  (:opam schematic-windows.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-android.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-android
+    --input %{dep:../schematic.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target schematic-android.%{version:schematic}.opam)
+ (deps
+  (:opam schematic-android.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
      -n1)))))
 
 (rule
@@ -34,7 +242,111 @@
    (progn
     (cat %{opam})
     (run git log
-     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/entropic#%H\" }"
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-cli-ios.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-ios --input
+    %{dep:../schematic-cli.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target schematic-cli-ios.%{version:schematic-cli}.opam)
+ (deps
+  (:opam schematic-cli-ios.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-cli-macos.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-macos
+    --input %{dep:../schematic-cli.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target schematic-cli-macos.%{version:schematic-cli}.opam)
+ (deps
+  (:opam schematic-cli-macos.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-cli-windows.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-windows
+    --input %{dep:../schematic-cli.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target schematic-cli-windows.%{version:schematic-cli}.opam)
+ (deps
+  (:opam schematic-cli-windows.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-cli-android.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-android
+    --input %{dep:../schematic-cli.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target schematic-cli-android.%{version:schematic-cli}.opam)
+ (deps
+  (:opam schematic-cli-android.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
      -n1)))))
 
 (rule
@@ -47,7 +359,111 @@
    (progn
     (cat %{opam})
     (run git log
-     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/entropic#%H\" }"
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-jsoo-ios.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-ios --input
+    %{dep:../schematic-jsoo.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target schematic-jsoo-ios.%{version:schematic-jsoo}.opam)
+ (deps
+  (:opam schematic-jsoo-ios.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-jsoo-macos.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-macos
+    --input %{dep:../schematic-jsoo.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target schematic-jsoo-macos.%{version:schematic-jsoo}.opam)
+ (deps
+  (:opam schematic-jsoo-macos.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-jsoo-windows.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-windows
+    --input %{dep:../schematic-jsoo.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target schematic-jsoo-windows.%{version:schematic-jsoo}.opam)
+ (deps
+  (:opam schematic-jsoo-windows.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-jsoo-android.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-android
+    --input %{dep:../schematic-jsoo.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target schematic-jsoo-android.%{version:schematic-jsoo}.opam)
+ (deps
+  (:opam schematic-jsoo-android.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
      -n1)))))
 
 (rule
@@ -60,5 +476,109 @@
    (progn
     (cat %{opam})
     (run git log
-     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/entropic#%H\" }"
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-sexp-ios.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-ios --input
+    %{dep:../schematic-sexp.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target schematic-sexp-ios.%{version:schematic-sexp}.opam)
+ (deps
+  (:opam schematic-sexp-ios.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-sexp-macos.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-macos
+    --input %{dep:../schematic-sexp.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target schematic-sexp-macos.%{version:schematic-sexp}.opam)
+ (deps
+  (:opam schematic-sexp-macos.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-sexp-windows.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-windows
+    --input %{dep:../schematic-sexp.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target schematic-sexp-windows.%{version:schematic-sexp}.opam)
+ (deps
+  (:opam schematic-sexp-windows.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
+     -n1)))))
+
+(rule
+ (target schematic-sexp-android.opam)
+ (mode
+  (promote (until-clean)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-android
+    --input %{dep:../schematic-sexp.opam} --cross
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+    --cross-exclude ""))))
+
+(rule
+ (target schematic-sexp-android.%{version:schematic-sexp}.opam)
+ (deps
+  (:opam schematic-sexp-android.opam))
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (cat %{opam})
+    (run git log
+     "--pretty=url { src: \"git://git@gitlab.routine.co:routine/schematic#%H\" }"
      -n1)))))
