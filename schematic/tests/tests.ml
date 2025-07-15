@@ -2556,6 +2556,42 @@ struct
       }
   end
 
+  module VersionSince = struct
+    module T = struct
+      type t =
+        | A of int
+        | B of string
+        | C of bool [@schematic.since "0.21.4"]
+      [@@deriving eq, show, schema]
+    end
+
+    include T
+
+    let since =
+      Test
+        {
+          here = [%here];
+          decoded = None;
+          name = "since";
+          value_testable = (module T);
+          schema;
+          value = C true;
+          expected = [%ezjsonm true];
+          kotlin_class_name = None;
+          is_kotlin_roundtrip_enabled = false;
+          swift_class_name = None;
+          is_swift_roundtrip_enabled = false;
+        }
+
+    let test =
+      {
+        name = "version_since";
+        speed = `Quick;
+        additional_test = None;
+        tests = [ since ];
+      }
+  end
+
   module Compile_check = struct
     (* Name conflict between parameter and type *)
     type 't t = { items : 't list } [@@deriving schema]
@@ -2754,6 +2790,7 @@ struct
             Computed.computed;
             Versionn.test;
             VersionCascade.test;
+            VersionSince.test;
           ];
       };
       {

@@ -17,6 +17,7 @@ type _ case =
       name : string;
       raw_name : string;  (** Only used for the C ABI. *)
       schema : 'a t;
+      since : Semver.t option;
     }
       -> 't case
 

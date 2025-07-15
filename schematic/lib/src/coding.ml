@@ -348,6 +348,8 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
     let[@landmark "Schematic.Coding.decode " ^ Coding.name] res v = decode v in
     res
 
+  type _ Stdlib.Effect.t += Minimal_version : Semver.t -> unit Stdlib.Effect.t
+
   let encode schema =
     let encode =
       let rec encode_field : type req t.
@@ -453,7 +455,13 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | Time_local -> Coding.of_time_local
         | Union { cases; key; _ } -> (
           let cases =
-            let f (Schema.Case { encoder; name; schema; _ }) =
+            let f (Schema.Case { encoder; name; schema; since; _ }) =
+              let () =
+                match since with
+                | None -> ()
+                | Some version ->
+                  Stdlib.Effect.perform (Minimal_version version)
+              in
               let encode = encode_schema context schema in
               fun v ->
                 match encoder v with
@@ -484,7 +492,10 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       in
       encode_schema { schema = None; path = []; reason = "" } schema
     in
-    let[@landmark "Schematic.Coding.encode " ^ Coding.name] res v = encode v in
+    let[@landmark "Schematic.Coding.encode " ^ Coding.name] res v =
+      try encode v
+      with effect Minimal_version _, k -> Stdlib.Effect.Deep.continue k ()
+    in
     res
 end
 
