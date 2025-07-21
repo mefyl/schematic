@@ -1291,8 +1291,7 @@ object KOffsetDateTimeSerializer : KSerializer<OffsetDateTime> {
  * Now, None becomes {"value": null} while Some(None) becomes {"value": {"value": null}}.
  * The extra verbosity is a small price to pay for this much-needed flexibility.
  */
-class CustomOptionSerializer<T>(private val dataSerializer: KSerializer<T>) :
-    KSerializer<Option<T>> {
+class CustomOptionSerializer<T>(dataSerializer: KSerializer<T>) : KSerializer<Option<T>> {
 
   private val nullableDataSerializer: KSerializer<T?> = dataSerializer.nullable
 
@@ -1311,7 +1310,7 @@ class CustomOptionSerializer<T>(private val dataSerializer: KSerializer<T>) :
         var value : T? = null
         while (true) {
           when (val index = decodeElementIndex(descriptor)) {
-            0 -> value = nullableDataSerializer.deserialize(decoder)
+            0 -> value = decodeSerializableElement(descriptor, 0, nullableDataSerializer)
             CompositeDecoder.DECODE_DONE -> break
             else -> error("Unexpected index: $index")
           }
@@ -1320,7 +1319,6 @@ class CustomOptionSerializer<T>(private val dataSerializer: KSerializer<T>) :
       }
 }
 
-@OptIn(ExperimentalSerializationApi::class)
 private val <T> KSerializer<T>.nullable get() =
   @Suppress("UNCHECKED_CAST")
   if (descriptor.isNullable) (this as KSerializer<T?>)
