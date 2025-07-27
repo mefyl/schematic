@@ -26,9 +26,9 @@
  (libraries alcotest base fmt hlist schematic))
 
 (tests
- (names base64 json typescript)
+ (names base64 json typescript versioning)
  (package schematic)
- (modules base64 json typescript)
+ (modules base64 json typescript versioning)
  (preprocess
   (pps ppx_deriving.eq ppx_deriving.show ppx_deriving.ord ppx_here
    schematic_ppx -- --cookie "schematic-version=\"0.15.0\""))

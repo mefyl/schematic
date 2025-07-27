@@ -28,6 +28,7 @@ module type S = sig
   type t
 
   val name : string
+  val encode_versioned : 'a Schema.t -> 'a -> t * Version.t option
   val encode : 'a Schema.t -> 'a -> t
   val decode : 'a Schema.t -> t -> ('a, E.decoding) Result.t
 end
@@ -350,7 +351,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
 
   type _ Stdlib.Effect.t += Minimal_version : Semver.t -> unit Stdlib.Effect.t
 
-  let encode schema =
+  let encode_versioned schema =
     let encode =
       let rec encode_field : type req t.
           E.decoding ->
@@ -456,16 +457,16 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | Union { cases; key; _ } -> (
           let cases =
             let f (Schema.Case { encoder; name; schema; since; _ }) =
-              let () =
-                match since with
-                | None -> ()
-                | Some version ->
-                  Stdlib.Effect.perform (Minimal_version version)
-              in
               let encode = encode_schema context schema in
               fun v ->
                 match encoder v with
                 | Some v -> (
+                  let () =
+                    match since with
+                    | None -> ()
+                    | Some version ->
+                      Stdlib.Effect.perform (Minimal_version version)
+                  in
                   let v = encode v in
                   match key with
                   | Some key -> (
@@ -493,10 +494,39 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       encode_schema { schema = None; path = []; reason = "" } schema
     in
     let[@landmark "Schematic.Coding.encode " ^ Coding.name] res v =
-      try encode v
-      with effect Minimal_version _, k -> Stdlib.Effect.Deep.continue k ()
+      let open Stdlib.Effect.Shallow in
+      let rec handle : type arg res.
+          Semver.t option ->
+          (arg, res) continuation ->
+          arg ->
+          res * Semver.t option =
+       fun version k arg ->
+        continue_with k arg
+          {
+            retc = (fun res -> (res, version));
+            exnc = raise;
+            effc =
+              (fun (type b) (eff : b Stdlib.Effect.t) ->
+                match eff with
+                | Minimal_version v ->
+                  let version =
+                    match version with
+                    | Some version when Semver.greater_than version v -> version
+                    | _ -> v
+                  in
+                  Some
+                    (fun (k : (b, res) continuation) ->
+                      handle (Some version) k ())
+                | _ -> None);
+          }
+      in
+      handle None (fiber encode) v
     in
     res
+
+  let encode schema =
+    let encode = encode_versioned schema in
+    fun v -> encode v |> fst
 end
 
 module type STR = sig
@@ -512,8 +542,12 @@ module Make_string (C : STR) : STR with type t = string = struct
 
   let name = C.name
 
-  let[@landmark "Schematic.Coding.String.encode " ^ C.name] encode schema t =
-    C.encode schema t |> C.to_string
+  let[@landmark "Schematic.Coding.String.encode " ^ C.name] encode_versioned
+      schema t =
+    let res, version = C.encode_versioned schema t in
+    (C.to_string res, version)
+
+  let encode schema t = encode_versioned schema t |> fst
 
   let[@landmark "Schematic.Coding.String.decode " ^ C.name] decode schema s =
     match C.of_string s with

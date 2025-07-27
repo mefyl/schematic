@@ -1,0 +1,33 @@
+module Schemas_library = struct
+  type Schematic.Schema.library += V
+
+  let v = V
+end
+
+type versioned =
+  | A of { v : int }
+  | B of { v : int }
+  | C of { v : int } [@schematic.since "0.2.0"]
+[@@schematic.union_key "type"] [@@deriving schema]
+
+let since () =
+  let _a, a_version =
+    Schematic.Json.encode_versioned versioned_schema (A { v = 14 })
+  and _c, c_version =
+    Schematic.Json.encode_versioned versioned_schema (C { v = 15 })
+  in
+  let () =
+    Alcotest.(check ~here:[%here] (option (module Schematic.Version)))
+      "unconstrained encoding" None a_version
+  and () =
+    Alcotest.(check ~here:[%here] (option (module Schematic.Version)))
+      "encoding constrained to >= 0.2.0"
+      (Some (Schematic.Version.make 0 2 0))
+      c_version
+  in
+  ()
+
+let () =
+  let open Alcotest in
+  let test_case name f = test_case name `Quick f in
+  run "schematic versioning" [ ("since", [ test_case "since" since ]) ]

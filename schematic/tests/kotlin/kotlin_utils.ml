@@ -10,6 +10,7 @@ module Tests = Test_utils.Tests.Make (struct
   type t = Ezjsonm.value
 
   let name = "Kotlin"
+  let encode_versioned schema v = (Schematic.Kotlin.to_json schema v, None)
   let encode = Schematic.Kotlin.to_json
   let decode = Schematic.Kotlin.from_json
   let t = Alcotest.testable Schematic.Json.pp Schematic.Json.equal
