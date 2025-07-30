@@ -403,9 +403,17 @@ module Make_inline (M : Base.Monad.S) = struct
     in
     inline desc Required f
 
-  let value (f : 'res inline_v) fields =
+  let value_versioned (f : 'res inline_v) fields =
+    let merge_versions l r =
+      match (l, r) with
+      | None, None -> None
+      | Some v, None | None, Some v -> Some v
+      | (Some l as left), (Some r as right) ->
+        if Semver.less_than l r then right else left
+    in
     let rec inline_field : type req t.
-        (t, req) field -> (req -> 'res list M.t, string) Result.t =
+        (t, req) field ->
+        (req -> ('res list * Semver.t option) M.t, string) Result.t =
      fun field ->
       let outline _schema =
         Result.return
@@ -413,23 +421,26 @@ module Make_inline (M : Base.Monad.S) = struct
         let f = f.f field in
         fun v ->
           let++ res = f v in
-          [ res ]
-      and inline : t Schema_intf.t -> (req -> 'res list M.t, string) Result.t =
+          ([ res ], None)
+      and inline :
+          t Schema_intf.t ->
+          (req -> ('res list * Semver.t option) M.t, string) Result.t =
        fun schema ->
         let+ f = inline_descriptor schema.descriptor in
         match field.requirement with
-        | Required -> (f : req -> 'res list M.t)
+        | Required -> (f : req -> ('res list * Semver.t option) M.t)
         | Default _ -> f
-        | Computed -> ( function Some v -> f v | None -> M.return [])
+        | Computed -> ( function Some v -> f v | None -> M.return ([], None))
         | Computed_optional -> (
-          function Some (Some v) -> f v | _ -> M.return [])
-        | Optional -> ( function Some v -> f v | None -> M.return [])
+          function Some (Some v) -> f v | _ -> M.return ([], None))
+        | Optional -> ( function Some v -> f v | None -> M.return ([], None))
       in
       inline_try ~inline ~outline field.schema
     and inline_fields : type t.
-        t Hlist.t fields -> (t Hlist.t -> 'res list M.t, string) Result.t =
+        t Hlist.t fields ->
+        (t Hlist.t -> ('res list * Semver.t option) M.t, string) Result.t =
       function
-      | FieldEnd -> Result.return (fun Hlist.[] -> M.return [])
+      | FieldEnd -> Result.return (fun Hlist.[] -> M.return ([], None))
       | Field { field; rest } ->
         let* tail = inline_fields rest in
         if field_ignored field then
@@ -437,12 +448,13 @@ module Make_inline (M : Base.Monad.S) = struct
         else
           let+ head = inline_field field in
           fun Hlist.(hd :: tl) ->
-            let++ head = head hd
-            and++ tail = tail tl in
-            head @ tail
+            let++ head, head_version = head hd
+            and++ tail, tail_version = tail tl in
+            (head @ tail, merge_versions head_version tail_version)
     and inline_descriptor : type t.
-        t descriptor -> (t -> 'res list M.t, string) Result.t = function
-      | Ignore -> Result.return (fun () -> M.return [])
+        t descriptor ->
+        (t -> ('res list * Semver.t option) M.t, string) Result.t = function
+      | Ignore -> Result.return (fun () -> M.return ([], None))
       | Fixpoint d ->
         (* Break infinite recursion. Would be better to have a fixpoint here
            too. *)
@@ -453,13 +465,13 @@ module Make_inline (M : Base.Monad.S) = struct
         fun v -> f (encode v)
       | Nullable schema -> (
         let+ f = inline_descriptor schema.descriptor in
-        function Some v -> f v | None -> M.return [])
+        function Some v -> f v | None -> M.return ([], None))
       | Object { fields; encode; _ } ->
         let+ f = inline_fields fields in
         fun v -> f (encode v)
       | Union { cases; key; _ } -> (
         let+ cases =
-          let f (Case { encoder; name; schema; _ }) =
+          let f (Case { encoder; name; schema; since; _ }) =
             let+ res = inline_descriptor schema.descriptor in
             let key =
               match key with
@@ -488,8 +500,8 @@ module Make_inline (M : Base.Monad.S) = struct
                 | Some key ->
                   Option.return
                   @@ let++ key = key ()
-                     and++ res = res v in
-                     key :: res)
+                     and++ res, version = res v in
+                     (key :: res, merge_versions version since))
           in
           List.map ~f cases |> Result.all
         in
@@ -502,6 +514,12 @@ module Make_inline (M : Base.Monad.S) = struct
           (Fmt.str "inline field is not an object: %a" pp_descriptor s)
     in
     inline_fields fields
+
+  let value f fields =
+    let+ result = value_versioned f fields in
+    fun fields ->
+      let++ result, _ = result fields in
+      result
 end
 
 module Inline = Make_inline (Base.Monad.Ident)

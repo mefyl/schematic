@@ -426,13 +426,20 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
               |> Base.Sequence.to_list)
         | Object { fields; encode; _ } ->
           let f =
-            Schema.Inline.value
+            Schema.Inline.value_versioned
               { f = (fun field req -> encode_field context field req) }
               fields
             |> Result.ok_or_failwith
           in
           fun v ->
-            let fields = f (encode v) |> List.filter_map ~f:Fn.id in
+            let fields =
+              let fields, version = f (encode v) in
+              let () =
+                Option.iter version ~f:(fun version ->
+                    Stdlib.Effect.perform (Minimal_version version))
+              in
+              List.filter_map ~f:Fn.id fields
+            in
             Coding.of_fields fields
         | Tuple { items; encode = t_encode; decode = _ } ->
           let encode =

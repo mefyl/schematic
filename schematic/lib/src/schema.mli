@@ -30,6 +30,11 @@ module Make_inline (M : Base.Monad.S) : sig
   val schema :
     't descriptor -> 'res inline -> ('res list list M.t, string) Result.t
 
+  val value_versioned :
+    'res inline_v ->
+    't Hlist.t fields ->
+    ('t Hlist.t -> ('res list * Semver.t option) M.t, string) result
+
   val value :
     'res inline_v ->
     't Hlist.t fields ->
