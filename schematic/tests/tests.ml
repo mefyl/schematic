@@ -2620,18 +2620,13 @@ struct
             (fun () ->
               Alcotest.(check ~here:[%here] text)
                 "schema pretty print"
-                {|<graph-result> = Union [
-                   { name: "list", schema: [ <graph-result> ] },
-                   { name: "nullable", schema: Nullable (<graph-result>) },
-                   {
-                   name: "object",
-                   schema: { value (Required): <graph-result>,  }
-                   },
-                   {
-                   name: "tuple",
-                   schema: [ <graph-result>, <graph-result>,  ]
-                   }
-                 ]|}
+                {|<graph-result> =
+Union {
+  "list": { schema: [ <graph-result> ] },
+  "nullable": { schema: Nullable (<graph-result>) },
+  "object": { schema: { value (Required): <graph-result> } },
+  "tuple": { schema: [ <graph-result>, <graph-result>,  ] }
+}|}
               @@ Fmt.str "%a" Schematic.Schema.pp
               @@ T.schema_versioned (fun _ -> None));
       }

@@ -26,71 +26,106 @@ let field_schema = function
 
 module Marks = Stdlib.Set.Make (String)
 
-let rec pp_descriptor : type u. Marks.t -> u descriptor Fmt.t =
- fun marks f d ->
-  let fmt =
-    let open Fmt in
-    let indent = 2 in
-    match d with
-    | Any _ -> const string "Any"
-    | Bool -> const string "Bool"
-    | Coding { f } -> const (pp_descriptor marks) (f None)
-    | Date -> const string "Date"
-    | Fixpoint s -> const (pp_descriptor marks) (Lazy.force s)
-    | Float -> const string "Float"
-    | Ignore -> const string "Ignore"
-    | Int -> const string "Int"
-    | Int64 -> const string "Int64"
-    | Json -> const string "Json"
-    | List schema ->
-      box ~indent
-      @@ const string "["
-         ++ sp
-         ++ (box @@ const (pp marks) schema)
-         ++ sp
-         ++ const string "]"
-    | Map { descriptor; _ } -> const (pp_descriptor marks) descriptor
-    | Mapping { item; _ } -> const (pp marks) item
-    | Null -> const string "Null"
-    | Nullable s ->
-      const string "Nullable (" ++ const (pp marks) s ++ const string ")"
-    | Sequence { item; _ } ->
-      box ~indent
-      @@ const string "["
-         ++ sp
-         ++ (box @@ const (pp marks) item)
-         ++ sp
-         ++ const string "]"
-    | String -> const string "String"
-    | String_const v -> escape v
-    | Time -> const string "Time"
-    | Time_local -> const string "Time_local"
-    | Object { fields; _ } ->
-      box
-      @@ (hvbox ~indent
-         @@ (const string "{" ++ sp ++ const (hvbox (pp_fields marks)) fields))
-         ++ sp
-         ++ const string "}"
-    | Tuple { items; _ } ->
-      box
-      @@ (hvbox ~indent
-         @@ (const string "[" ++ sp ++ const (hvbox (pp_tuple marks)) items))
-         ++ sp
-         ++ const string "]"
-    | Union { cases; _ } ->
-      box
-      @@ hvbox ~indent
-           (const string "Union ["
-           ++ sp
-           ++ (hvbox @@ const (hvbox (list ~sep:comma (pp_case marks))) cases))
-         ++ sp
-         ++ const string "]"
+let pp_container' ?(delimiters = ("{", "}")) ~indent pp_content content =
+  let intro, outro = delimiters in
+  let open Fmt in
+  let pp_lobby f () =
+    Stdlib.Format.pp_print_custom_break ~fits:("", 1, "")
+      ~breaks:("", indent, "") f
   in
-  fmt f ()
+  hvbox
+  @@ const string intro
+     ++ pp_lobby
+     ++ (hvbox @@ const pp_content content)
+     ++ sp
+     ++ const string outro
 
-and pp_case : type u. Marks.t -> u case Fmt.t =
- fun marks f (Case { name; schema; _ }) ->
-  Fmt.pf f "@[@[<hv>{@ name: %S,@ schema: %a@ @]}@]" name (pp marks) schema
+let pp_container ?delimiters ?(sep = Fmt.comma) ~indent pp_item items =
+  let open Fmt in
+  pp_container' ?delimiters ~indent (seq ~sep (box ~indent pp_item)) items
+
+let rec pp_descriptor : type u. Marks.t -> u descriptor Fmt.t =
+  let indent = 2 in
+  let pp_case : type u. Marks.t -> u case Fmt.t =
+   fun marks f (Case { name; schema; since; _ }) ->
+    let pp =
+      let open Fmt in
+      const Dump.string name
+      ++ const char ':'
+      ++ sp
+      ++ pp_container' ~indent
+           (using fst (option (const string "since: " ++ Semver.pp ++ comma))
+           ++ (using snd
+              @@ box ~indent (const string "schema:" ++ sp ++ pp marks)))
+           (since, schema)
+    in
+    pp f ()
+  in
+  fun marks f d ->
+    let fmt =
+      let open Fmt in
+      match d with
+      | Any _ -> const string "Any"
+      | Bool -> const string "Bool"
+      | Coding { f } -> const (pp_descriptor marks) (f None)
+      | Date -> const string "Date"
+      | Fixpoint s -> const (pp_descriptor marks) (Lazy.force s)
+      | Float -> const string "Float"
+      | Ignore -> const string "Ignore"
+      | Int -> const string "Int"
+      | Int64 -> const string "Int64"
+      | Json -> const string "Json"
+      | List schema ->
+        box ~indent
+        @@ const string "["
+           ++ sp
+           ++ (box @@ const (pp marks) schema)
+           ++ sp
+           ++ const string "]"
+      | Map { descriptor; _ } -> const (pp_descriptor marks) descriptor
+      | Mapping { item; _ } -> const (pp marks) item
+      | Null -> const string "Null"
+      | Nullable s ->
+        const string "Nullable (" ++ const (pp marks) s ++ const string ")"
+      | Sequence { item; _ } ->
+        box ~indent
+        @@ const string "["
+           ++ sp
+           ++ (box @@ const (pp marks) item)
+           ++ sp
+           ++ const string "]"
+      | String -> const string "String"
+      | String_const v -> escape v
+      | Time -> const string "Time"
+      | Time_local -> const string "Time_local"
+      | Object { fields; _ } ->
+        let open struct
+          type any_field = Field : _ field -> any_field
+          type any_fields = Fields : _ fields -> any_fields
+        end in
+        let pp_field fmt (Field { name; schema; requirement; _ }) =
+          let schema = field_schema schema in
+          Fmt.pf fmt "%s (%a):@ %a" name pp_requirement requirement (pp marks)
+            schema
+        and fields =
+          let unfold = function
+            | Fields FieldEnd -> None
+            | Fields (Field { field; rest }) -> Some (Field field, Fields rest)
+          in
+          Stdlib.Seq.unfold unfold (Fields fields)
+        in
+        pp_container ~indent pp_field fields
+      | Tuple { items; _ } ->
+        box
+        @@ (hvbox ~indent
+           @@ (const string "[" ++ sp ++ const (hvbox (pp_tuple marks)) items))
+           ++ sp
+           ++ const string "]"
+      | Union { cases; _ } ->
+        pp_container ~indent ~delimiters:("Union {", "}") (pp_case marks)
+        @@ Stdlib.List.to_seq cases
+    in
+    fmt f ()
 
 and pp_requirement : type t req. (t, req) requirement Fmt.t =
  fun f -> function
@@ -99,14 +134,6 @@ and pp_requirement : type t req. (t, req) requirement Fmt.t =
   | Default _ -> Fmt.string f "Default"
   | Required -> Fmt.string f "Required"
   | Optional -> Fmt.string f "Optional"
-
-and pp_fields : type t. Marks.t -> t fields Fmt.t =
- fun marks fmt -> function
-  | FieldEnd -> ()
-  | Field { field = { name; schema; requirement; _ }; rest; _ } ->
-    let schema = field_schema schema in
-    Fmt.pf fmt "%s (%a): %a,@ %a" name pp_requirement requirement (pp marks)
-      schema (pp_fields marks) rest
 
 and pp_tuple : type t. Marks.t -> t tuple Fmt.t =
  fun marks fmt -> function
@@ -120,7 +147,7 @@ and pp : type u. Marks.t -> u t Fmt.t =
   | Some id when Marks.mem id marks -> Fmt.fmt "<%s>" f id
   | Some id ->
     let marks = Marks.add id marks in
-    Fmt.fmt "<%s> = %a" f id (pp_descriptor marks) descriptor
+    Fmt.fmt "<%s> =@ %a" f id (pp_descriptor marks) descriptor
   | None -> (pp_descriptor marks) f descriptor
 
 let pp schema = pp Marks.empty schema
