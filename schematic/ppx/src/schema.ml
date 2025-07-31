@@ -784,6 +784,7 @@ let close ~configuration:_ ~context ~type_context schema =
       pvb_loc = loc;
       pvb_attributes =
         [ Warning.unused_var_strict ~loc; Warning.unused_rec ~loc ];
+      pvb_constraint = None;
     },
     {
       pvb_pat = pattern;
@@ -791,6 +792,7 @@ let close ~configuration:_ ~context ~type_context schema =
       pvb_loc = loc;
       pvb_attributes =
         [ Warning.unused_var_strict ~loc; Warning.unused_rec ~loc ];
+      pvb_constraint = None;
     } )
 
 let combine ~loc () expanded =
