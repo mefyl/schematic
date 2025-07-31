@@ -33,7 +33,7 @@ module Make_inline (M : Base.Monad.S) : sig
   val value_versioned :
     'res inline_v ->
     't Hlist.t fields ->
-    ('t Hlist.t -> ('res list * Semver.t option) M.t, string) result
+    ('t Hlist.t -> ('res list * Library_versions.t) M.t, string) result
 
   val value :
     'res inline_v ->

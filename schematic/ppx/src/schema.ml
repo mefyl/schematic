@@ -65,6 +65,11 @@ let esemver ~loc { Semver.major; minor; patch; prerelease; build } =
       ~prerelease:[%e elist ~loc @@ List.map ~f:(estring ~loc) prerelease]
       ~build:[%e elist ~loc @@ List.map ~f:(estring ~loc) build]]
 
+let esince ~loc since =
+  eopt ~loc
+    ~f:(fun version -> [%expr [%e esemver ~loc version], Schemas_library.V])
+    since
+
 let rec encode_type ~context ~type_context core_type =
   let Attributes.{ schema; _ } =
     Attributes.extract ~schema:true core_type.ptyp_attributes
@@ -423,7 +428,7 @@ and expand_any_variant ~context ~type_context poly options =
                         inline = false;
                         encoder = (fun () -> Some ());
                         decoder = (fun () -> ());
-                        since = [%e eopt ~loc ~f:(esemver ~loc) since];
+                        since = [%e esince ~loc since];
                       }
                   in
                   Union
@@ -495,7 +500,7 @@ and expand_any_variant ~context ~type_context poly options =
             name = [%e name];
             raw_name = [%e Ast.estring txt];
             schema = [%e schema_of_expanded ~context ~loc schema];
-            since = [%e eopt ~loc ~f:(esemver ~loc) since];
+            since = [%e esince ~loc since];
           }]
   and key =
     match type_context.attributes.union_key with

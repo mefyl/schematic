@@ -28,7 +28,7 @@ module type S = sig
   type t
 
   val name : string
-  val encode_versioned : 'a Schema.t -> 'a -> t * Version.t option
+  val encode_versioned : 'a Schema.t -> 'a -> t * Schema.Library_versions.t
   val encode : 'a Schema.t -> 'a -> t
   val decode : 'a Schema.t -> t -> ('a, E.decoding) Result.t
 end
@@ -349,7 +349,8 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
     let[@landmark "Schematic.Coding.decode " ^ Coding.name] res v = decode v in
     res
 
-  type _ Stdlib.Effect.t += Minimal_version : Semver.t -> unit Stdlib.Effect.t
+  type _ Stdlib.Effect.t +=
+    | Minimal_version : Schema.Library_versions.t -> unit Stdlib.Effect.t
 
   let encode_versioned schema =
     let encode =
@@ -433,10 +434,10 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           in
           fun v ->
             let fields =
-              let fields, version = f (encode v) in
+              let fields, versions = f (encode v) in
               let () =
-                Option.iter version ~f:(fun version ->
-                    Stdlib.Effect.perform (Minimal_version version))
+                if not (Map.is_empty versions) then
+                  Stdlib.Effect.perform (Minimal_version versions)
               in
               List.filter_map ~f:Fn.id fields
             in
@@ -471,8 +472,10 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
                   let () =
                     match since with
                     | None -> ()
-                    | Some version ->
-                      Stdlib.Effect.perform (Minimal_version version)
+                    | Some (version, library) ->
+                      Stdlib.Effect.perform
+                        (Minimal_version
+                           (Schema.Library_versions.singleton library version))
                   in
                   let v = encode v in
                   match key with
@@ -503,31 +506,25 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
     let[@landmark "Schematic.Coding.encode " ^ Coding.name] res v =
       let open Stdlib.Effect.Shallow in
       let rec handle : type arg res.
-          Semver.t option ->
+          Schema.Library_versions.t ->
           (arg, res) continuation ->
           arg ->
-          res * Semver.t option =
-       fun version k arg ->
+          res * Schema.Library_versions.t =
+       fun versions k arg ->
         continue_with k arg
           {
-            retc = (fun res -> (res, version));
+            retc = (fun res -> (res, versions));
             exnc = raise;
             effc =
               (fun (type b) (eff : b Stdlib.Effect.t) ->
                 match eff with
                 | Minimal_version v ->
-                  let version =
-                    match version with
-                    | Some version when Semver.greater_than version v -> version
-                    | _ -> v
-                  in
-                  Some
-                    (fun (k : (b, res) continuation) ->
-                      handle (Some version) k ())
+                  let version = Schema.Library_versions.union versions v in
+                  Some (fun (k : (b, res) continuation) -> handle version k ())
                 | _ -> None);
           }
       in
-      handle None (fiber encode) v
+      handle Schema.Library_versions.empty (fiber encode) v
     in
     res
 

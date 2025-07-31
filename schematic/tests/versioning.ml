@@ -1,3 +1,5 @@
+open Base
+
 module Schemas_library = struct
   type Schematic.Schema.library += V
 
@@ -22,17 +24,18 @@ let since () =
   in
   let () =
     Alcotest.(check ~here:[%here] (option (module Schematic.Version)))
-      "unconstrained encoding" None a_version
+      "unconstrained encoding" None
+      (Map.find a_version Schemas_library.V)
   and () =
     Alcotest.(check ~here:[%here] (option (module Schematic.Version)))
       "encoding constrained to >= 0.2.0"
       (Some (Schematic.Version.make 0 2 0))
-      c_version
+      (Map.find c_version Schemas_library.V)
   and () =
     Alcotest.(check ~here:[%here] (option (module Schematic.Version)))
       "encoding constrained to >= 0.2.0"
       (Some (Schematic.Version.make 0 2 0))
-      c_inlined_version
+      (Map.find c_inlined_version Schemas_library.V)
   in
   ()
 
