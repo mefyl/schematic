@@ -12,6 +12,8 @@ type version =
   } [@@deriving schema]
 ```
 
+## Coding
+
 Encode and decode to different formats using said schema.
 
 ```ocaml
@@ -64,3 +66,26 @@ let () = Json.of_schema version_schema |> Format.printf "%a" Json.pp
    "additionalProperties":
    false}
 ```
+
+## Versioning
+
+### Minimal decoding version
+
+Schematic supports declaring the minimal required version to decode an
+object through annotations. When encoding an object, using
+`encode_versioned` instead of `encode` will yield an additional map
+that describes the minimal version of each library required to decode
+the result. This can be used for instance to determine later whether a
+client is recent enough to receive this serialized piece of data.
+
+Supported means of declaring a minimal version:
+
+* `@schematic.since` on variant constructors declares that this
+  constructor was introduced at a specific version.
+  
+  ```ocaml
+  type t =
+    | A of int
+    | B of string [@@schematic.since 1.2.3] 
+      (** clients older than 1.2.3 will not be able to decode [B]. *)
+  ```

@@ -25,11 +25,23 @@ module Defaults = struct
 end
 
 module type S = sig
+  (** [t] is the type this coder encodes to and decodes from. *)
   type t
 
+  (** [name] is a pretty name for this coding for messaging purpose. *)
   val name : string
-  val encode_versioned : 'a Schema.t -> 'a -> t * Schema.Library_versions.t
+
+  (** [encode schema value] is the coded representation of [value] according to
+      [schema]. *)
   val encode : 'a Schema.t -> 'a -> t
+
+  (** [encode_versioned schema value] is [(encoded, versions)], where [encoded]
+      is [encode schema value] and [versions] the set of mimimum library version
+      requirement to be able to decode it back. *)
+  val encode_versioned : 'a Schema.t -> 'a -> t * Schema.Library_versions.t
+
+  (** [decode schema code] is the decoded version of [code] accorded to
+      [schema]. *)
   val decode : 'a Schema.t -> t -> ('a, E.decoding) Result.t
 end
 
