@@ -358,7 +358,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       in
       decode_schema { schema = None; path = []; reason = "" } schema
     in
-    let[@landmark "Schematic.Coding.decode " ^ Coding.name] res v = decode v in
+    let res v = decode v in
     res
 
   type _ Stdlib.Effect.t +=
@@ -515,7 +515,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       in
       encode_schema { schema = None; path = []; reason = "" } schema
     in
-    let[@landmark "Schematic.Coding.encode " ^ Coding.name] res v =
+    let res v =
       let open Stdlib.Effect.Shallow in
       let rec handle : type arg res.
           Schema.Library_versions.t ->
@@ -558,14 +558,13 @@ module Make_string (C : STR) : STR with type t = string = struct
 
   let name = C.name
 
-  let[@landmark "Schematic.Coding.String.encode " ^ C.name] encode_versioned
-      schema t =
+  let encode_versioned schema t =
     let res, version = C.encode_versioned schema t in
     (C.to_string res, version)
 
   let encode schema t = encode_versioned schema t |> fst
 
-  let[@landmark "Schematic.Coding.String.decode " ^ C.name] decode schema s =
+  let decode schema s =
     match C.of_string s with
     | Result.Ok t -> C.decode schema t
     | Result.Error msg ->

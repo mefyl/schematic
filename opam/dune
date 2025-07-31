@@ -21,8 +21,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-ios --input
     %{dep:../entropic.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target entropic-ios.%{version:entropic}.opam)
@@ -47,8 +46,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-macos
     --input %{dep:../entropic.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target entropic-macos.%{version:entropic}.opam)
@@ -73,8 +71,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-windows
     --input %{dep:../entropic.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target entropic-windows.%{version:entropic}.opam)
@@ -99,8 +96,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-android
     --input %{dep:../entropic.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target entropic-android.%{version:entropic}.opam)
@@ -138,8 +134,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-ios --input
     %{dep:../schematic.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target schematic-ios.%{version:schematic}.opam)
@@ -164,8 +159,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-macos
     --input %{dep:../schematic.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target schematic-macos.%{version:schematic}.opam)
@@ -190,8 +184,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-windows
     --input %{dep:../schematic.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target schematic-windows.%{version:schematic}.opam)
@@ -216,8 +209,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-android
     --input %{dep:../schematic.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target schematic-android.%{version:schematic}.opam)
@@ -255,8 +247,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-ios --input
     %{dep:../schematic-cli.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target schematic-cli-ios.%{version:schematic-cli}.opam)
@@ -281,8 +272,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-macos
     --input %{dep:../schematic-cli.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target schematic-cli-macos.%{version:schematic-cli}.opam)
@@ -307,8 +297,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-windows
     --input %{dep:../schematic-cli.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target schematic-cli-windows.%{version:schematic-cli}.opam)
@@ -333,8 +322,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-android
     --input %{dep:../schematic-cli.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target schematic-cli-android.%{version:schematic-cli}.opam)
@@ -372,8 +360,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-ios --input
     %{dep:../schematic-jsoo.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target schematic-jsoo-ios.%{version:schematic-jsoo}.opam)
@@ -398,8 +385,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-macos
     --input %{dep:../schematic-jsoo.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target schematic-jsoo-macos.%{version:schematic-jsoo}.opam)
@@ -424,8 +410,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-windows
     --input %{dep:../schematic-jsoo.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target schematic-jsoo-windows.%{version:schematic-jsoo}.opam)
@@ -450,8 +435,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-android
     --input %{dep:../schematic-jsoo.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target schematic-jsoo-android.%{version:schematic-jsoo}.opam)
@@ -489,8 +473,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-ios --input
     %{dep:../schematic-sexp.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target schematic-sexp-ios.%{version:schematic-sexp}.opam)
@@ -515,8 +498,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-macos
     --input %{dep:../schematic-sexp.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target schematic-sexp-macos.%{version:schematic-sexp}.opam)
@@ -541,8 +523,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-windows
     --input %{dep:../schematic-sexp.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target schematic-sexp-windows.%{version:schematic-sexp}.opam)
@@ -567,8 +548,7 @@
    (run %{workspace_root}/.logistic/ci/dune/dune_sak.exe rewrite-android
     --input %{dep:../schematic-sexp.opam} --cross
     entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
-    --cross-both fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
-    --cross-exclude ""))))
+    --cross-both fmt,ppx_deriving,ppx_here,semver2 --cross-exclude ""))))
 
 (rule
  (target schematic-sexp-android.%{version:schematic-sexp}.opam)

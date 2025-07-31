@@ -25,9 +25,6 @@ depends: [
   "hmap"
   "hlist-macos" {>= "0.2.0" & < "0.3.0"}
   "hmap"
-  "landmarks" {>= "1.5"}
-  "landmarks-ppx" {>= "1.5"}
-  "landmarks-ppx-macos" {>= "1.5"}
   "logs-macos"
   "ocaml-macos" {>= "4.14.0"}
   "ppxlib"

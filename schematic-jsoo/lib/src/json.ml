@@ -32,14 +32,14 @@ module String = Schematic.Coding.Make_string (struct
 
   let content_type = "application/json"
 
-  let[@landmark "JSON.parse"] of_string s =
+  let of_string s =
     try
       Js_of_ocaml.Js.Unsafe.global##._JSON##parse (Js_of_ocaml.Js.string s)
       |> Result.return
     with Js_of_ocaml.Js_error.Exn e ->
       Result.fail @@ Js_of_ocaml.Js_error.message e
 
-  let[@landmark "JSON.stringify"] to_string v =
+  let to_string v =
     Js_of_ocaml.Js.Unsafe.global##._JSON##stringify v
     |> Js_of_ocaml.Js.to_string
 end)
