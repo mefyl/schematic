@@ -10,6 +10,10 @@ module Tests = Test_utils.Tests.Make (struct
   type t = Ezjsonm.value
 
   let name = "Swift"
+
+  let encode_versioned schema v =
+    (Schematic.Swift.to_json schema v, Schematic.Schema.Library_versions.empty)
+
   let encode = Schematic.Swift.to_json
   let decode = Schematic.Swift.from_json
   let t = Alcotest.testable Schematic.Json.pp Schematic.Json.equal

@@ -25,10 +25,23 @@ module Defaults = struct
 end
 
 module type S = sig
+  (** [t] is the type this coder encodes to and decodes from. *)
   type t
 
+  (** [name] is a pretty name for this coding for messaging purpose. *)
   val name : string
+
+  (** [encode schema value] is the coded representation of [value] according to
+      [schema]. *)
   val encode : 'a Schema.t -> 'a -> t
+
+  (** [encode_versioned schema value] is [(encoded, versions)], where [encoded]
+      is [encode schema value] and [versions] the set of mimimum library version
+      requirement to be able to decode it back. *)
+  val encode_versioned : 'a Schema.t -> 'a -> t * Schema.Library_versions.t
+
+  (** [decode schema code] is the decoded version of [code] accorded to
+      [schema]. *)
   val decode : 'a Schema.t -> t -> ('a, E.decoding) Result.t
 end
 
@@ -348,7 +361,12 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
     let[@landmark "Schematic.Coding.decode " ^ Coding.name] res v = decode v in
     res
 
-  let encode schema =
+  type _ Stdlib.Effect.t +=
+    | Require_minimal_version :
+        Schema.Library_versions.t
+        -> unit Stdlib.Effect.t
+
+  let encode_versioned schema =
     let encode =
       let rec encode_field : type req t.
           E.decoding ->
@@ -423,13 +441,20 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
               |> Base.Sequence.to_list)
         | Object { fields; encode; _ } ->
           let f =
-            Schema.Inline.value
+            Schema.Inline.value_versioned
               { f = (fun field req -> encode_field context field req) }
               fields
             |> Result.ok_or_failwith
           in
           fun v ->
-            let fields = f (encode v) |> List.filter_map ~f:Fn.id in
+            let fields =
+              let fields, versions = f (encode v) in
+              let () =
+                if not (Map.is_empty versions) then
+                  Stdlib.Effect.perform (Require_minimal_version versions)
+              in
+              List.filter_map ~f:Fn.id fields
+            in
             Coding.of_fields fields
         | Tuple { items; encode = t_encode; decode = _ } ->
           let encode =
@@ -453,11 +478,19 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | Time_local -> Coding.of_time_local
         | Union { cases; key; _ } -> (
           let cases =
-            let f (Schema.Case { encoder; name; schema; _ }) =
+            let f (Schema.Case { encoder; name; schema; since; _ }) =
               let encode = encode_schema context schema in
               fun v ->
                 match encoder v with
                 | Some v -> (
+                  let () =
+                    match since with
+                    | None -> ()
+                    | Some (version, library) ->
+                      Stdlib.Effect.perform
+                        (Require_minimal_version
+                           (Schema.Library_versions.singleton library version))
+                  in
                   let v = encode v in
                   match key with
                   | Some key -> (
@@ -484,8 +517,34 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
       in
       encode_schema { schema = None; path = []; reason = "" } schema
     in
-    let[@landmark "Schematic.Coding.encode " ^ Coding.name] res v = encode v in
+    let[@landmark "Schematic.Coding.encode " ^ Coding.name] res v =
+      let open Stdlib.Effect.Shallow in
+      let rec handle : type arg res.
+          Schema.Library_versions.t ->
+          (arg, res) continuation ->
+          arg ->
+          res * Schema.Library_versions.t =
+       fun versions k arg ->
+        continue_with k arg
+          {
+            retc = (fun res -> (res, versions));
+            exnc = raise;
+            effc =
+              (fun (type b) (eff : b Stdlib.Effect.t) ->
+                match eff with
+                | Require_minimal_version v ->
+                  let version = Schema.Library_versions.union versions v in
+                  Some (fun (k : (b, res) continuation) -> handle version k ())
+                | _ -> None);
+          }
+      in
+      handle Schema.Library_versions.empty (fiber encode) v
+    in
     res
+
+  let encode schema =
+    let encode = encode_versioned schema in
+    fun v -> encode v |> fst
 end
 
 module type STR = sig
@@ -501,8 +560,12 @@ module Make_string (C : STR) : STR with type t = string = struct
 
   let name = C.name
 
-  let[@landmark "Schematic.Coding.String.encode " ^ C.name] encode schema t =
-    C.encode schema t |> C.to_string
+  let[@landmark "Schematic.Coding.String.encode " ^ C.name] encode_versioned
+      schema t =
+    let res, version = C.encode_versioned schema t in
+    (C.to_string res, version)
+
+  let encode schema t = encode_versioned schema t |> fst
 
   let[@landmark "Schematic.Coding.String.decode " ^ C.name] decode schema s =
     match C.of_string s with

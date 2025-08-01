@@ -20,5 +20,9 @@ module Make (C : Coding.S with type t = string) :
             reason = "Base 64 decoding failed: " ^ err;
           }
 
-  let encode schema value = C.encode schema value |> Base64.encode_exn ~alphabet
+  let encode_versioned schema value =
+    let res, version = C.encode_versioned schema value in
+    (Base64.encode_exn ~alphabet res, version)
+
+  let encode schema value = encode_versioned schema value |> fst
 end

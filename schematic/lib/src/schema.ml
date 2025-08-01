@@ -26,71 +26,110 @@ let field_schema = function
 
 module Marks = Stdlib.Set.Make (String)
 
-let rec pp_descriptor : type u. Marks.t -> u descriptor Fmt.t =
- fun marks f d ->
-  let fmt =
-    let open Fmt in
-    let indent = 2 in
-    match d with
-    | Any _ -> const string "Any"
-    | Bool -> const string "Bool"
-    | Coding { f } -> const (pp_descriptor marks) (f None)
-    | Date -> const string "Date"
-    | Fixpoint s -> const (pp_descriptor marks) (Lazy.force s)
-    | Float -> const string "Float"
-    | Ignore -> const string "Ignore"
-    | Int -> const string "Int"
-    | Int64 -> const string "Int64"
-    | Json -> const string "Json"
-    | List schema ->
-      box ~indent
-      @@ const string "["
-         ++ sp
-         ++ (box @@ const (pp marks) schema)
-         ++ sp
-         ++ const string "]"
-    | Map { descriptor; _ } -> const (pp_descriptor marks) descriptor
-    | Mapping { item; _ } -> const (pp marks) item
-    | Null -> const string "Null"
-    | Nullable s ->
-      const string "Nullable (" ++ const (pp marks) s ++ const string ")"
-    | Sequence { item; _ } ->
-      box ~indent
-      @@ const string "["
-         ++ sp
-         ++ (box @@ const (pp marks) item)
-         ++ sp
-         ++ const string "]"
-    | String -> const string "String"
-    | String_const v -> escape v
-    | Time -> const string "Time"
-    | Time_local -> const string "Time_local"
-    | Object { fields; _ } ->
-      box
-      @@ (hvbox ~indent
-         @@ (const string "{" ++ sp ++ const (hvbox (pp_fields marks)) fields))
-         ++ sp
-         ++ const string "}"
-    | Tuple { items; _ } ->
-      box
-      @@ (hvbox ~indent
-         @@ (const string "[" ++ sp ++ const (hvbox (pp_tuple marks)) items))
-         ++ sp
-         ++ const string "]"
-    | Union { cases; _ } ->
-      box
-      @@ hvbox ~indent
-           (const string "Union ["
-           ++ sp
-           ++ (hvbox @@ const (hvbox (list ~sep:comma (pp_case marks))) cases))
-         ++ sp
-         ++ const string "]"
+let pp_container' ?(delimiters = ("{", "}")) ~indent pp_content =
+  let intro, outro = delimiters in
+  let open Fmt in
+  let pp_lobby f _ =
+    Stdlib.Format.pp_print_custom_break ~fits:("", 1, "")
+      ~breaks:("", indent, "") f
   in
-  fmt f ()
+  hvbox
+  @@ const string intro
+     ++ pp_lobby
+     ++ (hvbox @@ pp_content)
+     ++ sp
+     ++ const string outro
 
-and pp_case : type u. Marks.t -> u case Fmt.t =
- fun marks f (Case { name; schema; _ }) ->
-  Fmt.pf f "@[@[<hv>{@ name: %S,@ schema: %a@ @]}@]" name (pp marks) schema
+let pp_container ?delimiters ?(sep = Fmt.comma) ~indent pp_item =
+  let open Fmt in
+  pp_container' ?delimiters ~indent (seq ~sep (box ~indent pp_item))
+
+let rec pp_descriptor : type u. Marks.t -> u descriptor Fmt.t =
+  let indent = 2 in
+  let pp_case : type u. Marks.t -> u case Fmt.t =
+   fun marks f (Case { name; schema; since; _ }) ->
+    let pp =
+      let open Fmt in
+      const Dump.string name
+      ++ const char ':'
+      ++ sp
+      ++ const
+           (pp_container' ~indent
+              (using fst
+                 (option
+                    (const string "since: " ++ using fst Semver.pp ++ comma))
+              ++ (using snd
+                 @@ box ~indent (const string "schema:" ++ sp ++ pp marks))))
+           (since, schema)
+    in
+    pp f ()
+  in
+  fun marks f d ->
+    let fmt =
+      let open Fmt in
+      match d with
+      | Any _ -> const string "Any"
+      | Bool -> const string "Bool"
+      | Coding { f } -> const (pp_descriptor marks) (f None)
+      | Date -> const string "Date"
+      | Fixpoint s -> const (pp_descriptor marks) (Lazy.force s)
+      | Float -> const string "Float"
+      | Ignore -> const string "Ignore"
+      | Int -> const string "Int"
+      | Int64 -> const string "Int64"
+      | Json -> const string "Json"
+      | List schema ->
+        box ~indent
+        @@ const string "["
+           ++ sp
+           ++ (box @@ const (pp marks) schema)
+           ++ sp
+           ++ const string "]"
+      | Map { descriptor; _ } -> const (pp_descriptor marks) descriptor
+      | Mapping { item; _ } -> const (pp marks) item
+      | Null -> const string "Null"
+      | Nullable s ->
+        const string "Nullable (" ++ const (pp marks) s ++ const string ")"
+      | Sequence { item; _ } ->
+        box ~indent
+        @@ const string "["
+           ++ sp
+           ++ (box @@ const (pp marks) item)
+           ++ sp
+           ++ const string "]"
+      | String -> const string "String"
+      | String_const v -> escape v
+      | Time -> const string "Time"
+      | Time_local -> const string "Time_local"
+      | Object { fields; _ } ->
+        let open struct
+          type any_field = Field : _ field -> any_field
+          type any_fields = Fields : _ fields -> any_fields
+        end in
+        let pp_field fmt (Field { name; schema; requirement; _ }) =
+          let schema = field_schema schema in
+          Fmt.pf fmt "%s (%a):@ %a" name pp_requirement requirement (pp marks)
+            schema
+        and fields =
+          let unfold = function
+            | Fields FieldEnd -> None
+            | Fields (Field { field; rest }) -> Some (Field field, Fields rest)
+          in
+          Stdlib.Seq.unfold unfold (Fields fields)
+        in
+        const (pp_container ~indent pp_field) fields
+      | Tuple { items; _ } ->
+        box
+        @@ (hvbox ~indent
+           @@ (const string "[" ++ sp ++ const (hvbox (pp_tuple marks)) items))
+           ++ sp
+           ++ const string "]"
+      | Union { cases; _ } ->
+        const
+          (pp_container ~indent ~delimiters:("Union {", "}") (pp_case marks))
+        @@ Stdlib.List.to_seq cases
+    in
+    fmt f ()
 
 and pp_requirement : type t req. (t, req) requirement Fmt.t =
  fun f -> function
@@ -99,14 +138,6 @@ and pp_requirement : type t req. (t, req) requirement Fmt.t =
   | Default _ -> Fmt.string f "Default"
   | Required -> Fmt.string f "Required"
   | Optional -> Fmt.string f "Optional"
-
-and pp_fields : type t. Marks.t -> t fields Fmt.t =
- fun marks fmt -> function
-  | FieldEnd -> ()
-  | Field { field = { name; schema; requirement; _ }; rest; _ } ->
-    let schema = field_schema schema in
-    Fmt.pf fmt "%s (%a): %a,@ %a" name pp_requirement requirement (pp marks)
-      schema (pp_fields marks) rest
 
 and pp_tuple : type t. Marks.t -> t tuple Fmt.t =
  fun marks fmt -> function
@@ -120,7 +151,7 @@ and pp : type u. Marks.t -> u t Fmt.t =
   | Some id when Marks.mem id marks -> Fmt.fmt "<%s>" f id
   | Some id ->
     let marks = Marks.add id marks in
-    Fmt.fmt "<%s> = %a" f id (pp_descriptor marks) descriptor
+    Fmt.fmt "<%s> =@ %a" f id (pp_descriptor marks) descriptor
   | None -> (pp_descriptor marks) f descriptor
 
 let pp schema = pp Marks.empty schema
@@ -376,9 +407,10 @@ module Make_inline (M : Base.Monad.S) = struct
     in
     inline desc Required f
 
-  let value (f : 'res inline_v) fields =
+  let value_versioned (f : 'res inline_v) fields =
     let rec inline_field : type req t.
-        (t, req) field -> (req -> 'res list M.t, string) Result.t =
+        (t, req) field ->
+        (req -> ('res list * Library_versions.t) M.t, string) Result.t =
      fun field ->
       let outline _schema =
         Result.return
@@ -386,23 +418,35 @@ module Make_inline (M : Base.Monad.S) = struct
         let f = f.f field in
         fun v ->
           let++ res = f v in
-          [ res ]
-      and inline : t Schema_intf.t -> (req -> 'res list M.t, string) Result.t =
+          ([ res ], Library_versions.empty)
+      and inline :
+          t Schema_intf.t ->
+          (req -> ('res list * Library_versions.t) M.t, string) Result.t =
        fun schema ->
         let+ f = inline_descriptor schema.descriptor in
         match field.requirement with
-        | Required -> (f : req -> 'res list M.t)
+        | Required -> (f : req -> ('res list * Library_versions.t) M.t)
         | Default _ -> f
-        | Computed -> ( function Some v -> f v | None -> M.return [])
+        | Computed -> (
+          function
+          | Some v -> f v
+          | None -> M.return ([], Library_versions.empty))
         | Computed_optional -> (
-          function Some (Some v) -> f v | _ -> M.return [])
-        | Optional -> ( function Some v -> f v | None -> M.return [])
+          function
+          | Some (Some v) -> f v
+          | _ -> M.return ([], Library_versions.empty))
+        | Optional -> (
+          function
+          | Some v -> f v
+          | None -> M.return ([], Library_versions.empty))
       in
       inline_try ~inline ~outline field.schema
     and inline_fields : type t.
-        t Hlist.t fields -> (t Hlist.t -> 'res list M.t, string) Result.t =
+        t Hlist.t fields ->
+        (t Hlist.t -> ('res list * Library_versions.t) M.t, string) Result.t =
       function
-      | FieldEnd -> Result.return (fun Hlist.[] -> M.return [])
+      | FieldEnd ->
+        Result.return (fun Hlist.[] -> M.return ([], Library_versions.empty))
       | Field { field; rest } ->
         let* tail = inline_fields rest in
         if field_ignored field then
@@ -410,12 +454,14 @@ module Make_inline (M : Base.Monad.S) = struct
         else
           let+ head = inline_field field in
           fun Hlist.(hd :: tl) ->
-            let++ head = head hd
-            and++ tail = tail tl in
-            head @ tail
+            let++ head, head_version = head hd
+            and++ tail, tail_version = tail tl in
+            (head @ tail, Library_versions.union tail_version head_version)
     and inline_descriptor : type t.
-        t descriptor -> (t -> 'res list M.t, string) Result.t = function
-      | Ignore -> Result.return (fun () -> M.return [])
+        t descriptor ->
+        (t -> ('res list * Library_versions.t) M.t, string) Result.t = function
+      | Ignore ->
+        Result.return (fun () -> M.return ([], Library_versions.empty))
       | Fixpoint d ->
         (* Break infinite recursion. Would be better to have a fixpoint here
            too. *)
@@ -426,13 +472,13 @@ module Make_inline (M : Base.Monad.S) = struct
         fun v -> f (encode v)
       | Nullable schema -> (
         let+ f = inline_descriptor schema.descriptor in
-        function Some v -> f v | None -> M.return [])
+        function Some v -> f v | None -> M.return ([], Library_versions.empty))
       | Object { fields; encode; _ } ->
         let+ f = inline_fields fields in
         fun v -> f (encode v)
       | Union { cases; key; _ } -> (
         let+ cases =
-          let f (Case { encoder; name; schema; _ }) =
+          let f (Case { encoder; name; schema; since; _ }) =
             let+ res = inline_descriptor schema.descriptor in
             let key =
               match key with
@@ -456,13 +502,22 @@ module Make_inline (M : Base.Monad.S) = struct
               match encoder v with
               | None -> None
               | Some v -> (
-                match key with
-                | None -> Some (res v)
-                | Some key ->
-                  Option.return
-                  @@ let++ key = key ()
-                     and++ res = res v in
-                     key :: res)
+                let result =
+                  match key with
+                  | None -> res v
+                  | Some key ->
+                    let++ key = key ()
+                    and++ res, versions = res v in
+                    (key :: res, versions)
+                in
+                match since with
+                | None -> Some result
+                | Some (version, library) ->
+                  Some
+                    (let++ res, versions = result in
+                     ( res,
+                       Library_versions.with_version library version versions ))
+                )
           in
           List.map ~f cases |> Result.all
         in
@@ -475,6 +530,12 @@ module Make_inline (M : Base.Monad.S) = struct
           (Fmt.str "inline field is not an object: %a" pp_descriptor s)
     in
     inline_fields fields
+
+  let value f fields =
+    let+ result = value_versioned f fields in
+    fun fields ->
+      let++ result, _ = result fields in
+      result
 end
 
 module Inline = Make_inline (Base.Monad.Ident)

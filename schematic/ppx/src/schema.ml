@@ -53,6 +53,23 @@ let schema_of_expanded ~context ~loc = function
     schema_of_components ~context ~loc descriptor id parametric
   | Expression e -> e
 
+let eopt ~loc ~f = function
+  | None -> [%expr None]
+  | Some value -> [%expr Some [%e f value]]
+
+let esemver ~loc { Semver.major; minor; patch; prerelease; build } =
+  let open Ast_builder.Default in
+  [%expr
+    Schematic.Version.make [%e eint ~loc major] [%e eint ~loc minor]
+      [%e eint ~loc patch]
+      ~prerelease:[%e elist ~loc @@ List.map ~f:(estring ~loc) prerelease]
+      ~build:[%e elist ~loc @@ List.map ~f:(estring ~loc) build]]
+
+let esince ~loc since =
+  eopt ~loc
+    ~f:(fun version -> [%expr [%e esemver ~loc version], Schemas_library.V])
+    since
+
 let rec encode_type ~context ~type_context core_type =
   let Attributes.{ schema; _ } =
     Attributes.extract ~schema:true core_type.ptyp_attributes
@@ -357,7 +374,7 @@ and expand_any_variant ~context ~type_context poly options =
         Attributes.extract ~alias:true
           ~computed:(match pcd_args with Pcstr_record _ -> true | _ -> false)
           ~gadt_variant:(Option.is_some context.gadt_variant)
-          attrs
+          ~since:true attrs
       in
       match (context.gadt_variant, gadt_variant) with
       | Some _, None -> None
@@ -367,7 +384,8 @@ and expand_any_variant ~context ~type_context poly options =
     in
     List.filter_map ~f options
   in
-  let f (txt, pcd_args, loc, Attributes.{ alias; aliases; computed; _ }) =
+  let f (txt, pcd_args, loc, Attributes.{ alias; aliases; computed; since; _ })
+      =
     let module Ast = (val Ast_builder.make loc) in
     let name =
       version_match ~f:Ast.estring (Ast.estring (String.lowercase txt)) alias
@@ -410,15 +428,16 @@ and expand_any_variant ~context ~type_context poly options =
                         inline = false;
                         encoder = (fun () -> Some ());
                         decoder = (fun () -> ());
+                        since = [%e esince ~loc since];
                       }
                   in
                   Union
                     {
-                      key = None;
-                      polymorphic = false;
                       cases =
                         __schematic_case [%e name]
                         :: Stdlib.List.map __schematic_case [%e aliases];
+                      key = None;
+                      polymorphic = false;
                     }]
           else
             expanded_of_descriptor ~loc
@@ -481,6 +500,7 @@ and expand_any_variant ~context ~type_context poly options =
             name = [%e name];
             raw_name = [%e Ast.estring txt];
             schema = [%e schema_of_expanded ~context ~loc schema];
+            since = [%e esince ~loc since];
           }]
   and key =
     match type_context.attributes.union_key with

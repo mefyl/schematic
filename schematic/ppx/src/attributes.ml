@@ -30,6 +30,7 @@ type t = {
   gadt_variant : string option;  (** [[@schematic.gadt]] attribute. *)
   name : expression option;  (** [[@schematic.name]] attribute. *)
   schema : expression option;  (** [@schematic.schema] attribute *)
+  since : Semver.t option;  (** [@schematic.since] attribute*)
   union_key : string option;  (** [@schematic.union_key] attribute*)
 }
 [@@deriving make]
@@ -45,7 +46,7 @@ let fields_of_computed ~loc computed =
   |> Sequence.to_list
 
 let rec extract ?(alias = false) ?(computed = false) ?(gadt_variant = false)
-    ?(name = false) ?(schema = false) ?(union_key = false) =
+    ?(name = false) ?(schema = false) ?(since = false) ?(union_key = false) =
   let merge name ~loc old v =
     match old with
     | None -> Some v
@@ -120,6 +121,23 @@ let rec extract ?(alias = false) ?(computed = false) ?(gadt_variant = false)
     | "schematic.name" when name -> attribute_name ~loc false attr_payload attrs
     | "schematic.name_opt" when name ->
       attribute_name ~loc true attr_payload attrs
+    | "schematic.since" when since ->
+      let pattern =
+        let semver_of_string repr =
+          match Semver.of_string repr with
+          | Some version -> version
+          | None ->
+            Ppxlib.Location.raise_errorf ~loc
+              "schematic-ppx: invalid semantic version: %S" repr
+        in
+        let open Ast_pattern in
+        map_result ~f:semver_of_string @@ single_expr_payload (estring __)
+      in
+      {
+        attrs with
+        since =
+          merge "since" ~loc attrs.since @@ expect ~loc pattern attr_payload;
+      }
     | "schematic.schema" when schema ->
       {
         attrs with
@@ -145,7 +163,8 @@ let rec extract ?(alias = false) ?(computed = false) ?(gadt_variant = false)
       aliases = [];
       computed = Map.empty (module String);
       gadt_variant = None;
-      schema = None;
       name = None;
+      schema = None;
+      since = None;
       union_key = None;
     }

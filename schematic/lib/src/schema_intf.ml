@@ -7,6 +7,45 @@ type (_, _) requirement =
   | Required : ('a, 'a) requirement
   | Optional : ('a, 'a option) requirement
 
+(** Library identifiers.
+
+    Libraries must define a new library constructor to version their schemas. *)
+type library = ..
+
+type version = library -> Semver.t option
+
+module Library_versions = struct
+  module Key = struct
+    type t = library
+
+    include Comparable.Make (struct
+      type t = library
+
+      let compare = Poly.compare
+      let sexp_of_t _ = Sexp.List []
+    end)
+  end
+
+  module Map = Map.M (Key)
+  include Map
+
+  type t = Semver.t Map.t
+
+  let empty = Base.Map.empty (module Key)
+  let singleton key value = Base.Map.singleton (module Key) key value
+
+  let union l r =
+    Base.Map.merge_skewed l r ~combine:(fun ~key:_ left right ->
+        if Semver.less_than left right then right else left)
+
+  let with_version library version versions =
+    Base.Map.update versions library ~f:(function
+      | Some previous_version
+        when not (Semver.less_than previous_version version) ->
+        previous_version
+      | _ -> version)
+end
+
 type _ case =
   | Case : {
       decoder : 'a -> 't;
@@ -17,6 +56,7 @@ type _ case =
       name : string;
       raw_name : string;  (** Only used for the C ABI. *)
       schema : 'a t;
+      since : (Semver.t * library) option;
     }
       -> 't case
 
@@ -245,9 +285,6 @@ module type WALK = sig
   val time_local : t M.t
   val tuple : t list M.t -> t M.t
 end
-
-type library = ..
-type version = library -> Semver.t option
 
 (** A descriptor mapped to the simplest atomic descriptor possible *)
 type 't flatten =

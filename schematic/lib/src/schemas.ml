@@ -101,6 +101,7 @@ module Either = struct
                   inline = false;
                   encoder = (function First x -> Some x | Second _ -> None);
                   decoder = Either.first;
+                  since = None;
                 };
               Case
                 {
@@ -110,6 +111,7 @@ module Either = struct
                   inline = false;
                   encoder = (function Second x -> Some x | First _ -> None);
                   decoder = Either.second;
+                  since = None;
                 };
             ];
           key = None;
@@ -166,6 +168,7 @@ module Result = struct
                   inline = false;
                   encoder = (function Ok x -> Some x | Error _ -> None);
                   decoder = Result.return;
+                  since = None;
                 };
               Case
                 {
@@ -176,6 +179,7 @@ module Result = struct
                   encoder =
                     (function Result.Error x -> Some x | Result.Ok _ -> None);
                   decoder = Result.fail;
+                  since = None;
                 };
             ];
           key = None;
