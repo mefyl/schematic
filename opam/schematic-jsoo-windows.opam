@@ -17,9 +17,6 @@ depends: [
   "fmt-windows"
   "js_of_ocaml" {>= "4.0.0" & < "7.0.0"}
   "js_of_ocaml-ppx" {>= "4.0.0" & < "7.0.0"}
-  "landmarks"
-  "landmarks-ppx"
-  "landmarks-ppx-windows"
   "ppx_here"
   "ppx_here-windows"
   "ptime-windows"

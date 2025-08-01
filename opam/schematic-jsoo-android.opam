@@ -17,9 +17,6 @@ depends: [
   "fmt-android"
   "js_of_ocaml" {>= "4.0.0" & < "7.0.0"}
   "js_of_ocaml-ppx" {>= "4.0.0" & < "7.0.0"}
-  "landmarks"
-  "landmarks-ppx"
-  "landmarks-ppx-android"
   "ppx_here"
   "ppx_here-android"
   "ptime-android"

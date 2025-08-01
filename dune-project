@@ -50,10 +50,6 @@
     (>= 0.2.0)
     (< 0.3.0)))
   hmap
-  (landmarks
-   (>= 1.5))
-  (landmarks-ppx
-   (>= 1.5))
   logs
   (ocaml
    (>= 4.14.0))
@@ -104,8 +100,6 @@
    (and
     (>= 4.0.0)
     (< 7.0.0)))
-  landmarks
-  landmarks-ppx
   (ppx_deriving :with-test)
   ppx_here
   ptime

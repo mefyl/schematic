@@ -1,7 +1,7 @@
 --name
 schematic
 --cross-both
-fmt,landmarks-ppx,ppx_deriving,ppx_here,semver2
+fmt,ppx_deriving,ppx_here,semver2
 --cross
 base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
 --local

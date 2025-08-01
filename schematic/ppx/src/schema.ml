@@ -778,20 +778,16 @@ let close ~configuration:_ ~context ~type_context schema =
              Schema.t]),
       Ast.pvar name_versioned )
   in
-  ( {
-      pvb_pat = pattern_versioned;
-      pvb_expr = body_versioned;
-      pvb_loc = loc;
-      pvb_attributes =
-        [ Warning.unused_var_strict ~loc; Warning.unused_rec ~loc ];
-    },
+  let with_warnings binding =
     {
-      pvb_pat = pattern;
-      pvb_expr = body;
-      pvb_loc = loc;
+      binding with
       pvb_attributes =
         [ Warning.unused_var_strict ~loc; Warning.unused_rec ~loc ];
-    } )
+    }
+  in
+  ( with_warnings
+    @@ Ast.value_binding ~pat:pattern_versioned ~expr:body_versioned,
+    with_warnings @@ Ast.value_binding ~pat:pattern ~expr:body )
 
 let combine ~loc () expanded =
   let versioned, unversioned = List.unzip expanded in
