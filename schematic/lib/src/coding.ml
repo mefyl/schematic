@@ -362,7 +362,9 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
     res
 
   type _ Stdlib.Effect.t +=
-    | Minimal_version : Schema.Library_versions.t -> unit Stdlib.Effect.t
+    | Require_minimal_version :
+        Schema.Library_versions.t
+        -> unit Stdlib.Effect.t
 
   let encode_versioned schema =
     let encode =
@@ -449,7 +451,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
               let fields, versions = f (encode v) in
               let () =
                 if not (Map.is_empty versions) then
-                  Stdlib.Effect.perform (Minimal_version versions)
+                  Stdlib.Effect.perform (Require_minimal_version versions)
               in
               List.filter_map ~f:Fn.id fields
             in
@@ -486,7 +488,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
                     | None -> ()
                     | Some (version, library) ->
                       Stdlib.Effect.perform
-                        (Minimal_version
+                        (Require_minimal_version
                            (Schema.Library_versions.singleton library version))
                   in
                   let v = encode v in
@@ -530,7 +532,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
             effc =
               (fun (type b) (eff : b Stdlib.Effect.t) ->
                 match eff with
-                | Minimal_version v ->
+                | Require_minimal_version v ->
                   let version = Schema.Library_versions.union versions v in
                   Some (fun (k : (b, res) continuation) -> handle version k ())
                 | _ -> None);
