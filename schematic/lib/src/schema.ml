@@ -26,23 +26,23 @@ let field_schema = function
 
 module Marks = Stdlib.Set.Make (String)
 
-let pp_container' ?(delimiters = ("{", "}")) ~indent pp_content content =
+let pp_container' ?(delimiters = ("{", "}")) ~indent pp_content =
   let intro, outro = delimiters in
   let open Fmt in
-  let pp_lobby f () =
+  let pp_lobby f _ =
     Stdlib.Format.pp_print_custom_break ~fits:("", 1, "")
       ~breaks:("", indent, "") f
   in
   hvbox
   @@ const string intro
      ++ pp_lobby
-     ++ (hvbox @@ const pp_content content)
+     ++ (hvbox @@ pp_content)
      ++ sp
      ++ const string outro
 
-let pp_container ?delimiters ?(sep = Fmt.comma) ~indent pp_item items =
+let pp_container ?delimiters ?(sep = Fmt.comma) ~indent pp_item =
   let open Fmt in
-  pp_container' ?delimiters ~indent (seq ~sep (box ~indent pp_item)) items
+  pp_container' ?delimiters ~indent (seq ~sep (box ~indent pp_item))
 
 let rec pp_descriptor : type u. Marks.t -> u descriptor Fmt.t =
   let indent = 2 in
@@ -53,11 +53,13 @@ let rec pp_descriptor : type u. Marks.t -> u descriptor Fmt.t =
       const Dump.string name
       ++ const char ':'
       ++ sp
-      ++ pp_container' ~indent
-           (using fst
-              (option (const string "since: " ++ using fst Semver.pp ++ comma))
-           ++ (using snd
-              @@ box ~indent (const string "schema:" ++ sp ++ pp marks)))
+      ++ const
+           (pp_container' ~indent
+              (using fst
+                 (option
+                    (const string "since: " ++ using fst Semver.pp ++ comma))
+              ++ (using snd
+                 @@ box ~indent (const string "schema:" ++ sp ++ pp marks))))
            (since, schema)
     in
     pp f ()
@@ -115,7 +117,7 @@ let rec pp_descriptor : type u. Marks.t -> u descriptor Fmt.t =
           in
           Stdlib.Seq.unfold unfold (Fields fields)
         in
-        pp_container ~indent pp_field fields
+        const (pp_container ~indent pp_field) fields
       | Tuple { items; _ } ->
         box
         @@ (hvbox ~indent
@@ -123,7 +125,8 @@ let rec pp_descriptor : type u. Marks.t -> u descriptor Fmt.t =
            ++ sp
            ++ const string "]"
       | Union { cases; _ } ->
-        pp_container ~indent ~delimiters:("Union {", "}") (pp_case marks)
+        const
+          (pp_container ~indent ~delimiters:("Union {", "}") (pp_case marks))
         @@ Stdlib.List.to_seq cases
     in
     fmt f ()
