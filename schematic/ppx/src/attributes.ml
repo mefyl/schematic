@@ -30,7 +30,7 @@ type t = {
   gadt_variant : string option;  (** [[@schematic.gadt]] attribute. *)
   name : expression option;  (** [[@schematic.name]] attribute. *)
   schema : expression option;  (** [@schematic.schema] attribute *)
-  since : Semver.t option;
+  since : Semver.t option;  (** [@schematic.since] attribute*)
   union_key : string option;  (** [@schematic.union_key] attribute*)
 }
 [@@deriving make]
