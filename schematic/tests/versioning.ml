@@ -6,19 +6,18 @@ module Schemas_library = struct
   let v = V
 end
 
-type versioned =
+(** Some data which encoding evolved over the versions *)
+type data =
   | A of { v : int }
   | B of { v : int }
   | C of { v : int } [@schematic.since "0.2.0"]
 [@@schematic.union_key "type"] [@@deriving schema]
 
-type inline = { inline : versioned [@schematic.inline] } [@@deriving schema]
+type inline = { inline : data [@schematic.inline] } [@@deriving schema]
 
 let since () =
-  let _a, a_version =
-    Schematic.Json.encode_versioned versioned_schema (A { v = 14 })
-  and _c, c_version =
-    Schematic.Json.encode_versioned versioned_schema (C { v = 15 })
+  let _a, a_version = Schematic.Json.encode_versioned data_schema (A { v = 14 })
+  and _c, c_version = Schematic.Json.encode_versioned data_schema (C { v = 15 })
   and _c_inlined, c_inlined_version =
     Schematic.Json.encode_versioned inline_schema { inline = C { v = 15 } }
   in
