@@ -100,6 +100,16 @@ module Ptime : sig
   val span_schema_versioned : Schema.version -> span Schema.t
 end
 
+module Option : sig
+  include module type of Option
+  include Schema_intf.S1 with type 'a t := 'a t
+
+  module M (T : Schema_intf.S) : sig
+    include module type of Option
+    include Schema_intf.S with type t = T.t t
+  end
+end
+
 module String : sig
   include module type of String
 

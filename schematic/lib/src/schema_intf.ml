@@ -312,3 +312,27 @@ module Name = struct
     | Parametric of string * t list
   [@@deriving eq, ord]
 end
+
+module type S = sig
+  type 'a schema := 'a t
+  type t
+
+  val schema_versioned : version -> t schema
+  val schema : t schema
+end
+
+module type S1 = sig
+  type 'a schema := 'a t
+  type 'a t
+
+  val schema_versioned : version -> 'a schema -> 'a t schema
+  val schema : 'a schema -> 'a t schema
+end
+
+module type S2 = sig
+  type 'a schema := 'a t
+  type ('a, 'b) t
+
+  val schema_versioned : version -> 'a schema -> 'b schema -> ('a, 'b) t schema
+  val schema : 'a schema -> 'b schema -> ('a, 'b) t schema
+end

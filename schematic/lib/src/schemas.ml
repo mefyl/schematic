@@ -241,6 +241,24 @@ module Ptime = struct
   let span_schema_versioned (_ : Schema.version) = span_schema
 end
 
+module Option = struct
+  include Option
+
+  let schema_versioned = option_schema_versioned
+  let schema = option_schema
+
+  module M (T : Schema_intf.S) = struct
+    include Option
+
+    type t = T.t Option.t
+
+    let schema_versioned version =
+      schema_versioned version @@ T.schema_versioned version
+
+    let schema = schema T.schema
+  end
+end
+
 module String = struct
   include String
 

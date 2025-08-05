@@ -107,7 +107,7 @@ struct
     let () = test ~here ?decoded name value_testable schema value expected in
     Coding.extra_test test_descripton encoded
 
-  module Option = struct
+  module Opt = struct
     include Option
 
     let schema_versioned = Schematic.Schemas.option_schema_versioned
@@ -331,7 +331,7 @@ struct
 
     (* Default option*)
 
-    type default_option = { oo : int Option.t Option.t [@default None] }
+    type default_option = { oo : int Opt.t Opt.t [@default None] }
     [@@deriving eq, schema, show]
 
     let default_option =
@@ -2409,7 +2409,7 @@ struct
            }
 
     type t = {
-      v : v Option.t;
+      v : v Opt.t;
           [@schematic.schema legacy < "0.6.1"] [@schematic.as "w" < "0.6.1"]
     }
     [@@deriving eq, schema, show]
