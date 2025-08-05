@@ -22,7 +22,8 @@ module Jsoo = Test_utils.Tests.Make (struct
 end)
 
 module Errors = struct
-  type either_opt = { v : (int, bool) Either.t option } [@@deriving schema]
+  type either_opt = { v : (int, bool) Schematic.Schemas.Either.t option }
+  [@@deriving schema]
 
   let undefined () =
     let res =

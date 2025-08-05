@@ -122,7 +122,8 @@ module Generate_types = struct
   let record () = test ~here:[%here] record_schema record_typescript
 
   module Parametric = struct
-    type string_or_int = (string, int) Either.t [@@deriving schema]
+    type string_or_int = (string, int) Schematic.Schemas.Either.t
+    [@@deriving schema]
 
     type ('t, 'error) res =
       | Ok of 't

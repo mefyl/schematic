@@ -91,7 +91,104 @@ let expand ~context types gadt jsoo plugins =
       [%str open Schematic_jsoo.Schemas [@@warning "-unused-open"]] @ contents
     else if context.global.inside then
       [%str open Schemas [@@warning "-unused-open"]] @ contents
-    else [%str open Schematic.Schemas [@@warning "-unused-open"]] @ contents
+    else
+      (* We are not including Schematic.Schemas anymore to avoid hiding user code.
+       * This causes us to:
+       *
+       * - Have to write all this boilerplate.
+       * - Prevents us from automatically exposing [Ptime],[Uri], ... because that
+       *   would fail if the client code don't link with them.
+       *)
+      [%str
+        open struct
+          module Schema = Schematic.Schema
+
+          let array_schema = Schematic.Schemas.array_schema
+          let array_schema_versioned = Schematic.Schemas.array_schema_versioned
+          let pp_ignore = Schematic.Schemas.pp_ignore
+          let equal_ignore = Schematic.Schemas.equal_ignore
+          let compare_ignore = Schematic.Schemas.compare_ignore
+          let bool_schema = Schematic.Schemas.bool_schema
+          let bool_schema_versioned = Schematic.Schemas.bool_schema_versioned
+          let char_schema = Schematic.Schemas.char_schema
+          let char_schema_versioned = Schematic.Schemas.char_schema_versioned
+          let float_schema = Schematic.Schemas.float_schema
+          let float_schema_versioned = Schematic.Schemas.float_schema_versioned
+          let ignore_schema = Schematic.Schemas.ignore_schema
+
+          let ignore_schema_versioned =
+            Schematic.Schemas.ignore_schema_versioned
+
+          let int64_schema = Schematic.Schemas.int64_schema
+          let int64_schema_versioned = Schematic.Schemas.int64_schema_versioned
+          let int_schema = Schematic.Schemas.int_schema
+          let int_schema_versioned = Schematic.Schemas.int_schema_versioned
+          let json_schema = Schematic.Schemas.json_schema
+          let json_schema_versioned = Schematic.Schemas.json_schema_versioned
+          let equal_json = Schematic.Schemas.equal_json
+          let list_schema = Schematic.Schemas.list_schema
+          let list_schema_versioned = Schematic.Schemas.list_schema_versioned
+          let mapping_schema = Schematic.Schemas.mapping_schema
+          let option_schema = Schematic.Schemas.option_schema
+
+          let option_schema_versioned =
+            Schematic.Schemas.option_schema_versioned
+
+          let string_const_schema = Schematic.Schemas.string_const_schema
+          let string_schema = Schematic.Schemas.string_schema
+
+          let string_schema_versioned =
+            Schematic.Schemas.string_schema_versioned
+
+          let unit_schema = Schematic.Schemas.unit_schema
+          let unit_schema_versioned = Schematic.Schemas.unit_schema_versioned
+
+          module Bool = struct
+            include Schematic.Schemas.Bool
+            include Bool
+          end
+
+          module Char = struct
+            include Schematic.Schemas.Char
+            include Char
+          end
+
+          (* module Either = struct *)
+          (*   include Schematic.Schemas.Either *)
+          (*   include Either *)
+          (* end *)
+
+          module Int = struct
+            include Schematic.Schemas.Int
+            include Int
+          end
+
+          (* module Ptime = struct *)
+          (*   include Schematic.Schemas.Ptime *)
+          (*   include Ptime *)
+          (* end *)
+
+          module Option = struct
+            include Schematic.Schemas.Option
+            include Option
+          end
+
+          module Result = struct
+            include Schematic.Schemas.Result
+            include Result
+          end
+
+          module String = struct
+            include Schematic.Schemas.String
+            include String
+          end
+
+          (* module Uri = struct *)
+          (*   include Schematic.Schemas.Uri *)
+          (*   include Uri *)
+          (* end *)
+        end [@@warning "-unused-open"]]
+      @ contents
   in
   match gadt with
   | Some variants ->

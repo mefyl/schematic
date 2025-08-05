@@ -68,13 +68,23 @@ module Int : sig
   val schema_versioned : Schema.version -> t Schema.t
 end
 
-module Result : sig
-  include module type of Base.Result
+module Option : sig
+  include module type of Option
+  include Schema_intf.S1 with type 'a t := 'a t
 
-  val schema : 't Schema.t -> 'error Schema.t -> ('t, 'error) t Schema.t
+  module M (T : Schema_intf.S) : sig
+    include module type of Option
+    include Schema_intf.S with type t = T.t t
+  end
+end
+
+module Pair : sig
+  type ('a, 'b) t = 'a * 'b
+
+  val schema : 'a Schema.t -> 'b Schema.t -> ('a, 'b) t Schema.t
 
   val schema_versioned :
-    Schema.version -> 't Schema.t -> 'error Schema.t -> ('t, 'error) t Schema.t
+    Schema.version -> 'a Schema.t -> 'b Schema.t -> ('a, 'b) t Schema.t
 end
 
 module Ptime : sig
@@ -100,14 +110,13 @@ module Ptime : sig
   val span_schema_versioned : Schema.version -> span Schema.t
 end
 
-module Option : sig
-  include module type of Option
-  include Schema_intf.S1 with type 'a t := 'a t
+module Result : sig
+  include module type of Base.Result
 
-  module M (T : Schema_intf.S) : sig
-    include module type of Option
-    include Schema_intf.S with type t = T.t t
-  end
+  val schema : 't Schema.t -> 'error Schema.t -> ('t, 'error) t Schema.t
+
+  val schema_versioned :
+    Schema.version -> 't Schema.t -> 'error Schema.t -> ('t, 'error) t Schema.t
 end
 
 module String : sig
@@ -126,12 +135,3 @@ end
 
 val one_or_many_versioned : 't Schema.t -> Schema.version -> 't list Schema.t
 val one_or_many : 't Schema.t -> 't list Schema.t
-
-module Pair : sig
-  type ('a, 'b) t = 'a * 'b
-
-  val schema : 'a Schema.t -> 'b Schema.t -> ('a, 'b) t Schema.t
-
-  val schema_versioned :
-    Schema.version -> 'a Schema.t -> 'b Schema.t -> ('a, 'b) t Schema.t
-end
