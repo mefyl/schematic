@@ -276,7 +276,7 @@ let add ~inside ~jsoo ~version =
     let _deriver = Deriving.add ~sig_type_decl ~str_type_decl "schema" in
     ()
   and () =
-    let extension =
+    let extension_schema =
       let extracter = Ast_pattern.(ptyp __)
       and expand ~ctxt type' =
         let loc = Ppxlib.Expansion_context.Extension.extension_point_loc ctxt in
@@ -308,9 +308,29 @@ let add ~inside ~jsoo ~version =
       in
       Extension.V3.declare "schema" Extension.Context.expression extracter
         expand
+    and extension_version =
+      let extracter = Ast_pattern.(single_expr_payload @@ estring __)
+      and expand ~ctxt repr =
+        let loc = Ppxlib.Expansion_context.Extension.extension_point_loc ctxt in
+        let open (val Ast_builder.make loc) in
+        match Semver.of_string repr with
+        | Some _ ->
+          [%expr
+            Schematic.Version.of_string_exn
+              [%e Ast_builder.Default.estring ~loc repr]]
+        | None ->
+          Ppxlib.Location.raise_errorf ~loc
+            "schematic-ppx: invalid semantic version: %S" repr
+      in
+      Extension.V3.declare "version" Extension.Context.expression extracter
+        expand
     in
     Driver.register_transformation
-      ~rules:[ Context_free.Rule.extension extension ]
+      ~rules:
+        [
+          Context_free.Rule.extension extension_schema;
+          Context_free.Rule.extension extension_version;
+        ]
       "schematic"
   in
   ()
