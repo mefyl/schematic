@@ -1,5 +1,10 @@
 include Semver
 
+let of_string_exn s =
+  match of_string s with
+  | Some version -> version
+  | None -> Fmt.failwith "invalid semantic version: %S" s
+
 let sexp_of_t = function
   | { major; minor; patch; _ } ->
     Base.Sexp.(
@@ -37,7 +42,7 @@ let schema =
   let decode s =
     match of_string s with
     | Some version -> Result.Ok version
-    | None -> Result.Error (Fmt.str "invalid version: %s" s)
+    | None -> Result.Error (Fmt.str "invalid semantic version: %s" s)
   in
   Schema.map ~decode ~encode:to_string @@ Schemas.string_schema
 
