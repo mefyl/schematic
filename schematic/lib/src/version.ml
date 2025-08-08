@@ -6,13 +6,15 @@ let of_string_exn s =
   | None -> Fmt.failwith "invalid semantic version: %S" s
 
 let sexp_of_t = function
-  | { major; minor; patch; _ } ->
+  | { major; minor; patch; prerelease; build } ->
     Base.Sexp.(
       List
         [
           Atom (Int.to_string major);
           Atom (Int.to_string minor);
           Atom (Int.to_string patch);
+          List (List.map (fun v -> Base.Sexp.Atom v) prerelease);
+          List (List.map (fun v -> Base.Sexp.Atom v) build);
         ])
 
 let make ?(prerelease = []) ?(build = []) major minor patch =
