@@ -276,9 +276,9 @@ let add ~inside ~jsoo ~version =
     let _deriver = Deriving.add ~sig_type_decl ~str_type_decl "schema" in
     ()
   and () =
-    let extension_schema =
+    let extension_schema, extension_schema_versioned =
       let extracter = Ast_pattern.(ptyp __)
-      and expand ~ctxt type' =
+      and expand versioned ~ctxt type' =
         let loc = Ppxlib.Expansion_context.Extension.extension_point_loc ctxt in
         let schema =
           let context =
@@ -299,15 +299,24 @@ let add ~inside ~jsoo ~version =
             type'
           |> Schema.schema_of_expanded ~context ~loc
         in
-        [%expr
-          begin [@warning "-unused-open"]
-            let open Schematic.Schemas in
-            let __schematic_version _ = None in
-            [%e schema]
-          end]
+        if versioned then
+          [%expr
+            begin [@warning "-unused-open"]
+              let open Schematic.Schemas in
+              fun __schematic_version -> [%e schema]
+            end]
+        else
+          [%expr
+            begin [@warning "-unused-open"]
+              let open Schematic.Schemas in
+              let __schematic_version _ = None in
+              [%e schema]
+            end]
       in
-      Extension.V3.declare "schema" Extension.Context.expression extracter
-        expand
+      ( Extension.V3.declare "schema" Extension.Context.expression extracter
+          (expand false),
+        Extension.V3.declare "schema_versioned" Extension.Context.expression
+          extracter (expand true) )
     and extension_version =
       let extracter = Ast_pattern.(single_expr_payload @@ estring __)
       and expand ~ctxt repr =
@@ -329,6 +338,7 @@ let add ~inside ~jsoo ~version =
       ~rules:
         [
           Context_free.Rule.extension extension_schema;
+          Context_free.Rule.extension extension_schema_versioned;
           Context_free.Rule.extension extension_version;
         ]
       "schematic"
