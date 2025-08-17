@@ -11,7 +11,7 @@ let rec pp f json =
     match json with
     | `Bool b -> const bool b
     | `Float f -> const float f
-    | `String s -> const Dump.string s
+    | `String _ as value -> const string (Ezjsonm.value_to_string value)
     | `Null -> const string "null"
     | `A elements ->
       box
