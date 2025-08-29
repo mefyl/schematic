@@ -1,5 +1,5 @@
 opam-version: "2.0"
-version: "0.21.0"
+version: "0.21.1"
 synopsis: "Schematic CLI tools"
 maintainer: ["mefyl <mefyl@gruntech.org>"]
 authors: ["mefyl <mefyl@gruntech.org>"]

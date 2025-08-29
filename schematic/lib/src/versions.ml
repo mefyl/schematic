@@ -1,4 +1,4 @@
-module V0_21_0 = struct
+module V0_21_1 = struct
   module Error = Error
   module Base64 = B64
   module Coding = Coding
@@ -19,3 +19,5 @@ module V0_21_0 = struct
   module Typescript = Typescript
   module Version = Version
 end
+
+module V0_21_0 = V0_21_1
