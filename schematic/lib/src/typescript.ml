@@ -12,8 +12,15 @@ type t =
       args : t list;
     }  (** [Template<T1, T2, ..., TN>] *)
   | Tuple of t list  (** [[T1, T2, ..., TN ]]*)
-  | Union of t list  (** [T1 | T2 | ... | TN] *)
+  | Union of case list  (** [T1 | T2 | ... | TN] *)
+
+and case = {
+  since : Version.t option;
+  t : t;
+}
 [@@deriving show]
+
+let union cases = Union (List.map ~f:(fun t -> { since = None; t }) cases)
 
 type typescript = t
 
@@ -42,7 +49,7 @@ module Of = Schema.Walk (struct
     | Type of t
 
   type nonrec t = t
-  type case = t
+  type nonrec case = case
 
   module M = State_monad.Make (struct
     type t = Marks.t
@@ -124,7 +131,7 @@ module Of = Schema.Walk (struct
 
   let nullable schema =
     let+ schema in
-    Union [ schema; Atom "null" ]
+    union [ schema; Atom "null" ]
 
   let object_ fields =
     let f fields =
@@ -140,7 +147,7 @@ module Of = Schema.Walk (struct
     match fields with
     | [] -> failwith "typescript: of_objects yielded no result"
     | [ fields ] -> f fields
-    | cases -> Union (List.map ~f cases)
+    | cases -> union (List.map ~f cases)
 
   let string = atom "string"
   let time = atom "Date"
@@ -154,12 +161,16 @@ module Of = Schema.Walk (struct
 
   (* Union *)
 
-  let case ~key ~inline:_ ~name ~raw_name:_ schema =
-    let+ schema in
-    match key with
-    | None -> schema
-    | Some key ->
-      Intersection [ schema; Object { fields = [ (key, String name, true) ] } ]
+  let case ?key ~inline:_ ~name ~raw_name:_ ?since schema =
+    let+ t =
+      let+ schema in
+      match key with
+      | None -> schema
+      | Some key ->
+        Intersection
+          [ schema; Object { fields = [ (key, String name, true) ] } ]
+    in
+    { since; t }
 
   let union ~id:_ ~polymorphic:_ cases =
     let+ cases in
@@ -200,7 +211,7 @@ module Precedence = struct
   include Comparable.Make (T)
 end
 
-let pp ?(indent = 2) fmt ts =
+let pp ?(annotate_since = false) ?(indent = 2) fmt ts =
   let rec pp (prec : Precedence.t) fmt ts =
     let printer =
       let open Fmt in
@@ -228,12 +239,16 @@ let pp ?(indent = 2) fmt ts =
         ++ const char '}'
       and union =
         let pp =
-          hvbox @@ list ~sep:(custom_break " | " " |") (hvbox (pp Union))
+          let pp_case f = function
+            | { since = Some since; t } when annotate_since ->
+              Fmt.pf f "%a /* since %a */" (pp Union) t Version.pp since
+            | { t; _ } -> pp Union f t
+          in
+          hvbox @@ list ~sep:(custom_break " | " " |") (hvbox pp_case)
         in
         if Precedence.(Union < prec) then const char '(' ++ pp ++ const char ')'
         else pp
       in
-
       match ts with
       | Atom s -> const string s
       | Intersection types ->
@@ -247,7 +262,7 @@ let pp ?(indent = 2) fmt ts =
            ++ const (list ~sep:comma (pp Delimited)) args
            ++ const char '>'
       | Tuple l -> const tuple l
-      | Union l -> const union l
+      | Union cases -> const union cases
     in
     printer fmt ()
   in
