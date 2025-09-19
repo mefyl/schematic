@@ -255,10 +255,11 @@ module type WALK = sig
   (* Union *)
 
   val case :
-    key:string option ->
+    ?key:string ->
     inline:bool ->
     name:string ->
     raw_name:string ->
+    ?since:Semver.t ->
     t M.t ->
     case M.t
 

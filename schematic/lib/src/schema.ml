@@ -598,8 +598,9 @@ module Walk (W : WALK) = struct
       W.union ~id ~polymorphic cases
 
   and case : type t. string option -> t case -> W.case W.M.t =
-   fun key (Case { inline; name; raw_name; schema = s; _ }) ->
-    W.case ~key ~inline ~name ~raw_name (schema s)
+   fun key (Case { inline; name; raw_name; schema = s; since; _ }) ->
+    W.case ?key ~inline ~name ~raw_name ?since:(Option.map ~f:fst since)
+      (schema s)
 
   and schema : type t. t Schema_intf.t -> W.t W.M.t =
    fun { id; descriptor = d; parametric = p } ->

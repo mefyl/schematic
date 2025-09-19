@@ -18,8 +18,10 @@ val of_schemas :
     OCaml. *)
 val name : string -> string
 
-(** [pp fmt t] outputs typescript types declaration for [t] to [fmt]. *)
-val pp : ?indent:int -> Format.formatter -> t -> unit
+(** [pp fmt t] outputs typescript types declaration for [t] to [fmt].
+
+    - [annotate_since] preserves [@schematic.since] annotation in comments. *)
+val pp : ?annotate_since:bool -> ?indent:int -> Format.formatter -> t -> unit
 
 (** [to_string t] is the typescript type declarations for [t]. *)
 val to_string : t -> string
