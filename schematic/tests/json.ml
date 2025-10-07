@@ -63,6 +63,15 @@ module Pretty_print = struct
 }|}
 end
 
+module Equal = struct
+  let object_ () =
+    Alcotest.check'
+      (module Schematic.Json)
+      ~msg:"order of fields does not matter"
+      ~expected:(`O [ ("a", `Bool true); ("b", `String "foo") ])
+      ~actual:(`O [ ("b", `String "foo"); ("a", `Bool true) ])
+end
+
 let () =
   let open Alcotest in
   let error_case ~here name f =
@@ -87,4 +96,5 @@ let () =
           test_case "array" Pretty_print.array;
           test_case "object" Pretty_print.object_;
         ] );
+      ("equal", [ test_case "object" Equal.object_ ]);
     ]

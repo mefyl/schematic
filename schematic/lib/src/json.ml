@@ -138,20 +138,12 @@ module Make (Json_impl : Impl) = struct
       and r = List.sort ~compare r in
       List.compare compare_field l r
 
-  let rec equal l r =
-    match (l, r) with
-    | `Null, `Null -> true
-    | `Bool l, `Bool r -> Bool.equal l r
-    | `Float l, `Float r -> Float.equal l r
-    | `String l, `String r -> String.equal l r
-    | `A l, `A r -> List.equal equal l r
-    | `O l, `O r ->
-      let compare (l, _) (r, _) = String.compare l r
-      and equal (lk, lv) (rk, rv) = String.equal lk rk && equal lv rv in
-      let l = List.sort ~compare l
-      and r = List.sort ~compare r in
-      List.equal equal l r
-    | _ -> false
+  include Comparable.Make (struct
+    type t = Ezjsonm.value
+
+    let compare = compare
+    let sexp_of_t = Ezjsonm.sexp_of_value
+  end)
 end
 
 module Impl_ezjsonm = struct
