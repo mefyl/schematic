@@ -3,6 +3,7 @@ type _ Coding.coding += Coding : t Coding.coding
 
 module type S = sig
   include Coding.STR with type t = t
+  include Base.Comparable.S with type t = t
 
   val from_channel : Stdlib.in_channel -> (t, Error.parsing) Base.Result.t
   val to_channel : Stdlib.out_channel -> t -> unit

@@ -21,7 +21,7 @@ module Tests = Test_utils.Tests.Make (struct
            ~with_:"\\$")
         (Base.String.escaped @@ Schematic.Json.to_string @@ encoded)
     in
-    if Stdlib.Sys.command cmd <> 0 then
+    if not @@ Int.equal (Stdlib.Sys.command cmd) 0 then
       Alcotest.check ~here t
         (Fmt.str "%s: schema validation" name)
         schema encoded
