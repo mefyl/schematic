@@ -84,6 +84,7 @@ and ('t, 'req) field = {
   omit : bool;
   requirement : ('t, 'req) requirement;
   schema : 't field_schema;
+  since : (Semver.t * library) option;
   title : string option;
 }
 

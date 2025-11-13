@@ -139,6 +139,24 @@ let expand_field _
         attrs with
         schema = { txt = expect ~loc pattern attr_payload; loc } :: attrs.schema;
       }
+    | "schematic.since" ->
+      let pattern =
+        let semver_of_string repr =
+          match Semver.of_string repr with
+          | Some version -> version
+          | None ->
+            Ppxlib.Location.raise_errorf ~loc
+              "schematic-ppx: invalid semantic version: %S" repr
+        in
+        let open Ast_pattern in
+        map_result ~f:semver_of_string @@ single_expr_payload (estring __)
+      in
+      (match attrs.since with
+      | None ->
+        { attrs with since = Some (expect ~loc pattern attr_payload) }
+      | Some _ ->
+        Ppxlib.Location.raise_errorf ~loc
+          "schematic-ppx: duplicate schematic.since annotation on field")
     | name -> (
       match String.split ~on:'.' name with
       | "schematic" :: plugin :: attribute -> (

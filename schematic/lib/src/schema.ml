@@ -193,6 +193,7 @@ let rec walk_fields : type t res.
                              minimum = None;
                              omit = false;
                              requirement = Required;
+                             since = None;
                              title = None;
                            };
                          rest = fields;
@@ -295,6 +296,7 @@ module Make_inline (M : Base.Monad.S) = struct
                             omit = field.omit;
                             requirement;
                             schema = field.schema;
+                            since = field.since;
                             title = field.title;
                           }
                       | Required, (Computed_optional as requirement) ->
@@ -308,6 +310,7 @@ module Make_inline (M : Base.Monad.S) = struct
                             omit = field.omit;
                             requirement;
                             schema = field.schema;
+                            since = field.since;
                             title = field.title;
                           }
                       | Required, Default Hlist.(head :: _) ->
@@ -321,6 +324,7 @@ module Make_inline (M : Base.Monad.S) = struct
                             omit = field.omit;
                             requirement = Default head;
                             schema = field.schema;
+                            since = field.since;
                             title = field.title;
                           }
                     in
@@ -386,6 +390,7 @@ module Make_inline (M : Base.Monad.S) = struct
                   minimum = None;
                   omit = false;
                   requirement = Required;
+                  since = None;
                   title = None;
                 }
               |> M.map ~f:Option.return
@@ -495,6 +500,7 @@ module Make_inline (M : Base.Monad.S) = struct
                        minimum = None;
                        omit = false;
                        requirement = Required;
+                       since = None;
                        title = None;
                      })
             in
@@ -954,6 +960,7 @@ let object_wrap name schema =
                     omit = false;
                     requirement = Required;
                     schema = Outline schema;
+                    since = None;
                     title = None;
                   };
                 rest = FieldEnd;
