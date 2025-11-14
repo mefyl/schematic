@@ -2,8 +2,17 @@
 
 (library
  (name schematic_deriver)
- (modules attributes attributes_intf expand expansion intf jsoo plugin schema
-  schematic_deriver utils)
+ (modules
+  attributes
+  attributes_intf
+  expand
+  expansion
+  intf
+  jsoo
+  plugin
+  schema
+  schematic_deriver
+  utils)
  (public_name schematic.deriver)
  (libraries base fmt hmap ppxlib semver2)
  (preprocess

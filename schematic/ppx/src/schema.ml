@@ -230,7 +230,8 @@ and _expand_record as_tuple ~context ~type_context
     let init = [%expr FieldEnd] in
     let f
         Attributes.(
-          { alias; inline; loc; name; schema; since; specs; _ } as attributes) rest =
+          { alias; inline; loc; name; schema; since; specs; _ } as attributes)
+        rest =
       let requirement, type_ = Attributes.requirement attributes in
       let requirement =
         match requirement with

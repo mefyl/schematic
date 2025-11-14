@@ -547,7 +547,8 @@ module Make_inline (M : Base.Monad.S) = struct
           let equal = equal (field_schema field.schema) in
           fun v ->
             let++ res = f v in
-            ([ res ], if equal v default then Library_versions.empty else version)
+            ( [ res ],
+              if equal v default then Library_versions.empty else version )
         | Computed -> (
           function
           | Some _ as v ->
