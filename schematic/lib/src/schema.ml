@@ -228,6 +228,117 @@ let rec flatten : type t. t descriptor -> t flatten =
     Flatten { descriptor; decode; encode }
   | descriptor -> Flatten { descriptor; decode = Result.return; encode = Fn.id }
 
+let compare schema =
+  let rec compare_json l r =
+    let assoc_compare compare l r =
+      let f (key, l) =
+        match List.Assoc.find ~equal:String.equal r key with
+        | None -> Some 1
+        | Some r -> ( match compare l r with 0 -> None | v -> Some v)
+      in
+      Option.value ~default:0 @@ List.find_map ~f l
+    in
+    match (l, r) with
+    | `Null, `Null -> 0
+    | `Null, _ -> -1
+    | _, `Null -> 1
+    | `Bool l, `Bool r -> Bool.compare l r
+    | `Bool _, _ -> -1
+    | _, `Bool _ -> 1
+    | `Float l, `Float r -> Float.compare l r
+    | `Float _, _ -> -1
+    | _, `Float _ -> 1
+    | `String l, `String r -> String.compare l r
+    | `String _, _ -> -1
+    | _, `String _ -> 1
+    | `A l, `A r -> List.compare compare_json l r
+    | `A _, _ -> -1
+    | _, `A _ -> 1
+    | `O l, `O r -> assoc_compare compare_json l r
+  in
+  let rec compare : type u. u descriptor -> u -> u -> int = function
+    | Any (module Coding) -> Coding.compare
+    | Bool -> Base.Bool.compare
+    | Coding { f } -> compare (f None)
+    | Date -> Base.Poly.compare
+    | Fixpoint s -> compare (Lazy.force s)
+    | Float -> Base.Poly.compare
+    | Ignore -> Base.Poly.compare
+    | Int | Int64 -> Base.Poly.compare
+    | Json -> compare_json
+    | List schema -> Base.List.compare (compare schema.descriptor)
+    | Sequence { item; deconstruct; _ } ->
+      fun l r ->
+        Base.Sequence.compare (compare item.descriptor) (deconstruct l)
+          (deconstruct r)
+    | Map { encode; descriptor; _ } ->
+      fun l r -> compare descriptor (encode l) (encode r)
+    | Mapping { deconstruct; item; _ } ->
+      fun l r ->
+        let compare_field (key_l, value_l) (key_r, value_r) =
+          match String.compare key_l key_r with
+          | 0 -> compare item.descriptor value_l value_r
+          | n -> n
+        in
+        Base.Sequence.compare compare_field (deconstruct l) (deconstruct r)
+    | Null -> fun () () -> 0
+    | Nullable s -> fun l r -> Base.Option.compare (compare s.descriptor) l r
+    | String -> String.compare
+    | String_const _ -> fun () () -> 0
+    | Time -> Ptime.compare
+    | Time_local -> (
+      fun (l, lz) (r, rz) ->
+        match Int.compare lz rz with 0 -> Ptime.compare l r | v -> v)
+    | Object { fields; encode; decode = _ } ->
+      let rec compare_fields : type u.
+          u Hlist.t fields -> u Hlist.t -> u Hlist.t -> int = function
+        | Field { field = { schema; requirement; _ }; rest } ->
+          let schema = field_schema schema in
+          let f (type field req) (schema : field t)
+              (requirement : (field, req) requirement) Hlist.((l : req) :: lr)
+              Hlist.((r : req) :: rr) =
+            let c =
+              match requirement with
+              | Computed -> Option.compare (compare schema.descriptor) l r
+              | Computed_optional ->
+                Option.compare (Option.compare (compare schema.descriptor)) l r
+              | Default _ -> compare schema.descriptor l r
+              | Optional -> Option.compare (compare schema.descriptor) l r
+              | Required -> compare schema.descriptor l r
+            in
+            match c with 0 -> compare_fields rest lr rr | v -> v
+          in
+          f schema requirement
+        | FieldEnd -> fun Hlist.[] Hlist.[] -> 0
+      in
+      let compare_items = compare_fields fields in
+      fun l r -> compare_items (encode l) (encode r)
+    | Tuple { items; encode; decode = _ } ->
+      let rec compare_items : type t. t tuple -> t -> t -> int = function
+        | ItemEnd -> fun Hlist.[] Hlist.[] -> 0
+        | Item { schema; rest } -> (
+          fun Hlist.(l :: lr) Hlist.(r :: rr) ->
+            match compare schema.descriptor l r with
+            | 0 -> compare_items rest lr rr
+            | v -> v)
+      in
+      let compare_items = compare_items items in
+      fun l r -> compare_items (encode l) (encode r)
+    | Union { cases; _ } ->
+      fun l r ->
+        let f (Case { schema; encoder; _ }) =
+          match (encoder l, encoder r) with
+          | None, None -> None
+          | Some _, None -> Some (-1)
+          | None, Some _ -> Some 1
+          | Some l, Some r -> Some (compare schema.descriptor l r)
+        in
+        Option.value ~default:0 @@ List.find_map ~f cases
+  in
+  compare schema.descriptor
+
+let equal schema l r = compare schema l r = 0
+
 (* Object inlining *)
 
 module Make_inline (M : Base.Monad.S) = struct
@@ -432,10 +543,11 @@ module Make_inline (M : Base.Monad.S) = struct
           fun v ->
             let++ res = f v in
             ([ res ], version)
-        | Default _ ->
+        | Default default ->
+          let equal = equal (field_schema field.schema) in
           fun v ->
             let++ res = f v in
-            ([ res ], version)
+            ([ res ], if equal v default then Library_versions.empty else version)
         | Computed -> (
           function
           | Some _ as v ->
@@ -706,117 +818,6 @@ let object_fields descriptor =
       }
   in
   List.map ~f:(List.filter_map ~f:Fn.id) names
-
-let assoc_compare compare l r =
-  let f (key, l) =
-    match List.Assoc.find ~equal:String.equal r key with
-    | None -> Some 1
-    | Some r -> ( match compare l r with 0 -> None | v -> Some v)
-  in
-  Option.value ~default:0 @@ List.find_map ~f l
-
-let compare schema =
-  let rec compare_json l r =
-    match (l, r) with
-    | `Null, `Null -> 0
-    | `Null, _ -> -1
-    | _, `Null -> 1
-    | `Bool l, `Bool r -> Bool.compare l r
-    | `Bool _, _ -> -1
-    | _, `Bool _ -> 1
-    | `Float l, `Float r -> Float.compare l r
-    | `Float _, _ -> -1
-    | _, `Float _ -> 1
-    | `String l, `String r -> String.compare l r
-    | `String _, _ -> -1
-    | _, `String _ -> 1
-    | `A l, `A r -> List.compare compare_json l r
-    | `A _, _ -> -1
-    | _, `A _ -> 1
-    | `O l, `O r -> assoc_compare compare_json l r
-  in
-  let rec compare : type u. u descriptor -> u -> u -> int = function
-    | Any (module Coding) -> Coding.compare
-    | Bool -> Base.Bool.compare
-    | Coding { f } -> compare (f None)
-    | Date -> Base.Poly.compare
-    | Fixpoint s -> compare (Lazy.force s)
-    | Float -> Base.Poly.compare
-    | Ignore -> Base.Poly.compare
-    | Int | Int64 -> Base.Poly.compare
-    | Json -> compare_json
-    | List schema -> Base.List.compare (compare schema.descriptor)
-    | Sequence { item; deconstruct; _ } ->
-      fun l r ->
-        Base.Sequence.compare (compare item.descriptor) (deconstruct l)
-          (deconstruct r)
-    | Map { encode; descriptor; _ } ->
-      fun l r -> compare descriptor (encode l) (encode r)
-    | Mapping { deconstruct; item; _ } ->
-      fun l r ->
-        let compare_field (key_l, value_l) (key_r, value_r) =
-          match String.compare key_l key_r with
-          | 0 -> compare item.descriptor value_l value_r
-          | n -> n
-        in
-        Base.Sequence.compare compare_field (deconstruct l) (deconstruct r)
-    | Null -> fun () () -> 0
-    | Nullable s -> fun l r -> Base.Option.compare (compare s.descriptor) l r
-    | String -> String.compare
-    | String_const _ -> fun () () -> 0
-    | Time -> Ptime.compare
-    | Time_local -> (
-      fun (l, lz) (r, rz) ->
-        match Int.compare lz rz with 0 -> Ptime.compare l r | v -> v)
-    | Object { fields; encode; decode = _ } ->
-      let rec compare_fields : type u.
-          u Hlist.t fields -> u Hlist.t -> u Hlist.t -> int = function
-        | Field { field = { schema; requirement; _ }; rest } ->
-          let schema = field_schema schema in
-          let f (type field req) (schema : field t)
-              (requirement : (field, req) requirement) Hlist.((l : req) :: lr)
-              Hlist.((r : req) :: rr) =
-            let c =
-              match requirement with
-              | Computed -> Option.compare (compare schema.descriptor) l r
-              | Computed_optional ->
-                Option.compare (Option.compare (compare schema.descriptor)) l r
-              | Default _ -> compare schema.descriptor l r
-              | Optional -> Option.compare (compare schema.descriptor) l r
-              | Required -> compare schema.descriptor l r
-            in
-            match c with 0 -> compare_fields rest lr rr | v -> v
-          in
-          f schema requirement
-        | FieldEnd -> fun Hlist.[] Hlist.[] -> 0
-      in
-      let compare_items = compare_fields fields in
-      fun l r -> compare_items (encode l) (encode r)
-    | Tuple { items; encode; decode = _ } ->
-      let rec compare_items : type t. t tuple -> t -> t -> int = function
-        | ItemEnd -> fun Hlist.[] Hlist.[] -> 0
-        | Item { schema; rest } -> (
-          fun Hlist.(l :: lr) Hlist.(r :: rr) ->
-            match compare schema.descriptor l r with
-            | 0 -> compare_items rest lr rr
-            | v -> v)
-      in
-      let compare_items = compare_items items in
-      fun l r -> compare_items (encode l) (encode r)
-    | Union { cases; _ } ->
-      fun l r ->
-        let f (Case { schema; encoder; _ }) =
-          match (encoder l, encoder r) with
-          | None, None -> None
-          | Some _, None -> Some (-1)
-          | None, Some _ -> Some 1
-          | Some l, Some r -> Some (compare schema.descriptor l r)
-        in
-        Option.value ~default:0 @@ List.find_map ~f cases
-  in
-  compare schema.descriptor
-
-let equal schema l r = compare schema l r = 0
 
 type pack = Pack : _ t -> pack
 

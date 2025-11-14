@@ -20,6 +20,13 @@ type record = {
 }
 [@@deriving schema]
 
+type record_default = {
+  x : int;
+  y : int;
+  z : int; [@schematic.default 0] [@schematic.since "0.2.0"]
+}
+[@@deriving schema]
+
 type inline = { inline : data [@schematic.inline] } [@@deriving schema]
 
 let since_variant () =
@@ -63,12 +70,35 @@ let since_record () =
   in
   ()
 
+let since_record_default () =
+  let _a, a_version =
+    Schematic.Json.encode_versioned record_default_schema
+      { x = 0; y = 1; z = 0 }
+  and _b, b_version =
+    Schematic.Json.encode_versioned record_default_schema
+      { x = 0; y = 1; z = 2 }
+  in
+  let () =
+    Alcotest.(check ~here:[%here] (option (module Schematic.Version)))
+      "unconstrained encoding" None
+      (Map.find a_version Schemas_library.V)
+  and () =
+    Alcotest.(check ~here:[%here] (option (module Schematic.Version)))
+      "encoding constrained to >= 0.2.0"
+      (Some (Schematic.Version.make 0 2 0))
+      (Map.find b_version Schemas_library.V)
+  in
+  ()
+
 let () =
   let open Alcotest in
   let test_case name f = test_case name `Quick f in
   run "schematic versioning"
     [
       ( "since",
-        [ test_case "variants" since_variant; test_case "records" since_record ]
-      );
+        [
+          test_case "variants" since_variant;
+          test_case "records optional field" since_record;
+          test_case "records default field" since_record_default;
+        ] );
     ]
