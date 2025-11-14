@@ -31,7 +31,7 @@
     };
 
     dune = {
-      url = "github:ocaml/dune/55353da9f2982ce39558dd084166a90e83e3d3f5";
+      url = "github:ocaml/dune";
       inputs = {
         nixpkgs.follows = "nixpkgs";
         flake-utils.follows = "flake-utils";
@@ -55,6 +55,11 @@
       lib.mkRoutineRepo =
         path:
         { localPackages ? null
+          # A function for building the set of opam files to take into account in the local repository.
+          # Takes `nixpkgs` as argument to allow using the lib functions (`fileset` in particular), and should return a `fileset`
+          #
+          # If `null`, all the non-cross packages in the repository will be used
+        , opamFiles ? null
           # Extra Opam packages to install for development (in the form of an opam-nix query).
           # E.g.,
           # { acid = "*"; logs = "0.7.0"; }
@@ -63,17 +68,16 @@
           # An extra overlay applied to the OCaml packages set.
           # The first argument is the global pkgs set, the two other ones are the standard overlay arguments for the OCaml pkg set.
         , extraOCamlOverlay ? (pkgs: final: prev: { })
-          # Regexes to filter in the opam files to pick
-        , opamFilesRegexes ? [ "^.*\\.opam$" ]
         , resolveArgsOverride ? (args: args)
         , extraRepos ? [ ]
           # Unfortunately the OCaml version must be passed explicitly because it impacts the development packages (LSP, etc.) provided by the shell.
         , ocamlVersion
-        , ocamlformatVersion ? builtins.head (builtins.match ".*^version=([^\n]*).*" (builtins.readFile (path + "/.ocamlformat")))
-        , withSwift ? false
+          # Force a specific ocamlformat version, e.g. `"0.26.2"`.
+        , ocamlformatVersion ? null
           # Whether to make the shell swift-compatible.
           # This isn't enabled by default as it is
           # somewhat invasive (forcing the stdenv to use clang in particular)
+        , withSwift ? false
         }:
         flake-utils.lib.eachDefaultSystem (
           system:
@@ -83,16 +87,42 @@
               # Required for steam-run
               config.allowUnfree = true;
             };
-
+            shared = import ./shared.nix { inherit pkgs; };
+            ocamlformatVersion_ =
+              if ocamlformatVersion == null
+              then
+                shared.ocamlformatVersionFromDotOcamlformat (path + "/.ocamlformat")
+              else
+                ocamlformatVersion;
             # Only keep root opam files
-            opamFiles = pkgs.lib.sourceByRegex path opamFilesRegexes;
+            opamFiles_ =
+              let
+                opamFilesWithoutCrossCompilation =
+                  pkgs.lib.fileset.fileFilter
+                    (file: file.hasExt "opam"
+                      && !(pkgs.lib.hasSuffix "-android.opam" file.name)
+                      && !(pkgs.lib.hasSuffix "-ios.opam" file.name)
+                      && !(pkgs.lib.hasSuffix "-macos.opam" file.name)
+                      && !(pkgs.lib.hasSuffix "-windows.opam" file.name))
+                    path;
+                gitTracked = pkgs.lib.fileset.gitTrackedWith { recurseSubmodules = true; } path;
+                allOpamFiles =
+                  if opamFiles != null then
+                    (opamFiles pkgs)
+                  else
+                    pkgs.lib.fileset.intersection gitTracked opamFilesWithoutCrossCompilation;
+              in
+              pkgs.lib.fileset.toSource {
+                root = path;
+                fileset = allOpamFiles;
+              };
 
             on = opam-nix.lib.${system};
 
             localPackages_ = if localPackages != null then localPackages else
             builtins.attrNames
               (builtins.mapAttrs (_: pkgs.lib.last)
-                (on.listRepo (on.makeOpamRepo opamFiles)));
+                (on.listRepo (on.makeOpamRepoRec opamFiles_)));
 
             # You can add "development" Opam packages here. They will get added to the devShell automatically.
             devPackagesQuery =
@@ -113,7 +143,7 @@
                   utop = "*";
                   ocaml-lsp-server = "*";
                   merlin = "*";
-                  ocamlformat = ocamlformatVersion;
+                  ocamlformat = ocamlformatVersion_;
                 } // pkgs.lib.optionalAttrs
                   (builtins.compareVersions ocamlVersion "5.2.0" >= 0)
                   {
@@ -149,10 +179,11 @@
               on.buildOpamProject'
                 (resolveArgsOverride {
                   repos = [ opam-repository-extended routine-opam-repository ] ++ extraRepos;
+                  recursive = true;
                   resolveArgs.with-test = true;
                   resolveArgs.criteria = "-removed,-count[avoid-version:,true],-count[version-lag:,true],-changed,-count[version-lag:,false],-count[missing-depexts:,true],-new";
                 })
-                opamFiles
+                opamFiles_
                 query;
 
             overlay = final: prev:
@@ -241,6 +272,10 @@
                   doCheck = false;
                 });
 
+                memtrace = prev.memtrace.overrideAttrs (a: {
+                  doCheck = false;
+                });
+
                 merlin = prev.merlin.overrideAttrs (a: {
                   doCheck = false;
                 });
@@ -311,11 +346,6 @@
                   doCheck = false;
                   buildInputs = a.buildInputs or [ ] ++ [ pkgs.tzdata prev.logs ];
                 });
-
-                utop = prev.utop.overrideAttrs (a: {
-                  # Utop has multiple root directories and Nix only wants one
-                  sourceRoot = ".";
-                });
               };
 
             scope' = scope.overrideScope (pkgs.lib.composeExtensions overlay (extraOCamlOverlay pkgs));
@@ -345,22 +375,7 @@
             packages =
               pkgs.lib.getAttrs localPackages_ scope';
 
-            routine_run = pkgs.buildFHSEnv {
-              name = "routine-run";
-
-              targetPkgs = pkgs:
-                (pkgs.appimageTools.defaultFhsEnvArgs.targetPkgs pkgs) ++
-                (pkgs.appimageTools.defaultFhsEnvArgs.multiPkgs pkgs);
-
-              runScript = pkgs.writers.writeBash "routine-run" ''
-                executable="''${1:-./dist_electron/linux-unpacked/routine}"
-                shift
-
-                exec "$executable" "$@"
-              '';
-
-
-            };
+            routine_run = shared.routine_run;
 
             ciPackages = import ./ci-packages.nix {
               inherit pkgs;
