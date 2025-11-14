@@ -309,7 +309,10 @@ module Generate_types = struct
 
   let since_annotation_record () =
     test ~annotate_since:true ~here:[%here] versioned_record_schema
-      [ ("VersionedRecord", {|{ "x": number; "y": number; "z"?: number /* since 0.2.0 */ }|}) ]
+      [
+        ( "VersionedRecord",
+          {|{ "x": number; "y": number; "z"?: number /* since 0.2.0 */ }|} );
+      ]
 
   type versioned_variant =
     | A of { v : int }
@@ -319,7 +322,11 @@ module Generate_types = struct
 
   let since_annotation_variant () =
     test ~annotate_since:true ~here:[%here] versioned_variant_schema
-      [ ("VersionedVariant", {|{ "v": number } | { "v": number } | { "v": number } /* since 0.2.0 */|}) ]
+      [
+        ( "VersionedVariant",
+          {|{ "v": number } | { "v": number } | { "v": number } /* since 0.2.0 */|}
+        );
+      ]
 end
 
 let () =

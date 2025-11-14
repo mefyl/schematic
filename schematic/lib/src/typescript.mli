@@ -23,7 +23,8 @@ val name : string -> string
     - [annotate_since] preserves [@schematic.since] annotation in comments. *)
 val pp : ?annotate_since:bool -> ?indent:int -> Format.formatter -> t -> unit
 
-(** [to_string ?annotate_since ?indent t] is the typescript type declarations for [t].
+(** [to_string ?annotate_since ?indent t] is the typescript type declarations
+    for [t].
 
     - Add version comments iff [annotate_since]. *)
 val to_string : ?annotate_since:bool -> ?indent:int -> t -> string
