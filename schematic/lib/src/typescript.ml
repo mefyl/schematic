@@ -301,7 +301,8 @@ let pp ?(annotate_since = false) ?(indent = 2) fmt ts =
   in
   pp Union fmt ts
 
-let to_string t = Fmt.(str "%a" (box pp) t)
+let to_string ?annotate_since ?indent t =
+  Fmt.(str "%a" (box (pp ?annotate_since ?indent)) t)
 
 type state = Marks.t
 

@@ -299,6 +299,27 @@ module Generate_types = struct
         ( "UnionOuter",
           {|{ "a": number } | { "b": number } & { "kind": "ctor" }|} );
       ]
+
+  type versioned_record = {
+    x : int;
+    y : int;
+    z : int option; [@schematic.since "0.2.0"]
+  }
+  [@@deriving schema]
+
+  let versioned () =
+    let expected = Base.Set.of_list (module String_pair)
+      [ ("VersionedRecord", {|{ "x": number; "y": number; /* since 0.2.0 */ "z"?: number }|}) ]
+    in
+    let actual =
+      Schematic.Typescript.of_schema versioned_record_schema
+      |> List.map ~f:(fun (id, schema) ->
+             (id, Schematic.Typescript.to_string ~annotate_since:true schema))
+      |> Base.Set.of_list (module String_pair)
+    in
+    Alcotest.(
+      check ~here:[%here] Testables.Set.String_pair.set "typescript declarations"
+        expected actual)
 end
 
 let () =
@@ -325,5 +346,6 @@ let () =
             test_case "option option" `Quick option_default;
             test_case "duplicate type" `Quick duplicate;
             test_case "priorities" `Quick priorities;
+            test_case "versioned" `Quick versioned;
           ] );
     ]
