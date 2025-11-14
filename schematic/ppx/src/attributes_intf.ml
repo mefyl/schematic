@@ -49,6 +49,7 @@ type field = {
   name : string; [@main]
   plugins : Hmap.t; [@default Hmap.empty]
   schema : expression versioned; [@default []]
+  since : Semver.t option;
   specs : specs; [@default make_specs ()]
   type_ : core_type;
 }

@@ -1,4 +1,4 @@
-(version 3.5.1)
+(version 5.6-504)
 
 (build
  (all_platforms
@@ -9,11 +9,11 @@
 
 (depends
  (all_platforms
-  (ocaml dune)))
+  (ocaml dune csexp)))
 
 (source
  (fetch
   (url
-   https://github.com/mirage/ocaml-base64/releases/download/v3.5.1/base64-3.5.1.tbz)
+   https://github.com/ocaml/merlin/releases/download/v5.6-504/merlin-5.6-504.tbz)
   (checksum
-   sha256=d8fedaa59bd12feae7acc08b5928dd478aac523f4ca8d240470d2500651c65ed)))
+   sha256=82d648a4180d6d5aa3a083218e28bf197f4e9f147884de9302bb6811ad98b77f)))

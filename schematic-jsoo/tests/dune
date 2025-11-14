@@ -20,7 +20,14 @@
  (package schematic-jsoo)
  (modes js)
  (modules jsoo)
- (libraries alcotest base fmt hlist js_of_ocaml schematic schematic-jsoo
+ (libraries
+  alcotest
+  base
+  fmt
+  hlist
+  js_of_ocaml
+  schematic
+  schematic-jsoo
   test_utils)
  (preprocess
   (pps js_of_ocaml-ppx ppx_here schematic.ppx)))

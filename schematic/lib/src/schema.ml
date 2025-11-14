@@ -193,6 +193,7 @@ let rec walk_fields : type t res.
                              minimum = None;
                              omit = false;
                              requirement = Required;
+                             since = None;
                              title = None;
                            };
                          rest = fields;
@@ -227,454 +228,16 @@ let rec flatten : type t. t descriptor -> t flatten =
     Flatten { descriptor; decode; encode }
   | descriptor -> Flatten { descriptor; decode = Result.return; encode = Fn.id }
 
-(* Object inlining *)
-
-module Make_inline (M : Base.Monad.S) = struct
-  include Make_inline (M)
-
-  let ( let++ ) = M.Let_syntax.( >>| )
-  let ( and++ ) = M.Let_syntax.Let_syntax.both
-
-  let inline_try ~inline ~outline = function
-    | Inline schema -> inline schema
-    | Inline_try schema -> (
-      match inline schema with
-      | Result.Ok _ as ok -> ok
-      | Result.Error _ -> outline schema)
-    | Outline schema -> outline schema
-
-  let schema desc f =
-    let rec inline : type req res t.
-        t descriptor ->
-        (t, req) requirement ->
-        res inline ->
-        (res list list M.t, string) Result.t =
-     fun d req f ->
-      match d with
-      | Ignore -> M.return [ [] ] |> Result.return
-      | Fixpoint d -> inline (Lazy.force d) req f
-      | Map { descriptor; encode; _ } -> (
-        match req with
-        | Computed -> inline descriptor Computed f
-        | Computed_optional -> inline descriptor Computed_optional f
-        | Default d -> inline descriptor (Default (encode d)) f
-        | Optional -> inline descriptor Optional f
-        | Required -> inline descriptor Required f)
-      | Nullable d -> inline d.descriptor Optional f
-      | Object { fields; encode; _ } -> (
-        let rec inline_fields : type req f.
-            (f Hlist.t, req) requirement ->
-            f Hlist.t fields ->
-            (res list list M.t, string) Result.t =
-         fun req -> function
-           | FieldEnd -> M.return [ [] ] |> Result.return
-           | Field { field; rest } when field_ignored field -> (
-             match req with
-             | Computed -> inline_fields Computed rest
-             | Computed_optional -> inline_fields Computed_optional rest
-             | Default Hlist.(_ :: tail) -> inline_fields (Default tail) rest
-             | Optional -> inline_fields Optional rest
-             | Required -> inline_fields Required rest)
-           | Field { field; rest } ->
-             let+ head =
-               let outline _schema =
-                 Result.return
-                 @@ let++ head =
-                      match (field.requirement, req) with
-                      | (Computed | Computed_optional | Default _ | Optional), _
-                      | Required, Required ->
-                        f.f field
-                      | Required, ((Computed | Optional) as requirement) ->
-                        f.f
-                          {
-                            description = field.description;
-                            examples = field.examples;
-                            maximum = field.maximum;
-                            minimum = field.minimum;
-                            name = field.name;
-                            omit = field.omit;
-                            requirement;
-                            schema = field.schema;
-                            title = field.title;
-                          }
-                      | Required, (Computed_optional as requirement) ->
-                        f.f
-                          {
-                            description = field.description;
-                            examples = field.examples;
-                            maximum = field.maximum;
-                            minimum = field.minimum;
-                            name = field.name;
-                            omit = field.omit;
-                            requirement;
-                            schema = field.schema;
-                            title = field.title;
-                          }
-                      | Required, Default Hlist.(head :: _) ->
-                        f.f
-                          {
-                            description = field.description;
-                            examples = field.examples;
-                            maximum = field.maximum;
-                            minimum = field.minimum;
-                            name = field.name;
-                            omit = field.omit;
-                            requirement = Default head;
-                            schema = field.schema;
-                            title = field.title;
-                          }
-                    in
-                    [ [ head ] ]
-               and inline schema =
-                 let next () =
-                   match (field.requirement, req) with
-                   | (Computed | Computed_optional | Default _ | Optional), _
-                   | Required, Required ->
-                     inline schema.descriptor field.requirement f
-                   | Required, Default Hlist.(head :: _) ->
-                     inline schema.descriptor (Default head) f
-                   | Required, ((Computed | Optional) as requirement) ->
-                     inline schema.descriptor requirement f
-                   | Required, Computed_optional ->
-                     inline schema.descriptor Computed_optional f
-                 in
-                 match f.filter with
-                 | None -> next ()
-                 | Some filter -> (
-                   match filter field with
-                   | None -> next ()
-                   | Some res ->
-                     Result.return
-                     @@ let++ res in
-                        [ [ res ] ])
-               in
-               inline_try ~inline ~outline field.schema
-             and+ tail =
-               match req with
-               | Computed -> inline_fields Computed rest
-               | Computed_optional -> inline_fields Computed_optional rest
-               | Default Hlist.(_ :: tail) -> inline_fields (Default tail) rest
-               | Optional -> inline_fields Optional rest
-               | Required -> inline_fields Required rest
-             in
-             let++ head
-             and++ tail in
-             Sequence.(
-               cartesian_product (of_list head) (of_list tail)
-               |> map ~f:(fun (h, t) -> h @ t)
-               |> to_list)
-        in
-        match req with
-        | Computed -> inline_fields Computed fields
-        | Computed_optional -> inline_fields Computed_optional fields
-        | Default v -> inline_fields (Default (encode v)) fields
-        | Required -> inline_fields Required fields
-        | Optional -> inline_fields Optional fields)
-      | Union { cases; key; _ } ->
-        let f (Case { schema; name; _ }) =
-          let key =
-            match key with
-            | None -> M.return None
-            | Some key ->
-              f.f
-                {
-                  name = key;
-                  schema = Outline (make (String_const name));
-                  description = None;
-                  examples = [];
-                  maximum = None;
-                  minimum = None;
-                  omit = false;
-                  requirement = Required;
-                  title = None;
-                }
-              |> M.map ~f:Option.return
-          in
-          let+ res = inline schema.descriptor Required f in
-          let++ key
-          and++ res in
-          match key with
-          | Some key -> List.map ~f:(fun l -> key :: l) res
-          | None -> res
-        in
-        let res = List.map ~f cases in
-        let+ res = Result.all res in
-        let++ res = M.all res in
-        List.concat res
-      | s ->
-        Result.fail
-          (Fmt.str "inline field is not an object: %a" pp_descriptor s)
-    in
-    inline desc Required f
-
-  let value_versioned (f : 'res inline_v) fields =
-    let rec inline_field : type req t.
-        (t, req) field ->
-        (req -> ('res list * Library_versions.t) M.t, string) Result.t =
-     fun field ->
-      let outline _schema =
-        Result.return
-        @@
-        let f = f.f field in
-        fun v ->
-          let++ res = f v in
-          ([ res ], Library_versions.empty)
-      and inline :
-          t Schema_intf.t ->
-          (req -> ('res list * Library_versions.t) M.t, string) Result.t =
-       fun schema ->
-        let+ f = inline_descriptor schema.descriptor in
-        match field.requirement with
-        | Required -> (f : req -> ('res list * Library_versions.t) M.t)
-        | Default _ -> f
-        | Computed -> (
-          function
-          | Some v -> f v
-          | None -> M.return ([], Library_versions.empty))
-        | Computed_optional -> (
-          function
-          | Some (Some v) -> f v
-          | _ -> M.return ([], Library_versions.empty))
-        | Optional -> (
-          function
-          | Some v -> f v
-          | None -> M.return ([], Library_versions.empty))
-      in
-      inline_try ~inline ~outline field.schema
-    and inline_fields : type t.
-        t Hlist.t fields ->
-        (t Hlist.t -> ('res list * Library_versions.t) M.t, string) Result.t =
-      function
-      | FieldEnd ->
-        Result.return (fun Hlist.[] -> M.return ([], Library_versions.empty))
-      | Field { field; rest } ->
-        let* tail = inline_fields rest in
-        if field_ignored field then
-          Result.return (fun Hlist.(_ :: tl) -> tail tl)
-        else
-          let+ head = inline_field field in
-          fun Hlist.(hd :: tl) ->
-            let++ head, head_version = head hd
-            and++ tail, tail_version = tail tl in
-            (head @ tail, Library_versions.union tail_version head_version)
-    and inline_descriptor : type t.
-        t descriptor ->
-        (t -> ('res list * Library_versions.t) M.t, string) Result.t = function
-      | Ignore ->
-        Result.return (fun () -> M.return ([], Library_versions.empty))
-      | Fixpoint d ->
-        (* Break infinite recursion. Would be better to have a fixpoint here
-           too. *)
-        Result.return (fun v ->
-            (inline_descriptor (Lazy.force d) |> Result.ok_or_failwith) v)
-      | Map { descriptor; encode; _ } ->
-        let+ f = inline_descriptor descriptor in
-        fun v -> f (encode v)
-      | Nullable schema -> (
-        let+ f = inline_descriptor schema.descriptor in
-        function Some v -> f v | None -> M.return ([], Library_versions.empty))
-      | Object { fields; encode; _ } ->
-        let+ f = inline_fields fields in
-        fun v -> f (encode v)
-      | Union { cases; key; _ } -> (
-        let+ cases =
-          let f (Case { encoder; name; schema; since; _ }) =
-            let+ res = inline_descriptor schema.descriptor in
-            let key =
-              match key with
-              | None -> None
-              | Some key ->
-                Some
-                  (f.f
-                     {
-                       name = key;
-                       schema = Outline (make (String_const name));
-                       description = None;
-                       examples = [];
-                       maximum = None;
-                       minimum = None;
-                       omit = false;
-                       requirement = Required;
-                       title = None;
-                     })
-            in
-            fun v ->
-              match encoder v with
-              | None -> None
-              | Some v -> (
-                let result =
-                  match key with
-                  | None -> res v
-                  | Some key ->
-                    let++ key = key ()
-                    and++ res, versions = res v in
-                    (key :: res, versions)
-                in
-                match since with
-                | None -> Some result
-                | Some (version, library) ->
-                  Some
-                    (let++ res, versions = result in
-                     ( res,
-                       Library_versions.with_version library version versions ))
-                )
-          in
-          List.map ~f cases |> Result.all
-        in
-        fun v ->
-          match List.find_map cases ~f:(fun case -> case v) with
-          | Some case -> case
-          | None -> failwith "no union cased matched in inline_f")
-      | s ->
-        Result.fail
-          (Fmt.str "inline field is not an object: %a" pp_descriptor s)
-    in
-    inline_fields fields
-
-  let value f fields =
-    let+ result = value_versioned f fields in
-    fun fields ->
-      let++ result, _ = result fields in
-      result
-end
-
-module Inline = Make_inline (Base.Monad.Ident)
-
-(* Walker *)
-
-module Walk (W : WALK) = struct
-  let ( let+ ) = W.M.Let_syntax.( >>| )
-  let ( and+ ) = W.M.Let_syntax.Let_syntax.both
-
-  module Inline = Make_inline (W.M)
-
-  let rec descriptor : type t. id:string option -> t descriptor -> W.t W.M.t =
-   fun ~id -> function
-    | Any _ -> W.any
-    | Bool -> W.bool
-    | Coding { f } -> descriptor ~id (f None)
-    | Float -> W.float
-    | Date -> W.date
-    | Fixpoint s -> descriptor ~id (Lazy.force s)
-    | Int -> W.int
-    | Ignore -> W.ignore
-    | Int64 -> W.int64
-    | Json -> W.json
-    | List l -> W.list (schema l)
-    | Null -> W.null
-    | String -> W.string
-    | Time -> W.time
-    | Time_local -> W.time_local
-    | Map { descriptor = d; _ } -> W.map @@ descriptor ~id d
-    | Mapping { item; _ } -> W.mapping (schema item)
-    | Nullable s -> W.nullable (schema s)
-    | Sequence { item; _ } -> W.list (schema item)
-    | String_const s -> W.string_const s
-    | Object _ as o -> (
-      let fields =
-        let f { name; requirement; schema = s; _ } =
-          W.field ~required:(required requirement)
-            ~computed:(computed requirement) name
-            (schema @@ field_schema s)
-        and filter field =
-          let s = field_schema field.schema in
-          W.inline
-            (match s.parametric with
-            | None -> None
-            | Some p ->
-              Some
-                (fun () ->
-                  let name, args, eff_args, t = parametric p in
-                  W.parametric name args eff_args t))
-            (fun () -> schema s)
-            field
-        in
-        Inline.schema o { f; filter = Some filter }
-      in
-      match fields with Ok fields -> W.object_ fields | Error e -> failwith e)
-    | Tuple { items; _ } -> W.tuple @@ tuple items
-    | Union { cases; key; polymorphic } ->
-      let cases = List.map ~f:(case key) cases |> W.M.all in
-      W.union ~id ~polymorphic cases
-
-  and case : type t. string option -> t case -> W.case W.M.t =
-   fun key (Case { inline; name; raw_name; schema = s; since; _ }) ->
-    W.case ?key ~inline ~name ~raw_name ?since:(Option.map ~f:fst since)
-      (schema s)
-
-  and schema : type t. t Schema_intf.t -> W.t W.M.t =
-   fun { id; descriptor = d; parametric = p } ->
-    let schema () = descriptor ~id d
-    and parametric =
-      match p with
-      | None -> None
-      | Some p ->
-        Some
-          (fun () ->
-            let name, args, eff_args, t = parametric p in
-            W.parametric name args eff_args t)
-    in
-    W.schema id parametric schema
-
-  and parametric : type t.
-      t parametric -> string * string list * W.t W.M.t list * W.t W.M.t =
-    function
-    | Plain { name; descriptor = d } -> (name, [], [], descriptor ~id:None d)
-    | Parametric { name; parameter; next } ->
-      let template_name, args, eff_args, t =
-        parametric
-          (next
-             {
-               id = Some ("#" ^ name);
-               (* FIXME: Ensure we don't keep eg. an `Ignore` schema that would
-                  be discarded. Handle that better with an actual `Var`
-                  descriptor.*)
-               descriptor =
-                 Map
-                   {
-                     decode = (fun _ -> failwith "unreachable");
-                     encode = (fun _ -> failwith "unreachable");
-                     descriptor = Int;
-                   };
-               parametric = None;
-             })
-      in
-      (template_name, name :: args, schema parameter :: eff_args, t)
-
-  and tuple : type t. t tuple -> W.t list W.M.t = function
-    | ItemEnd -> W.M.return []
-    | Item { schema = s; rest } ->
-      let+ s = schema s
-      and+ rest = tuple rest in
-      s :: rest
-
-  let parametric p =
-    let name, args, eff_args, t = parametric p in
-    W.parametric name args eff_args t
-end
-
-let object_fields descriptor =
-  let+ names =
-    Inline.schema descriptor
-      {
-        f =
-          (fun { name; requirement; _ } ->
-            Option.some_if (required requirement) name);
-        filter = None;
-      }
-  in
-  List.map ~f:(List.filter_map ~f:Fn.id) names
-
-let assoc_compare compare l r =
-  let f (key, l) =
-    match List.Assoc.find ~equal:String.equal r key with
-    | None -> Some 1
-    | Some r -> ( match compare l r with 0 -> None | v -> Some v)
-  in
-  Option.value ~default:0 @@ List.find_map ~f l
-
 let compare schema =
   let rec compare_json l r =
+    let assoc_compare compare l r =
+      let f (key, l) =
+        match List.Assoc.find ~equal:String.equal r key with
+        | None -> Some 1
+        | Some r -> ( match compare l r with 0 -> None | v -> Some v)
+      in
+      Option.value ~default:0 @@ List.find_map ~f l
+    in
     match (l, r) with
     | `Null, `Null -> 0
     | `Null, _ -> -1
@@ -775,6 +338,476 @@ let compare schema =
   compare schema.descriptor
 
 let equal schema l r = compare schema l r = 0
+
+(* Object inlining *)
+
+module Make_inline (M : Base.Monad.S) = struct
+  include Make_inline (M)
+
+  let ( let++ ) = M.Let_syntax.( >>| )
+  let ( and++ ) = M.Let_syntax.Let_syntax.both
+
+  let inline_try ~inline ~outline = function
+    | Inline schema -> inline schema
+    | Inline_try schema -> (
+      match inline schema with
+      | Result.Ok _ as ok -> ok
+      | Result.Error _ -> outline schema)
+    | Outline schema -> outline schema
+
+  let schema desc f =
+    let rec inline : type req res t.
+        t descriptor ->
+        (t, req) requirement ->
+        res inline ->
+        (res list list M.t, string) Result.t =
+     fun d req f ->
+      match d with
+      | Ignore -> M.return [ [] ] |> Result.return
+      | Fixpoint d -> inline (Lazy.force d) req f
+      | Map { descriptor; encode; _ } -> (
+        match req with
+        | Computed -> inline descriptor Computed f
+        | Computed_optional -> inline descriptor Computed_optional f
+        | Default d -> inline descriptor (Default (encode d)) f
+        | Optional -> inline descriptor Optional f
+        | Required -> inline descriptor Required f)
+      | Nullable d -> inline d.descriptor Optional f
+      | Object { fields; encode; _ } -> (
+        let rec inline_fields : type req f.
+            (f Hlist.t, req) requirement ->
+            f Hlist.t fields ->
+            (res list list M.t, string) Result.t =
+         fun req -> function
+           | FieldEnd -> M.return [ [] ] |> Result.return
+           | Field { field; rest } when field_ignored field -> (
+             match req with
+             | Computed -> inline_fields Computed rest
+             | Computed_optional -> inline_fields Computed_optional rest
+             | Default Hlist.(_ :: tail) -> inline_fields (Default tail) rest
+             | Optional -> inline_fields Optional rest
+             | Required -> inline_fields Required rest)
+           | Field { field; rest } ->
+             let+ head =
+               let outline _schema =
+                 Result.return
+                 @@ let++ head =
+                      match (field.requirement, req) with
+                      | (Computed | Computed_optional | Default _ | Optional), _
+                      | Required, Required ->
+                        f.f field
+                      | Required, ((Computed | Optional) as requirement) ->
+                        f.f
+                          {
+                            description = field.description;
+                            examples = field.examples;
+                            maximum = field.maximum;
+                            minimum = field.minimum;
+                            name = field.name;
+                            omit = field.omit;
+                            requirement;
+                            schema = field.schema;
+                            since = field.since;
+                            title = field.title;
+                          }
+                      | Required, (Computed_optional as requirement) ->
+                        f.f
+                          {
+                            description = field.description;
+                            examples = field.examples;
+                            maximum = field.maximum;
+                            minimum = field.minimum;
+                            name = field.name;
+                            omit = field.omit;
+                            requirement;
+                            schema = field.schema;
+                            since = field.since;
+                            title = field.title;
+                          }
+                      | Required, Default Hlist.(head :: _) ->
+                        f.f
+                          {
+                            description = field.description;
+                            examples = field.examples;
+                            maximum = field.maximum;
+                            minimum = field.minimum;
+                            name = field.name;
+                            omit = field.omit;
+                            requirement = Default head;
+                            schema = field.schema;
+                            since = field.since;
+                            title = field.title;
+                          }
+                    in
+                    [ [ head ] ]
+               and inline schema =
+                 let next () =
+                   match (field.requirement, req) with
+                   | (Computed | Computed_optional | Default _ | Optional), _
+                   | Required, Required ->
+                     inline schema.descriptor field.requirement f
+                   | Required, Default Hlist.(head :: _) ->
+                     inline schema.descriptor (Default head) f
+                   | Required, ((Computed | Optional) as requirement) ->
+                     inline schema.descriptor requirement f
+                   | Required, Computed_optional ->
+                     inline schema.descriptor Computed_optional f
+                 in
+                 match f.filter with
+                 | None -> next ()
+                 | Some filter -> (
+                   match filter field with
+                   | None -> next ()
+                   | Some res ->
+                     Result.return
+                     @@ let++ res in
+                        [ [ res ] ])
+               in
+               inline_try ~inline ~outline field.schema
+             and+ tail =
+               match req with
+               | Computed -> inline_fields Computed rest
+               | Computed_optional -> inline_fields Computed_optional rest
+               | Default Hlist.(_ :: tail) -> inline_fields (Default tail) rest
+               | Optional -> inline_fields Optional rest
+               | Required -> inline_fields Required rest
+             in
+             let++ head
+             and++ tail in
+             Sequence.(
+               cartesian_product (of_list head) (of_list tail)
+               |> map ~f:(fun (h, t) -> h @ t)
+               |> to_list)
+        in
+        match req with
+        | Computed -> inline_fields Computed fields
+        | Computed_optional -> inline_fields Computed_optional fields
+        | Default v -> inline_fields (Default (encode v)) fields
+        | Required -> inline_fields Required fields
+        | Optional -> inline_fields Optional fields)
+      | Union { cases; key; _ } ->
+        let f (Case { schema; name; _ }) =
+          let key =
+            match key with
+            | None -> M.return None
+            | Some key ->
+              f.f
+                {
+                  name = key;
+                  schema = Outline (make (String_const name));
+                  description = None;
+                  examples = [];
+                  maximum = None;
+                  minimum = None;
+                  omit = false;
+                  requirement = Required;
+                  since = None;
+                  title = None;
+                }
+              |> M.map ~f:Option.return
+          in
+          let+ res = inline schema.descriptor Required f in
+          let++ key
+          and++ res in
+          match key with
+          | Some key -> List.map ~f:(fun l -> key :: l) res
+          | None -> res
+        in
+        let res = List.map ~f cases in
+        let+ res = Result.all res in
+        let++ res = M.all res in
+        List.concat res
+      | s ->
+        Result.fail
+          (Fmt.str "inline field is not an object: %a" pp_descriptor s)
+    in
+    inline desc Required f
+
+  let value_versioned (f : 'res inline_v) fields =
+    let rec inline_field : type req t.
+        (t, req) field ->
+        (req -> ('res list * Library_versions.t) M.t, string) Result.t =
+     fun field ->
+      let outline _schema =
+        Result.return
+        @@
+        let f = f.f field in
+        let version =
+          match field.since with
+          | None -> Library_versions.empty
+          | Some (version, library) ->
+            Library_versions.singleton library version
+        in
+        let with_version f v version =
+          let++ res = f v in
+          ([ res ], version)
+        in
+        match field.requirement with
+        | Required -> fun v -> with_version f v version
+        | Default default ->
+          let equal = equal (field_schema field.schema) in
+          fun v ->
+            with_version f v
+              (if equal v default then Library_versions.empty else version)
+        | Computed -> (
+          function
+          | Some _ as v -> with_version f v version
+          | None as v -> with_version f v Library_versions.empty)
+        | Computed_optional -> (
+          function
+          | Some (Some _) as v -> with_version f v version
+          | other -> with_version f other Library_versions.empty)
+        | Optional -> (
+          function
+          | Some _ as v -> with_version f v version
+          | None as v -> with_version f v Library_versions.empty)
+      and inline :
+          t Schema_intf.t ->
+          (req -> ('res list * Library_versions.t) M.t, string) Result.t =
+       fun schema ->
+        let+ f = inline_descriptor schema.descriptor in
+        match field.requirement with
+        | Required -> (f : req -> ('res list * Library_versions.t) M.t)
+        | Default _ -> f
+        | Computed -> (
+          function
+          | Some v -> f v
+          | None -> M.return ([], Library_versions.empty))
+        | Computed_optional -> (
+          function
+          | Some (Some v) -> f v
+          | _ -> M.return ([], Library_versions.empty))
+        | Optional -> (
+          function
+          | Some v -> f v
+          | None -> M.return ([], Library_versions.empty))
+      in
+      inline_try ~inline ~outline field.schema
+    and inline_fields : type t.
+        t Hlist.t fields ->
+        (t Hlist.t -> ('res list * Library_versions.t) M.t, string) Result.t =
+      function
+      | FieldEnd ->
+        Result.return (fun Hlist.[] -> M.return ([], Library_versions.empty))
+      | Field { field; rest } ->
+        let* tail = inline_fields rest in
+        if field_ignored field then
+          Result.return (fun Hlist.(_ :: tl) -> tail tl)
+        else
+          let+ head = inline_field field in
+          fun Hlist.(hd :: tl) ->
+            let++ head, head_version = head hd
+            and++ tail, tail_version = tail tl in
+            (head @ tail, Library_versions.union tail_version head_version)
+    and inline_descriptor : type t.
+        t descriptor ->
+        (t -> ('res list * Library_versions.t) M.t, string) Result.t = function
+      | Ignore ->
+        Result.return (fun () -> M.return ([], Library_versions.empty))
+      | Fixpoint d ->
+        (* Break infinite recursion. Would be better to have a fixpoint here
+           too. *)
+        Result.return (fun v ->
+            (inline_descriptor (Lazy.force d) |> Result.ok_or_failwith) v)
+      | Map { descriptor; encode; _ } ->
+        let+ f = inline_descriptor descriptor in
+        fun v -> f (encode v)
+      | Nullable schema -> (
+        let+ f = inline_descriptor schema.descriptor in
+        function Some v -> f v | None -> M.return ([], Library_versions.empty))
+      | Object { fields; encode; _ } ->
+        let+ f = inline_fields fields in
+        fun v -> f (encode v)
+      | Union { cases; key; _ } -> (
+        let+ cases =
+          let f (Case { encoder; name; schema; since; _ }) =
+            let+ res = inline_descriptor schema.descriptor in
+            let key =
+              match key with
+              | None -> None
+              | Some key ->
+                Some
+                  (f.f
+                     {
+                       name = key;
+                       schema = Outline (make (String_const name));
+                       description = None;
+                       examples = [];
+                       maximum = None;
+                       minimum = None;
+                       omit = false;
+                       requirement = Required;
+                       since = None;
+                       title = None;
+                     })
+            in
+            fun v ->
+              match encoder v with
+              | None -> None
+              | Some v -> (
+                let result =
+                  match key with
+                  | None -> res v
+                  | Some key ->
+                    let++ key = key ()
+                    and++ res, versions = res v in
+                    (key :: res, versions)
+                in
+                match since with
+                | None -> Some result
+                | Some (version, library) ->
+                  Some
+                    (let++ res, versions = result in
+                     ( res,
+                       Library_versions.with_version library version versions ))
+                )
+          in
+          List.map ~f cases |> Result.all
+        in
+        fun v ->
+          match List.find_map cases ~f:(fun case -> case v) with
+          | Some case -> case
+          | None -> failwith "no union cased matched in inline_f")
+      | s ->
+        Result.fail
+          (Fmt.str "inline field is not an object: %a" pp_descriptor s)
+    in
+    inline_fields fields
+
+  let value f fields =
+    let+ result = value_versioned f fields in
+    fun fields ->
+      let++ result, _ = result fields in
+      result
+end
+
+module Inline = Make_inline (Base.Monad.Ident)
+
+(* Walker *)
+
+module Walk (W : WALK) = struct
+  let ( let+ ) = W.M.Let_syntax.( >>| )
+  let ( and+ ) = W.M.Let_syntax.Let_syntax.both
+
+  module Inline = Make_inline (W.M)
+
+  let rec descriptor : type t. id:string option -> t descriptor -> W.t W.M.t =
+   fun ~id -> function
+    | Any _ -> W.any
+    | Bool -> W.bool
+    | Coding { f } -> descriptor ~id (f None)
+    | Float -> W.float
+    | Date -> W.date
+    | Fixpoint s -> descriptor ~id (Lazy.force s)
+    | Int -> W.int
+    | Ignore -> W.ignore
+    | Int64 -> W.int64
+    | Json -> W.json
+    | List l -> W.list (schema l)
+    | Null -> W.null
+    | String -> W.string
+    | Time -> W.time
+    | Time_local -> W.time_local
+    | Map { descriptor = d; _ } -> W.map @@ descriptor ~id d
+    | Mapping { item; _ } -> W.mapping (schema item)
+    | Nullable s -> W.nullable (schema s)
+    | Sequence { item; _ } -> W.list (schema item)
+    | String_const s -> W.string_const s
+    | Object _ as o -> (
+      let fields =
+        let f { name; requirement; schema = s; description; since; title; _ } =
+          W.field ~required:(required requirement)
+            ~computed:(computed requirement) ?description
+            ?since:(Option.map ~f:fst since) ?title name
+            (schema @@ field_schema s)
+        and filter field =
+          let s = field_schema field.schema in
+          W.inline
+            (match s.parametric with
+            | None -> None
+            | Some p ->
+              Some
+                (fun () ->
+                  let name, args, eff_args, t = parametric p in
+                  W.parametric name args eff_args t))
+            (fun () -> schema s)
+            field
+        in
+        Inline.schema o { f; filter = Some filter }
+      in
+      match fields with Ok fields -> W.object_ fields | Error e -> failwith e)
+    | Tuple { items; _ } -> W.tuple @@ tuple items
+    | Union { cases; key; polymorphic } ->
+      let cases = List.map ~f:(case key) cases |> W.M.all in
+      W.union ~id ~polymorphic cases
+
+  and case : type t. string option -> t case -> W.case W.M.t =
+   fun key (Case { inline; name; raw_name; schema = s; since; _ }) ->
+    W.case ?key ~inline ~name ~raw_name ?since:(Option.map ~f:fst since)
+      (schema s)
+
+  and schema : type t. t Schema_intf.t -> W.t W.M.t =
+   fun { id; descriptor = d; parametric = p } ->
+    let schema () = descriptor ~id d
+    and parametric =
+      match p with
+      | None -> None
+      | Some p ->
+        Some
+          (fun () ->
+            let name, args, eff_args, t = parametric p in
+            W.parametric name args eff_args t)
+    in
+    W.schema id parametric schema
+
+  and parametric : type t.
+      t parametric -> string * string list * W.t W.M.t list * W.t W.M.t =
+    function
+    | Plain { name; descriptor = d } -> (name, [], [], descriptor ~id:None d)
+    | Parametric { name; parameter; next } ->
+      let template_name, args, eff_args, t =
+        parametric
+          (next
+             {
+               id = Some ("#" ^ name);
+               (* FIXME: Ensure we don't keep eg. an `Ignore` schema that would
+                  be discarded. Handle that better with an actual `Var`
+                  descriptor.*)
+               descriptor =
+                 Map
+                   {
+                     decode = (fun _ -> failwith "unreachable");
+                     encode = (fun _ -> failwith "unreachable");
+                     descriptor = Int;
+                   };
+               parametric = None;
+             })
+      in
+      (template_name, name :: args, schema parameter :: eff_args, t)
+
+  and tuple : type t. t tuple -> W.t list W.M.t = function
+    | ItemEnd -> W.M.return []
+    | Item { schema = s; rest } ->
+      let+ s = schema s
+      and+ rest = tuple rest in
+      s :: rest
+
+  let parametric p =
+    let name, args, eff_args, t = parametric p in
+    W.parametric name args eff_args t
+end
+
+let object_fields descriptor =
+  let+ names =
+    Inline.schema descriptor
+      {
+        f =
+          (fun { name; requirement; _ } ->
+            Option.some_if (required requirement) name);
+        filter = None;
+      }
+  in
+  List.map ~f:(List.filter_map ~f:Fn.id) names
 
 type pack = Pack : _ t -> pack
 
@@ -954,6 +987,7 @@ let object_wrap name schema =
                     omit = false;
                     requirement = Required;
                     schema = Outline schema;
+                    since = None;
                     title = None;
                   };
                 rest = FieldEnd;

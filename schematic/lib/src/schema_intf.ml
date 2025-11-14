@@ -84,6 +84,7 @@ and ('t, 'req) field = {
   omit : bool;
   requirement : ('t, 'req) requirement;
   schema : 't field_schema;
+  since : (Semver.t * library) option;
   title : string option;
 }
 
@@ -234,7 +235,15 @@ module type WALK = sig
 
       All schema details such as ignored fields and inlining are handled by the
       walker. *)
-  val field : computed:bool -> required:bool -> string -> t M.t -> field M.t
+  val field :
+    computed:bool ->
+    required:bool ->
+    ?description:string ->
+    ?since:Semver.t ->
+    ?title:string ->
+    string ->
+    t M.t ->
+    field M.t
 
   (** [object_ fields] combines the fields alternatives in a single object.
 

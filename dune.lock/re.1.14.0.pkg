@@ -1,4 +1,4 @@
-(version 3.6)
+(version 1.14.0)
 
 (build
  (all_platforms
@@ -9,10 +9,9 @@
 
 (depends
  (all_platforms
-  (ocaml dune ppxlib gen)))
+  (dune ocaml)))
 
 (source
  (fetch
-  (url
-   https://github.com/ocaml-community/sedlex/archive/refs/tags/v3.6.tar.gz)
-  (checksum md5=ad2d0ec91d20171d3a7161a0cc0c2e6a)))
+  (url https://github.com/ocaml/ocaml-re/archive/refs/tags/1.14.0.tar.gz)
+  (checksum md5=03f4a83100cb9229a796b85c698076e1)))
