@@ -1,11 +1,19 @@
 open Base
 
 (** A TypeScript type expression. *)
-type t =
+type field = {
+  name : string;
+  type' : t;
+  required : bool;
+  description : string option;
+  since : Version.t option;
+  title : string option;
+}
+
+and t =
   | Atom of string  (** An identifier. *)
   | Intersection of t list  (** [X & Y & ... ] *)
-  | Object of { fields : (string * t * bool) list }
-      (** An object, with fields defined as [(name, type, required)] *)
+  | Object of { fields : field list }  (** An object with typed fields *)
   | String of string  (** A string literal *)
   | Template of {
       name : string;
@@ -44,8 +52,8 @@ include Marks.Make (struct
 end)
 
 module Of = Schema.Walk (struct
-  type field =
-    | Field of (string * t * bool)
+  type nonrec field =
+    | Field of field
     | Type of t
 
   type nonrec t = t
@@ -94,9 +102,9 @@ module Of = Schema.Walk (struct
   let json = atom "any"
   let bool = atom "boolean"
 
-  let field ~computed:_ ~required name schema =
+  let field ~computed:_ ~required ?description ?since ?title name schema =
     let+ schema in
-    Field (name, schema, required)
+    Field { name; type' = schema; required; description; since; title }
 
   let inline (parametric : (unit -> Marks.t -> t * Marks.t) option) schema s =
     match (parametric, s) with
@@ -168,7 +176,23 @@ module Of = Schema.Walk (struct
       | None -> schema
       | Some key ->
         Intersection
-          [ schema; Object { fields = [ (key, String name, true) ] } ]
+          [
+            schema;
+            Object
+              {
+                fields =
+                  [
+                    {
+                      name = key;
+                      type' = String name;
+                      required = true;
+                      description = None;
+                      since = None;
+                      title = None;
+                    };
+                  ];
+              };
+          ]
     in
     { since; t }
 
@@ -222,15 +246,24 @@ let pp ?(annotate_since = false) ?(indent = 2) fmt ts =
         ++ sp
         ++ const char ']'
       and object_ =
-        let field f (name, v, required) =
+        let field f { name; type'; required; since; _ } =
+          let comment =
+            match since with
+            | Some since when annotate_since ->
+              Fmt.const Fmt.string "/* since "
+              ++ Fmt.const Version.pp since
+              ++ Fmt.const Fmt.string " */ "
+            | _ -> Fmt.nop
+          in
           let pp =
             box ~indent
-            @@ Fmt.pair
-                 ~sep:(const string (if required then ":" else "?:") ++ sp)
-                 Dump.string
-                 (hvbox (pp Delimited))
+            @@ comment
+               ++ Fmt.pair
+                    ~sep:(const string (if required then ":" else "?:") ++ sp)
+                    Dump.string
+                    (hvbox (pp Delimited))
           in
-          pp f (name, v)
+          pp f (name, type')
         in
         const char '{'
         ++ break 1 indent

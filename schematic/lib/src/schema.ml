@@ -727,9 +727,10 @@ module Walk (W : WALK) = struct
     | String_const s -> W.string_const s
     | Object _ as o -> (
       let fields =
-        let f { name; requirement; schema = s; _ } =
+        let f { name; requirement; schema = s; description; since; title } =
           W.field ~required:(required requirement)
-            ~computed:(computed requirement) name
+            ~computed:(computed requirement) ?description
+            ?since:(Option.map ~f:fst since) ?title name
             (schema @@ field_schema s)
         and filter field =
           let s = field_schema field.schema in
