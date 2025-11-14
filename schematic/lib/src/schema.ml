@@ -421,9 +421,45 @@ module Make_inline (M : Base.Monad.S) = struct
         Result.return
         @@
         let f = f.f field in
-        fun v ->
-          let++ res = f v in
-          ([ res ], Library_versions.empty)
+        let version =
+          match field.since with
+          | None -> Library_versions.empty
+          | Some (version, library) ->
+            Library_versions.singleton library version
+        in
+        match field.requirement with
+        | Required ->
+          fun v ->
+            let++ res = f v in
+            ([ res ], version)
+        | Default _ ->
+          fun v ->
+            let++ res = f v in
+            ([ res ], version)
+        | Computed -> (
+          function
+          | Some _ as v ->
+            let++ res = f v in
+            ([ res ], version)
+          | None as v ->
+            let++ res = f v in
+            ([ res ], Library_versions.empty))
+        | Computed_optional -> (
+          function
+          | Some (Some _) as v ->
+            let++ res = f v in
+            ([ res ], version)
+          | other ->
+            let++ res = f other in
+            ([ res ], Library_versions.empty))
+        | Optional -> (
+          function
+          | Some _ as v ->
+            let++ res = f v in
+            ([ res ], version)
+          | None as v ->
+            let++ res = f v in
+            ([ res ], Library_versions.empty))
       and inline :
           t Schema_intf.t ->
           (req -> ('res list * Library_versions.t) M.t, string) Result.t =
