@@ -538,41 +538,29 @@ module Make_inline (M : Base.Monad.S) = struct
           | Some (version, library) ->
             Library_versions.singleton library version
         in
+        let with_version f v version =
+          let++ res = f v in
+          ([ res ], version)
+        in
         match field.requirement with
-        | Required ->
-          fun v ->
-            let++ res = f v in
-            ([ res ], version)
+        | Required -> fun v -> with_version f v version
         | Default default ->
           let equal = equal (field_schema field.schema) in
           fun v ->
-            let++ res = f v in
-            ( [ res ],
-              if equal v default then Library_versions.empty else version )
+            with_version f v
+              (if equal v default then Library_versions.empty else version)
         | Computed -> (
           function
-          | Some _ as v ->
-            let++ res = f v in
-            ([ res ], version)
-          | None as v ->
-            let++ res = f v in
-            ([ res ], Library_versions.empty))
+          | Some _ as v -> with_version f v version
+          | None as v -> with_version f v Library_versions.empty)
         | Computed_optional -> (
           function
-          | Some (Some _) as v ->
-            let++ res = f v in
-            ([ res ], version)
-          | other ->
-            let++ res = f other in
-            ([ res ], Library_versions.empty))
+          | Some (Some _) as v -> with_version f v version
+          | other -> with_version f other Library_versions.empty)
         | Optional -> (
           function
-          | Some _ as v ->
-            let++ res = f v in
-            ([ res ], version)
-          | None as v ->
-            let++ res = f v in
-            ([ res ], Library_versions.empty))
+          | Some _ as v -> with_version f v version
+          | None as v -> with_version f v Library_versions.empty)
       and inline :
           t Schema_intf.t ->
           (req -> ('res list * Library_versions.t) M.t, string) Result.t =
@@ -727,7 +715,7 @@ module Walk (W : WALK) = struct
     | String_const s -> W.string_const s
     | Object _ as o -> (
       let fields =
-        let f { name; requirement; schema = s; description; since; title } =
+        let f { name; requirement; schema = s; description; since; title; _ } =
           W.field ~required:(required requirement)
             ~computed:(computed requirement) ?description
             ?since:(Option.map ~f:fst since) ?title name
