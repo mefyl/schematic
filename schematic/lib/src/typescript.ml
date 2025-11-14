@@ -250,18 +250,18 @@ let pp ?(annotate_since = false) ?(indent = 2) fmt ts =
           let comment =
             match since with
             | Some since when annotate_since ->
-              Fmt.const Fmt.string "/* since "
+              Fmt.const Fmt.string " /* since "
               ++ Fmt.const Version.pp since
-              ++ Fmt.const Fmt.string " */ "
+              ++ Fmt.const Fmt.string " */"
             | _ -> Fmt.nop
           in
           let pp =
             box ~indent
-            @@ comment
-               ++ Fmt.pair
-                    ~sep:(const string (if required then ":" else "?:") ++ sp)
-                    Dump.string
-                    (hvbox (pp Delimited))
+            @@ Fmt.pair
+                 ~sep:(const string (if required then ":" else "?:") ++ sp)
+                 Dump.string
+                 (hvbox (pp Delimited))
+               ++ comment
           in
           pp f (name, type')
         in
