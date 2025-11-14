@@ -104,12 +104,12 @@ let variant_typescript = ("Variant", {|Record | { "i": number }|})
 module Generate_types = struct
   open Test_utils
 
-  let test ~here t (expected : _ list) =
+  let test ?(annotate_since = false) ~here t (expected : _ list) =
     let expected = Base.Set.of_list (module String_pair) expected in
     let actual =
       Schematic.Typescript.of_schema t
       |> List.map ~f:(fun (id, schema) ->
-             (id, Schematic.Typescript.to_string schema))
+             (id, Schematic.Typescript.to_string ~annotate_since schema))
       |> Base.Set.of_list (module String_pair)
     in
     Alcotest.(
@@ -307,19 +307,19 @@ module Generate_types = struct
   }
   [@@deriving schema]
 
-  let versioned () =
-    let expected = Base.Set.of_list (module String_pair)
+  let since_annotation_record () =
+    test ~annotate_since:true ~here:[%here] versioned_record_schema
       [ ("VersionedRecord", {|{ "x": number; "y": number; /* since 0.2.0 */ "z"?: number }|}) ]
-    in
-    let actual =
-      Schematic.Typescript.of_schema versioned_record_schema
-      |> List.map ~f:(fun (id, schema) ->
-             (id, Schematic.Typescript.to_string ~annotate_since:true schema))
-      |> Base.Set.of_list (module String_pair)
-    in
-    Alcotest.(
-      check ~here:[%here] Testables.Set.String_pair.set "typescript declarations"
-        expected actual)
+
+  type versioned_variant =
+    | A of { v : int }
+    | B of { v : int }
+    | C of { v : int } [@schematic.since "0.2.0"]
+  [@@deriving schema]
+
+  let since_annotation_variant () =
+    test ~annotate_since:true ~here:[%here] versioned_variant_schema
+      [ ("VersionedVariant", {|{ "v": number } | { "v": number } | { "v": number } /* since 0.2.0 */|}) ]
 end
 
 let () =
@@ -346,6 +346,7 @@ let () =
             test_case "option option" `Quick option_default;
             test_case "duplicate type" `Quick duplicate;
             test_case "priorities" `Quick priorities;
-            test_case "versioned" `Quick versioned;
+            test_case "since annotation record" `Quick since_annotation_record;
+            test_case "since annotation variant" `Quick since_annotation_variant;
           ] );
     ]
