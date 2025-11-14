@@ -237,6 +237,12 @@ end
 
 let pp ?(annotate_since = false) ?(indent = 2) fmt ts =
   let rec pp (prec : Precedence.t) fmt ts =
+    let since_comment =
+      let open Fmt in
+      if annotate_since then
+        option @@ (const string " /* since " ++ Version.pp ++ const string " */")
+      else nop
+    in
     let printer =
       let open Fmt in
       let tuple =
@@ -247,21 +253,13 @@ let pp ?(annotate_since = false) ?(indent = 2) fmt ts =
         ++ const char ']'
       and object_ =
         let field f { name; type'; required; since; _ } =
-          let comment =
-            match since with
-            | Some since when annotate_since ->
-              Fmt.const Fmt.string " /* since "
-              ++ Fmt.const Version.pp since
-              ++ Fmt.const Fmt.string " */"
-            | _ -> Fmt.nop
-          in
           let pp =
             box ~indent
             @@ Fmt.pair
                  ~sep:(const string (if required then ":" else "?:") ++ sp)
                  Dump.string
                  (hvbox (pp Delimited))
-               ++ comment
+               ++ const since_comment since
           in
           pp f (name, type')
         in
@@ -272,10 +270,8 @@ let pp ?(annotate_since = false) ?(indent = 2) fmt ts =
         ++ const char '}'
       and union =
         let pp =
-          let pp_case f = function
-            | { since = Some since; t } when annotate_since ->
-              Fmt.pf f "%a /* since %a */" (pp Union) t Version.pp since
-            | { t; _ } -> pp Union f t
+          let pp_case f { since; t } =
+            Fmt.pf f "%a%a" (pp Union) t since_comment since
           in
           hvbox @@ list ~sep:(custom_break " | " " |") (hvbox pp_case)
         in
