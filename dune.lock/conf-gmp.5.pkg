@@ -92,6 +92,8 @@
   (= %{os} openbsd))
  ((gmp)
   (= %{os} freebsd))
+ ((gmp)
+  (= %{os_distribution} arch))
  ((gmp-dev)
   (= %{os_distribution} alpine))
  ((gmp-devel)
