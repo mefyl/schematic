@@ -1,4 +1,4 @@
-(version 0.27.0)
+(version 0.28.1)
 
 (build
  (progn
@@ -12,6 +12,6 @@
 (source
  (fetch
   (url
-   https://github.com/ocaml-ppx/ocamlformat/releases/download/0.27.0/ocamlformat-0.27.0.tbz)
+   https://github.com/ocaml-ppx/ocamlformat/releases/download/0.28.1/ocamlformat-0.28.1.tbz)
   (checksum
-   sha256=ddbf484c076d08f99400ee84b790ec231f5c8fcbd5d3324a6400d5388e846d15)))
+   sha256=70bda037d0bed961ed91bdb5198b2eeef542444750a8b015d80ccb94b3ff41fb)))
