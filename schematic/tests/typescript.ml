@@ -58,6 +58,12 @@ type inline_keyed_variant = {
 }
 [@@deriving schema]
 
+type optional_inline_variant = {
+  required_field : string;
+  optional_variant : variant option; [@schematic.inline]
+}
+[@@deriving schema]
+
 module Computed = struct
   type t = {
     x : int;
@@ -198,6 +204,17 @@ module Generate_types = struct
             {|Record & { "kind": "krecord" } | { "i": number } & { "kind": "kotherwise" }|}
           )
        :: record_typescript
+
+  let optional_inline_variant () =
+    test ~here:[%here] optional_inline_variant_schema
+      [
+        ( "OptionalInlineVariant",
+          {|{ "required_field": string } & Variant | { "required_field": string }|}
+        );
+        ("Record", "{ \"a\": number; \"c\": string } & Inline");
+        ("Variant", "Record | { \"i\": number }");
+        inline_typescript;
+      ]
 
   type 'a inline_try = {
     maybe : bool;
@@ -348,6 +365,7 @@ let () =
             test_case "inline-try" `Quick inline_try;
             test_case "inline-option" `Quick hidden_inline_optional;
             test_case "inline-keyed-variant" `Quick inline_keyed_variant;
+            test_case "optional-inline-variant" `Quick optional_inline_variant;
             test_case "computed" `Quick computed;
             test_case "option option" `Quick option_option;
             test_case "option option" `Quick option_default;

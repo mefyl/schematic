@@ -14,6 +14,10 @@ let required : type a b. (a, b) requirement -> bool = function
   | Computed | Required -> true
   | _ -> false
 
+let is_optional : type a b. (a, b) requirement -> bool = function
+  | Optional -> true
+  | _ -> false
+
 let map ~decode ~encode { descriptor; id; _ } =
   { id; descriptor = Map { decode; encode; descriptor }; parametric = None }
 
@@ -461,7 +465,10 @@ module Make_inline (M : Base.Monad.S) = struct
                    | Some res ->
                      Result.return
                      @@ let++ res in
-                        [ [ res ] ])
+                        (* For optional inline fields (like optional unions),
+                           generate base case alternative *)
+                        if is_optional field.requirement then [ [ res ]; [] ]
+                        else [ [ res ] ])
                in
                inline_try ~inline ~outline field.schema
              and+ tail =
