@@ -523,7 +523,9 @@ module Make_inline (M : Base.Monad.S) = struct
         let res = List.map ~f cases in
         let+ res = Result.all res in
         let++ res = M.all res in
-        List.concat res
+        let res = List.concat res in
+        (* Add base case for optional unions to support None case *)
+        if is_optional req then res @ [ [] ] else res
       | s ->
         Result.fail
           (Fmt.str "inline field is not an object: %a" pp_descriptor s)
@@ -805,16 +807,29 @@ module Walk (W : WALK) = struct
 end
 
 let object_fields descriptor =
-  let+ names =
-    Inline.schema descriptor
+  let result = Inline.schema descriptor
       {
         f =
           (fun { name; requirement; _ } ->
             Option.some_if (required requirement) name);
-        filter = None;
+        filter =
+          Some
+            (fun field ->
+              match field.schema with
+              | Inline _ | Inline_try _ ->
+                (* Field is inlined, so don't include its name -
+                   the inline mechanism will process its inner fields *)
+                None
+              | Outline _ ->
+                (* Field is not inlined, include its name *)
+                Some (Option.some_if (required field.requirement) field.name));
       }
   in
-  List.map ~f:(List.filter_map ~f:Fn.id) names
+  match result with
+  | Result.Ok names ->
+      Result.Ok (List.map ~f:(List.filter_map ~f:Fn.id) names)
+  | Error e ->
+      Error e
 
 type pack = Pack : _ t -> pack
 
