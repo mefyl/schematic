@@ -1370,7 +1370,8 @@ struct
     and nested_inline_inner_required = {
       created : string;
       message : string;
-      event : nested_inline_event; [@schematic.inline]  (* Required, not optional *)
+      event : nested_inline_event; [@schematic.inline]
+          (* Required, not optional *)
     }
 
     and nested_inline_inner = {
@@ -1404,10 +1405,12 @@ struct
         testable (pp_inline_maybe @@ pp a) (equal_inline_maybe @@ equal a))
 
     let nested_inline_inner_required =
-      Alcotest.testable pp_nested_inline_inner_required equal_nested_inline_inner_required
+      Alcotest.testable pp_nested_inline_inner_required
+        equal_nested_inline_inner_required
 
     let nested_inline_outer_required =
-      Alcotest.testable pp_nested_inline_outer_required equal_nested_inline_outer_required
+      Alcotest.testable pp_nested_inline_outer_required
+        equal_nested_inline_outer_required
 
     let nested_inline_inner =
       Alcotest.testable pp_nested_inline_inner equal_nested_inline_inner

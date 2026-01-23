@@ -807,7 +807,8 @@ module Walk (W : WALK) = struct
 end
 
 let object_fields descriptor =
-  let result = Inline.schema descriptor
+  let result =
+    Inline.schema descriptor
       {
         f =
           (fun { name; requirement; _ } ->
@@ -817,8 +818,8 @@ let object_fields descriptor =
             (fun field ->
               match field.schema with
               | Inline _ | Inline_try _ ->
-                (* Field is inlined, so don't include its name -
-                   the inline mechanism will process its inner fields *)
+                (* Field is inlined, so don't include its name - the inline
+                   mechanism will process its inner fields *)
                 None
               | Outline _ ->
                 (* Field is not inlined, include its name *)
@@ -826,10 +827,8 @@ let object_fields descriptor =
       }
   in
   match result with
-  | Result.Ok names ->
-      Result.Ok (List.map ~f:(List.filter_map ~f:Fn.id) names)
-  | Error e ->
-      Error e
+  | Result.Ok names -> Result.Ok (List.map ~f:(List.filter_map ~f:Fn.id) names)
+  | Error e -> Error e
 
 type pack = Pack : _ t -> pack
 
