@@ -813,17 +813,7 @@ let object_fields descriptor =
         f =
           (fun { name; requirement; _ } ->
             Option.some_if (required requirement) name);
-        filter =
-          Some
-            (fun field ->
-              match field.schema with
-              | Inline _ | Inline_try _ ->
-                (* Field is inlined, so don't include its name - the inline
-                   mechanism will process its inner fields *)
-                None
-              | Outline _ ->
-                (* Field is not inlined, include its name *)
-                Some (Option.some_if (required field.requirement) field.name));
+        filter = None;
       }
   in
   match result with
