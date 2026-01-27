@@ -14,6 +14,10 @@ let required : type a b. (a, b) requirement -> bool = function
   | Computed | Required -> true
   | _ -> false
 
+let is_optional : type a b. (a, b) requirement -> bool = function
+  | Optional -> true
+  | _ -> false
+
 let map ~decode ~encode { descriptor; id; _ } =
   { id; descriptor = Map { decode; encode; descriptor }; parametric = None }
 
@@ -461,7 +465,10 @@ module Make_inline (M : Base.Monad.S) = struct
                    | Some res ->
                      Result.return
                      @@ let++ res in
-                        [ [ res ] ])
+                        (* For optional inline fields (like optional unions),
+                           generate base case alternative *)
+                        if is_optional field.requirement then [ [ res ]; [] ]
+                        else [ [ res ] ])
                in
                inline_try ~inline ~outline field.schema
              and+ tail =
@@ -516,7 +523,9 @@ module Make_inline (M : Base.Monad.S) = struct
         let res = List.map ~f cases in
         let+ res = Result.all res in
         let++ res = M.all res in
-        List.concat res
+        let res = List.concat res in
+        (* Add base case for optional unions to support None case *)
+        if is_optional req then res @ [ [] ] else res
       | s ->
         Result.fail
           (Fmt.str "inline field is not an object: %a" pp_descriptor s)
@@ -807,7 +816,7 @@ let object_fields descriptor =
         filter = None;
       }
   in
-  List.map ~f:(List.filter_map ~f:Fn.id) names
+  List.map ~f:List.filter_opt names
 
 type pack = Pack : _ t -> pack
 

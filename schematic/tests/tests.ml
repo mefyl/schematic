@@ -1362,6 +1362,33 @@ struct
       maybe : bool;
       inline : 'a; [@schematic.inline_try]
     }
+
+    and nested_inline_event =
+      | Mention of { origin : string }
+      | SetRelation of { relation : string }
+
+    and nested_inline_inner_required = {
+      created : string;
+      message : string;
+      event : nested_inline_event; [@schematic.inline]
+          (* Required, not optional *)
+    }
+
+    and nested_inline_inner = {
+      created : string;
+      message : string;
+      event : nested_inline_event option; [@schematic.inline]
+    }
+
+    and nested_inline_outer_required = {
+      data : nested_inline_inner_required; [@schematic.inline]
+      workspace_id : string;
+    }
+
+    and nested_inline_outer = {
+      data : nested_inline_inner; [@schematic.inline]
+      workspace_id : string;
+    }
     [@@deriving eq, schema, show]
 
     let inline = Alcotest.testable pp_inline equal_inline
@@ -1376,6 +1403,20 @@ struct
     let inline_maybe a =
       Alcotest.(
         testable (pp_inline_maybe @@ pp a) (equal_inline_maybe @@ equal a))
+
+    let nested_inline_inner_required =
+      Alcotest.testable pp_nested_inline_inner_required
+        equal_nested_inline_inner_required
+
+    let nested_inline_outer_required =
+      Alcotest.testable pp_nested_inline_outer_required
+        equal_nested_inline_outer_required
+
+    let nested_inline_inner =
+      Alcotest.testable pp_nested_inline_inner equal_nested_inline_inner
+
+    let nested_inline_outer =
+      Alcotest.testable pp_nested_inline_outer equal_nested_inline_outer
 
     let descriptor_fields descriptor =
       match
@@ -1540,6 +1581,115 @@ struct
                 schema;
                 value = { maybe = true; inline = 416 };
                 expected = [%ezjsonm { maybe = true; inline = 416 }];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
+              };
+          ];
+      }
+
+    let inline_nested_union_required =
+      {
+        name = "inline-nested-union-required";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            Test
+              {
+                name = "nested union required";
+                here = [%here];
+                decoded = None;
+                value_testable = nested_inline_outer_required;
+                schema = nested_inline_outer_required_schema;
+                value =
+                  {
+                    data =
+                      {
+                        created = "2026-01-23T12:00:00Z";
+                        message = "test";
+                        event = Mention { origin = "channel-123" };
+                      };
+                    workspace_id = "workspace-123";
+                  };
+                expected =
+                  [%ezjsonm
+                    {
+                      created = "2026-01-23T12:00:00Z";
+                      message = "test";
+                      origin = "channel-123";
+                      workspace_id = "workspace-123";
+                    }];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
+              };
+          ];
+      }
+
+    let inline_nested_union_optional =
+      {
+        name = "inline-nested-union-optional";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            Test
+              {
+                name = "nested union none";
+                here = [%here];
+                decoded = None;
+                value_testable = nested_inline_outer;
+                schema = nested_inline_outer_schema;
+                value =
+                  {
+                    data =
+                      {
+                        created = "2026-01-23T12:00:00Z";
+                        message = "test";
+                        event = None;
+                      };
+                    workspace_id = "workspace-123";
+                  };
+                expected =
+                  [%ezjsonm
+                    {
+                      created = "2026-01-23T12:00:00Z";
+                      message = "test";
+                      workspace_id = "workspace-123";
+                    }];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
+              };
+            Test
+              {
+                name = "nested union some";
+                here = [%here];
+                decoded = None;
+                value_testable = nested_inline_outer;
+                schema = nested_inline_outer_schema;
+                value =
+                  {
+                    data =
+                      {
+                        created = "2026-01-23T12:00:00Z";
+                        message = "test";
+                        event = Some (Mention { origin = "channel-123" });
+                      };
+                    workspace_id = "workspace-123";
+                  };
+                expected =
+                  [%ezjsonm
+                    {
+                      created = "2026-01-23T12:00:00Z";
+                      message = "test";
+                      origin = "channel-123";
+                      workspace_id = "workspace-123";
+                    }];
                 kotlin_class_name = None;
                 is_kotlin_roundtrip_enabled = true;
                 swift_class_name = None;
@@ -2771,6 +2921,8 @@ Union {
             Inline.variant_payload;
             Inline.inline_variant;
             Inline.inline_try;
+            Inline.inline_nested_union_required;
+            Inline.inline_nested_union_optional;
             Inline.inline_parametric;
             Inline.inline_nested_optional;
             Inline.inline_nested_default;
