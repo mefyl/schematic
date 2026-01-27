@@ -1,4 +1,4 @@
-module V0_21_2 = struct
+module V0_21_3 = struct
   module Error = Error
   module Base64 = B64
   module Coding = Coding
@@ -20,5 +20,6 @@ module V0_21_2 = struct
   module Version = Version
 end
 
+module V0_21_2 = V0_21_3
 module V0_21_1 = V0_21_2
 module V0_21_0 = V0_21_1
