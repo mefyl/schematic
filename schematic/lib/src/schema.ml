@@ -807,7 +807,7 @@ module Walk (W : WALK) = struct
 end
 
 let object_fields descriptor =
-  let result =
+  let+ names =
     Inline.schema descriptor
       {
         f =
@@ -816,9 +816,7 @@ let object_fields descriptor =
         filter = None;
       }
   in
-  match result with
-  | Result.Ok names -> Result.Ok (List.map ~f:(List.filter_map ~f:Fn.id) names)
-  | Error e -> Error e
+  List.map ~f:List.filter_opt names
 
 type pack = Pack : _ t -> pack
 
