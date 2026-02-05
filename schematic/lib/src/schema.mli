@@ -55,7 +55,14 @@ val pack : _ t -> pack
 type 'res unpacker = { unpack : 't. 't t -> 'res }
 
 val unpack : 'res unpacker -> pack -> 'res
-val make : ?id:string -> ?parametric:'t parametric -> 't descriptor -> 't t
+
+val make :
+  ?id:string ->
+  ?documentation:string ->
+  ?parametric:'t parametric ->
+  't descriptor ->
+  't t
+
 val name_combine : _ t -> string -> string
 val fixpoint : ('a descriptor -> 'a descriptor) -> 'a descriptor
 

@@ -166,6 +166,7 @@ and _ descriptor =
 (** A Schematic schema. *)
 and 't t = {
   id : string option;
+  documentation : string option;
   descriptor : 't descriptor;
   parametric : 't parametric option;
 }
@@ -269,6 +270,7 @@ module type WALK = sig
     name:string ->
     raw_name:string ->
     ?since:Semver.t ->
+    ?documentation:string ->
     t M.t ->
     case M.t
 

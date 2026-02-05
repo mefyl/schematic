@@ -10,6 +10,7 @@ type configuration = unit
 type expanded =
   | Components of {
       descriptor : expression;
+      documentation : expression;
       id : expression;
       parametric : expression;
     }
@@ -29,14 +30,15 @@ let schema_anonymous_name_versioned i =
 let schema_id_versioned ?prefix ~loc = suffix_id ~loc ?prefix "schema_versioned"
 
 let expanded_of_descriptor ~loc ?(id = [%expr None])
-    ?(parametric = [%expr None]) descriptor =
-  Components { descriptor; id; parametric }
+    ?(documentation = [%expr None]) ?(parametric = [%expr None]) descriptor =
+  Components { descriptor; documentation; id; parametric }
 
-let schema_of_components ~context ~loc descriptor id parametric =
+let schema_of_components ~context ~loc descriptor documentation id parametric =
   if context.global.inside then
     [%expr
       {
         Schema.descriptor = [%e descriptor];
+        documentation = [%e documentation];
         id = [%e id];
         parametric = [%e parametric];
       }]
@@ -44,13 +46,14 @@ let schema_of_components ~context ~loc descriptor id parametric =
     [%expr
       {
         Schematic.Schema.descriptor = [%e descriptor];
+        documentation = [%e documentation];
         id = [%e id];
         parametric = [%e parametric];
       }]
 
 let schema_of_expanded ~context ~loc = function
-  | Components { descriptor; id; parametric } ->
-    schema_of_components ~context ~loc descriptor id parametric
+  | Components { descriptor; documentation; id; parametric } ->
+    schema_of_components ~context ~loc descriptor documentation id parametric
   | Expression e -> e
 
 let eopt ~loc ~f = function
@@ -424,6 +427,7 @@ and expand_any_variant ~context ~type_context poly options =
                         schema =
                           {
                             descriptor = String_const name;
+                            documentation = None;
                             id = None;
                             parametric = None;
                           };
@@ -708,7 +712,7 @@ let close ~configuration:_ ~context ~type_context schema =
             | Some __schematic_schema_id -> [%e parametric]
           in
           [%e
-            schema_of_components ~context ~loc descriptor
+            schema_of_components ~context ~loc descriptor [%expr None]
               [%expr
                 match __schematic_parametric with
                 | None -> [%e id]
