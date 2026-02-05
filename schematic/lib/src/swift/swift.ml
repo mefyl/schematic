@@ -178,6 +178,12 @@ let to_object_field_name s = to_swift_identifier @@ to_camel_case s
 let to_type_name s = to_swift_identifier @@ to_pascal_case s
 let to_enum_case_name = to_object_field_name
 
+let pp_docstring fmt doc =
+  let escape s = String.substr_replace_all s ~pattern:"*/" ~with_:"*\\/" in
+  Fmt.pf fmt "/** %s */@;" (escape doc)
+
+let pp_docstring_opt = Fmt.option pp_docstring
+
 type swift_type =
   | Simple of string  (** E.g. [Foo] *)
   | Generic of string * swift_type list
@@ -186,20 +192,30 @@ type swift_type =
            "String"])] is [Bar<List<Boolean>, String>] *)
 [@@deriving show]
 
+type swift_field = {
+  name : string;
+  type_ : swift_type;
+  description : string option;
+}
+[@@deriving show]
+
 type swift_struct = {
   generics : swift_type list;
-  fields : (string * swift_type) list;
+  fields : swift_field list;
+  documentation : string option;
 }
 
 and swift_union = {
   generics : swift_type list;
   cases : swift_case list;
+  documentation : string option;
 }
 [@@deriving show]
 
 and swift_case = {
   case_name : string;
   arguments : swift_argument list;
+  description : string option;
 }
 
 (** An argument for a Swift function/constructor. *)
@@ -216,7 +232,7 @@ type swift =
   | Enum of swift_union
 [@@deriving show]
 
-let empty_struct = Struct { generics = []; fields = [] }
+let empty_struct = Struct { generics = []; fields = []; documentation = None }
 
 module Date = struct
   (** A sligtly more structured version of [PTime.date] for serialization
@@ -270,7 +286,7 @@ module Parser = struct
         while parsing [schema]. *)
   let rec schema_to_swift_marks : type a.
       Marks.t -> a Schema.t -> string option * swift * Marks.t =
-   fun marks ({ id; descriptor; parametric } as schema) ->
+   fun marks ({ id; descriptor; parametric; documentation } as schema) ->
     let () =
       Logs.debug (fun m ->
           m "schema_to_swift_marks: Parsing schema %a" Schema.pp schema)
@@ -290,7 +306,9 @@ module Parser = struct
           Logs.debug (fun m ->
               m "schema_to_swift_marks: Start parsing unnamed schema")
         in
-        let swift, marks = descriptor_to_swift_marks marks descriptor in
+        let swift, marks =
+          descriptor_to_swift_marks marks documentation descriptor
+        in
         (swift_type_name, swift, marks)
       | Some None ->
         (* Swift type name but not present in the marks: add [InProgress] in
@@ -302,7 +320,9 @@ module Parser = struct
               m "schema_to_swift_marks: Start parsing %s" swift_type_name)
         in
         let marks = Map.add_exn ~key:swift_type_name ~data:InProgress marks in
-        let swift, marks = descriptor_to_swift_marks marks descriptor in
+        let swift, marks =
+          descriptor_to_swift_marks marks documentation descriptor
+        in
         let marks = Map.set ~key:swift_type_name ~data:(Done swift) marks in
         (Some swift_type_name, swift, marks)
       | Some (Some InProgress) ->
@@ -331,15 +351,15 @@ module Parser = struct
       @@ Fmt.str "Not yet supported: %s for schema %a" s Schema.pp schema
 
   and descriptor_to_swift_marks : type a.
-      Marks.t -> a Schema.descriptor -> swift * Marks.t =
-   fun marks descriptor ->
+      Marks.t -> string option -> a Schema.descriptor -> swift * Marks.t =
+   fun marks schema_documentation descriptor ->
     match descriptor with
     | Any (module Coding) -> raise (NotYetImplemented "Any")
     | Bool -> (Atom (Simple "Swift.Bool"), marks)
     | Coding { f = _ } -> raise (NotYetImplemented "Coding")
     | Date -> (Atom (Simple "Routine.TimelessDate"), marks)
     | Fixpoint lazy_descriptor ->
-      descriptor_to_swift_marks marks (Lazy.force lazy_descriptor)
+      descriptor_to_swift_marks marks None (Lazy.force lazy_descriptor)
     | Float -> (Atom (Simple "Swift.Float"), marks)
     | Ignore ->
       (empty_struct, marks)
@@ -354,7 +374,7 @@ module Parser = struct
     | Sequence { item; _ } ->
       (* TODO We will probably need [swift] to support generics *)
       list_to_swift_marks marks item
-    | Map { descriptor; _ } -> descriptor_to_swift_marks marks descriptor
+    | Map { descriptor; _ } -> descriptor_to_swift_marks marks None descriptor
     | Mapping { item; _ } ->
       (* TODO We will probably need [swift] to support generics *)
       let type_name, swift, marks = schema_to_swift_marks marks item in
@@ -397,7 +417,13 @@ module Parser = struct
     | Object { fields = FieldEnd; _ } -> (empty_struct, marks)
     | Object { fields; _ } ->
       let swift_fields, marks = object_fields_to_swift_marks marks fields in
-      (Struct { fields = swift_fields; generics = [] }, marks)
+      ( Struct
+          {
+            fields = swift_fields;
+            generics = [];
+            documentation = schema_documentation;
+          },
+        marks )
     | String -> (Atom (Simple "Swift.String"), marks)
     | String_const _ -> (empty_struct, marks)
     | Time -> (Atom (Simple "Foundation.Date"), marks)
@@ -414,6 +440,7 @@ module Parser = struct
               (marks, rest_nested_types)
             ->
             let case_name = to_enum_case_name case_name in
+            let case_documentation = schema.documentation in
             let type_name, swift, marks = schema_to_swift_marks marks schema in
             let nested_type =
               match (type_name, swift) with
@@ -424,19 +451,23 @@ module Parser = struct
                     [
                       { argument_name = None; argument_type = Simple type_name };
                     ];
+                  description = case_documentation;
                 }
               | None, Atom swift_type ->
                 {
                   case_name;
                   arguments =
                     [ { argument_name = None; argument_type = swift_type } ];
+                  description = case_documentation;
                 }
               | None, Struct { fields; _ } ->
                 {
                   case_name;
                   arguments =
-                    List.map fields ~f:(fun (name, argument_type) ->
+                    List.map fields
+                      ~f:(fun { name; type_ = argument_type; _ } ->
                         { argument_name = Some name; argument_type });
+                  description = case_documentation;
                 }
               | None, _ ->
                 raise
@@ -448,7 +479,14 @@ module Parser = struct
             (marks, nested_types))
           cases
       in
-      let swift = Enum { cases; generics = [ (* TODO *) ] } in
+      let swift =
+        Enum
+          {
+            cases;
+            generics = [ (* TODO *) ];
+            documentation = schema_documentation;
+          }
+      in
       (swift, marks)
 
   and list_to_swift_marks : type a. Marks.t -> a Schema.t -> swift * Marks.t =
@@ -499,7 +537,7 @@ module Parser = struct
    fun marks parametric ->
     match parametric with
     | Plain { name; descriptor } ->
-      let _swift, marks = descriptor_to_swift_marks marks descriptor in
+      let _swift, marks = descriptor_to_swift_marks marks None descriptor in
       (* TODO do we need this [swift] type? *)
       ([ Simple name ], marks)
     | Parametric { name; parameter; next } ->
@@ -513,8 +551,7 @@ module Parser = struct
       (Simple name :: other_types, marks)
 
   and object_fields_to_swift_marks : type a.
-      Marks.t -> a Hlist.t Schema.fields -> (string * swift_type) list * Marks.t
-      =
+      Marks.t -> a Hlist.t Schema.fields -> swift_field list * Marks.t =
    fun marks fields ->
     match fields with
     | FieldEnd -> ([], marks)
@@ -542,11 +579,12 @@ module Parser = struct
       (swift_field :: swift_fields, marks)
 
   and object_field_to_swift_marks : type t req.
-      Marks.t -> (t, req) Schema.field -> (string * swift_type) * Marks.t =
+      Marks.t -> (t, req) Schema.field -> swift_field * Marks.t =
    fun marks
        {
          name;
          requirement;
+         description;
          (* For Swift, we do not care about inlining, we decided to preserve the
             same structure as the original OCaml type. *)
          schema = Outline schema | Inline schema | Inline_try schema;
@@ -596,7 +634,8 @@ module Parser = struct
       Logs.debug (fun m ->
           m "object_field_to_swift_marks: Result: %a" pp_swift_type swift_type)
     in
-    ((to_object_field_name name, swift_type), marks)
+    ( { name = to_object_field_name name; type_ = swift_type; description },
+      marks )
 
   let packed_schema_to_swift_marks marks packed_schema =
     Schema.unpack
@@ -609,10 +648,11 @@ module Parser = struct
         case_name = to_type_name case_name;
         arguments =
           [ { argument_name = None; argument_type = Simple case_name } ];
+        description = None;
       }
     in
     let cases = marks |> List.map ~f:name_to_case in
-    Marks.Done (Enum { generics = []; cases })
+    Marks.Done (Enum { generics = []; cases; documentation = None })
 end
 
 (** Module responsible for generating actual Swift code from the parser result.
@@ -631,13 +671,19 @@ module Generator = struct
         close_delim
 
   (** Pretty-print a single field inside a [struct] *)
-  let rec pp_field : (string * swift_type) Fmt.t =
-   fun f (field_name, field_type) ->
-    Fmt.pf f "public let %s: %a" field_name pp_swift_type field_type
+  let rec pp_field : swift_field Fmt.t =
+   fun f { name; type_; description } ->
+    (match description with
+    | Some doc -> Fmt.pf f "/** %s@; */@;" doc
+    | None -> ());
+    Fmt.pf f "public let %s: %a" name pp_swift_type type_
 
   (** Pretty-print a single [case] inside an [enum] *)
   and pp_case : swift_case Fmt.t =
-   fun f { case_name; arguments } ->
+   fun f { case_name; arguments; description } ->
+    (match description with
+    | Some doc -> Fmt.pf f "/** %s@; */@;" doc
+    | None -> ());
     let pp_case_arg fmt { argument_name; argument_type } =
       let pp_name fmt = function
         | None -> Fmt.pf fmt ""
@@ -660,13 +706,15 @@ module Generator = struct
     | Simple s -> Fmt.pf f "%s" s
     | Generic (s, generics) -> Fmt.pf f "%s%a" s pp_generics generics
 
-  and pp_class_init : (string * swift_type) list Fmt.t =
+  and pp_class_init : swift_field list Fmt.t =
    fun f fields ->
     Fmt.pf f "public init(%a) { %a }"
-      Fmt.(list ~sep:comma (pair ~sep:(any ":@ ") string pp_swift_type))
+      Fmt.(
+        list ~sep:comma (fun fmt { name; type_; _ } ->
+            pf fmt "%s:@ %a" name pp_swift_type type_))
       fields
       Fmt.(
-        list ~sep:(any "@;") (fun fmt (name, _) ->
+        list ~sep:(any "@;") (fun fmt { name; _ } ->
             pf fmt "self.%s = %s" name name))
       fields
 
@@ -679,13 +727,19 @@ module Generator = struct
         name
     | Done (Atom alias) ->
       Fmt.pf f "public typealias %s = %a" name pp_swift_type alias
-    | Done (Struct { fields; generics }) ->
+    | Done (Struct { fields; generics; documentation }) ->
+      (match documentation with
+      | Some doc -> Fmt.pf f "/** %s@; */@;" doc
+      | None -> ());
       Fmt.pf f
         "@[<v 2>public final class %s%a : Codable, Sendable {@;%a@;%a@]@;}@;"
         name pp_generics generics
         (Fmt.list ~sep:Fmt.cut pp_field)
         fields pp_class_init fields
-    | Done (Enum { cases; generics }) ->
+    | Done (Enum { cases; generics; documentation }) ->
+      (match documentation with
+      | Some doc -> Fmt.pf f "/** %s@; */@;" doc
+      | None -> ());
       Fmt.pf f
         "@[<v 2>public indirect enum %s%a : Codable, Sendable {@;%a@]@;}@;" name
         pp_generics generics
