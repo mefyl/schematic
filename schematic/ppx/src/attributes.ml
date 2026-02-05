@@ -27,6 +27,8 @@ type t = {
   computed : (string, expression * core_type, String.comparator_witness) Map.t;
       [@default Map.empty (module String)]
       (** [@schematic.computed] attribute *)
+  documentation : string option; [@default None]
+      (** [[@ocaml.doc]] attribute. *)
   gadt_variant : string option;  (** [[@schematic.gadt]] attribute. *)
   name : expression option;  (** [[@schematic.name]] attribute. *)
   schema : expression option;  (** [@schematic.schema] attribute *)
@@ -45,8 +47,9 @@ let fields_of_computed ~loc computed =
   |> Sequence.map ~f:(field_of_computed ~loc)
   |> Sequence.to_list
 
-let rec extract ?(alias = false) ?(computed = false) ?(gadt_variant = false)
-    ?(name = false) ?(schema = false) ?(since = false) ?(union_key = false) =
+let rec extract ?(alias = false) ?(computed = false) ?(documentation = false)
+    ?(gadt_variant = false) ?(name = false) ?(schema = false) ?(since = false)
+    ?(union_key = false) =
   let merge name ~loc old v =
     match old with
     | None -> Some v
@@ -67,8 +70,15 @@ let rec extract ?(alias = false) ?(computed = false) ?(gadt_variant = false)
   in
   function
   | { attr_name = { txt; _ }; attr_loc = loc; attr_payload } :: attrs -> (
-    let attrs = extract ~alias ~computed ~name ~union_key attrs in
+    let attrs =
+      extract ~alias ~computed ~documentation ~name ~union_key ~since attrs
+    in
     match txt with
+    | "ocaml.doc" when documentation ->
+      let doc =
+        expect ~loc Ast_pattern.(single_expr_payload (estring __)) attr_payload
+      in
+      { attrs with documentation = Some (String.strip doc) }
     | "schematic.as" when alias ->
       let alias =
         expect
@@ -162,6 +172,7 @@ let rec extract ?(alias = false) ?(computed = false) ?(gadt_variant = false)
       alias = [];
       aliases = [];
       computed = Map.empty (module String);
+      documentation = None;
       gadt_variant = None;
       name = None;
       schema = None;

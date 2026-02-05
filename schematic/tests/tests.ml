@@ -2878,6 +2878,75 @@ Union {
     let _ = [%schema: t]
   end
 
+  module Documentation = struct
+    (** This is a documented type for testing *)
+    type documented_type = int [@@deriving schema]
+
+    type undocumented_type = int [@@deriving schema]
+
+    (** A record with documentation *)
+    type documented_record = {
+      field1 : int;
+      field2 : string;
+    }
+    [@@deriving schema]
+
+    (** A variant with documentation *)
+    type documented_variant =
+      | A
+      | B of int
+    [@@deriving schema]
+
+    let basic =
+      {
+        name = "basic documentation";
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some
+            (fun () ->
+              Alcotest.(
+                check ~here:[%here] (option string)
+                  "documented type has documentation"
+                  (Some "This is a documented type for testing")
+                  documented_type_schema.documentation);
+              Alcotest.(
+                check ~here:[%here] (option string)
+                  "undocumented type has no documentation" None
+                  undocumented_type_schema.documentation));
+      }
+
+    let record =
+      {
+        name = "record documentation";
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some
+            (fun () ->
+              Alcotest.(
+                check ~here:[%here] (option string)
+                  "documented record has documentation"
+                  (Some "A record with documentation")
+                  documented_record_schema.documentation));
+      }
+
+    let variant =
+      {
+        name = "variant documentation";
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some
+            (fun () ->
+              Alcotest.(
+                check ~here:[%here] (option string)
+                  "documented variant has documentation"
+                  (Some "A variant with documentation")
+                  documented_variant_schema.documentation));
+      }
+  end
+
   (* Driver *)
 
   let test_descriptions : test_group list =
@@ -2961,6 +3030,11 @@ Union {
       {
         name = "extension";
         test_cases = [ Extension.atomic; Extension.composite ];
+      };
+      {
+        name = "documentation";
+        test_cases =
+          [ Documentation.basic; Documentation.record; Documentation.variant ];
       };
     ]
 
