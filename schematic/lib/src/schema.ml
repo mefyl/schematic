@@ -763,7 +763,7 @@ module Walk (W : WALK) = struct
       ?documentation:s.documentation (schema s)
 
   and schema : type t. t Schema_intf.t -> W.t W.M.t =
-   fun { id; descriptor = d; parametric = p } ->
+   fun { id; documentation; descriptor = d; parametric = p } ->
     let schema () = descriptor ~id d
     and parametric =
       match p with
@@ -774,7 +774,7 @@ module Walk (W : WALK) = struct
             let name, args, eff_args, t = parametric p in
             W.parametric name args eff_args t)
     in
-    W.schema id parametric schema
+    W.schema ~id ~documentation parametric schema
 
   and parametric : type t.
       t parametric -> string * string list * W.t W.M.t list * W.t W.M.t =

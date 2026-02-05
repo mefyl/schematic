@@ -223,9 +223,13 @@ module type WALK = sig
 
   (* Schema *)
 
-  (** [schema id parametric schema] *)
+  (** [schema id documentation parametric schema] *)
   val schema :
-    string option -> (unit -> t M.t) option -> (unit -> t M.t) -> t M.t
+    id:string option ->
+    documentation:string option ->
+    (unit -> t M.t) option ->
+    (unit -> t M.t) ->
+    t M.t
 
   (** [parametric template_name arg_names effective_args t] *)
   val parametric : string -> string list -> t M.t list -> t M.t -> t M.t

@@ -119,16 +119,20 @@ module Make (S : MARK) = struct
     val identifier : 'a Schema_intf.t -> S.t -> string
 
     val convert :
-      string option ->
+      id:string option ->
+      documentation:string option ->
       'a Schema_intf.descriptor ->
       'a Schema_intf.parametric option ->
       S.t * Marks.t
   end) =
   struct
-    let of_descriptor d = M.convert None d None
+    let of_descriptor d = M.convert ~id:None ~documentation:None d None
 
-    let mark_of_schema (Schema.{ id; descriptor; parametric } as schema) =
-      let ((t, _) as res) = M.convert id descriptor parametric in
+    let mark_of_schema
+        (Schema.{ id; documentation; descriptor; parametric } as schema) =
+      let ((t, _) as res) =
+        M.convert ~id ~documentation descriptor parametric
+      in
       let id = M.identifier schema t in
       (id, lazy res)
 

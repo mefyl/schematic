@@ -8,6 +8,33 @@ end
 
 type 'a hidden_option = 'a option [@@deriving schema]
 
+(** A documented type for testing TypeScript JSDoc generation *)
+type documented_type = int [@@deriving schema]
+
+(** A user record with name and age fields *)
+type documented_record = {
+  name : string;
+  age : int;
+}
+[@@deriving schema]
+
+(** A type with */ in the documentation to test escaping *)
+type documented_with_star_slash = string [@@deriving schema]
+
+(** A user with documented fields *)
+type user_with_field_docs = {
+  name : string;  (** The user's full name *)
+  age : int;  (** Age in years *)
+  email : string option;  (** Optional email address *)
+}
+[@@deriving schema]
+
+(** A result type with documented cases *)
+type result_with_case_docs =
+  | Ok of int  (** Success with a value *)
+  | Error of string  (** Failure with an error message *)
+[@@deriving schema]
+
 type record = {
   a : int;
   inline : inline; [@schematic.inline]
@@ -114,8 +141,9 @@ module Generate_types = struct
     let expected = Base.Set.of_list (module String_pair) expected in
     let actual =
       Schematic.Typescript.of_schema t
-      |> List.map ~f:(fun (id, schema) ->
-             (id, Schematic.Typescript.to_string ~annotate_since schema))
+      |> List.map
+           ~f:(fun (id, { Schematic.Typescript.type_; documentation = _ }) ->
+             (id, Schematic.Typescript.to_string ~annotate_since type_))
       |> Base.Set.of_list (module String_pair)
     in
     Alcotest.(
@@ -344,6 +372,109 @@ module Generate_types = struct
           {|{ "v": number } | { "v": number } | { "v": number } /* since 0.2.0 */|}
         );
       ]
+
+  let documentation_simple () =
+    let types = Schematic.Typescript.of_schema documented_type_schema in
+    let output =
+      types
+      |> List.map ~f:(fun entry ->
+             Fmt.to_to_string Schematic.Typescript.pp_toplevel entry)
+      |> String.concat ~sep:""
+    in
+    let expected =
+      {|/**
+ * A documented type for testing TypeScript JSDoc generation
+ */
+export type DocumentedType = number;
+
+|}
+    in
+    Alcotest.(check ~here:[%here] string)
+      "typescript with documentation" expected output
+
+  let documentation_record () =
+    let types = Schematic.Typescript.of_schema documented_record_schema in
+    let output =
+      types
+      |> List.map ~f:(fun entry ->
+             Fmt.to_to_string Schematic.Typescript.pp_toplevel entry)
+      |> String.concat ~sep:""
+    in
+    let expected =
+      {|/**
+ * A user record with name and age fields
+ */
+export type DocumentedRecord = { "name": string; "age": number };
+
+|}
+    in
+    Alcotest.(check ~here:[%here] string)
+      "typescript record with documentation" expected output
+
+  let documentation_with_escape () =
+    let types =
+      Schematic.Typescript.of_schema documented_with_star_slash_schema
+    in
+    let output =
+      types
+      |> List.map ~f:(fun entry ->
+             Fmt.to_to_string Schematic.Typescript.pp_toplevel entry)
+      |> String.concat ~sep:""
+    in
+    let expected =
+      {|/**
+ * A type with *\/ in the documentation to test escaping
+ */
+export type DocumentedWithStarSlash = string;
+
+|}
+    in
+    Alcotest.(check ~here:[%here] string)
+      "typescript with escaped */" expected output
+
+  let field_documentation () =
+    let types = Schematic.Typescript.of_schema user_with_field_docs_schema in
+    let output =
+      types
+      |> List.map ~f:(fun entry ->
+             Fmt.to_to_string Schematic.Typescript.pp_toplevel entry)
+      |> String.concat ~sep:""
+    in
+    let expected =
+      {|/**
+ * A user with documented fields
+ */
+export type UserWithFieldDocs = {
+    /** The user's full name */ "name": string;
+    /** Age in years */ "age": number;
+    /** Optional email address */ "email"?: string
+  };
+
+|}
+    in
+    Alcotest.(check ~here:[%here] string)
+      "typescript with field documentation" expected output
+
+  let case_documentation () =
+    let types = Schematic.Typescript.of_schema result_with_case_docs_schema in
+    let output =
+      types
+      |> List.map ~f:(fun entry ->
+             Fmt.to_to_string Schematic.Typescript.pp_toplevel entry)
+      |> String.concat ~sep:""
+    in
+    let expected =
+      {|/**
+ * A result type with documented cases
+ */
+export type ResultWithCaseDocs =
+  /** Success with a value */ number |
+  /** Failure with an error message */ string;
+
+|}
+    in
+    Alcotest.(check ~here:[%here] string)
+      "typescript with case documentation" expected output
 end
 
 let () =
@@ -373,5 +504,11 @@ let () =
             test_case "priorities" `Quick priorities;
             test_case "since annotation record" `Quick since_annotation_record;
             test_case "since annotation variant" `Quick since_annotation_variant;
+            test_case "documentation simple" `Quick documentation_simple;
+            test_case "documentation record" `Quick documentation_record;
+            test_case "documentation with escape" `Quick
+              documentation_with_escape;
+            test_case "field documentation" `Quick field_documentation;
+            test_case "case documentation" `Quick case_documentation;
           ] );
     ]
