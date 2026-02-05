@@ -404,8 +404,9 @@ struct
 
   (* Record *)
 
+  (** A version description *)
   type version = {
-    major : int;
+    major : int;  (** Major version number *)
     minor : int;
     subminor : int;
   }
@@ -2897,6 +2898,20 @@ Union {
       | B of int
     [@@deriving schema]
 
+    (** A user with documented fields *)
+    type user_with_field_docs = {
+      name : string;  (** The user's full name *)
+      age : int;  (** Age in years *)
+      email : string option;  (** Optional email address *)
+    }
+    [@@deriving schema]
+
+    (** A result type with documented cases *)
+    type result_with_case_docs =
+      | Ok of int  (** Success with a value *)
+      | Error of string  (** Failure with an error message *)
+    [@@deriving schema]
+
     let basic =
       {
         name = "basic documentation";
@@ -2944,6 +2959,75 @@ Union {
                   "documented variant has documentation"
                   (Some "A variant with documentation")
                   documented_variant_schema.documentation));
+      }
+
+    let field_docs =
+      {
+        name = "field documentation";
+        speed = `Quick;
+        tests =
+          [
+            Test
+              {
+                name = "field documentation";
+                here = [%here];
+                decoded = None;
+                schema = user_with_field_docs_schema;
+                kotlin_class_name = Some "UserWithFieldDocs";
+                is_kotlin_roundtrip_enabled = false;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = false;
+                value =
+                  { name = "Alice"; age = 30; email = Some "alice@example.com" };
+                expected =
+                  [%ezjsonm
+                    { name = "Alice"; age = 30; email = "alice@example.com" }];
+                value_testable =
+                  Alcotest.testable
+                    (fun f { name; age; email } ->
+                      Fmt.pf f "{ name = %s; age = %d; email = %a }" name age
+                        Fmt.(option string)
+                        email)
+                    (fun a b ->
+                      String.(a.name = b.name)
+                      && Int.(a.age = b.age)
+                      && Option.equal String.equal a.email b.email);
+              };
+          ];
+        additional_test = None;
+      }
+
+    let case_docs =
+      {
+        name = "case documentation";
+        speed = `Quick;
+        tests =
+          [
+            Test
+              {
+                name = "case documentation";
+                here = [%here];
+                decoded = None;
+                schema = result_with_case_docs_schema;
+                kotlin_class_name = Some "ResultWithCaseDocs";
+                is_kotlin_roundtrip_enabled = false;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = false;
+                value = Ok 42;
+                expected = `Float 42.0;
+                value_testable =
+                  Alcotest.testable
+                    (fun f -> function
+                      | Ok v -> Fmt.pf f "Ok %d" v
+                      | Error s -> Fmt.pf f "Error %s" s)
+                    (fun a b ->
+                      match (a, b) with
+                      | Ok x, Ok y -> Int.(x = y)
+                      | Error x, Error y -> String.(x = y)
+                      | _ -> false);
+              };
+          ];
+        additional_test = None;
       }
   end
 
@@ -3034,7 +3118,13 @@ Union {
       {
         name = "documentation";
         test_cases =
-          [ Documentation.basic; Documentation.record; Documentation.variant ];
+          [
+            Documentation.basic;
+            Documentation.record;
+            Documentation.variant;
+            Documentation.field_docs;
+            Documentation.case_docs;
+          ];
       };
     ]
 
