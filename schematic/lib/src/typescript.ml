@@ -334,7 +334,7 @@ let to_string ?annotate_since ?indent t =
 
 (** [pp_toplevel fmt (name, (ts, doc))] prints a toplevel definition defining
     [name] as [ts], with optional JSDoc documentation. *)
-let pp_toplevel fmt (name, { type_; documentation }) =
+let pp_toplevel ?annotate_since ?indent fmt (name, { type_; documentation }) =
   (match documentation with
   | Some doc ->
     let escaped_doc = escape_jsdoc_comment doc in
@@ -343,7 +343,7 @@ let pp_toplevel fmt (name, { type_; documentation }) =
     Fmt.pf fmt " */@."
   | None -> ());
   Fmt.pf fmt "@[<2>export type %s =@ %a;@]@.@." name
-    (fun fmt -> pp ~indent:2 fmt)
+    (fun fmt -> pp ?annotate_since ?indent fmt)
     type_
 
 type state = Marks.t

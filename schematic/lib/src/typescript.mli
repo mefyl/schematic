@@ -36,7 +36,12 @@ val to_string : ?annotate_since:bool -> ?indent:int -> t -> string
 
 (** [pp_toplevel fmt (name, (t, doc))] prints a toplevel TypeScript type
     declaration with optional JSDoc documentation. *)
-val pp_toplevel : Format.formatter -> string * documented -> unit
+val pp_toplevel :
+  ?annotate_since:bool ->
+  ?indent:int ->
+  Format.formatter ->
+  string * documented ->
+  unit
 
 (** A state to be passed across invocation to avoid emitting types multiple
     times. *)
