@@ -3,7 +3,10 @@
 data class DocumentedRecord(val name: String,
 val age: Int)
 
-/** A documented type for testing TypeScript JSDoc generation */
+/** A documented type for testing TypeScript JSDoc generation.
+
+    With a long comment to ensures that we wrap things properly even in the
+    presence of absurdly long lines in the original documentation comment */
 typealias DocumentedType = Int
 
 /** A type with *\/ in the documentation to test escaping */

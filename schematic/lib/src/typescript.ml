@@ -233,6 +233,12 @@ let of_descriptor d = Of.descriptor ~id:None d Marks.empty |> fst
 let escape_jsdoc_comment s =
   String.substr_replace_all s ~pattern:"*/" ~with_:"*\\/"
 
+let pp_docstring fmt = function
+  | None -> ()
+  | Some doc ->
+    let escaped = escape_jsdoc_comment doc in
+    Fmt.pf fmt "@[<hv 2>/**@ @[<h>%a@]@ @]*/@;" Fmt.string escaped
+
 let break sp id fmt _ = Stdlib.Format.pp_print_break fmt sp id
 
 let custom_break fits breaks fmt _ =
@@ -275,11 +281,7 @@ let pp ?(annotate_since = false) ?(indent = 2) fmt ts =
         ++ const char ']'
       and object_ =
         let field f { name; type'; required; since; description } =
-          (match description with
-          | Some doc ->
-            let escaped = escape_jsdoc_comment doc in
-            Fmt.pf f "/** %s */ " escaped
-          | None -> ());
+          pp_docstring f description;
           let pp =
             box ~indent
             @@ Fmt.pair
@@ -298,11 +300,7 @@ let pp ?(annotate_since = false) ?(indent = 2) fmt ts =
       and union =
         let pp =
           let pp_case f { since; t; documentation } =
-            (match documentation with
-            | Some doc ->
-              let escaped = escape_jsdoc_comment doc in
-              Fmt.pf f "/** %s */ " escaped
-            | None -> ());
+            pp_docstring f documentation;
             Fmt.pf f "%a%a" (pp Union) t since_comment since
           in
           hvbox @@ list ~sep:(custom_break " | " " |") (hvbox pp_case)
@@ -335,14 +333,8 @@ let to_string ?annotate_since ?indent t =
 (** [pp_toplevel fmt (name, (ts, doc))] prints a toplevel definition defining
     [name] as [ts], with optional JSDoc documentation. *)
 let pp_toplevel ?annotate_since ?indent fmt (name, { type_; documentation }) =
-  (match documentation with
-  | Some doc ->
-    let escaped_doc = escape_jsdoc_comment doc in
-    Fmt.pf fmt "/**@.";
-    Fmt.pf fmt " * %s@." escaped_doc;
-    Fmt.pf fmt " */@."
-  | None -> ());
-  Fmt.pf fmt "@[<2>export type %s =@ %a;@]@.@." name
+  pp_docstring fmt documentation;
+  Fmt.pf fmt "@[<2>export type %s =@ %a;@]" name
     (fun fmt -> pp ?annotate_since ?indent fmt)
     type_
 

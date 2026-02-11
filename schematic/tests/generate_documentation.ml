@@ -8,7 +8,10 @@ end
 
 type 'a hidden_option = 'a option [@@deriving schema]
 
-(** A documented type for testing TypeScript JSDoc generation *)
+(** A documented type for testing TypeScript JSDoc generation.
+
+    With a long comment to ensures that we wrap things properly even in the
+    presence of absurdly long lines in the original documentation comment *)
 type documented_type = int [@@deriving schema]
 
 (** A user record with name and age fields *)
