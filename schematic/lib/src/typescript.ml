@@ -300,8 +300,9 @@ let pp ?(annotate_since = false) ?(indent = 2) fmt ts =
       and union =
         let pp =
           let pp_case f { since; t; documentation } =
-            pp_docstring f documentation;
-            Fmt.pf f "%a%a" (pp Union) t since_comment since
+            Fmt.pf f "%a%a%s%a" (pp Union) t since_comment since
+              (if Option.is_some documentation then " " else "")
+              pp_docstring documentation
           in
           hvbox @@ list ~sep:(custom_break " | " " |") (hvbox pp_case)
         in

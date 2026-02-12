@@ -24,5 +24,5 @@ export type UserWithFieldDocs = {
 
 /** A result type with documented cases */
 export type ResultWithCaseDocs =
-  /** Success with a value */ number |
-  /** Failure with an error message */ string;
+  number /** Success with a value */  |
+  string /** Failure with an error message */ ;
