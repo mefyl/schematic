@@ -16,7 +16,8 @@ let type_context (t : type_declaration) =
   in
   {
     attributes =
-      Attributes.extract ~computed ~name:true ~union_key t.ptype_attributes;
+      Attributes.extract ~computed ~documentation:true ~name:true ~union_key
+        t.ptype_attributes;
     loc = t.ptype_loc;
     name = t.ptype_name.txt;
     params = t.ptype_params;

@@ -25,12 +25,19 @@ and t =
 and case = {
   since : Version.t option;
   t : t;
+  documentation : string option;
 }
 [@@deriving show]
 
-let union cases = Union (List.map ~f:(fun t -> { since = None; t }) cases)
+let union cases =
+  Union (List.map ~f:(fun t -> { since = None; t; documentation = None }) cases)
 
 type typescript = t
+
+type documented = {
+  type_ : t;
+  documentation : string option;
+}
 
 let name s =
   String.split ~on:'_' s
@@ -40,9 +47,9 @@ let name s =
   |> String.concat ~sep:""
 
 include Marks.Make (struct
-  type t = typescript
+  type t = documented
 
-  let pp = pp
+  let pp fmt { type_; documentation = _ } = pp fmt type_
 
   module Id = struct
     include String
@@ -69,20 +76,26 @@ module Of = Schema.Walk (struct
 
   (* Schema *)
 
-  let of_id id s =
+  let of_id id documentation s =
     if String.is_prefix ~prefix:"#" id then
       M.return (Atom (name @@ String.subo ~pos:1 id))
     else fun marks ->
-      let mark = (id, lazy (s () marks)) in
+      let mark =
+        ( id,
+          lazy
+            (let type_, marks = s () marks in
+             ({ type_; documentation }, marks)) )
+      in
       (Atom (name id), Marks.add marks mark)
 
-  let schema id parametric s =
+  let schema ~id ~documentation parametric s =
     match parametric with
     | Some parametric -> parametric ()
-    | None -> ( match id with None -> s () | Some id -> of_id id s)
+    | None -> (
+      match id with None -> s () | Some id -> of_id id documentation s)
 
-  let parametric template_name args effective t =
-    let* t
+  let parametric template_name args effective type_ =
+    let* type_
     and* effective = M.all effective in
     fun marks ->
       let template_name = name template_name in
@@ -93,7 +106,7 @@ module Of = Schema.Walk (struct
               (list ~sep:(const string ", ") string)
               (List.map ~f:name args))
         in
-        (id, lazy (t, marks))
+        (id, lazy ({ type_; documentation = None }, marks))
       in
       (Template { name = template_name; args = effective }, Marks.add marks mark)
 
@@ -169,7 +182,7 @@ module Of = Schema.Walk (struct
 
   (* Union *)
 
-  let case ?key ~inline:_ ~name ~raw_name:_ ?since schema =
+  let case ?key ~inline:_ ~name ~raw_name:_ ?since ?documentation schema =
     let+ t =
       let+ schema in
       match key with
@@ -194,7 +207,7 @@ module Of = Schema.Walk (struct
               };
           ]
     in
-    { since; t }
+    { since; t; documentation }
 
   let union ~id:_ ~polymorphic:_ cases =
     let+ cases in
@@ -204,13 +217,28 @@ end)
 include Make_mark_converter (struct
   let identifier { Schema.id; _ } _ = Option.value_exn ~here:[%here] id
 
-  let convert id descriptor parametric =
-    match parametric with
-    | Some parametric -> Of.parametric parametric Marks.empty
-    | _ -> Of.descriptor ~id descriptor Marks.empty
+  let convert ~id ~documentation descriptor parametric =
+    let type_, marks =
+      match parametric with
+      | Some parametric -> Of.parametric parametric Marks.empty
+      | _ -> Of.descriptor ~id descriptor Marks.empty
+    in
+    ({ type_; documentation }, marks)
 end)
 
 let of_descriptor d = Of.descriptor ~id:None d Marks.empty |> fst
+
+(** Escape documentation strings for JSDoc comments. Replaces */ with *\/ to
+    avoid prematurely closing comment blocks. *)
+let escape_jsdoc_comment s =
+  String.substr_replace_all s ~pattern:"*/" ~with_:"*\\/"
+
+let pp_docstring fmt = function
+  | None -> ()
+  | Some doc ->
+    let escaped = escape_jsdoc_comment doc in
+    Fmt.pf fmt "@[<hv 2>/**@ @[<h>%a@]@ @]*/@;" Fmt.string escaped
+
 let break sp id fmt _ = Stdlib.Format.pp_print_break fmt sp id
 
 let custom_break fits breaks fmt _ =
@@ -252,7 +280,8 @@ let pp ?(annotate_since = false) ?(indent = 2) fmt ts =
         ++ sp
         ++ const char ']'
       and object_ =
-        let field f { name; type'; required; since; _ } =
+        let field f { name; type'; required; since; description } =
+          pp_docstring f description;
           let pp =
             box ~indent
             @@ Fmt.pair
@@ -270,8 +299,10 @@ let pp ?(annotate_since = false) ?(indent = 2) fmt ts =
         ++ const char '}'
       and union =
         let pp =
-          let pp_case f { since; t } =
-            Fmt.pf f "%a%a" (pp Union) t since_comment since
+          let pp_case f { since; t; documentation } =
+            Fmt.pf f "%a%a%s%a" (pp Union) t since_comment since
+              (if Option.is_some documentation then " " else "")
+              pp_docstring documentation
           in
           hvbox @@ list ~sep:(custom_break " | " " |") (hvbox pp_case)
         in
@@ -299,6 +330,14 @@ let pp ?(annotate_since = false) ?(indent = 2) fmt ts =
 
 let to_string ?annotate_since ?indent t =
   Fmt.(str "%a" (box (pp ?annotate_since ?indent)) t)
+
+(** [pp_toplevel fmt (name, (ts, doc))] prints a toplevel definition defining
+    [name] as [ts], with optional JSDoc documentation. *)
+let pp_toplevel ?annotate_since ?indent fmt (name, { type_; documentation }) =
+  pp_docstring fmt documentation;
+  Fmt.pf fmt "@[<2>export type %s =@ %a;@]" name
+    (fun fmt -> pp ?annotate_since ?indent fmt)
+    type_
 
 type state = Marks.t
 

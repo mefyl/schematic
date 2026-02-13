@@ -579,7 +579,13 @@ end
 
 module Any (Coding : IMPL) = struct
   let schema =
-    Schema.{ descriptor = Any (module Coding); id = None; parametric = None }
+    Schema.
+      {
+        descriptor = Any (module Coding);
+        documentation = None;
+        id = None;
+        parametric = None;
+      }
 
   let schema_versioned _ = schema
 end

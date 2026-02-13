@@ -166,6 +166,7 @@ and _ descriptor =
 (** A Schematic schema. *)
 and 't t = {
   id : string option;
+  documentation : string option;
   descriptor : 't descriptor;
   parametric : 't parametric option;
 }
@@ -222,9 +223,13 @@ module type WALK = sig
 
   (* Schema *)
 
-  (** [schema id parametric schema] *)
+  (** [schema id documentation parametric schema] *)
   val schema :
-    string option -> (unit -> t M.t) option -> (unit -> t M.t) -> t M.t
+    id:string option ->
+    documentation:string option ->
+    (unit -> t M.t) option ->
+    (unit -> t M.t) ->
+    t M.t
 
   (** [parametric template_name arg_names effective_args t] *)
   val parametric : string -> string list -> t M.t list -> t M.t -> t M.t
@@ -269,6 +274,7 @@ module type WALK = sig
     name:string ->
     raw_name:string ->
     ?since:Semver.t ->
+    ?documentation:string ->
     t M.t ->
     case M.t
 

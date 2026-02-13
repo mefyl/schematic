@@ -8,6 +8,33 @@ end
 
 type 'a hidden_option = 'a option [@@deriving schema]
 
+(** A documented type for testing TypeScript JSDoc generation *)
+type documented_type = int [@@deriving schema]
+
+(** A user record with name and age fields *)
+type documented_record = {
+  name : string;
+  age : int;
+}
+[@@deriving schema]
+
+(** A type with */ in the documentation to test escaping *)
+type documented_with_star_slash = string [@@deriving schema]
+
+(** A user with documented fields *)
+type user_with_field_docs = {
+  name : string;  (** The user's full name *)
+  age : int;  (** Age in years *)
+  email : string option;  (** Optional email address *)
+}
+[@@deriving schema]
+
+(** A result type with documented cases *)
+type result_with_case_docs =
+  | Ok of int  (** Success with a value *)
+  | Error of string  (** Failure with an error message *)
+[@@deriving schema]
+
 type record = {
   a : int;
   inline : inline; [@schematic.inline]
@@ -114,8 +141,9 @@ module Generate_types = struct
     let expected = Base.Set.of_list (module String_pair) expected in
     let actual =
       Schematic.Typescript.of_schema t
-      |> List.map ~f:(fun (id, schema) ->
-             (id, Schematic.Typescript.to_string ~annotate_since schema))
+      |> List.map
+           ~f:(fun (id, { Schematic.Typescript.type_; documentation = _ }) ->
+             (id, Schematic.Typescript.to_string ~annotate_since type_))
       |> Base.Set.of_list (module String_pair)
     in
     Alcotest.(

@@ -66,6 +66,14 @@ let expand_field _
           "schematic-ppx: expression payload expected"
     in
     match attr_name.txt with
+    | "ocaml.doc" ->
+      let doc =
+        expect ~loc Ast_pattern.(single_expr_payload (estring __)) attr_payload
+      in
+      {
+        attrs with
+        specs = { attrs.specs with description = Some (String.strip doc) };
+      }
     | "default" -> default Attributes_intf.Source.generic true false
     | "schematic.as" ->
       let pattern = Ast_pattern.(versioned (estring __) (estring __)) in

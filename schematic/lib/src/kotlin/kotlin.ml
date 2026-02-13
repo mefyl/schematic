@@ -102,22 +102,35 @@ type kotlin_type =
            "String"])] is [Bar<List<Boolean>, String>] *)
 [@@deriving show]
 
+type 'a documented = {
+  value : 'a; [@main]
+  documentation : string option;
+}
+[@@deriving show, make]
+
+type kotlin_field = {
+  name : string;
+  type_ : kotlin_type;
+}
+[@@deriving show]
+
 type kotlin_data_class = {
   generics : kotlin_type list;
-  fields : (string * kotlin_type) list;
+  fields : kotlin_field documented list;
 }
 [@@deriving show]
 
 type kotlin =
-  | Atom of kotlin_type  (** Type alias or basic type *)
+  | Atom of kotlin_type documented  (** Type alias or basic type *)
   | Data_object
       (** Data classes without any field. Kotlin forbids data classes without
           any field. *)
-  | Data_class of kotlin_data_class
+  | Data_class of kotlin_data_class documented
       (** A record, with fields defined as [(name, type, required)] *)
   | Sealed_interface of {
       generics : kotlin_type list;
-      nested_data_classes : (string * kotlin_case) list;
+      nested_data_classes : (string * kotlin_case * string option) list;
+      documentation : string option;
     }
       (** A union type-ish in Kotlin, in the form of a sealed interface and
           implementing classes. *)
@@ -177,7 +190,7 @@ module Parser = struct
    fun type_name kotlin ->
     match (type_name, kotlin) with
     | Some type_name, _ -> Simple type_name
-    | None, Atom kotlin_type -> kotlin_type
+    | None, Atom kotlin_type -> kotlin_type.value
     | _ ->
       Fmt.failwith "I don't know how to extract a Kotlin type from: %a\n"
         pp_kotlin kotlin
@@ -189,7 +202,7 @@ module Parser = struct
         while parsing [schema]. *)
   let rec schema_to_kotlin_marks : type a.
       Marks.t -> a Schema.t -> string option * kotlin * Marks.t =
-   fun marks ({ id; descriptor; parametric } as schema) ->
+   fun marks ({ id; descriptor; parametric; documentation } as schema) ->
     let () =
       Logs.debug (fun m ->
           m "schema_to_kotlin_marks: Parsing schema %a" Schema.pp schema)
@@ -209,7 +222,9 @@ module Parser = struct
           Logs.debug (fun m ->
               m "schema_to_kotlin_marks: Start parsing unnamed schema")
         in
-        let kotlin, marks = descriptor_to_kotlin_marks marks descriptor in
+        let kotlin, marks =
+          descriptor_to_kotlin_marks marks documentation descriptor
+        in
         (kotlin_type_name, kotlin, marks)
       | Some None ->
         (* Kotlin type name but not present in the marks: add [InProgress] in
@@ -221,7 +236,9 @@ module Parser = struct
               m "schema_to_kotlin_marks: Start parsing %s" kotlin_type_name)
         in
         let marks = Map.add_exn ~key:kotlin_type_name ~data:InProgress marks in
-        let kotlin, marks = descriptor_to_kotlin_marks marks descriptor in
+        let kotlin, marks =
+          descriptor_to_kotlin_marks marks documentation descriptor
+        in
         let marks = Map.set ~key:kotlin_type_name ~data:(Done kotlin) marks in
         (Some kotlin_type_name, kotlin, marks)
       | Some (Some InProgress) ->
@@ -234,7 +251,11 @@ module Parser = struct
                 kotlin_type_name)
         in
         ( Some kotlin_type_name,
-          Atom (Simple kotlin_type_name (* TODO generics *)),
+          Atom
+            {
+              value = Simple kotlin_type_name (* TODO generics *);
+              documentation = None;
+            },
           marks )
       | Some (Some (Done kotlin)) ->
         let () =
@@ -250,30 +271,33 @@ module Parser = struct
       @@ Fmt.str "Not yet supported: %s for schema %a" s Schema.pp schema
 
   and descriptor_to_kotlin_marks : type a.
-      Marks.t -> a Schema.descriptor -> kotlin * Marks.t =
-   fun marks descriptor ->
+      Marks.t -> string option -> a Schema.descriptor -> kotlin * Marks.t =
+   fun marks schema_documentation descriptor ->
+    let atom atm =
+      Atom (make_documented ?documentation:schema_documentation atm)
+    in
     match descriptor with
     | Any (module Coding) -> raise (NotYetImplemented "Any")
-    | Bool -> (Atom (Simple "Boolean"), marks)
+    | Bool -> (atom (Simple "Boolean"), marks)
     | Coding { f = _ } -> raise (NotYetImplemented "Coding")
-    | Date -> (Atom (Simple "LocalDate"), marks)
+    | Date -> (atom (Simple "LocalDate"), marks)
     | Fixpoint lazy_descriptor ->
-      descriptor_to_kotlin_marks marks (Lazy.force lazy_descriptor)
-    | Float -> (Atom (Simple "Float"), marks)
+      descriptor_to_kotlin_marks marks None (Lazy.force lazy_descriptor)
+    | Float -> (atom (Simple "Float"), marks)
     | Ignore ->
       (Data_object, marks)
       (* Treat [Ignore] fields as an empty object that will be removed in a
          later pass *)
-    | Int -> (Atom (Simple "Int"), marks)
-    | Int64 -> (Atom (Simple "Long"), marks)
-    | Json -> (Atom (Simple "JsonElement"), marks)
+    | Int -> (atom (Simple "Int"), marks)
+    | Int64 -> (atom (Simple "Long"), marks)
+    | Json -> (atom (Simple "JsonElement"), marks)
     | List item_schema ->
       (* TODO We will probably need [kotlin] to support generics *)
-      list_to_kotlin_marks marks item_schema
+      list_to_kotlin_marks schema_documentation marks item_schema
     | Sequence { item; _ } ->
       (* TODO We will probably need [kotlin] to support generics *)
-      list_to_kotlin_marks marks item
-    | Map { descriptor; _ } -> descriptor_to_kotlin_marks marks descriptor
+      list_to_kotlin_marks schema_documentation marks item
+    | Map { descriptor; _ } -> descriptor_to_kotlin_marks marks None descriptor
     | Mapping { item; _ } ->
       (* TODO We will probably need [kotlin] to support generics *)
       let type_name, kotlin, marks = schema_to_kotlin_marks marks item in
@@ -281,11 +305,11 @@ module Parser = struct
         type_name_and_kotlin_to_kotlin_type_exn type_name kotlin
       in
       let kotlin =
-        Atom
+        atom
           (Generic ("kotlin.collections.Map", [ Simple "String"; kotlin_type ]))
       in
       (kotlin, marks)
-    | Null -> (Atom (Simple "Unit"), marks)
+    | Null -> (atom (Simple "Unit"), marks)
     | Nullable schema ->
       let type_name, kotlin, marks = schema_to_kotlin_marks marks schema in
       let () =
@@ -296,7 +320,8 @@ module Parser = struct
       in
       let res =
         match (type_name, kotlin) with
-        | None, Atom kotlin_type -> (Atom (wrap_in_option kotlin_type), marks)
+        | None, Atom kotlin_type ->
+          (atom (wrap_in_option kotlin_type.value), marks)
         | None, _kotlin ->
           raise
             (NotYetImplemented
@@ -305,7 +330,7 @@ module Parser = struct
                    that is not an Atom: %a"
                   pp_kotlin kotlin))
         | Some type_name, _kotlin ->
-          (Atom (wrap_in_option (Simple type_name)), marks)
+          (atom (wrap_in_option (Simple type_name)), marks)
       in
       let () =
         Logs.debug (fun m ->
@@ -328,14 +353,19 @@ module Parser = struct
            [Ignore]), this data class must be converted to a data object (cf
            previous case). *)
       | kotlin_fields ->
-        (Data_class { fields = kotlin_fields; generics = [] }, marks))
-    | String -> (Atom (Simple "String"), marks)
+        ( Data_class
+            {
+              value = { fields = kotlin_fields; generics = [] };
+              documentation = schema_documentation;
+            },
+          marks ))
+    | String -> (atom (Simple "String"), marks)
     | String_const _ -> (Data_object, marks)
-    | Time -> (Atom (Simple "Instant"), marks)
-    | Time_local -> (Atom (Simple "OffsetDateTime"), marks)
+    | Time -> (atom (Simple "Instant"), marks)
+    | Time_local -> (atom (Simple "OffsetDateTime"), marks)
     | Tuple { items; _ } ->
       let kotlin_type, marks = tuple_to_kotlin_marks marks items in
-      (Atom kotlin_type, marks)
+      (atom kotlin_type, marks)
     | Union { key = _; cases; polymorphic = _ } ->
       (* For simplicity, we ignore the optional union key *)
       let marks, nested_data_classes =
@@ -345,14 +375,17 @@ module Parser = struct
               (marks, rest_nested_types)
             ->
             let case_name = to_pascal_case case_name in
+            let case_documentation = schema.documentation in
             let type_name, kotlin, marks =
               schema_to_kotlin_marks marks schema
             in
             let nested_type =
               match (type_name, kotlin) with
-              | Some type_name, _kotlin -> (case_name, Wrap (Simple type_name))
-              | None, Atom kotlin_type -> (case_name, Wrap kotlin_type)
-              | None, _ -> (case_name, Inline kotlin)
+              | Some type_name, _kotlin ->
+                (case_name, Wrap (Simple type_name), case_documentation)
+              | None, Atom kotlin_type ->
+                (case_name, Wrap kotlin_type.value, case_documentation)
+              | None, _ -> (case_name, Inline kotlin, case_documentation)
               (* TODO Need to add generics *)
             in
             let nested_types = nested_type :: rest_nested_types in
@@ -360,17 +393,27 @@ module Parser = struct
           cases
       in
       let kotlin =
-        Sealed_interface { nested_data_classes; generics = [ (* TODO *) ] }
+        Sealed_interface
+          {
+            nested_data_classes;
+            generics = [ (* TODO *) ];
+            documentation = schema_documentation;
+          }
       in
       (kotlin, marks)
 
-  and list_to_kotlin_marks : type a. Marks.t -> a Schema.t -> kotlin * Marks.t =
-   fun marks item_schema ->
+  and list_to_kotlin_marks : type a.
+      string option -> Marks.t -> a Schema.t -> kotlin * Marks.t =
+   fun documentation marks item_schema ->
     let type_name, kotlin, marks = schema_to_kotlin_marks marks item_schema in
     let kotlin_type =
       type_name_and_kotlin_to_kotlin_type_exn type_name kotlin
     in
-    let kotlin = Atom (Generic ("kotlin.collections.List", [ kotlin_type ])) in
+    let kotlin =
+      Atom
+        (make_documented ?documentation
+        @@ Generic ("kotlin.collections.List", [ kotlin_type ]))
+    in
     (kotlin, marks)
 
   and tuple_to_kotlin_marks : type a.
@@ -425,7 +468,7 @@ module Parser = struct
    fun marks parametric ->
     match parametric with
     | Plain { name; descriptor } ->
-      let _kotlin, marks = descriptor_to_kotlin_marks marks descriptor in
+      let _kotlin, marks = descriptor_to_kotlin_marks marks None descriptor in
       (* TODO do we need this [kotlin] type? *)
       ([ Simple name ], marks)
     | Parametric { name; parameter; next } ->
@@ -441,7 +484,7 @@ module Parser = struct
   and object_fields_to_kotlin_marks : type a.
       Marks.t ->
       a Hlist.t Schema.fields ->
-      (string * kotlin_type) list * Marks.t =
+      kotlin_field documented list * Marks.t =
    fun marks fields ->
     match fields with
     | FieldEnd -> ([], marks)
@@ -469,11 +512,12 @@ module Parser = struct
       (kotlin_field :: kotlin_fields, marks)
 
   and object_field_to_kotlin_marks : type t req.
-      Marks.t -> (t, req) Schema.field -> (string * kotlin_type) * Marks.t =
+      Marks.t -> (t, req) Schema.field -> kotlin_field documented * Marks.t =
    fun marks
        {
          name;
          requirement;
+         description;
          (* For Kotlin, we do not care about inlining, we decided to preserve
             the same structure as the original OCaml type. *)
          schema = Outline schema | Inline schema | Inline_try schema;
@@ -495,8 +539,8 @@ module Parser = struct
     let kotlin_type, marks =
       match (kotlin_type_name, kotlin) with
       | Some kotlin_type_name, _ -> (Simple kotlin_type_name, marks)
-      | None, Atom (Simple type_name) -> (Simple type_name, marks)
-      | None, Atom (Generic (type_name, generics)) ->
+      | None, Atom { value = Simple type_name; _ } -> (Simple type_name, marks)
+      | None, Atom { value = Generic (type_name, generics); _ } ->
         (Generic (type_name, generics), marks)
       | None, Sealed_interface { nested_data_classes; _ } ->
         (* Corner case: there is one (1) occurrence in the whole RPC type
@@ -505,7 +549,7 @@ module Parser = struct
            name and create an associated type. *)
         let id =
           nested_data_classes
-          |> List.map ~f:(fun (case_name, _kotlin_case) -> case_name)
+          |> List.map ~f:(fun (case_name, _kotlin_case, _doc) -> case_name)
           |> String.concat ~sep:"-or-"
           |> to_pascal_case
         in
@@ -524,7 +568,11 @@ module Parser = struct
           m "object_field_to_kotlin_marks: Result: %a" pp_kotlin_type
             kotlin_type)
     in
-    ((to_object_field_name name, kotlin_type), marks)
+    ( {
+        value = { name = to_object_field_name name; type_ = kotlin_type };
+        documentation = description;
+      },
+      marks )
 
   let packed_schema_to_kotlin_marks marks packed_schema =
     Schema.unpack
@@ -537,13 +585,22 @@ end
 module Generator = struct
   let original_pp_kotlin_type = pp_kotlin_type
 
+  let pp_docstring fmt doc =
+    let escape s = String.substr_replace_all s ~pattern:"*/" ~with_:"*\\/" in
+    Fmt.pf fmt "/** %s */@;" (escape doc)
+
+  let pp_docstring_opt = Fmt.option pp_docstring
+
+  let pp_documented pp_elt fmt (elt : 'a documented) =
+    Fmt.pf fmt "%a%a" pp_docstring_opt elt.documentation pp_elt elt.value
+
   (** Convenience for Android developers: default all option types to [None] *)
   let add_default_none_for_option : kotlin_type -> string = function
     | Generic (name, _) when String.equal name option_kotlin_type -> " = None"
     | _ -> ""
 
-  let rec pp_field : (string * kotlin_type) Fmt.t =
-   fun f (field_name, field_type) ->
+  let rec pp_field : kotlin_field Fmt.t =
+   fun f { name = field_name; type_ = field_type } ->
     Fmt.pf f "val %s: %a%s" field_name pp_kotlin_type field_type
       (add_default_none_for_option field_type)
 
@@ -566,22 +623,29 @@ module Generator = struct
         "Parsing is complete but we still have In Progress parsing for type %s"
         name
     | Done (Atom alias) ->
-      Fmt.pf f "typealias %s = %a" name pp_kotlin_type alias
+      let pp_alias f = Fmt.pf f "typealias %s = %a" name pp_kotlin_type in
+      pp_documented pp_alias f alias
     | Done Data_object ->
       raise (NotYetImplemented "Top-level data object, really?")
-    | Done (Data_class { fields; generics }) ->
-      Fmt.pf f "@Serializable@;data class %s%a(%a)" name pp_generics generics
-        (Fmt.list ~sep:Fmt.comma pp_field)
-        fields
-    | Done (Sealed_interface { nested_data_classes; generics }) ->
+    | Done (Data_class dataclass) ->
+      let pp_data_class fmt { fields; generics } =
+        Fmt.pf fmt "@Serializable@;data class %s%a(%a)" name pp_generics
+          generics
+          (Fmt.list ~sep:Fmt.comma (pp_documented pp_field))
+          fields
+      in
+      pp_documented pp_data_class f dataclass
+    | Done (Sealed_interface { nested_data_classes; generics; documentation })
+      ->
       Fmt.pf f
-        "@Serializable@;\
+        "%a@Serializable@;\
          @OptIn(ExperimentalSerializationApi::class)@;\
          @JsonClassDiscriminator(\"%s\")@;\
          sealed interface %s%a {@;\
          <0 4>@[%a@]@;\
          }"
-        union_type_discriminator name pp_generics generics
+        pp_docstring_opt documentation union_type_discriminator name pp_generics
+        generics
         (Fmt.list ~sep:Fmt.cut
            (pp_sealed_nested_data_class ~parent_interface:name))
         nested_data_classes
@@ -590,8 +654,8 @@ module Generator = struct
       must add extra information, like the [@SerialName] or the parent interface
       name that it implements. *)
   and pp_sealed_nested_data_class :
-      parent_interface:string -> (string * kotlin_case) Fmt.t =
-   fun ~parent_interface f (case_name, kotlin_case) ->
+      parent_interface:string -> (string * kotlin_case * string option) Fmt.t =
+   fun ~parent_interface f (case_name, kotlin_case, case_documentation) ->
     (* For now we prefix with the parent interface name otherwise it can
        incorrectly recurse. E.g. imagine you have top-level type [Foo] and a
        union type [Bar] with a nested class [Foo] with a field of type [Foo]
@@ -608,11 +672,11 @@ module Generator = struct
     match kotlin_case with
     | Wrap kotlin_type ->
       Fmt.pf f
-        "@Serializable@;\
+        "%a@Serializable@;\
          @SerialName(\"%s\")@;\
          data class %s%a(val value: %a) : %s@;"
-        case_name type_name pp_generics generics pp_kotlin_type kotlin_type
-        parent_interface
+        pp_docstring_opt case_documentation case_name type_name pp_generics
+        generics pp_kotlin_type kotlin_type parent_interface
     | Inline kotlin ->
       (* When inlining, we actually create an "inner" data class/object, so that
          all cases of a [Union] have the same structure, and then create a
@@ -621,10 +685,10 @@ module Generator = struct
       let inner_kotlin_type = Simple inner_kotlin_type_name in
       let pp_inner_kotlin f kotlin =
         match kotlin with
-        | Data_class { fields; generics } ->
+        | Data_class { value = { fields; generics }; _ } ->
           Fmt.pf f "@Serializable@;data class %s%a(%a)@;" inner_kotlin_type_name
             pp_generics generics
-            (Fmt.list ~sep:Fmt.comma pp_field)
+            (Fmt.list ~sep:Fmt.comma (pp_documented pp_field))
             fields
         | Data_object ->
           Fmt.pf f "@Serializable@;data object %s%a@;" inner_kotlin_type_name

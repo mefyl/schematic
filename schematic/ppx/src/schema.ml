@@ -10,6 +10,7 @@ type configuration = unit
 type expanded =
   | Components of {
       descriptor : expression;
+      documentation : expression;
       id : expression;
       parametric : expression;
     }
@@ -29,14 +30,15 @@ let schema_anonymous_name_versioned i =
 let schema_id_versioned ?prefix ~loc = suffix_id ~loc ?prefix "schema_versioned"
 
 let expanded_of_descriptor ~loc ?(id = [%expr None])
-    ?(parametric = [%expr None]) descriptor =
-  Components { descriptor; id; parametric }
+    ?(documentation = [%expr None]) ?(parametric = [%expr None]) descriptor =
+  Components { descriptor; documentation; id; parametric }
 
-let schema_of_components ~context ~loc descriptor id parametric =
+let schema_of_components ~context ~loc descriptor documentation id parametric =
   if context.global.inside then
     [%expr
       {
         Schema.descriptor = [%e descriptor];
+        documentation = [%e documentation];
         id = [%e id];
         parametric = [%e parametric];
       }]
@@ -44,13 +46,14 @@ let schema_of_components ~context ~loc descriptor id parametric =
     [%expr
       {
         Schematic.Schema.descriptor = [%e descriptor];
+        documentation = [%e documentation];
         id = [%e id];
         parametric = [%e parametric];
       }]
 
 let schema_of_expanded ~context ~loc = function
-  | Components { descriptor; id; parametric } ->
-    schema_of_components ~context ~loc descriptor id parametric
+  | Components { descriptor; documentation; id; parametric } ->
+    schema_of_components ~context ~loc descriptor documentation id parametric
   | Expression e -> e
 
 let eopt ~loc ~f = function
@@ -372,9 +375,10 @@ and expand_any_variant ~context ~type_context poly options =
   let loc = type_context.loc in
   let options =
     let f (txt, pcd_args, loc, attrs) =
-      let (Attributes.{ gadt_variant; _ } as attrs) =
+      let (Attributes.{ gadt_variant; documentation; _ } as attrs) =
         Attributes.extract ~alias:true
           ~computed:(match pcd_args with Pcstr_record _ -> true | _ -> false)
+          ~documentation:true
           ~gadt_variant:(Option.is_some context.gadt_variant)
           ~since:true attrs
       in
@@ -382,12 +386,16 @@ and expand_any_variant ~context ~type_context poly options =
       | Some _, None -> None
       | Some expected, Some effective when String.(expected <> effective) ->
         None
-      | _ -> Some (txt, pcd_args, loc, attrs)
+      | _ -> Some (txt, pcd_args, loc, attrs, documentation)
     in
     List.filter_map ~f options
   in
-  let f (txt, pcd_args, loc, Attributes.{ alias; aliases; computed; since; _ })
-      =
+  let f
+      ( txt,
+        pcd_args,
+        loc,
+        Attributes.{ alias; aliases; computed; since; _ },
+        case_documentation ) =
     let module Ast = (val Ast_builder.make loc) in
     let name =
       version_match ~f:Ast.estring (Ast.estring (String.lowercase txt)) alias
@@ -424,6 +432,7 @@ and expand_any_variant ~context ~type_context poly options =
                         schema =
                           {
                             descriptor = String_const name;
+                            documentation = None;
                             id = None;
                             parametric = None;
                           };
@@ -501,7 +510,17 @@ and expand_any_variant ~context ~type_context poly options =
             inline = [%e Ast.ebool inline];
             name = [%e name];
             raw_name = [%e Ast.estring txt];
-            schema = [%e schema_of_expanded ~context ~loc schema];
+            schema =
+              [%e
+                let s = schema_of_expanded ~context ~loc schema in
+                match case_documentation with
+                | None -> s
+                | Some doc ->
+                  [%expr
+                    {
+                      ([%e s]) with
+                      Schema.documentation = Some [%e Ast.estring doc];
+                    }]];
             since = [%e esince ~loc since];
           }]
   and key =
@@ -557,6 +576,11 @@ let close ~configuration:_ ~context ~type_context schema =
       [%expr Some [%e Ast.estring str]]
     in
     Option.value ~default type_context.attributes.name
+  in
+  let schema_documentation =
+    match type_context.attributes.documentation with
+    | None -> [%expr None]
+    | Some doc -> [%expr Some [%e Ast.estring doc]]
   in
   let params_wrap body =
     let wrap i exp arg =
@@ -708,7 +732,7 @@ let close ~configuration:_ ~context ~type_context schema =
             | Some __schematic_schema_id -> [%e parametric]
           in
           [%e
-            schema_of_components ~context ~loc descriptor
+            schema_of_components ~context ~loc descriptor schema_documentation
               [%expr
                 match __schematic_parametric with
                 | None -> [%e id]
@@ -721,8 +745,19 @@ let close ~configuration:_ ~context ~type_context schema =
     | Expression e ->
       let e =
         if context.global.inside then
-          [%expr { ([%e e]) with Schema.id = [%e id] }]
-        else [%expr { ([%e e]) with Schematic.Schema.id = [%e id] }]
+          [%expr
+            {
+              ([%e e]) with
+              Schema.id = [%e id];
+              documentation = [%e schema_documentation];
+            }]
+        else
+          [%expr
+            {
+              ([%e e]) with
+              Schematic.Schema.id = [%e id];
+              documentation = [%e schema_documentation];
+            }]
       in
       (e, false)
   in

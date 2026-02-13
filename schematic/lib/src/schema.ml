@@ -4,7 +4,9 @@ include Schema_intf
 let ( let* ) = Stdlib.Result.bind
 let ( let+ ) v f = Stdlib.Result.map f v
 let ( and+ ) = Base.Result.Let_syntax.Let_syntax.both
-let make ?id ?parametric descriptor = { id; descriptor; parametric }
+
+let make ?id ?documentation ?parametric descriptor =
+  { id; documentation; descriptor; parametric }
 
 let computed : type a b. (a, b) requirement -> bool = function
   | Computed | Computed_optional -> true
@@ -18,8 +20,13 @@ let is_optional : type a b. (a, b) requirement -> bool = function
   | Optional -> true
   | _ -> false
 
-let map ~decode ~encode { descriptor; id; _ } =
-  { id; descriptor = Map { decode; encode; descriptor }; parametric = None }
+let map ~decode ~encode { descriptor; documentation; id; _ } =
+  {
+    id;
+    documentation;
+    descriptor = Map { decode; encode; descriptor };
+    parametric = None;
+  }
 
 let field_schema = function
   | Inline schema -> schema
@@ -753,10 +760,10 @@ module Walk (W : WALK) = struct
   and case : type t. string option -> t case -> W.case W.M.t =
    fun key (Case { inline; name; raw_name; schema = s; since; _ }) ->
     W.case ?key ~inline ~name ~raw_name ?since:(Option.map ~f:fst since)
-      (schema s)
+      ?documentation:s.documentation (schema s)
 
   and schema : type t. t Schema_intf.t -> W.t W.M.t =
-   fun { id; descriptor = d; parametric = p } ->
+   fun { id; documentation; descriptor = d; parametric = p } ->
     let schema () = descriptor ~id d
     and parametric =
       match p with
@@ -767,7 +774,7 @@ module Walk (W : WALK) = struct
             let name, args, eff_args, t = parametric p in
             W.parametric name args eff_args t)
     in
-    W.schema id parametric schema
+    W.schema ~id ~documentation parametric schema
 
   and parametric : type t.
       t parametric -> string * string list * W.t W.M.t list * W.t W.M.t =
@@ -779,6 +786,7 @@ module Walk (W : WALK) = struct
           (next
              {
                id = Some ("#" ^ name);
+               documentation = None;
                (* FIXME: Ensure we don't keep eg. an `Ignore` schema that would
                   be discarded. Handle that better with an actual `Var`
                   descriptor.*)
@@ -1002,6 +1010,7 @@ let object_wrap name schema =
                 rest = FieldEnd;
               };
         };
+    documentation = None;
     id = None;
     parametric = None;
   }

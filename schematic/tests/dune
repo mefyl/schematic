@@ -52,3 +52,59 @@
    --cookie
    "schematic-version=\"0.15.0\""))
  (libraries alcotest base fmt hlist schematic test_utils))
+
+(executable
+ (name generate_documentation)
+ (modules generate_documentation)
+ (preprocess
+  (pps
+   ppx_deriving.eq
+   ppx_deriving.show
+   ppx_deriving.ord
+   ppx_here
+   schematic_ppx
+   --
+   --cookie
+   "schematic-version=\"0.15.0\""))
+ (libraries schematic base fmt hlist))
+
+(rule
+ (target typescript_documentation.actual.ts)
+ (action
+  (with-stdout-to
+   %{target}
+   (run ./generate_documentation.exe typescript))))
+
+(rule
+ (target kotlin_documentation.actual.kt)
+ (action
+  (with-stdout-to
+   %{target}
+   (run ./generate_documentation.exe kotlin))))
+
+(rule
+ (target swift_documentation.actual.swift)
+ (action
+  (with-stdout-to
+   %{target}
+   (run ./generate_documentation.exe swift))))
+
+(rule
+ (alias runtest)
+ (package schematic)
+ (action
+  (diff
+   typescript_documentation.expected.ts
+   typescript_documentation.actual.ts)))
+
+(rule
+ (alias runtest)
+ (package schematic)
+ (action
+  (diff kotlin_documentation.expected.kt kotlin_documentation.actual.kt)))
+
+(rule
+ (alias runtest)
+ (package schematic)
+ (action
+  (diff swift_documentation.expected.swift swift_documentation.actual.swift)))
