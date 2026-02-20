@@ -38,6 +38,12 @@ let ok_or_fail = function
   | Result.Ok result -> result
   | Result.Error reason -> fail reason
 
+(** A prefix header for long strings length. *)
+let long_string_beacon = 0xFFFF
+
+(** The minimal size for a string to be considered long. *)
+let long_string_threshold = 65535
+
 module Input = struct
   type t = {
     buffer : Bytes.t;
@@ -107,8 +113,16 @@ module Input = struct
       let () = t.position <- t.position + 2 in
       Bytes.unsafe_get_int16 t.buffer (t.position - 2)
     in
-    let string_length = int16 t in
-    let input_length, padding_length = round ~header:2 string_length in
+    let string_length, input_length, padding_length =
+      let int16 = int16 t in
+      let long_string = int16 = long_string_beacon in
+      let length = if long_string then int t else int16 in
+      let input_length, padding_length =
+        let header_size = if long_string then 10 else 2 in
+        round ~header:header_size length
+      in
+      (length, input_length, padding_length)
+    in
     let current = t.position in
     if current + string_length <= t.length then
       let () = t.position <- current + input_length in
@@ -343,8 +357,16 @@ module Output = struct
       t.position <- t.position + 2
     in
     let length = String.length v in
-    let () = int16 length t in
-    let size, pad = round ~header:2 length in
+    let header_size =
+      if length >= long_string_threshold then
+        let () = int16 long_string_beacon t in
+        let () = int length t in
+        10
+      else
+        let () = int16 length t in
+        2
+    in
+    let size, pad = round ~header:header_size length in
     let () = ensure size t in
     if size < buffer_length then
       let () =
