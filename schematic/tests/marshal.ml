@@ -104,6 +104,15 @@ let () =
           test_case "escaped string"
           @@ roundtrip ~here:[%here] Alcotest.string [%schema: string]
                "Choke ) on #; this";
+          test_case "large string (>65535 bytes)"
+          @@ roundtrip ~here:[%here] Alcotest.string [%schema: string]
+               (String.make 100000 'x');
+          test_case "large string at boundary (65534 bytes)"
+          @@ roundtrip ~here:[%here] Alcotest.string [%schema: string]
+               (String.make 65534 'y');
+          test_case "large string at boundary (65535 bytes)"
+          @@ roundtrip ~here:[%here] Alcotest.string [%schema: string]
+               (String.make 65535 'z');
           test_case "empty list"
           @@ roundtrip ~here:[%here] Alcotest.(list int) [%schema: int list] [];
           test_case "int list"
