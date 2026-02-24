@@ -32,8 +32,6 @@ and case = {
 let union cases =
   Union (List.map ~f:(fun t -> { since = None; t; documentation = None }) cases)
 
-type typescript = t
-
 type documented = {
   type_ : t;
   documentation : string option;
@@ -280,7 +278,7 @@ let pp ?(annotate_since = false) ?(indent = 2) fmt ts =
         ++ sp
         ++ const char ']'
       and object_ =
-        let field f { name; type'; required; since; description } =
+        let field f { name; type'; required; since; description; _ } =
           pp_docstring f description;
           let pp =
             box ~indent
