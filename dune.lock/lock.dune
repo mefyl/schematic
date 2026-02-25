@@ -1,6 +1,6 @@
 (lang package 0.1)
 
-(dependency_hash acbff97494ad0fc46c8cb9d629c9d837)
+(dependency_hash 63b20f01cd5807542af003d240707d94)
 
 (ocaml ocaml-base-compiler)
 
@@ -8,11 +8,24 @@
  (complete true)
  (used
   ((source
-    https://github.com/ocaml-dune/opam-overlays.git#2a9543286ff0e0656058fee5c0da7abc16b8717d))
+    ssh://git@gitlab.routine.co/routine/opam#523961bc22afb47f66b102ac4fb6654e96410b00))
   ((source
-    https://github.com/ocaml/opam-repository.git#48c9f6e789883c3dbb4ff03be0529c4936e40316))
+    https://github.com/ocaml/opam-repository.git#58311292be3bc343cc7f3b3926dfaf0015eb5afd))
   ((source
-    ssh://git@gitlab.routine.co/routine/opam#15183552a6b406fe99afccc59c8e6d41b27edc3b))))
+    https://github.com/ocaml-dune/opam-overlays.git#2a9543286ff0e0656058fee5c0da7abc16b8717d))))
+
+(expanded_solver_variable_bindings
+ (variable_values
+  (with-doc false)
+  (with-dev-setup false)
+  (post true)
+  (opam-version 2.2.0))
+ (unset_variables
+  with-test
+  sys-ocaml-libc
+  enable-ocaml-beta-repository
+  dev
+  build))
 
 (solved_for_platforms
  ((arch x86_64)
@@ -22,8 +35,4 @@
  ((arch x86_64)
   (os macos))
  ((arch arm64)
-  (os macos))
- ((arch x86_64)
-  (os win32))
- ((arch arm64)
-  (os win32)))
+  (os macos)))
