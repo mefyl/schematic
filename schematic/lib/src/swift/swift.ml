@@ -178,12 +178,6 @@ let to_object_field_name s = to_swift_identifier @@ to_camel_case s
 let to_type_name s = to_swift_identifier @@ to_pascal_case s
 let to_enum_case_name = to_object_field_name
 
-let pp_docstring fmt doc =
-  let escape s = String.substr_replace_all s ~pattern:"*/" ~with_:"*\\/" in
-  Fmt.pf fmt "/** %s */@;" (escape doc)
-
-let pp_docstring_opt = Fmt.option pp_docstring
-
 type swift_type =
   | Simple of string  (** E.g. [Foo] *)
   | Generic of string * swift_type list
