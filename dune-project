@@ -44,7 +44,6 @@
   (ezjsonm
    (>= 1.1.0))
   fmt
-  hmap
   (hlist
    (and
     (>= 0.2.0)

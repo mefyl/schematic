@@ -1,4 +1,4 @@
-(version 1.20)
+(version 1.21.1)
 
 (build
  (all_platforms
@@ -13,6 +13,6 @@
 
 (source
  (fetch
-  (url https://github.com/xavierleroy/cryptokit/archive/release1201.tar.gz)
+  (url https://github.com/xavierleroy/cryptokit/archive/release1211.tar.gz)
   (checksum
-   sha256=b933c32b4e03e7236add969c2f583df241aeff8eabd2cabb1f345a78250fcea6)))
+   sha256=186fda8b2063882688e1c2621c8234c35acdf4e10cfdd3213ee04bef16902953)))
