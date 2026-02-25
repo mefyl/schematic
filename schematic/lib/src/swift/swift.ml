@@ -335,7 +335,7 @@ module Parser = struct
           Atom
             {
               alias = Simple swift_type_name (* TODO generics *);
-              documentation = None;
+              documentation;
             },
           marks )
       | Some (Some (Done swift)) ->
@@ -353,33 +353,29 @@ module Parser = struct
 
   and descriptor_to_swift_marks : type a.
       Marks.t -> string option -> a Schema.descriptor -> swift * Marks.t =
-   fun marks schema_documentation descriptor ->
+   fun marks documentation descriptor ->
     match descriptor with
     | Any (module Coding) -> raise (NotYetImplemented "Any")
-    | Bool -> (Atom { alias = Simple "Swift.Bool"; documentation = None }, marks)
+    | Bool -> (Atom { alias = Simple "Swift.Bool"; documentation }, marks)
     | Coding { f = _ } -> raise (NotYetImplemented "Coding")
     | Date ->
-      ( Atom { alias = Simple "Routine.TimelessDate"; documentation = None },
-        marks )
+      (Atom { alias = Simple "Routine.TimelessDate"; documentation }, marks)
     | Fixpoint lazy_descriptor ->
       descriptor_to_swift_marks marks None (Lazy.force lazy_descriptor)
-    | Float ->
-      (Atom { alias = Simple "Swift.Float"; documentation = None }, marks)
+    | Float -> (Atom { alias = Simple "Swift.Float"; documentation }, marks)
     | Ignore ->
       (empty_struct, marks)
       (* Treat [Ignore] fields as an empty object that will be removed in a
          later pass *)
-    | Int -> (Atom { alias = Simple "Swift.Int"; documentation = None }, marks)
-    | Int64 ->
-      (Atom { alias = Simple "Swift.Int64"; documentation = None }, marks)
-    | Json ->
-      (Atom { alias = Simple "Foundation.Data"; documentation = None }, marks)
+    | Int -> (Atom { alias = Simple "Swift.Int"; documentation }, marks)
+    | Int64 -> (Atom { alias = Simple "Swift.Int64"; documentation }, marks)
+    | Json -> (Atom { alias = Simple "Foundation.Data"; documentation }, marks)
     | List item ->
       (* TODO We will probably need [swift] to support generics *)
-      list_to_swift_marks marks item
+      list_to_swift_marks ~documentation marks item
     | Sequence { item; _ } ->
       (* TODO We will probably need [swift] to support generics *)
-      list_to_swift_marks marks item
+      list_to_swift_marks ~documentation marks item
     | Map { descriptor; _ } -> descriptor_to_swift_marks marks None descriptor
     | Mapping { item; _ } ->
       (* TODO We will probably need [swift] to support generics *)
@@ -390,12 +386,11 @@ module Parser = struct
           {
             alias =
               Generic ("Swift.Dictionary", [ Simple "Swift.String"; swift_type ]);
-            documentation = None;
+            documentation;
           }
       in
       (swift, marks)
-    | Null ->
-      (Atom { alias = Simple "Routine.Unit"; documentation = None }, marks)
+    | Null -> (Atom { alias = Simple "Routine.Unit"; documentation }, marks)
     | Nullable schema ->
       let type_name, swift, marks = schema_to_swift_marks marks schema in
       let () =
@@ -416,11 +411,7 @@ module Parser = struct
                    that is not an Atom: %a"
                   pp_swift swift))
         | Some type_name, _swift ->
-          ( Atom
-              {
-                alias = wrap_in_option (Simple type_name);
-                documentation = None;
-              },
+          ( Atom { alias = wrap_in_option (Simple type_name); documentation },
             marks )
       in
       let () =
@@ -434,28 +425,15 @@ module Parser = struct
     | Object { fields = FieldEnd; _ } -> (empty_struct, marks)
     | Object { fields; _ } ->
       let swift_fields, marks = object_fields_to_swift_marks marks fields in
-      ( Struct
-          {
-            fields = swift_fields;
-            generics = [];
-            documentation = schema_documentation;
-          },
-        marks )
-    | String ->
-      ( Atom
-          {
-            alias = Simple "Swift.String";
-            documentation = schema_documentation;
-          },
-        marks )
+      (Struct { fields = swift_fields; generics = []; documentation }, marks)
+    | String -> (Atom { alias = Simple "Swift.String"; documentation }, marks)
     | String_const _ -> (empty_struct, marks)
-    | Time ->
-      (Atom { alias = Simple "Foundation.Date"; documentation = None }, marks)
+    | Time -> (Atom { alias = Simple "Foundation.Date"; documentation }, marks)
     | Time_local ->
-      (Atom { alias = Simple "Routine.ZonedDate"; documentation = None }, marks)
+      (Atom { alias = Simple "Routine.ZonedDate"; documentation }, marks)
     | Tuple { items; _ } ->
       let swift_type, marks = tuple_to_swift_marks marks items in
-      (Atom { alias = swift_type; documentation = None }, marks)
+      (Atom { alias = swift_type; documentation }, marks)
     | Union { key = _; cases; polymorphic = _ } ->
       (* For simplicity, we ignore the optional union key *)
       let marks, cases =
@@ -504,26 +482,16 @@ module Parser = struct
             (marks, nested_types))
           cases
       in
-      let swift =
-        Enum
-          {
-            cases;
-            generics = [ (* TODO *) ];
-            documentation = schema_documentation;
-          }
-      in
+      let swift = Enum { cases; generics = [ (* TODO *) ]; documentation } in
       (swift, marks)
 
-  and list_to_swift_marks : type a. Marks.t -> a Schema.t -> swift * Marks.t =
-   fun marks item_schema ->
+  and list_to_swift_marks : type a.
+      documentation:string option -> Marks.t -> a Schema.t -> swift * Marks.t =
+   fun ~documentation marks item_schema ->
     let type_name, swift, marks = schema_to_swift_marks marks item_schema in
     let swift_type = type_name_and_swift_to_swift_type_exn type_name swift in
     let swift =
-      Atom
-        {
-          alias = Generic ("Swift.Array", [ swift_type ]);
-          documentation = None;
-        }
+      Atom { alias = Generic ("Swift.Array", [ swift_type ]); documentation }
     in
     (swift, marks)
 

@@ -10,6 +10,10 @@ public final class DocumentedRecord : Codable, Sendable {
 }
 
 
+/** A documented type for testing TypeScript JSDoc generation.
+
+    With a long comment to ensures that we wrap things properly even in the
+    presence of absurdly long lines in the original documentation comment */
 public typealias DocumentedType = Swift.Int
 
 /** A type with *\/ in the documentation to test escaping */
