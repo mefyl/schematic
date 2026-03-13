@@ -3,4 +3,4 @@
 (library
  (name schematic_sexp)
  (public_name schematic-sexp)
- (libraries base csexp fmt ptime schematic sexplib))
+ (libraries base fmt ptime schematic sexplib))
