@@ -108,7 +108,5 @@ module type IMPL = sig
     val tuple_pop : const
     val tuple_item_push : const
     val tuple_item_pop : const
-    val union_push : int -> 'a Schema.case writer
-    val union_pop : const
   end
 end

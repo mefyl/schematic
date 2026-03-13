@@ -158,3 +158,166 @@ end
 module T = Make (Impl_ezjsonm)
 include T
 module String = Coding.Make_string (T)
+
+module Streaming_impl = struct
+  let name = Impl.name
+
+  module Input = struct
+    type t = unit
+
+    let of_channel _ = failwith "JSON streaming deserialization not implemented"
+    let of_string _ = failwith "JSON streaming deserialization not implemented"
+    let bool _ = failwith "JSON streaming deserialization not implemented"
+
+    let date =
+      `Custom
+        (fun _ -> failwith "JSON streaming deserialization not implemented")
+
+    let eof _ = failwith "JSON streaming deserialization not implemented"
+    let float _ = failwith "JSON streaming deserialization not implemented"
+    let int _ = failwith "JSON streaming deserialization not implemented"
+    let int64 _ = failwith "JSON streaming deserialization not implemented"
+    let json _ = failwith "JSON streaming deserialization not implemented"
+    let list_push _ = failwith "JSON streaming deserialization not implemented"
+    let list_pop _ = failwith "JSON streaming deserialization not implemented"
+
+    let list_item_push _ =
+      failwith "JSON streaming deserialization not implemented"
+
+    let list_item_pop _ =
+      failwith "JSON streaming deserialization not implemented"
+
+    let object_push _ =
+      failwith "JSON streaming deserialization not implemented"
+
+    let object_pop _ = failwith "JSON streaming deserialization not implemented"
+
+    let object_field_push _ =
+      failwith "JSON streaming deserialization not implemented"
+
+    let object_field_pop _ =
+      failwith "JSON streaming deserialization not implemented"
+
+    let object_field_opt_push _ =
+      failwith "JSON streaming deserialization not implemented"
+
+    let object_field_opt_pop _ =
+      failwith "JSON streaming deserialization not implemented"
+
+    let option_push _ =
+      failwith "JSON streaming deserialization not implemented"
+
+    let option_pop _ = failwith "JSON streaming deserialization not implemented"
+    let string _ = failwith "JSON streaming deserialization not implemented"
+
+    let time =
+      `Custom
+        (fun _ -> failwith "JSON streaming deserialization not implemented")
+
+    let time_local =
+      `Custom
+        (fun _ -> failwith "JSON streaming deserialization not implemented")
+
+    let tuple_push _ = failwith "JSON streaming deserialization not implemented"
+    let tuple_pop _ = failwith "JSON streaming deserialization not implemented"
+
+    let tuple_item_push _ =
+      failwith "JSON streaming deserialization not implemented"
+
+    let tuple_item_pop _ =
+      failwith "JSON streaming deserialization not implemented"
+
+    let union_push _ _ =
+      failwith "JSON streaming deserialization not implemented"
+
+    let union_pop _ = failwith "JSON streaming deserialization not implemented"
+  end
+
+  module Output = struct
+    type t = {
+      mutable first_item : bool list;
+      put : string -> unit;
+      backend : backend;
+    }
+
+    and backend =
+      | Channel of Stdlib.out_channel
+      | Buffer of Buffer.t
+
+    let of_channel channel =
+      {
+        first_item = [];
+        put = Stdlib.output_string channel;
+        backend = Channel channel;
+      }
+
+    let of_buffer buffer =
+      {
+        first_item = [];
+        put = Buffer.add_string buffer;
+        backend = Buffer buffer;
+      }
+
+    let of_json f v t = t.put @@ to_string (f v)
+    let bool = of_json Ezjsonm.bool
+    let string = of_json Ezjsonm.string
+    let date = `Generic
+    let eof _ = ()
+    let float = of_json Ezjsonm.float
+    let int = of_json Ezjsonm.int
+    let int64 = of_json Ezjsonm.int64
+
+    let json =
+      let json json writer =
+        let dst =
+          match writer.backend with
+          | Buffer buffer -> `Buffer buffer
+          | Channel channel -> `Channel channel
+        in
+        Ezjsonm.value_to_dst ~minify:true dst json
+      in
+      `Custom json
+
+    let container_push c t =
+      t.first_item <- true :: t.first_item;
+      t.put c
+
+    let item_push t =
+      match t.first_item with
+      | true :: tail -> t.first_item <- false :: tail
+      | _ -> t.put ","
+
+    let list_push = container_push "["
+    let list_pop t = t.put "]"
+    let list_item_push = item_push
+    let list_item_pop _ = ()
+    let object_push = container_push "{"
+    let object_pop t = t.put "}"
+
+    let object_field_push name t =
+      item_push t;
+      string name t;
+      t.put ":"
+
+    let object_field_pop _ = ()
+    let object_field_opt_push = object_field_push
+    let object_field_opt_pop = object_field_pop
+    let object_field_opt_none _ _ = ()
+    let option_none t = t.put "null"
+    let option_push _ = ()
+    let option_pop _ = ()
+    let time = `Custom (fun t writer -> string (Ptime.to_rfc3339 t) writer)
+
+    let time_local =
+      `Custom
+        (fun (t, tz_offset_s) writer ->
+          string (Ptime.to_rfc3339 ~tz_offset_s t) writer)
+
+    let tuple_push = list_push
+    let tuple_pop = list_pop
+    let tuple_item_push = list_item_push
+    let tuple_item_pop = list_item_pop
+  end
+end
+
+module Streaming = Streaming.Make (Streaming_impl)

@@ -7,3 +7,4 @@ val schema_versioned : Schema.version -> t Schema.t
 
 module String : Coding.STR with type t = string
 module Make (_ : Impl) : S
+module Streaming : Streaming.S with type error = Error.Decoding.t
