@@ -19,6 +19,7 @@ module Jsoo = Test_utils.Tests.Make (struct
 
   let of_json _ = None
   let extra_test _ _ = ()
+  let streaming = None
 end)
 
 module Errors = struct

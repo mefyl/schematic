@@ -7,6 +7,7 @@ module Tests = Test_utils.Tests.Make (struct
   let t = Alcotest.testable Schematic.Json.pp Schematic.Json.equal
   let of_json json = Some json
   let local_time_support = true
+  let streaming = Some (module Schematic.Json.Streaming : Schematic.Streaming.S)
 
   let extra_test (Test_utils.Tests.Test { here; schema; _ }) encoded =
     let schema =

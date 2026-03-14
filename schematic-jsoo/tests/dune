@@ -11,7 +11,7 @@
  (package schematic-jsoo)
  (modes js)
  (modules json)
- (libraries alcotest js_of_ocaml schematic-jsoo test_utils)
+ (libraries alcotest js_of_ocaml schematic schematic-jsoo test_utils)
  (preprocess
   (pps js_of_ocaml-ppx ppx_here schematic.ppx)))
 

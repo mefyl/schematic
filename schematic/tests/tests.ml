@@ -62,6 +62,8 @@ module Make (Coding : sig
   val extra_test : test_description -> t -> unit
   val of_json : json -> t option
   val local_time_support : bool
+  val to_string : t -> string
+  val streaming : (module Schematic.Streaming.S) option
 end) =
 struct
   let test ~here ?decoded name value_testable schema value expected =
@@ -105,6 +107,16 @@ struct
       Fmt.epr "Running test2 for schema %a@." Schematic.Schema.pp schema
     in
     let () = test ~here ?decoded name value_testable schema value expected in
+    let () =
+      match Coding.streaming with
+      | None -> ()
+      | Some (module S : Schematic.Streaming.S) ->
+        let streaming = S.to_string schema value in
+        Alcotest.(check ~here string)
+          (Fmt.str "%s: streaming matches coding" name)
+          (Coding.to_string @@ Coding.encode schema value)
+          streaming
+    in
     Coding.extra_test test_descripton encoded
 
   module Opt = struct
