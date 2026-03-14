@@ -515,8 +515,11 @@ let to_channel schema value channel =
   let output = Output.of_channel channel in
   write schema value output
 
+let to_buffer schema value buffer =
+  let output = Output.of_buffer buffer in
+  write schema value output
+
 let to_string schema value =
   let result = Buffer.create buffer_length in
-  let output = Output.of_buffer result in
-  let _output = write schema value output in
+  let () = to_buffer schema value result in
   Buffer.contents result

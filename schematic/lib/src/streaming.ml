@@ -444,9 +444,12 @@ module Make (Impl : IMPL) = struct
     let () = write schema value output in
     Impl.Output.eof output
 
+  let to_buffer schema value buffer =
+    let output = Impl.Output.of_buffer buffer in
+    write schema value output
+
   let to_string schema value =
     let result = Buffer.create 4096 in
-    let output = Impl.Output.of_buffer result in
-    let _output = write schema value output in
+    let () = to_buffer schema value result in
     Buffer.contents result
 end
