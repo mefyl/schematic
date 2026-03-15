@@ -21,6 +21,7 @@ depends: [
   "alcotest" {>= "1.1.0" & with-test}
   "base" {>= "v0.15.0"}
   "base64" {>= "3.5.0"}
+  "bytesrw"
   "ezjsonm" {>= "1.1.0"}
   "fmt"
   "hlist" {>= "0.2.0" & < "0.3.0"}

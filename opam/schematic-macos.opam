@@ -19,10 +19,10 @@ depends: [
   "dune" {>= "3.20"}
   "base-macos" {>= "v0.15.0"}
   "base64-macos" {>= "3.5.0"}
+  "bytesrw"
   "ezjsonm-macos" {>= "1.1.0"}
   "fmt"
   "fmt-macos"
-  "hmap"
   "hlist-macos" {>= "0.2.0" & < "0.3.0"}
   "hmap"
   "logs-macos"

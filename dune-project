@@ -41,6 +41,7 @@
    (>= v0.15.0))
   (base64
    (>= 3.5.0))
+   bytesrw
   (ezjsonm
    (>= 1.1.0))
   fmt

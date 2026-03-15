@@ -19,10 +19,10 @@ depends: [
   "dune" {>= "3.20"}
   "base-android" {>= "v0.15.0"}
   "base64-android" {>= "3.5.0"}
+  "bytesrw"
   "ezjsonm-android" {>= "1.1.0"}
   "fmt"
   "fmt-android"
-  "hmap"
   "hlist-android" {>= "0.2.0" & < "0.3.0"}
   "hmap"
   "logs-android"
