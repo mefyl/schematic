@@ -3,7 +3,7 @@
 (library
  (name schematic)
  (public_name schematic)
- (libraries base base64 ezjsonm fmt hlist logs ptime semver2 uri)
+ (libraries base base64 bytesrw ezjsonm fmt hlist logs ptime semver2 uri)
  (preprocess
   (pps
    schematic_ppx_inside

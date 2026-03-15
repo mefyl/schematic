@@ -314,47 +314,33 @@ let of_string schema string =
 
 module Output = struct
   type t = {
-    buffer : Bytes.t;
-    flush : ?position:int -> size:int -> Bytes.t -> unit;
-        (** [flush  ?position ~size buffer] writes to the input [size] bytes
-            from [buffer] starting at [position] (default 0). *)
-    mutable position : int;
+    scratch : Bytes.t;  (** 8-byte scratch buffer for encoding primitives *)
+    writer : Bytesrw.Bytes.Writer.t;
   }
 
-  let of_flush flush =
-    { buffer = Bytes.create buffer_length; flush; position = 0 }
+  let of_bytes_writer writer = { scratch = Bytes.create 8; writer }
 
   let of_channel channel =
-    let flush ?(position = 0) ~size buffer =
-      Stdlib.output channel buffer position size
-    in
-    of_flush flush
+    of_bytes_writer (Bytesrw.Bytes.Writer.of_out_channel channel)
 
-  let of_buffer buffer =
-    let flush ?(position = 0) ~size bytes =
-      Buffer.add_subbytes buffer bytes ~pos:position ~len:size
-    in
-    of_flush flush
+  let of_buffer buffer = of_bytes_writer (Bytesrw.Bytes.Writer.of_buffer buffer)
 
-  let ensure size t =
-    if t.position + size > buffer_length then
-      let () = t.flush ~size:t.position t.buffer in
-      t.position <- 0
+  let write_scratch t ~length =
+    Bytesrw.Bytes.Writer.write t.writer
+      (Bytesrw.Bytes.Slice.make t.scratch ~first:0 ~length)
 
   let padding = Bytes.init 8 ~f:(fun _ -> '\x00')
 
   let[@inline] int64 v t =
-    let () = ensure 8 t in
-    let () = Bytes.unsafe_set_int64 t.buffer t.position v in
-    t.position <- t.position + 8
+    Bytes.unsafe_set_int64 t.scratch 0 v;
+    write_scratch t ~length:8
 
   let[@inline] int v t = int64 (Int64.of_int v) t
 
   let string v t =
     let[@inline] int16 v t =
-      let () = ensure 2 t in
-      let () = Bytes.unsafe_set_int16 t.buffer t.position v in
-      t.position <- t.position + 2
+      Bytes.unsafe_set_int16 t.scratch 0 v;
+      write_scratch t ~length:2
     in
     let length = String.length v in
     let header_size =
@@ -366,24 +352,18 @@ module Output = struct
         let () = int16 length t in
         2
     in
-    let size, pad = round ~header:header_size length in
-    let () = ensure size t in
-    if size < buffer_length then
-      let () =
-        Bytes.blito
-          ~src:(Bytes.unsafe_of_string_promise_no_mutation v)
-          ~dst:t.buffer ~dst_pos:t.position ()
-      in
-      t.position <- t.position + size
-    else
-      let () =
-        t.flush ~size:length (Bytes.unsafe_of_string_promise_no_mutation v)
-      in
-      if pad > 0 then t.flush ~size:pad padding
+    let _size, pad = round ~header:header_size length in
+    let () =
+      Bytesrw.Bytes.Writer.write_bytes t.writer
+        (Bytes.unsafe_of_string_promise_no_mutation v)
+    in
+    if pad > 0 then
+      Bytesrw.Bytes.Writer.write t.writer
+        (Bytesrw.Bytes.Slice.make padding ~first:0 ~length:pad)
 
   let[@inline] bool v t = int (if v then 1 else 0) t
   let[@inline] float v t = int64 (Int64.bits_of_float v) t
-  let eof t = if t.position > 0 then t.flush ~size:t.position t.buffer
+  let eof _ = ()
 
   (* FIXME: could be made more compact *)
   let json json t =
@@ -511,13 +491,15 @@ end
 
 let write = Output.write
 
-let to_channel schema value channel =
-  let output = Output.of_channel channel in
+let to_bytes schema value writer =
+  let output = Output.of_bytes_writer writer in
   write schema value output
 
+let to_channel schema value channel =
+  to_bytes schema value (Bytesrw.Bytes.Writer.of_out_channel channel)
+
 let to_buffer schema value buffer =
-  let output = Output.of_buffer buffer in
-  write schema value output
+  to_bytes schema value (Bytesrw.Bytes.Writer.of_buffer buffer)
 
 let to_string schema value =
   let result = Buffer.create buffer_length in

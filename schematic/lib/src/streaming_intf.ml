@@ -11,6 +11,7 @@ module type S = sig
   val of_string : 'a Schema.t -> string -> ('a, error) Result.t
   val to_string : 'a Schema.t -> 'a -> string
   val to_buffer : 'a Schema.t -> 'a -> Buffer.t -> unit
+  val to_bytes : 'a Schema.t -> 'a -> Bytesrw.Bytes.Writer.t -> unit
   val to_channel : 'a Schema.t -> 'a -> out_channel -> unit
 end
 
@@ -69,8 +70,7 @@ module type IMPL = sig
     type 'a writer := ('a, t) Writer.t
     type const := t -> unit
 
-    val of_channel : out_channel -> t
-    val of_buffer : Buffer.t -> t
+    val of_bytes_writer : Bytesrw.Bytes.Writer.t -> t
     val bool : bool writer
     val date : Ptime.date writer customizable
     val eof : const
