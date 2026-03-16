@@ -18,15 +18,15 @@ endif
 build:
 	if test -d /root/node_modules; then ln -s /root/node_modules; fi
 	$(DUNE) subst
-	$(DUNE) build --profile release $(WORKSPACE_OPT) --ignore-promoted-rules @install
+	time $(DUNE) build --profile release $(WORKSPACE_OPT) --ignore-promoted-rules @install
 
 lint:
-	$(DUNE) fmt $(WORKSPACE_OPT)
+	time $(DUNE) build $(WORKSPACE_OPT) @fmt
 
 check:
 	if test -d /root/node_modules; then ln -s /root/node_modules; fi
 	$(DUNE) subst
-	$(DUNE) runtest $(WORKSPACE_OPT)
+	time $(DUNE) runtest $(WORKSPACE_OPT)
 
 package:
 	$(DUNE) subst
