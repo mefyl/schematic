@@ -10,7 +10,7 @@
   ((source
     ssh://git@gitlab.routine.co/routine/opam#50c915bdbaa6653a782f158675eeca10c9be89a9))
   ((source
-    https://github.com/ocaml/opam-repository.git#8d34e0cf3c0ccacb6c8a26c24d0e5eb0b17fbf9d))
+    https://github.com/ocaml/opam-repository.git#4f056bfedf536e66065c3783e694e6aa0b38261a))
   ((source
     https://github.com/ocaml-dune/opam-overlays.git#2a9543286ff0e0656058fee5c0da7abc16b8717d))))
 

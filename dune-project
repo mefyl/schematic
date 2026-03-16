@@ -41,7 +41,7 @@
    (>= v0.15.0))
   (base64
    (>= 3.5.0))
-   bytesrw
+  bytesrw
   (ezjsonm
    (>= 1.1.0))
   fmt
@@ -148,3 +148,12 @@
   ppx_here
   (schematic
    (= :version))))
+
+; Work around a concurrency bug with ocamlfind + dune pkg.
+
+(pin
+ (url
+  git+https://github.com/dbuenzli/bytesrw#47bdebcbc527c264572fb5fbcc5ca606e67bcd32)
+ (package
+  (name bytesrw)
+  (version 0.3.0)))
