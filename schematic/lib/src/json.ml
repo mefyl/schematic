@@ -250,14 +250,6 @@ module Streaming_impl = struct
     let int = of_json Ezjsonm.int
     let int64 = of_json Ezjsonm.int64
 
-    let json =
-      let json json t =
-        let buf = Buffer.create 256 in
-        Ezjsonm.value_to_dst ~minify:true (`Buffer buf) json;
-        put t (Buffer.contents buf)
-      in
-      `Custom json
-
     let container_push c t =
       t.first_item <- true :: t.first_item;
       put t c
@@ -284,6 +276,31 @@ module Streaming_impl = struct
     let object_field_opt_pop = object_field_pop
     let object_field_opt_none _ _ = ()
     let option_none t = put t "null"
+
+    let json =
+      let rec json v t =
+        match v with
+        | `Null -> option_none t
+        | `Bool b -> bool b t
+        | `Float f -> float f t
+        | `String s -> string s t
+        | `A items ->
+          list_push t;
+          List.iter items ~f:(fun v ->
+              list_item_push t;
+              json v t;
+              list_item_pop t);
+          list_pop t
+        | `O fields ->
+          object_push t;
+          List.iter fields ~f:(fun (name, v) ->
+              object_field_push name t;
+              json v t;
+              object_field_pop t);
+          object_pop t
+      in
+      `Custom json
+
     let option_push _ = ()
     let option_pop _ = ()
     let time = `Custom (fun t writer -> string (Ptime.to_rfc3339 t) writer)
