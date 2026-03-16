@@ -21,7 +21,7 @@ build:
 	$(DUNE) build --profile release $(WORKSPACE_OPT) --ignore-promoted-rules @install
 
 lint:
-	$(DUNE) build $(WORKSPACE_OPT) @fmt
+	$(DUNE) fmt $(WORKSPACE_OPT)
 
 check:
 	if test -d /root/node_modules; then ln -s /root/node_modules; fi
