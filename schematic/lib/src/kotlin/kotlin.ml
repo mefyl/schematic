@@ -1002,9 +1002,7 @@ module Json = struct
           let* items =
             v
             |> List.map ~f:(fun json ->
-                   decode
-                     { context with path = context.path @ [ "[]" ] }
-                     item json)
+                decode { context with path = context.path @ [ "[]" ] } item json)
             |> Result.all
           in
           items

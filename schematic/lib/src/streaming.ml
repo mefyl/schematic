@@ -252,9 +252,9 @@ module Make (Impl : IMPL) = struct
         let () =
           deconstruct v
           |> Base.Sequence.iter ~f:(fun v ->
-                 let () = W.list_item_push writer in
-                 let () = write_schema context item v writer in
-                 W.list_item_pop writer)
+              let () = W.list_item_push writer in
+              let () = write_schema context item v writer in
+              W.list_item_pop writer)
         in
         W.list_pop writer
       | Map { encode; descriptor; _ } ->
@@ -273,9 +273,9 @@ module Make (Impl : IMPL) = struct
           v
           |> deconstruct
           |> Base.Sequence.iter ~f:(fun (key, data) ->
-                 let () = W.object_field_push key writer in
-                 let () = write_schema context item data writer in
-                 W.object_field_pop writer)
+              let () = W.object_field_push key writer in
+              let () = write_schema context item data writer in
+              W.object_field_pop writer)
         in
         W.object_pop writer
       | Object { fields; encode; _ } ->

@@ -104,42 +104,41 @@ type any = { any : Schematic_jsoo.Jsoo.t } [@@deriving schema ~jsoo]
 
 let () =
   Js.export_all
-    (object%js
-       method ofString s =
-         of_result
-         @@
-         let open Result in
-         Schematic_jsoo.Json.of_string (Js.to_string s) >>= fun json ->
-         Schematic.Json.decode o_schema json |> decode_error "JSON" >>| o_to_js
+    object%js
+      method ofString s =
+        of_result
+        @@
+        let open Result in
+        Schematic_jsoo.Json.of_string (Js.to_string s) >>= fun json ->
+        Schematic.Json.decode o_schema json |> decode_error "JSON" >>| o_to_js
 
-       method ofJs v =
-         of_result
-         @@
-         let open Result in
-         Schematic_jsoo.Jsoo.decode o_schema v |> decode_error "js" >>| o_to_js
+      method ofJs v =
+        of_result
+        @@
+        let open Result in
+        Schematic_jsoo.Jsoo.decode o_schema v |> decode_error "js" >>| o_to_js
 
-       method toString o =
-         o_of_js_exn o
-         |> Schematic.Json.encode o_schema
-         |> Schematic_jsoo.Json.to_string
-         |> Js.string
+      method toString o =
+        o_of_js_exn o
+        |> Schematic.Json.encode o_schema
+        |> Schematic_jsoo.Json.to_string
+        |> Js.string
 
-       method toJs o = o_of_js_exn o |> Schematic_jsoo.Jsoo.encode o_schema
+      method toJs o = o_of_js_exn o |> Schematic_jsoo.Jsoo.encode o_schema
 
-       method variantRoundtrip (js : variant_js) =
-         of_result
-         @@
-         let open Result in
-         Schematic_jsoo.Jsoo.decode variant_schema js
-         |> decode_error "js"
-         >>| variant_to_js
+      method variantRoundtrip (js : variant_js) =
+        of_result
+        @@
+        let open Result in
+        Schematic_jsoo.Jsoo.decode variant_schema js
+        |> decode_error "js"
+        >>| variant_to_js
 
-       method any js =
-         match
-           Schematic_jsoo.Jsoo.decode any_schema js |> decode_error "any"
-         with
-         | Result.Ok { any } -> (Js.Unsafe.coerce any)##.content
-         | Result.Error msg ->
-           Js_error.(
-             raise_ @@ of_error (new%js Js.error_constr (Js.string msg)))
-    end)
+      method any js =
+        match
+          Schematic_jsoo.Jsoo.decode any_schema js |> decode_error "any"
+        with
+        | Result.Ok { any } -> (Js.Unsafe.coerce any)##.content
+        | Result.Error msg ->
+          Js_error.(raise_ @@ of_error (new%js Js.error_constr (Js.string msg)))
+    end
