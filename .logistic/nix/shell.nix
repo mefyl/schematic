@@ -15,7 +15,7 @@
 let
   ci-packages = import ./ci-packages.nix { inherit pkgs; };
 
-  dune-preview = (import srcs.flake-compat { src = srcs.dune; }).outputs.packages.${pkgs.system}.dune;
+  dune-preview = (import srcs.flake-compat { src = srcs.dune; }).outputs.packages.${pkgs.stdenv.hostPlatform.system}.dune;
   shared =
     import ./shared.nix { inherit pkgs; };
 in
