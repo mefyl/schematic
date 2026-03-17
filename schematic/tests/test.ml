@@ -58,7 +58,7 @@ let streaming_lazy_sequence () =
   end in
   let buffer = Buffer.create 4096
   and current_length = ref 0 in
-  Schematic.Json.Streaming.to_buffer batch_schema
+  Schematic.Json.Streaming.to_bytes batch_schema
     {
       etag = 0;
       commits =
@@ -74,7 +74,7 @@ let streaming_lazy_sequence () =
               let () = current_length := length in
               i));
     }
-    buffer
+  @@ Bytesrw.Bytes.Writer.of_buffer ~slice_length:1 buffer
 
 let () =
   Alcotest.run "Schematic.Schema"

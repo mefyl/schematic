@@ -22,7 +22,7 @@
  (package schematic)
  (modules test)
  (deps validate-schema)
- (libraries alcotest base ezjsonm fmt hlist schematic test_utils)
+ (libraries alcotest base bytesrw ezjsonm fmt hlist schematic test_utils)
  (preprocess
   (pps schematic_ppx)))
 
