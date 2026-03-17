@@ -62,4 +62,7 @@ module Tests = Test_utils.Tests.Make (struct
         check ~here
           (result value_testable schematic_error_decoding_testable)
           "JSON values do not match after a roundtrip" (Ok value) actual)
+
+  let to_string = Schematic.Json.to_string
+  let streaming = None
 end)

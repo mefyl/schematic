@@ -10,6 +10,8 @@ type time_local_pair = Ptime.t * int [@@deriving schema]
 module Make (Impl : IMPL) = struct
   let name = Impl.name
 
+  type error = E.Decoding.t
+
   module Input = Impl.Input
   module Output = Impl.Output
 
@@ -239,19 +241,25 @@ module Make (Impl : IMPL) = struct
       | List items_schema ->
         let () = W.list_push writer in
         let () =
-          List.iter v ~f:(fun v -> write_schema context items_schema v writer)
+          List.iter v ~f:(fun v ->
+              let () = W.list_item_push writer in
+              let () = write_schema context items_schema v writer in
+              W.list_item_pop writer)
         in
         W.list_pop writer
       | Sequence { item; deconstruct; _ } ->
         let () = W.list_push writer in
         let () =
           deconstruct v
-          |> Base.Sequence.iter ~f:(fun v -> write_schema context item v writer)
+          |> Base.Sequence.iter ~f:(fun v ->
+                 let () = W.list_item_push writer in
+                 let () = write_schema context item v writer in
+                 W.list_item_pop writer)
         in
         W.list_pop writer
       | Map { encode; descriptor; _ } ->
         write_descriptor context descriptor (encode v) writer
-      | Null -> ()
+      | Null -> W.option_none writer
       | Nullable s -> (
         match v with
         | None -> W.option_none writer
@@ -260,51 +268,19 @@ module Make (Impl : IMPL) = struct
           let () = write_schema context s v writer in
           W.option_pop writer)
       | Mapping { deconstruct; item; _ } ->
-        let () = W.list_push writer in
+        let () = W.object_push writer in
         let () =
           v
           |> deconstruct
           |> Base.Sequence.iter ~f:(fun (key, data) ->
-                 W.string key writer;
-                 write_schema context item data writer)
+                 let () = W.object_field_push key writer in
+                 let () = write_schema context item data writer in
+                 W.object_field_pop writer)
         in
-        W.list_pop writer
+        W.object_pop writer
       | Object { fields; encode; _ } ->
         let () = W.object_push writer in
-        let () =
-          let rec write_fields : type t.
-              t Hlist.t Schema.fields -> t Hlist.t -> unit =
-           fun fields v ->
-            match fields with
-            | FieldEnd -> ()
-            | Field { field = { name; schema; requirement; _ }; rest } ->
-              let (head :: tail) = v in
-              let () =
-                match Schema.field_schema schema with
-                | { descriptor = Ignore; _ } -> ()
-                | schema -> (
-                  match requirement with
-                  | Default _ ->
-                    let () = W.object_field_push name writer in
-                    let () = write_schema context schema head writer in
-                    W.object_field_pop writer
-                  | Optional -> (
-                    match head with
-                    | None -> W.object_field_opt_none name writer
-                    | Some head ->
-                      let () = W.object_field_opt_push name writer in
-                      let () = write_schema context schema head writer in
-                      W.object_field_opt_pop writer)
-                  | Required ->
-                    let () = W.object_field_push name writer in
-                    let () = write_schema context schema head writer in
-                    W.object_field_pop writer
-                  | Computed | Computed_optional -> ())
-              in
-              write_fields rest tail
-          in
-          write_fields fields (encode v)
-        in
+        let () = write_fields context fields (encode v) writer in
         W.object_pop writer
       | Tuple { items; encode; decode = _ } ->
         let () = W.tuple_push writer in
@@ -315,14 +291,16 @@ module Make (Impl : IMPL) = struct
             | ItemEnd -> ()
             | Item { schema; rest } ->
               let (head :: tail) = v in
+              let () = W.tuple_item_push writer in
               let () = write_schema context schema head writer in
+              let () = W.tuple_item_pop writer in
               write_items rest tail
           in
           write_items items (encode v)
         in
         W.tuple_pop writer
       | String -> W.string v writer
-      | String_const _ -> ()
+      | String_const s -> W.string s writer
       | Time -> (
         match W.time with
         | `Generic -> W.float (Ptime.to_float_s v) writer
@@ -331,18 +309,130 @@ module Make (Impl : IMPL) = struct
         match W.time_local with
         | `Generic -> write_schema context time_local_pair_schema v writer
         | `Custom f -> f v writer)
-      | Union { cases; _ } ->
-        let rec search i = function
+      | Union { cases; key; _ } ->
+        let rec search = function
           | [] -> fail "no case match"
-          | (Schema.Case { encoder; schema; _ } as case) :: tail -> (
+          | Schema.Case { encoder; schema; name; _ } :: tail -> (
             match encoder v with
-            | Some v ->
-              let () = W.union_push i case writer in
-              let () = write_schema context schema v writer in
-              W.union_pop writer
-            | None -> search (i + 1) tail)
+            | None -> search tail
+            | Some case_v -> (
+              match key with
+              | None -> write_schema context schema case_v writer
+              | Some key ->
+                let rec write_with_key : type a. a Schema.t -> a -> unit =
+                 fun schema case_v ->
+                  match schema.descriptor with
+                  | Object { fields; encode; _ } ->
+                    let () = W.object_push writer in
+                    let () = W.object_field_push key writer in
+                    let () = W.string name writer in
+                    let () = W.object_field_pop writer in
+                    let () =
+                      write_fields context fields (encode case_v) writer
+                    in
+                    W.object_pop writer
+                  | Fixpoint s ->
+                    write_with_key
+                      { schema with descriptor = Lazy.force s }
+                      case_v
+                  | Map { encode; descriptor; _ } ->
+                    write_with_key (Schema.make descriptor) (encode case_v)
+                  | _ -> write_schema context schema case_v writer
+                in
+                write_with_key schema case_v))
         in
-        search 0 cases
+        search cases
+    and write_fields : type t.
+        E.decoding -> t Hlist.t Schema.fields -> t Hlist.t -> W.t -> unit =
+     fun context fields v writer ->
+      match fields with
+      | FieldEnd -> ()
+      | Field { field = { name; schema = fs; requirement; _ }; rest } ->
+        let (head :: tail) = v in
+        let () =
+          let rec write_inline : type a. a Schema.t -> a -> unit =
+           fun schema v ->
+            match schema.descriptor with
+            | Coding { f } -> write_inline { schema with descriptor = f None } v
+            | Fixpoint s ->
+              write_inline { schema with descriptor = Lazy.force s } v
+            | Ignore -> ()
+            | Map { encode; descriptor; _ } ->
+              write_inline (Schema.make descriptor) (encode v)
+            | Nullable inner -> (
+              match v with None -> () | Some v -> write_inline inner v)
+            | Object { fields = inner_fields; encode; _ } ->
+              write_fields context inner_fields (encode v) writer
+            | Union { cases; _ } ->
+              let rec search = function
+                | [] -> fail "no case match"
+                | Schema.Case { encoder; schema = case_schema; _ } :: rest -> (
+                  match encoder v with
+                  | None -> search rest
+                  | Some case_v -> write_inline case_schema case_v)
+              in
+              search cases
+            | _ ->
+              let () = W.object_field_push name writer in
+              let () = write_schema context schema v writer in
+              W.object_field_pop writer
+          in
+          match fs with
+          | Inline schema | Inline_try schema -> (
+            match requirement with
+            | Required -> write_inline schema head
+            | Default default ->
+              if Schema.compare schema head default <> 0 then
+                write_inline schema head
+            | Optional -> (
+              match head with
+              | None -> ()
+              | Some head -> write_inline schema head)
+            | Computed -> (
+              match head with
+              | None -> ()
+              | Some head -> write_inline schema head)
+            | Computed_optional -> (
+              match head with
+              | None | Some None -> ()
+              | Some (Some head) -> write_inline schema head))
+          | Outline schema -> (
+            match schema with
+            | { descriptor = Ignore; _ } -> ()
+            | schema -> (
+              match requirement with
+              | Default default ->
+                if Schema.compare schema head default <> 0 then
+                  let () = W.object_field_push name writer in
+                  let () = write_schema context schema head writer in
+                  W.object_field_pop writer
+              | Optional -> (
+                match head with
+                | None -> W.object_field_opt_none name writer
+                | Some head ->
+                  let () = W.object_field_opt_push name writer in
+                  let () = write_schema context schema head writer in
+                  W.object_field_opt_pop writer)
+              | Required ->
+                let () = W.object_field_push name writer in
+                let () = write_schema context schema head writer in
+                W.object_field_pop writer
+              | Computed -> (
+                match head with
+                | None -> ()
+                | Some head ->
+                  let () = W.object_field_push name writer in
+                  let () = write_schema context schema head writer in
+                  W.object_field_pop writer)
+              | Computed_optional -> (
+                match head with
+                | None | Some None -> ()
+                | Some (Some head) ->
+                  let () = W.object_field_push name writer in
+                  let () = write_schema context schema head writer in
+                  W.object_field_pop writer)))
+        in
+        write_fields context rest tail writer
     and write_schema : type t. E.decoding -> t Schema.t -> t writer =
      fun context schema ->
       write_descriptor { context with schema = schema.id } schema.descriptor
@@ -354,9 +444,12 @@ module Make (Impl : IMPL) = struct
     let () = write schema value output in
     Impl.Output.eof output
 
+  let to_buffer schema value buffer =
+    let output = Impl.Output.of_buffer buffer in
+    write schema value output
+
   let to_string schema value =
     let result = Buffer.create 4096 in
-    let output = Impl.Output.of_buffer result in
-    let _output = write schema value output in
+    let () = to_buffer schema value result in
     Buffer.contents result
 end
