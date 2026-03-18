@@ -22,7 +22,6 @@ depends: [
   "ezjsonm-windows" {>= "1.1.0"}
   "fmt"
   "fmt-windows"
-  "hmap"
   "hlist-windows" {>= "0.2.0" & < "0.3.0"}
   "hmap"
   "logs-windows"

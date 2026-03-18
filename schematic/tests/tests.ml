@@ -2215,6 +2215,56 @@ struct
               [%ezjsonm { a = 359; b = "---" }];
           ];
       }
+
+    (** A documented type for JSON schema *)
+    type documented = { value : int  (** The documented value field *) }
+    [@@deriving schema]
+
+    let documented_description =
+      test_schema "json-schema-metadata-documented" documented_schema
+        {|{
+          "additionalProperties" : false,
+          "properties" :
+          {
+            "value" :
+            {
+              "$schema" : "https://json-schema.org/draft/2019-09/schema",
+              "title" : "Value",
+              "description" : "The documented value field",
+              "type" : "integer"
+            }
+          },
+          "$id" : "#documented",
+          "$schema" : "https://json-schema.org/draft/2019-09/schema",
+          "description" : "A documented type for JSON schema",
+          "type" : "object"
+      }|}
+
+    (** Type with "quotes" and a backslash \ *)
+    type special_chars = {
+      field : int;  (** Field with "quotes" and a backslash \ *)
+    }
+    [@@deriving schema]
+
+    let special_chars_description =
+      test_schema "json-schema-metadata-special-chars" special_chars_schema
+        {|{
+          "additionalProperties" : false,
+          "properties" :
+          {
+            "field" :
+            {
+              "$schema" : "https://json-schema.org/draft/2019-09/schema",
+              "title" : "Field",
+              "description" : "Field with \"quotes\" and a backslash \\",
+              "type" : "integer"
+            }
+          },
+          "$id" : "#special_chars",
+          "$schema" : "https://json-schema.org/draft/2019-09/schema",
+          "description" : "Type with \"quotes\" and a backslash \\",
+          "type" : "object"
+      }|}
   end
 
   module Comparison = struct
@@ -3094,6 +3144,8 @@ Union {
             time;
             Metadata.description;
             Metadata.default;
+            Metadata.documented_description;
+            Metadata.special_chars_description;
             failure;
             optional_inline;
             keyed;

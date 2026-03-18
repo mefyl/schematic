@@ -22,7 +22,6 @@ depends: [
   "ezjsonm-ios" {>= "1.1.0"}
   "fmt"
   "fmt-ios"
-  "hmap"
   "hlist-ios" {>= "0.2.0" & < "0.3.0"}
   "hmap"
   "logs-ios"
