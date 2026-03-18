@@ -22,7 +22,6 @@ depends: [
   "ezjsonm-macos" {>= "1.1.0"}
   "fmt"
   "fmt-macos"
-  "hmap"
   "hlist-macos" {>= "0.2.0" & < "0.3.0"}
   "hmap"
   "logs-macos"
