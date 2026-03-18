@@ -2241,7 +2241,9 @@ struct
       }|}
 
     (** Type with "quotes" and a backslash \ *)
-    type special_chars = { field : int  (** Field with "quotes" and a backslash \ *) }
+    type special_chars = {
+      field : int;  (** Field with "quotes" and a backslash \ *)
+    }
     [@@deriving schema]
 
     let special_chars_description =
