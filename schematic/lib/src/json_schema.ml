@@ -35,15 +35,24 @@ let of_schema schema =
     make ~core
   in
   let id_name s = "#" ^ s in
+  let with_documentation documentation schema =
+    match documentation with
+    | None -> schema
+    | Some doc ->
+      { schema with metadata = { schema.metadata with description = Some doc } }
+  in
   let rec of_schema : type u. ids -> u Schema.t -> t * ids =
    fun marks -> function
-     | { id = None; descriptor; _ } -> of_descriptor marks descriptor
+     | { id = None; documentation; descriptor; _ } ->
+       let schema, marks = of_descriptor marks descriptor in
+       (with_documentation documentation schema, marks)
      | { id = Some id; _ } when Set.mem marks id ->
        (make ~core:(make_core ~ref:(id_name id) ()) (), marks)
-     | { id = Some id; descriptor; _ } ->
+     | { id = Some id; documentation; descriptor; _ } ->
        let marks = Set.add marks id in
        let schema, marks = of_descriptor marks descriptor in
-       ( { schema with core = { schema.core with id = Some (id_name id) } },
+       ( with_documentation documentation
+           { schema with core = { schema.core with id = Some (id_name id) } },
          marks )
   and of_descriptor : type u. ids -> u Schema.descriptor -> t * ids =
    fun marks -> function

@@ -2215,6 +2215,30 @@ struct
               [%ezjsonm { a = 359; b = "---" }];
           ];
       }
+
+    (** A documented type for JSON schema *)
+    type documented = { value : int  (** The documented value field *) }
+    [@@deriving schema]
+
+    let documented_description =
+      test_schema "json-schema-metadata-documented" documented_schema
+        {|{
+          "additionalProperties" : false,
+          "properties" :
+          {
+            "value" :
+            {
+              "$schema" : "https://json-schema.org/draft/2019-09/schema",
+              "title" : "Value",
+              "description" : "The documented value field",
+              "type" : "integer"
+            }
+          },
+          "$id" : "#documented",
+          "$schema" : "https://json-schema.org/draft/2019-09/schema",
+          "description" : "A documented type for JSON schema",
+          "type" : "object"
+      }|}
   end
 
   module Comparison = struct
@@ -3094,6 +3118,7 @@ Union {
             time;
             Metadata.description;
             Metadata.default;
+            Metadata.documented_description;
             failure;
             optional_inline;
             keyed;
