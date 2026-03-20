@@ -441,7 +441,8 @@ module Make (Impl : IMPL) = struct
 
   let to_bytes schema value writer =
     let output = Impl.Output.of_bytes_writer writer in
-    write schema value output
+    let () = write schema value output in
+    Impl.Output.eof output
 
   let to_channel schema value channel =
     to_bytes schema value (Bytesrw.Bytes.Writer.of_out_channel channel)

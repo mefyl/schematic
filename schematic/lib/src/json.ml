@@ -235,47 +235,68 @@ module Streaming_impl = struct
 
   module Output = struct
     type t = {
-      mutable first_item : bool list;
+      buffer : Bytes.t;
+      encoder : Jsonm.encoder;
       writer : Bytesrw.Bytes.Writer.t;
     }
 
-    let of_bytes_writer writer = { first_item = []; writer }
-    let put t s = Bytesrw.Bytes.Writer.write_string t.writer s
-    let of_json f v t = put t @@ to_string (f v)
-    let bool = of_json Ezjsonm.bool
-    let string = of_json Ezjsonm.string
+    let of_bytes_writer writer =
+      let output =
+        {
+          buffer = Bytes.create (Bytesrw.Bytes.Writer.slice_length writer);
+          encoder = Jsonm.encoder `Manual;
+          writer;
+        }
+      in
+      let () =
+        Jsonm.Manual.dst output.encoder output.buffer 0
+          (Bytes.length output.buffer)
+      in
+      output
+
+    let flush output =
+      let length = Bytes.length output.buffer in
+      let () =
+        Bytesrw.Bytes.Writer.write output.writer
+        @@ Bytesrw.Bytes.Slice.make output.buffer ~first:0
+             ~length:(length - Jsonm.Manual.dst_rem output.encoder)
+      in
+      Jsonm.Manual.dst output.encoder output.buffer 0 length
+
+    let put' output k =
+      let rec encode t =
+        match Jsonm.encode output.encoder t with
+        | `Ok -> ()
+        | `Partial ->
+          let () = flush output in
+          encode `Await
+      in
+      encode k
+
+    let put output lexeme = put' output (`Lexeme lexeme)
+    let bool bool output = put output (`Bool bool)
+    let string string output = put output (`String string)
     let date = `Generic
-    let eof _ = ()
-    let float = of_json Ezjsonm.float
-    let int = of_json Ezjsonm.int
-    let int64 = of_json Ezjsonm.int64
 
-    let container_push c t =
-      t.first_item <- true :: t.first_item;
-      put t c
+    let eof output =
+      let () = put' output `End in
+      Bytesrw.Bytes.Writer.write_eod output.writer
 
-    let item_push t =
-      match t.first_item with
-      | true :: tail -> t.first_item <- false :: tail
-      | _ -> put t ","
-
-    let list_push = container_push "["
-    let list_pop t = put t "]"
-    let list_item_push = item_push
+    let float float output = put output (`Float float)
+    let int int output = float (Float.of_int int) output
+    let int64 int64 output = float (Float.of_int64 int64) output
+    let list_push output = put output `As
+    let list_pop output = put output `Ae
+    let list_item_push _ = ()
     let list_item_pop _ = ()
-    let object_push = container_push "{"
-    let object_pop t = put t "}"
-
-    let object_field_push name t =
-      item_push t;
-      string name t;
-      put t ":"
-
+    let object_push output = put output `Os
+    let object_pop output = put output `Oe
+    let object_field_push name output = put output (`Name name)
     let object_field_pop _ = ()
     let object_field_opt_push = object_field_push
     let object_field_opt_pop = object_field_pop
     let object_field_opt_none _ _ = ()
-    let option_none t = put t "null"
+    let option_none output = put output `Null
 
     let json =
       let rec json v t =
