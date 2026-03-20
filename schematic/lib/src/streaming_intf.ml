@@ -27,6 +27,9 @@ exception Content of Error.Decoding.t
 exception Channel of string
 
 module type IMPL = sig
+  type t
+
+  val coding : t Coding.coding
   val name : string
 
   module Input : sig

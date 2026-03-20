@@ -221,7 +221,7 @@ module Make (Impl : IMPL) = struct
         (* FIXME: support any *)
         failf "any %s descriptor not supported when streaming" Any.name
       | Bool -> W.bool v writer
-      | Coding { f } -> write_descriptor context (f None) v writer
+      | Coding { f } -> write_descriptor context (f (Some Impl.coding)) v writer
       | Date -> (
         match W.date with
         | `Generic -> write_schema context date_tuple_schema v writer
@@ -353,7 +353,8 @@ module Make (Impl : IMPL) = struct
           let rec write_inline : type a. a Schema.t -> a -> unit =
            fun schema v ->
             match schema.descriptor with
-            | Coding { f } -> write_inline { schema with descriptor = f None } v
+            | Coding { f } ->
+              write_inline { schema with descriptor = f (Some Impl.coding) } v
             | Fixpoint s ->
               write_inline { schema with descriptor = Lazy.force s } v
             | Ignore -> ()

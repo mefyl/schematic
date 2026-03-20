@@ -160,6 +160,9 @@ include T
 module String = Coding.Make_string (T)
 
 module Streaming_impl = struct
+  type t = Ezjsonm.value
+
+  let coding = Coding
   let name = Impl.name
 
   module Input = struct

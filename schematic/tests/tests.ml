@@ -270,6 +270,49 @@ struct
         ];
     }
 
+  (* Coding *)
+
+  let coding =
+    {
+      name = "coding descriptors";
+      speed = `Quick;
+      tests =
+        [
+          Test
+            {
+              name = "json";
+              here = [%here];
+              decoded = None;
+              schema =
+                Schema.make
+                @@ Coding
+                     {
+                       f =
+                         (fun (type coding)
+                           (coding : coding Schematic.Coding.coding option)
+                         ->
+                           match coding with
+                           | Some Schematic.Json.Coding ->
+                             Schema.Map
+                               {
+                                 encode = (fun i -> i + 1);
+                                 decode = (fun i -> Result.Ok (i - 1));
+                                 descriptor = Schema.Int;
+                               }
+                           | _ -> Int);
+                     };
+              kotlin_class_name = None;
+              is_kotlin_roundtrip_enabled = false;
+              swift_class_name = None;
+              is_swift_roundtrip_enabled = false;
+              value = 2992;
+              expected = `Float 2993.0;
+              value_testable = Alcotest.int;
+            };
+        ];
+      additional_test = None;
+    }
+
   (* Optionals *)
 
   module Optionals = struct
@@ -3056,6 +3099,7 @@ Union {
             atom_float;
             atom_string;
             atom_date;
+            coding;
             Optionals.options;
             Optionals.nullable_option;
             Optionals.default_option;
