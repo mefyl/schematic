@@ -1855,7 +1855,6 @@ struct
       let inline_nested_default =
         Alcotest.testable pp_inline_nested_default equal_inline_nested_default
       in
-
       let mk_test name value expected =
         Test
           {
@@ -1884,6 +1883,41 @@ struct
             mk_test "default inline empty"
               { inline_nested = { inlined = None } }
               (`O []);
+          ];
+      }
+
+    let inline_keyed =
+      let module T = struct
+        type t = { keyed : Polymorphic_variant.keyed [@schematic.inline] }
+        [@@deriving eq, schema, show]
+      end in
+      let test ~here name value expected =
+        Test
+          {
+            name;
+            here;
+            decoded = None;
+            value_testable = (module T);
+            schema = T.schema;
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled = true;
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = true;
+          }
+      in
+      {
+        name = "inline keyed";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            test ~here:[%here] "no payload" { keyed = `Left }
+              [%ezjsonm { position = "left" }];
+            test ~here:[%here] "payload"
+              { keyed = `Center { stable = true } }
+              [%ezjsonm { position = "center"; stable = true }];
           ];
       }
   end
@@ -3135,6 +3169,7 @@ Union {
             Inline.inline_parametric;
             Inline.inline_nested_optional;
             Inline.inline_nested_default;
+            Inline.inline_keyed;
             time;
             Metadata.description;
             Metadata.default;

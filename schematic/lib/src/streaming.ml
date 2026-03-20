@@ -364,13 +364,23 @@ module Make (Impl : IMPL) = struct
               match v with None -> () | Some v -> write_inline inner v)
             | Object { fields = inner_fields; encode; _ } ->
               write_fields context inner_fields (encode v) writer
-            | Union { cases; _ } ->
+            | Union { cases; key; _ } ->
               let rec search = function
                 | [] -> fail "no case match"
-                | Schema.Case { encoder; schema = case_schema; _ } :: rest -> (
+                | Schema.Case { encoder; name; schema = case_schema; _ } :: rest
+                  -> (
                   match encoder v with
                   | None -> search rest
-                  | Some case_v -> write_inline case_schema case_v)
+                  | Some case_v ->
+                    let () =
+                      match key with
+                      | Some key ->
+                        let () = W.object_field_push key writer in
+                        let () = W.string name writer in
+                        W.object_field_pop writer
+                      | None -> ()
+                    in
+                    write_inline case_schema case_v)
               in
               search cases
             | _ ->
