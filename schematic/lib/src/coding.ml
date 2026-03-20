@@ -2,7 +2,29 @@ module E = Error
 open Base
 include Coding_intf
 
-module Message = struct
+(** Lazily formatted messages.
+
+    Conceptually similar to [Fmt.str], but interpolated only when and if needed.
+
+    FIXME: Promote to acid sometime. *)
+module Message : sig
+  type t
+
+  (** Interpolation arguments for a formatted message. *)
+  type ('f, 'res) args =
+    | [] : ('res, 'res) args
+    | ( :: ) : ('arg * ('rest, 'res) args) -> ('arg -> 'rest, 'res) args
+
+  (** [empty] is the message interpolating to [""]. *)
+  val empty : t
+
+  (** [make fmt [arg1; arg2; ...]] is the message that interpolates to
+      [Fmt.str fmt arg1 arg2 ...] *)
+  val make : ('a, Formatter.t, unit, string) format4 -> ('a, string) args -> t
+
+  (** [to_string t] is the interpolation of t. *)
+  val to_string : t -> string
+end = struct
   type ('f, 'res) args =
     | [] : ('res, 'res) args
     | ( :: ) : ('arg * ('rest, 'res) args) -> ('arg -> 'rest, 'res) args
