@@ -30,9 +30,9 @@ module Errors = struct
     let res =
       Schematic_jsoo.Jsoo.decode either_opt_schema
         (Js_of_ocaml.Js.Unsafe.inject
-           (object%js
-              val v = Js_of_ocaml.Js.undefined
-           end))
+           object%js
+             val v = Js_of_ocaml.Js.undefined
+           end)
     in
     Alcotest.(
       check ~here:[%here] (result pass reject)

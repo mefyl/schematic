@@ -100,10 +100,10 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
     in
     unroll descriptor
     |> List.find ~f:(fun expected ->
-           Option.is_none
-           @@ List.find
-                ~f:(fun f -> not (List.Assoc.mem ~equal:String.equal fields f))
-                expected)
+        Option.is_none
+        @@ List.find
+             ~f:(fun f -> not (List.Assoc.mem ~equal:String.equal fields f))
+             expected)
     |> Option.is_none
 
   let decode schema =

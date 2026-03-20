@@ -236,29 +236,12 @@ module Streaming_impl = struct
   module Output = struct
     type t = {
       mutable first_item : bool list;
-      put : string -> unit;
-      backend : backend;
+      writer : Bytesrw.Bytes.Writer.t;
     }
 
-    and backend =
-      | Channel of Stdlib.out_channel
-      | Buffer of Buffer.t
-
-    let of_channel channel =
-      {
-        first_item = [];
-        put = Stdlib.output_string channel;
-        backend = Channel channel;
-      }
-
-    let of_buffer buffer =
-      {
-        first_item = [];
-        put = Buffer.add_string buffer;
-        backend = Buffer buffer;
-      }
-
-    let of_json f v t = t.put @@ to_string (f v)
+    let of_bytes_writer writer = { first_item = []; writer }
+    let put t s = Bytesrw.Bytes.Writer.write_string t.writer s
+    let of_json f v t = put t @@ to_string (f v)
     let bool = of_json Ezjsonm.bool
     let string = of_json Ezjsonm.string
     let date = `Generic
@@ -267,43 +250,57 @@ module Streaming_impl = struct
     let int = of_json Ezjsonm.int
     let int64 = of_json Ezjsonm.int64
 
-    let json =
-      let json json writer =
-        let dst =
-          match writer.backend with
-          | Buffer buffer -> `Buffer buffer
-          | Channel channel -> `Channel channel
-        in
-        Ezjsonm.value_to_dst ~minify:true dst json
-      in
-      `Custom json
-
     let container_push c t =
       t.first_item <- true :: t.first_item;
-      t.put c
+      put t c
 
     let item_push t =
       match t.first_item with
       | true :: tail -> t.first_item <- false :: tail
-      | _ -> t.put ","
+      | _ -> put t ","
 
     let list_push = container_push "["
-    let list_pop t = t.put "]"
+    let list_pop t = put t "]"
     let list_item_push = item_push
     let list_item_pop _ = ()
     let object_push = container_push "{"
-    let object_pop t = t.put "}"
+    let object_pop t = put t "}"
 
     let object_field_push name t =
       item_push t;
       string name t;
-      t.put ":"
+      put t ":"
 
     let object_field_pop _ = ()
     let object_field_opt_push = object_field_push
     let object_field_opt_pop = object_field_pop
     let object_field_opt_none _ _ = ()
-    let option_none t = t.put "null"
+    let option_none t = put t "null"
+
+    let json =
+      let rec json v t =
+        match v with
+        | `Null -> option_none t
+        | `Bool b -> bool b t
+        | `Float f -> float f t
+        | `String s -> string s t
+        | `A items ->
+          list_push t;
+          List.iter items ~f:(fun v ->
+              list_item_push t;
+              json v t;
+              list_item_pop t);
+          list_pop t
+        | `O fields ->
+          object_push t;
+          List.iter fields ~f:(fun (name, v) ->
+              object_field_push name t;
+              json v t;
+              object_field_pop t);
+          object_pop t
+      in
+      `Custom json
+
     let option_push _ = ()
     let option_pop _ = ()
     let time = `Custom (fun t writer -> string (Ptime.to_rfc3339 t) writer)

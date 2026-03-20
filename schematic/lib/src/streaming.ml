@@ -252,9 +252,9 @@ module Make (Impl : IMPL) = struct
         let () =
           deconstruct v
           |> Base.Sequence.iter ~f:(fun v ->
-                 let () = W.list_item_push writer in
-                 let () = write_schema context item v writer in
-                 W.list_item_pop writer)
+              let () = W.list_item_push writer in
+              let () = write_schema context item v writer in
+              W.list_item_pop writer)
         in
         W.list_pop writer
       | Map { encode; descriptor; _ } ->
@@ -273,9 +273,9 @@ module Make (Impl : IMPL) = struct
           v
           |> deconstruct
           |> Base.Sequence.iter ~f:(fun (key, data) ->
-                 let () = W.object_field_push key writer in
-                 let () = write_schema context item data writer in
-                 W.object_field_pop writer)
+              let () = W.object_field_push key writer in
+              let () = write_schema context item data writer in
+              W.object_field_pop writer)
         in
         W.object_pop writer
       | Object { fields; encode; _ } ->
@@ -439,17 +439,18 @@ module Make (Impl : IMPL) = struct
     in
     write_schema { schema = None; path = []; reason = "" } schema
 
-  let to_channel schema value channel =
-    let output = Impl.Output.of_channel channel in
-    let () = write schema value output in
-    Impl.Output.eof output
-
-  let to_buffer schema value buffer =
-    let output = Impl.Output.of_buffer buffer in
+  let to_bytes schema value writer =
+    let output = Impl.Output.of_bytes_writer writer in
     write schema value output
 
+  let to_channel schema value channel =
+    to_bytes schema value (Bytesrw.Bytes.Writer.of_out_channel channel)
+
+  let to_buffer schema value buffer =
+    to_bytes schema value (Bytesrw.Bytes.Writer.of_buffer buffer)
+
   let to_string schema value =
-    let result = Buffer.create 4096 in
-    let () = to_buffer schema value result in
-    Buffer.contents result
+    let buf = Buffer.create 4096 in
+    let () = to_buffer schema value buf in
+    Buffer.contents buf
 end

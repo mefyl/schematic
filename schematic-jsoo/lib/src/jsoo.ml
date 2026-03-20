@@ -65,7 +65,7 @@ module Impl : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
   let of_date = `Custom js_of_date
 
   let of_fields fields =
-    let res = Js.Unsafe.coerce (object%js end) in
+    let res = Js.Unsafe.coerce object%js end in
     let () =
       let f (field, v) = Js.Unsafe.set res (Js.string field) v in
       List.iter ~f fields

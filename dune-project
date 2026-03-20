@@ -41,6 +41,7 @@
    (>= v0.15.0))
   (base64
    (>= 3.5.0))
+  bytesrw
   (ezjsonm
    (>= 1.1.0))
   fmt
@@ -147,3 +148,20 @@
   ppx_here
   (schematic
    (= :version))))
+
+; Work around a concurrency bug with ocamlfind + dune pkg until it's fixed
+; upstream.
+
+; File "dune.lock/bytesrw.0.3.0.pkg", line 8, characters 6-11:
+; 8 |       ocaml
+;           ^^^^^
+; Error: Logs for package bytesrw
+; Warning: The library directory where ocamlbuild was originally installed (/builds/routine/schematic/_build/.sandbox/a085ee08f9d502a0339365e7db1f402b/_private/default/.pkg/ocamlbuild.0.16.1+dune-6439ba2990d98dd44846aa8272d56e5b/target/lib/ocamlbuild) either no longer exists, or does not contain a copy of the ocamlbuild library. Guessing that the correct library directory is /builds/routine/schematic/_build/_private/default/.pkg/ocamlbuild.0.16.1+dune-6439ba2990d98dd44846aa8272d56e5b/target/lib/ocamlbuild because a copy of the ocamlbuild library exists at that location, and because it is located at the expected path relative to the current ocamlbuild executable. This can happen if ocamlbuild's files are moved from the location where they were originally installed.pkg.ml: [ERROR] cmd ['ocamlbuild' '-use-ocamlfind' '-classic-display' '-j' '4' '-tag' 'debug'
+;      '-build-dir' '_build' 'pkg.otarget']: exited with 10
+
+(pin
+ (url
+  git+https://github.com/dbuenzli/bytesrw#47bdebcbc527c264572fb5fbcc5ca606e67bcd32)
+ (package
+  (name bytesrw)
+  (version 0.3.0)))

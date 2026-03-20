@@ -41,7 +41,7 @@ module Tests = Test_utils.Tests.Make (struct
         schema.id
         |> Option.first_some swift_class_name
         |> Option.map ~f:(fun schema_id ->
-               Schematic.Swift.to_type_name schema_id)
+            Schematic.Swift.to_type_name schema_id)
         |> Option.value_exn ~here
       in
       let json_sent = Schematic.Swift.to_json schema value in

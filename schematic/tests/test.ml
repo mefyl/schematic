@@ -65,14 +65,14 @@ let streaming_lazy_sequence () =
         Base.Sequence.(
           of_list [ 0; 1; 2; 3; 4 ]
           |> map ~f:(fun i ->
-                 let length = Buffer.length buffer in
-                 let () =
-                   Alcotest.(check bool)
-                     "buffer is filled as we lazily process the sequence" true
-                     (length > !current_length)
-                 in
-                 let () = current_length := length in
-                 i));
+              let length = Buffer.length buffer in
+              let () =
+                Alcotest.(check bool)
+                  "buffer is filled as we lazily process the sequence" true
+                  (length > !current_length)
+              in
+              let () = current_length := length in
+              i));
     }
     buffer
 

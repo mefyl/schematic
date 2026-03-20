@@ -302,13 +302,13 @@ let add ~inside ~jsoo ~version =
         in
         if versioned then
           [%expr
-            begin [@warning "-unused-open"]
+            begin[@warning "-unused-open"]
               let open Schematic.Schemas in
               fun __schematic_version -> [%e schema]
             end]
         else
           [%expr
-            begin [@warning "-unused-open"]
+            begin[@warning "-unused-open"]
               let open Schematic.Schemas in
               let __schematic_version _ = None in
               [%e schema]
