@@ -18,9 +18,15 @@ module Message : sig
   (** [empty] is the message interpolating to [""]. *)
   val empty : t
 
-  (** [make fmt [arg1; arg2; ...]] is the message that interpolates to
-      [Fmt.str fmt arg1 arg2 ...] *)
-  val make : ('a, Formatter.t, unit, string) format4 -> ('a, string) args -> t
+  (** [fmt f [arg1; arg2; ...]] is the message that interpolates to
+      [Fmt.str f arg1 arg2 ...]. *)
+  val fmt : ('a, Formatter.t, unit, string) format4 -> ('a, string) args -> t
+
+  (** [of_string s] is the message that interpolates to [s]. *)
+  val of_string : string -> t
+
+  (** [of_lazy l] is the message that interpolates to [Lazy.force l]. *)
+  val of_lazy : string Lazy.t -> t
 
   (** [to_string t] is the interpolation of t. *)
   val to_string : t -> string
@@ -33,11 +39,19 @@ end = struct
    fun f args -> match args with [] -> f | head :: tail -> apply (f head) tail
 
   type t =
-    | V : ('f, Formatter.t, unit, string) format4 * ('f, string) args -> t
+    | Fmt : ('f, Formatter.t, unit, string) format4 * ('f, string) args -> t
+    | Lazy : string Lazy.t -> t
+    | String : string -> t
 
-  let empty = V ("", [])
-  let make fmt args = V (fmt, args)
-  let to_string (V (fmt, args)) = apply (Fmt.str fmt) args
+  let empty = String ""
+  let fmt fmt args = Fmt (fmt, args)
+  let of_lazy e = Lazy e
+  let of_string s = String s
+
+  let to_string = function
+    | Fmt (fmt, args) -> apply (Fmt.str fmt) args
+    | Lazy l -> Lazy.force l
+    | String s -> s
 end
 
 let map_results ~f l =
@@ -55,10 +69,10 @@ module Error = struct
     reason : Message.t;
   }
 
-  let make context string =
-    { context with reason = Message.make "%s" [ string ] }
+  let make context string = { context with reason = Message.of_string string }
 
-  let fmt context fmt args = { context with reason = Message.make fmt args }
+  let fmt context fmt args =
+    Result.Error { context with reason = Message.fmt fmt args }
 
   let to_decoding { path; schema; reason } : E.decoding =
     { path; schema; reason = Message.to_string reason }
@@ -107,12 +121,10 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
     | None -> (
       match Coding.to_string v with
       | Some string ->
-        Result.fail
-        @@ Error.fmt context "expected %s, got %S" [ expected; string ]
+        Error.fmt context "expected %s, got %S" [ expected; string ]
       | None ->
-        Result.fail
-        @@ Error.fmt context "expected %s, got %s"
-             [ expected; Coding.type_name v ])
+        Error.fmt context "expected %s, got %s" [ expected; Coding.type_name v ]
+      )
 
   let key_get context o f =
     match Coding.key_get with
@@ -200,14 +212,12 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
         | Required -> (
           function
           | Some v -> decode schema v
-          | None ->
-            Result.fail
-            @@ Error.fmt context "missing required field %S" [ field ])
+          | None -> Error.fmt context "missing required field %S" [ field ])
       and decode_descriptor : type t.
           Error.t -> t Schema.descriptor -> Coding.t -> (t, Error.t) Result.t =
        fun context schema v ->
         let type_error expected res = type_error context expected v res
-        and error fmt args = Result.Error (Error.fmt context fmt args)
+        and error fmt args = Error.fmt context fmt args
         and ( >>= ) = Result.( >>= ) in
         match schema with
         | Any (module Any) -> Any.of_any Coding.coding v |> type_error Any.name
@@ -341,8 +351,10 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
               decode_schema context schema hd >>= fun hd ->
               decode_tuple rest tl >>= fun tl -> Result.return Hlist.(hd :: tl)
             | ItemEnd, [] -> Result.return Hlist.[]
-            | Item _, [] -> error "not enough tuple elements" []
-            | ItemEnd, _ -> error "too many tuple elements" []
+            | Item _, [] ->
+              Result.Error (Error.make context "not enough tuple elements")
+            | ItemEnd, _ ->
+              Result.Error (Error.make context "too many tuple elements")
           in
           decode_tuple items v |> Result.map ~f:t_decode
         | Union { cases; key; _ } -> (
