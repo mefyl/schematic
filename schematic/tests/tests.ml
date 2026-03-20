@@ -270,6 +270,49 @@ struct
         ];
     }
 
+  (* Coding *)
+
+  let coding =
+    {
+      name = "coding descriptors";
+      speed = `Quick;
+      tests =
+        [
+          Test
+            {
+              name = "json";
+              here = [%here];
+              decoded = None;
+              schema =
+                Schema.make
+                @@ Coding
+                     {
+                       f =
+                         (fun (type coding)
+                           (coding : coding Schematic.Coding.coding option)
+                         ->
+                           match coding with
+                           | Some Schematic.Json.Coding ->
+                             Schema.Map
+                               {
+                                 encode = (fun i -> i + 1);
+                                 decode = (fun i -> Result.Ok (i - 1));
+                                 descriptor = Schema.Int;
+                               }
+                           | _ -> Int);
+                     };
+              kotlin_class_name = None;
+              is_kotlin_roundtrip_enabled = false;
+              swift_class_name = None;
+              is_swift_roundtrip_enabled = false;
+              value = 2992;
+              expected = `Float 2993.0;
+              value_testable = Alcotest.int;
+            };
+        ];
+      additional_test = None;
+    }
+
   (* Optionals *)
 
   module Optionals = struct
@@ -1812,7 +1855,6 @@ struct
       let inline_nested_default =
         Alcotest.testable pp_inline_nested_default equal_inline_nested_default
       in
-
       let mk_test name value expected =
         Test
           {
@@ -1841,6 +1883,41 @@ struct
             mk_test "default inline empty"
               { inline_nested = { inlined = None } }
               (`O []);
+          ];
+      }
+
+    let inline_keyed =
+      let module T = struct
+        type t = { keyed : Polymorphic_variant.keyed [@schematic.inline] }
+        [@@deriving eq, schema, show]
+      end in
+      let test ~here name value expected =
+        Test
+          {
+            name;
+            here;
+            decoded = None;
+            value_testable = (module T);
+            schema = T.schema;
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled = true;
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = true;
+          }
+      in
+      {
+        name = "inline keyed";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            test ~here:[%here] "no payload" { keyed = `Left }
+              [%ezjsonm { position = "left" }];
+            test ~here:[%here] "payload"
+              { keyed = `Center { stable = true } }
+              [%ezjsonm { position = "center"; stable = true }];
           ];
       }
   end
@@ -3106,6 +3183,7 @@ Union {
             atom_float;
             atom_string;
             atom_date;
+            coding;
             Optionals.options;
             Optionals.nullable_option;
             Optionals.default_option;
@@ -3141,6 +3219,7 @@ Union {
             Inline.inline_parametric;
             Inline.inline_nested_optional;
             Inline.inline_nested_default;
+            Inline.inline_keyed;
             time;
             Metadata.description;
             Metadata.default;

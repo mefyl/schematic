@@ -221,7 +221,7 @@ module Make (Impl : IMPL) = struct
         (* FIXME: support any *)
         failf "any %s descriptor not supported when streaming" Any.name
       | Bool -> W.bool v writer
-      | Coding { f } -> write_descriptor context (f None) v writer
+      | Coding { f } -> write_descriptor context (f (Some Impl.coding)) v writer
       | Date -> (
         match W.date with
         | `Generic -> write_schema context date_tuple_schema v writer
@@ -353,7 +353,8 @@ module Make (Impl : IMPL) = struct
           let rec write_inline : type a. a Schema.t -> a -> unit =
            fun schema v ->
             match schema.descriptor with
-            | Coding { f } -> write_inline { schema with descriptor = f None } v
+            | Coding { f } ->
+              write_inline { schema with descriptor = f (Some Impl.coding) } v
             | Fixpoint s ->
               write_inline { schema with descriptor = Lazy.force s } v
             | Ignore -> ()
@@ -363,13 +364,23 @@ module Make (Impl : IMPL) = struct
               match v with None -> () | Some v -> write_inline inner v)
             | Object { fields = inner_fields; encode; _ } ->
               write_fields context inner_fields (encode v) writer
-            | Union { cases; _ } ->
+            | Union { cases; key; _ } ->
               let rec search = function
                 | [] -> fail "no case match"
-                | Schema.Case { encoder; schema = case_schema; _ } :: rest -> (
+                | Schema.Case { encoder; name; schema = case_schema; _ } :: rest
+                  -> (
                   match encoder v with
                   | None -> search rest
-                  | Some case_v -> write_inline case_schema case_v)
+                  | Some case_v ->
+                    let () =
+                      match key with
+                      | Some key ->
+                        let () = W.object_field_push key writer in
+                        let () = W.string name writer in
+                        W.object_field_pop writer
+                      | None -> ()
+                    in
+                    write_inline case_schema case_v)
               in
               search cases
             | _ ->
