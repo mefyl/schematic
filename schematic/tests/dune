@@ -56,6 +56,22 @@
  (libraries alcotest base fmt hlist schematic test_utils))
 
 (executable
+ (name json_test_suite)
+ (modules json_test_suite)
+ (libraries alcotest ezjsonm schematic))
+
+(rule
+ (alias runtest)
+ (package schematic)
+ (deps
+  (source_tree json-test-suite))
+ (action
+  (setenv
+   JSON_TEST_SUITE_DIR
+   %{project_root}/schematic/tests/json-test-suite
+   (run %{dep:json_test_suite.exe}))))
+
+(executable
  (name generate_documentation)
  (modules generate_documentation)
  (preprocess
