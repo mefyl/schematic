@@ -1,5 +1,5 @@
 open Base
-include Json_intf
+include Json_coding_intf
 
 let schema = Schema.make Json
 let schema_versioned (_ : Schema.version) = schema
