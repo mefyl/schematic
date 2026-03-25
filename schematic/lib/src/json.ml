@@ -100,13 +100,9 @@ end
 module Make (Json_impl : Impl) = struct
   include Coding.Make (Impl)
 
-  let from_channel c =
-    match Ezjsonm.value_from_channel c with
-    | v -> Result.return v
-    | exception Ezjsonm.Parse_error (_, msg) -> Result.fail msg
-
   let content_type = "application/json"
   let of_string s = Json_impl.of_string s
+  let from_channel c = of_string (In_channel.input_all c)
   let to_channel chan t = Ezjsonm.value_to_channel ~minify:true chan t
   let to_string t = Json_impl.to_string t
   let pp = pp
@@ -148,9 +144,59 @@ end
 
 module Impl_ezjsonm = struct
   let of_string s =
-    match Ezjsonm.value_from_string s with
-    | v -> Result.return v
-    | exception Ezjsonm.Parse_error (_, msg) -> Result.fail msg
+    let decoder = Json_scanner.of_string s
+    and parse scanner =
+      let exception Abort of string in
+      let module Stack = struct
+        type t =
+          | In_array of Ezjsonm.value list * t
+          | In_object of string * (string * Ezjsonm.value) list * t
+          | Empty
+      end in
+      let open Json_scanner in
+      let dec () = scan scanner in
+      let rec value l stack =
+        match l with
+        | Object_start -> obj [] stack
+        | Array_start -> arr [] stack
+        | Null -> continue `Null stack
+        | Bool b -> continue (`Bool b) stack
+        | Float f -> continue (`Float f) stack
+        | String s -> continue (`String s) stack
+        | token -> raise (Abort (Fmt.str "unexpected %a" pp_token token))
+      and arr so_far stack =
+        match dec () with
+        | Array_end -> continue (`A (List.rev so_far)) stack
+        | l ->
+          let stack = Stack.In_array (so_far, stack) in
+          value l stack
+      and obj so_far stack =
+        match dec () with
+        | Object_end -> continue (`O (List.rev so_far)) stack
+        | Name n ->
+          let stack = Stack.In_object (n, so_far, stack) in
+          value (dec ()) stack
+        | token -> raise (Abort (Fmt.str "unexpected %a" pp_token token))
+      and continue v stack =
+        match stack with
+        | Stack.In_array (vs, stack) ->
+          let so_far = v :: vs in
+          arr so_far stack
+        | Stack.In_object (n, ms, stack) ->
+          let so_far = (n, v) :: ms in
+          obj so_far stack
+        | Stack.Empty -> (
+          match dec () with
+          | End -> v
+          | token -> raise (Abort (Fmt.str "unexpected %a" pp_token token)))
+      in
+      match value (dec ()) Empty with
+      | value -> Result.Ok value
+      | exception Abort error -> Error error
+      | exception Json_scanner.Error.Parse_error error ->
+        Error (Fmt.str "%a" Json_scanner.Error.pp error)
+    in
+    parse decoder
 
   let to_string t = Ezjsonm.value_to_string ~minify:true t
 end
