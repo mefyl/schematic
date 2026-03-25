@@ -163,7 +163,7 @@ module Impl_ezjsonm = struct
         | Bool b -> continue (`Bool b) stack
         | Float f -> continue (`Float f) stack
         | String s -> continue (`String s) stack
-        | _ -> raise (Abort "FIXME")
+        | token -> raise (Abort (Fmt.str "unexpected %a" pp_token token))
       and arr so_far stack =
         match dec () with
         | Array_end -> continue (`A (List.rev so_far)) stack
@@ -176,7 +176,7 @@ module Impl_ezjsonm = struct
         | Name n ->
           let stack = Stack.In_object (n, so_far, stack) in
           value (dec ()) stack
-        | _l -> raise (Abort "FIXME object fields")
+        | token -> raise (Abort (Fmt.str "unexpected %a" pp_token token))
       and continue v stack =
         match stack with
         | Stack.In_array (vs, stack) ->
@@ -185,7 +185,10 @@ module Impl_ezjsonm = struct
         | Stack.In_object (n, ms, stack) ->
           let so_far = (n, v) :: ms in
           obj so_far stack
-        | Stack.Empty -> ( match dec () with End -> v | _ -> raise (Abort ""))
+        | Stack.Empty -> (
+          match dec () with
+          | End -> v
+          | token -> raise (Abort (Fmt.str "unexpected %a" pp_token token)))
       in
       match value (dec ()) Empty with
       | value -> Result.Ok value
