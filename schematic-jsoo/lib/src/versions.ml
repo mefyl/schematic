@@ -3,3 +3,5 @@ module V0_22_0 = struct
   module Jsoo = Jsoo
   module Schemas = Schemas
 end
+
+module V0_22_1 = V0_22_0

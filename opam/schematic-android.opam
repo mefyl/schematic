@@ -1,5 +1,5 @@
 opam-version: "2.0"
-version: "0.22.0"
+version: "0.22.1"
 synopsis: "Derive schemas from Ocaml types"
 description: """
 Schematic lets you derive type meta informations using a ppx_deriving
