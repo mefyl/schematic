@@ -1,4 +1,4 @@
-include module type of Json_intf
+include module type of Json_coding_intf
 module Impl : Coding.IMPL with type t = t
 include S
 

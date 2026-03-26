@@ -14,7 +14,7 @@ check () {
     fi
 }
 
-check "schematic/lib/src/schematic.ml"
-check "schematic/lib/src/versions.ml"
+check "schematic/src/schematic.ml"
+check "schematic/src/versions.ml"
 check "schematic-jsoo/lib/src/schematic_jsoo.ml"
 check "schematic-jsoo/lib/src/versions.ml"

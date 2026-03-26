@@ -134,7 +134,9 @@ let of_schema schema =
                     ->
                       let schema = Schema.field_schema schema in
                       let t, marks = of_schema marks schema
-                      and to_json v = Json.to_ezjsonm @@ Json.encode schema v in
+                      and to_json v =
+                        Json_coding.to_ezjsonm @@ Json_coding.encode schema v
+                      in
                       ( ( name,
                           {
                             t with
