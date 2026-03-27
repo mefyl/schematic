@@ -8,4 +8,4 @@ val make :
   unit ->
   t
 
-val of_schema : _ Schema.t -> t
+val of_schema : ?defs:bool -> _ Schema.t -> t
