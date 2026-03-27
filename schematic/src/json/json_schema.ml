@@ -22,7 +22,7 @@ let null =
   let validation = make_validation ~type_:[ Null ] () in
   make ~validation ()
 
-let of_schema ?(defs = false) schema =
+let of_schema ?(defs = false) (schema : _ Schema.t) =
   let open struct
     type state = {
       marks : (string, String.comparator_witness) Set.t;
@@ -245,7 +245,11 @@ let of_schema ?(defs = false) schema =
     and validation = make_validation ~type_:[ Array ] () in
     (make ~applicator ~validation (), state)
   in
-  let result, state = of_schema empty_state schema in
   if defs then
+    let result, state =
+      of_descriptor empty_state schema.descriptor
+      |> fun (s, st) -> (with_documentation schema.documentation s, st)
+    in
     { result with core = { result.core with defs = List.rev state.defs } }
-  else result
+  else
+    of_schema empty_state schema |> fst

@@ -2368,11 +2368,30 @@ struct
     }
     [@@deriving schema]
 
+    type segment = {
+      a : point;
+      b : point;
+    }
+    [@@deriving schema]
+
     let point =
-      test_schema "json-schema-defs-point" point_schema
+      test_schema "json-schema-defs-point" segment_schema
         {|{
           "$schema": "https://json-schema.org/draft/2019-09/schema",
-          "$ref": "#/$defs/point",
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "$schema": "https://json-schema.org/draft/2019-09/schema",
+              "title": "A",
+              "$ref": "#/$defs/point"
+            },
+            "b": {
+              "$schema": "https://json-schema.org/draft/2019-09/schema",
+              "title": "B",
+              "$ref": "#/$defs/point"
+            }
+          },
+          "type": "object",
           "$defs": {
             "point": {
               "additionalProperties": false,
