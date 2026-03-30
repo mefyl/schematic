@@ -199,15 +199,32 @@ let of_schema schema =
              | ( Some key,
                  {
                    validation = { type_ = [ Object ]; _ };
-                   applicator = { properties; _ };
+                   applicator = { properties; any_of; _ };
                    _;
                  } ) ->
+               let key_schema = string_const name in
+               let any_of =
+                 List.map any_of ~f:(fun item ->
+                     match item.applicator.additionalProperties with
+                     | Allowed false ->
+                       {
+                         item with
+                         applicator =
+                           {
+                             item.applicator with
+                             properties =
+                               (key, key_schema) :: item.applicator.properties;
+                           };
+                       }
+                     | _ -> item)
+               in
                {
                  schema with
                  applicator =
                    {
                      schema.applicator with
-                     properties = (key, string_const name) :: properties;
+                     properties = (key, key_schema) :: properties;
+                     any_of;
                    };
                }
              | _ -> schema

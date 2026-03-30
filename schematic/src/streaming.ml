@@ -319,27 +319,54 @@ module Make (Impl : IMPL) = struct
               match key with
               | None -> write_schema context schema case_v writer
               | Some key ->
-                let rec write_with_key : type a. a Schema.t -> a -> unit =
-                 fun schema case_v ->
+                let rec write_with_keys : type a.
+                    (string * string) list -> a Schema.t -> a -> unit =
+                 fun keys schema case_v ->
                   match schema.descriptor with
                   | Object { fields; encode; _ } ->
                     let () = W.object_push writer in
-                    let () = W.object_field_push key writer in
-                    let () = W.string name writer in
-                    let () = W.object_field_pop writer in
+                    let () =
+                      List.iter keys ~f:(fun (k, n) ->
+                          let () = W.object_field_push k writer in
+                          let () = W.string n writer in
+                          W.object_field_pop writer)
+                    in
                     let () =
                       write_fields context fields (encode case_v) writer
                     in
                     W.object_pop writer
                   | Fixpoint s ->
-                    write_with_key
+                    write_with_keys keys
                       { schema with descriptor = Lazy.force s }
                       case_v
                   | Map { encode; descriptor; _ } ->
-                    write_with_key (Schema.make descriptor) (encode case_v)
+                    write_with_keys keys (Schema.make descriptor)
+                      (encode case_v)
+                  | Union { cases = inner_cases; key = inner_key; _ } ->
+                    let rec search_inner = function
+                      | [] -> fail "no case match"
+                      | Schema.Case
+                          {
+                            encoder = inner_encoder;
+                            schema = inner_schema;
+                            name = inner_name;
+                            _;
+                          }
+                        :: rest -> (
+                        match inner_encoder case_v with
+                        | None -> search_inner rest
+                        | Some inner_v ->
+                          let keys =
+                            match inner_key with
+                            | Some k -> keys @ [ (k, inner_name) ]
+                            | None -> keys
+                          in
+                          write_with_keys keys inner_schema inner_v)
+                    in
+                    search_inner inner_cases
                   | _ -> write_schema context schema case_v writer
                 in
-                write_with_key schema case_v))
+                write_with_keys [ (key, name) ] schema case_v))
         in
         search cases
     and write_fields : type t.

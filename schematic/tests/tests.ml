@@ -755,6 +755,56 @@ struct
               };
           ];
       }
+
+    let nested_inline =
+      let module T = struct
+        type pagination_stopped_reason =
+          | Max_number_of_records of { max_number_of_records : int }
+        [@@schematic.union_key "pagination-stopped-reason-kind"]
+        [@@deriving eq, schema, show]
+
+        type t =
+          | Success  (** Enabled data collection is fully synchronized. *)
+          | Pagination_stopped of pagination_stopped_reason
+              (** Enabled data collection is partially synchronized: not all
+                  records were fetched. *)
+          | No_list_method
+              (** Enabled data collection does not have a [list] method, so we
+                  can't fetch records. Creating/updating/deleting a record may
+                  still work (grey area). *)
+        [@@schematic.union_key "status-kind"] [@@deriving eq, schema, show]
+      end in
+      {
+        name = "nested inline variants with keys";
+        speed = `Quick;
+        additional_test = None;
+        tests =
+          [
+            Test
+              {
+                name = "two keys";
+                here = [%here];
+                decoded = None;
+                value_testable = (module T);
+                schema = T.schema;
+                value =
+                  Pagination_stopped
+                    (Max_number_of_records { max_number_of_records = 1 });
+                expected =
+                  `O
+                    [
+                      ("status-kind", `String "pagination_stopped");
+                      ( "pagination-stopped-reason-kind",
+                        `String "max_number_of_records" );
+                      ("max_number_of_records", `Float 1.);
+                    ];
+                kotlin_class_name = None;
+                is_kotlin_roundtrip_enabled = true;
+                swift_class_name = None;
+                is_swift_roundtrip_enabled = true;
+              };
+          ];
+      }
   end
 
   (* Polymorphic variant *)
@@ -3195,6 +3245,7 @@ Union {
             Variant.computed;
             Variant.no_match;
             Variant.null_object;
+            Variant.nested_inline;
             Polymorphic_variant.payload;
             Polymorphic_variant.keyed;
             alias;
