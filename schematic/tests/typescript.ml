@@ -191,7 +191,7 @@ module Generate_types = struct
         [
           ("Inline", "VariantInline<Record>");
           ("Record", "{ \"field\": number }");
-          ("VariantInline<V>", "{  } & V");
+          ("VariantInline<V>", "V");
         ]
 
     type inline_ignore = Schematic.Schemas.ignore variant_inline
@@ -199,10 +199,7 @@ module Generate_types = struct
 
     let inline_ignore () =
       test ~here:[%here] inline_ignore_schema
-        [
-          ("InlineIgnore", "VariantInline<{  }>");
-          ("VariantInline<V>", "{  } & V");
-        ]
+        [ ("InlineIgnore", "VariantInline<{  }>"); ("VariantInline<V>", "V") ]
   end
 
   let tuple () = test ~here:[%here] tuple_schema [ tuple_typescript ]

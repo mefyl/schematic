@@ -159,8 +159,12 @@ module Of = Schema.Walk (struct
           | Field f -> First f
           | Type t -> Second t)
       in
-      let object_ = Object { fields } in
-      match types with [] -> object_ | _ -> Intersection (object_ :: types)
+      match (fields, types) with
+      | [], [] -> Object { fields = [] }
+      | [], [ t ] -> t
+      | [], types -> Intersection types
+      | fields, [] -> Object { fields }
+      | fields, types -> Intersection (Object { fields } :: types)
     in
     let+ fields in
     match fields with
@@ -185,25 +189,26 @@ module Of = Schema.Walk (struct
       let+ schema in
       match key with
       | None -> schema
-      | Some key ->
-        Intersection
-          [
-            schema;
-            Object
-              {
-                fields =
-                  [
-                    {
-                      name = key;
-                      type' = String name;
-                      required = true;
-                      description = None;
-                      since = None;
-                      title = None;
-                    };
-                  ];
-              };
-          ]
+      | Some key -> (
+        let key =
+          Object
+            {
+              fields =
+                [
+                  {
+                    name = key;
+                    type' = String name;
+                    required = true;
+                    description = None;
+                    since = None;
+                    title = None;
+                  };
+                ];
+            }
+        in
+        match schema with
+        | Object { fields = [] } -> key
+        | _ -> Intersection [ schema; key ])
     in
     { since; t; documentation }
 
