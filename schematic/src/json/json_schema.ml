@@ -247,9 +247,8 @@ let of_schema ?(defs = false) (schema : _ Schema.t) =
   in
   if defs then
     let result, state =
-      of_descriptor empty_state schema.descriptor
-      |> fun (s, st) -> (with_documentation schema.documentation s, st)
+      of_descriptor empty_state schema.descriptor |> fun (s, st) ->
+      (with_documentation schema.documentation s, st)
     in
     { result with core = { result.core with defs = List.rev state.defs } }
-  else
-    of_schema empty_state schema |> fst
+  else of_schema empty_state schema |> fst
