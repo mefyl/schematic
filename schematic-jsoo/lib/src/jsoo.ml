@@ -9,6 +9,8 @@ let date_of_js (date : Js.Unsafe.any) =
     Some (date##getFullYear, date##getMonth + 1, date##getDate)
   else None
 
+let date = Jv.get Jv.global "Date"
+
 let js_of_date (y, m, d) : Js.Unsafe.any =
   new%js Js.date_day y (m - 1) d |> Js.Unsafe.coerce
 
@@ -124,9 +126,10 @@ module Impl : Schematic.Coding.IMPL with type t = Js.Unsafe.any = struct
     else None
 
   let to_time v =
-    if Js.instanceof v Js.date_now then
-      let date = Js.Unsafe.coerce v in
-      Ptime.of_float_s (date##getTime /. 1000.) |> Result.of_option ~error:None
+    let jv = Jv.repr v in
+    if Jv.instanceof ~cons:date jv then
+      let ms = Jv.call jv "getTime" [||] |> Jv.to_float in
+      Ptime.of_float_s (ms /. 1000.) |> Result.of_option ~error:None
     else Result.fail None
 
   let to_time_local v =

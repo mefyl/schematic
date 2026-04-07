@@ -89,6 +89,7 @@
     (>= 1.1.0)
     :with-test))
   base
+  brr
   (conf-npm :with-test)
   ezjsonm
   fmt
