@@ -1,3 +1,7 @@
+;; WASM stubs for base
+;;
+;; Copied verbatim from https://github.com/janestreet/base/src/runtime.wat#5154f5d8e98bac7b23acbd143f72529f9658f3bb
+
 (module
    (import "env" "caml_copy_int64"
       (func $caml_copy_int64 (param i64) (result (ref eq))))
