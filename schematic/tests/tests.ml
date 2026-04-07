@@ -11,8 +11,8 @@ end
 let ( let* ) = Result.( >>= )
 let ( let+ ) = Result.( >>| )
 
-let json_schema ?defs schema =
-  Schematic.Json.Schema.of_schema ?defs schema
+let json_schema ?reference schema =
+  Schematic.Json.Schema.of_schema ?reference schema
   |> Schematic.Json.encode Schematic.Json.Schema.schema
 
 let make_error ?(path = []) ?schema reason =
@@ -2350,7 +2350,7 @@ struct
         match Schematic.Json.of_string expected with
         | Result.Ok json -> json
         | Result.Error _ -> Alcotest.fail "invalid literal JSON"
-      and effective = json_schema ~defs:true schema in
+      and effective = json_schema ~reference:`Defs schema in
       {
         name;
         speed = `Quick;

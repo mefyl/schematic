@@ -22,7 +22,7 @@ let null =
   let validation = make_validation ~type_:[ Null ] () in
   make ~validation ()
 
-let of_schema ?(defs = false) (schema : _ Schema.t) =
+let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
   let open struct
     type state = {
       marks : (string, String.comparator_witness) Set.t;
@@ -52,21 +52,24 @@ let of_schema ?(defs = false) (schema : _ Schema.t) =
        let schema, state = of_descriptor state descriptor in
        (with_documentation documentation schema, state)
      | { id = Some id; _ } when Set.mem state.marks id ->
-       let ref_str = if defs then "#/$defs/" ^ id else id_name id in
+       let ref_str =
+         match reference with `Defs -> "#/$defs/" ^ id | `Ids -> id_name id
+       in
        (make ~core:(make_core ~ref:ref_str ()) (), state)
-     | { id = Some id; documentation; descriptor; _ } ->
+     | { id = Some id; documentation; descriptor; _ } -> (
        let state = { state with marks = Set.add state.marks id } in
        let schema, state = of_descriptor state descriptor in
        let schema = with_documentation documentation schema in
-       if defs then
+       match reference with
+       | `Defs ->
          let state = { state with defs = (id, schema) :: state.defs } in
          let schema = make ~core:(make_core ~ref:("#/$defs/" ^ id) ()) () in
          (schema, state)
-       else
+       | `Ids ->
          let schema =
            { schema with core = { schema.core with id = Some (id_name id) } }
          in
-         (schema, state)
+         (schema, state))
   and of_descriptor : type u. state -> u Schema.descriptor -> t * state =
    fun state -> function
      | Any _ -> (make (), state)
@@ -245,10 +248,11 @@ let of_schema ?(defs = false) (schema : _ Schema.t) =
     and validation = make_validation ~type_:[ Array ] () in
     (make ~applicator ~validation (), state)
   in
-  if defs then
+  match reference with
+  | `Defs ->
     let result, state =
       of_descriptor empty_state schema.descriptor |> fun (s, st) ->
       (with_documentation schema.documentation s, st)
     in
     { result with core = { result.core with defs = List.rev state.defs } }
-  else of_schema empty_state schema |> fst
+  | `Ids -> of_schema empty_state schema |> fst
