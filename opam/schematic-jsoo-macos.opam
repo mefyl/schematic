@@ -12,6 +12,7 @@ bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "dune" {>= "3.20"}
   "base-macos"
+  "brr"
   "ezjsonm-macos"
   "fmt"
   "fmt-macos"
@@ -22,6 +23,7 @@ depends: [
   "ptime-macos"
   "schematic-macos" {= version}
   "uri-macos"
+  "wasm_of_ocaml-compiler"
 ]
 build: [
   ["dune" "subst"] {dev}

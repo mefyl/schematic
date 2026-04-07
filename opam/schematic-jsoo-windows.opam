@@ -12,6 +12,7 @@ bug-reports: "https://gitlab.routine.co/routine/schematic/-/issues"
 depends: [
   "dune" {>= "3.20"}
   "base-windows"
+  "brr"
   "ezjsonm-windows"
   "fmt"
   "fmt-windows"
@@ -22,6 +23,7 @@ depends: [
   "ptime-windows"
   "schematic-windows" {= version}
   "uri-windows"
+  "wasm_of_ocaml-compiler"
 ]
 build: [
   ["dune" "subst"] {dev}
