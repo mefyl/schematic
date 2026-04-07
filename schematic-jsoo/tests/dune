@@ -9,8 +9,12 @@
 (test
  (name json)
  (package schematic-jsoo)
- (modes js)
+ (modes js wasm)
  (modules json)
+ (wasm_of_ocaml
+  (compilation_mode whole_program)
+  (flags --effects=cps)
+  (wasm_files base.wat cstruct.wat))
  (libraries alcotest js_of_ocaml schematic schematic-jsoo test_utils)
  (preprocess
   (pps js_of_ocaml-ppx ppx_here schematic.ppx)))
@@ -18,7 +22,11 @@
 (test
  (name jsoo)
  (package schematic-jsoo)
- (modes js)
+ (modes js wasm)
+ (wasm_of_ocaml
+  (compilation_mode whole_program)
+  (flags --effects=cps)
+  (wasm_files base.wat cstruct.wat))
  (modules jsoo)
  (libraries
   alcotest

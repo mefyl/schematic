@@ -89,6 +89,7 @@
     (>= 1.1.0)
     :with-test))
   base
+  brr
   (conf-npm :with-test)
   ezjsonm
   fmt
@@ -109,7 +110,8 @@
     :with-test))
   (schematic
    (= :version))
-  uri))
+  uri
+  wasm_of_ocaml-compiler))
 
 (package
  (name schematic-sexp)
@@ -165,3 +167,12 @@
  (package
   (name bytesrw)
   (version 0.3.0)))
+
+; For Wasmoo support.
+
+(pin
+ (url
+  git+https://github.com/mefyl/alcotest#f0007cbfdffd868945dd7503160c8bce08d01113)
+ (package
+  (name alcotest)
+  (version 1.9.1)))
