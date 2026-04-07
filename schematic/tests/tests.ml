@@ -11,8 +11,8 @@ end
 let ( let* ) = Result.( >>= )
 let ( let+ ) = Result.( >>| )
 
-let json_schema schema =
-  Schematic.Json.Schema.of_schema schema
+let json_schema ?reference schema =
+  Schematic.Json.Schema.of_schema ?reference schema
   |> Schematic.Json.encode Schematic.Json.Schema.schema
 
 let make_error ?(path = []) ?schema reason =
@@ -2394,6 +2394,79 @@ struct
       }|}
   end
 
+  module Defs = struct
+    let test_schema name schema expected =
+      let expected =
+        match Schematic.Json.of_string expected with
+        | Result.Ok json -> json
+        | Result.Error _ -> Alcotest.fail "invalid literal JSON"
+      and effective = json_schema ~reference:`Defs schema in
+      {
+        name;
+        speed = `Quick;
+        tests = [];
+        additional_test =
+          Some
+            (fun () ->
+              Alcotest.check ~here:[%here] json "json-schema" expected effective);
+      }
+
+    (** A point in the 2D plane *)
+    type point = {
+      x : int;  (** Ox coordinate *)
+      y : int;  (** Oy coordinate *)
+    }
+    [@@deriving schema]
+
+    type segment = {
+      a : point;
+      b : point;
+    }
+    [@@deriving schema]
+
+    let point =
+      test_schema "json-schema-defs-point" segment_schema
+        {|{
+          "$schema": "https://json-schema.org/draft/2019-09/schema",
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "$schema": "https://json-schema.org/draft/2019-09/schema",
+              "title": "A",
+              "$ref": "#/$defs/point"
+            },
+            "b": {
+              "$schema": "https://json-schema.org/draft/2019-09/schema",
+              "title": "B",
+              "$ref": "#/$defs/point"
+            }
+          },
+          "type": "object",
+          "$defs": {
+            "point": {
+              "additionalProperties": false,
+              "properties": {
+                "x": {
+                  "$schema": "https://json-schema.org/draft/2019-09/schema",
+                  "title": "X",
+                  "description": "Ox coordinate",
+                  "type": "integer"
+                },
+                "y": {
+                  "$schema": "https://json-schema.org/draft/2019-09/schema",
+                  "title": "Y",
+                  "description": "Oy coordinate",
+                  "type": "integer"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2019-09/schema",
+              "description": "A point in the 2D plane",
+              "type": "object"
+            }
+          }
+        }|}
+  end
+
   module Comparison = struct
     open Alcotest
 
@@ -3276,6 +3349,7 @@ Union {
             Metadata.default;
             Metadata.documented_description;
             Metadata.special_chars_description;
+            Defs.point;
             failure;
             optional_inline;
             keyed;
