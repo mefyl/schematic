@@ -26,7 +26,7 @@
     --input
     %{dep:../entropic.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -60,7 +60,7 @@
     --input
     %{dep:../entropic.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -94,7 +94,7 @@
     --input
     %{dep:../entropic.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -128,7 +128,7 @@
     --input
     %{dep:../entropic.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -177,7 +177,7 @@
     --input
     %{dep:../schematic.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -211,7 +211,7 @@
     --input
     %{dep:../schematic.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -245,7 +245,7 @@
     --input
     %{dep:../schematic.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -279,7 +279,7 @@
     --input
     %{dep:../schematic.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -328,7 +328,7 @@
     --input
     %{dep:../schematic-cli.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -362,7 +362,7 @@
     --input
     %{dep:../schematic-cli.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -396,7 +396,7 @@
     --input
     %{dep:../schematic-cli.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -430,7 +430,7 @@
     --input
     %{dep:../schematic-cli.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -479,7 +479,7 @@
     --input
     %{dep:../schematic-jsoo.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -513,7 +513,7 @@
     --input
     %{dep:../schematic-jsoo.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -547,7 +547,7 @@
     --input
     %{dep:../schematic-jsoo.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -581,7 +581,7 @@
     --input
     %{dep:../schematic-jsoo.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -630,7 +630,7 @@
     --input
     %{dep:../schematic-sexp.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -664,7 +664,7 @@
     --input
     %{dep:../schematic-sexp.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -698,7 +698,7 @@
     --input
     %{dep:../schematic-sexp.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude
@@ -732,7 +732,7 @@
     --input
     %{dep:../schematic-sexp.opam}
     --cross
-    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+    entropic,schematic,schematic-cli,schematic-jsoo,schematic-sexp,acid,hlist,timmy,base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
     --cross-both
     fmt,ppx_deriving,ppx_here,semver2
     --cross-exclude

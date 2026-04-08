@@ -3,6 +3,6 @@ schematic
 --cross-both
 fmt,ppx_deriving,ppx_here,semver2
 --cross
-base,base64,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
+base,base64,bytesrw,csexp,ezjsonm,fmt,hlist,logs,ptime,sexplib,uri
 --local
 acid,hlist,timmy
