@@ -5,3 +5,4 @@ module V0_22_0 = struct
 end
 
 module V0_22_1 = V0_22_0
+module V0_22_2 = V0_22_1
