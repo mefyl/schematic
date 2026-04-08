@@ -2,23 +2,28 @@ open Base
 open Js_of_ocaml
 
 let ( == ) = Stdlib.( == )
-let _Array = Js.Unsafe.global##._Array
 
-let rec of_js (o : Js.Unsafe.any) =
-  let o = Js.Unsafe.coerce o in
-  if o == Js.Unsafe.pure_js_expr "null" then `Null
-  else if Js.typeof o == Js.string "string" then `String (Js.to_string o)
-  else if Js.typeof o == Js.string "number" then `Float (Js.float_of_number o)
-  else if Js.typeof o == Js.string "boolean" then `Bool (Js.to_bool o)
-  else if (Js.Unsafe.pure_js_expr "Array")##isArray o then
-    `A (Js.array_map of_js o |> Js.to_array |> Array.to_list)
-  else
-    let entries =
-      let keys = Js.object_keys o |> Js.to_array
-      and f key = (Js.to_string key, of_js @@ Js.Unsafe.get o key) in
-      Array.map ~f keys |> Array.to_list
-    in
-    `O entries
+let of_js =
+  let const_boolean = Jstr.v "boolean"
+  and const_number = Jstr.v "number"
+  and const_string = Jstr.v "string"
+  and object' = Jv.get Jv.global "Object" in
+  let rec of_js o =
+    if Jv.is_null o then `Null
+    else if Jv.is_array o then `A (Jv.to_list of_js o)
+    else
+      let type' = Jv.typeof o in
+      if Jstr.equal type' const_string then `String (Jv.to_string o)
+      else if Jstr.equal type' const_number then `Float (Jv.to_float o)
+      else if Jstr.equal type' const_boolean then `Bool (Jv.to_bool o)
+      else
+        let keys = Jv.to_list Jv.to_jstr @@ Jv.call object' "keys" [| o |] in
+        let f key =
+          (Jstr.to_string key, of_js @@ Jv.get o (Jstr.to_string key))
+        in
+        `O (List.map ~f keys)
+  in
+  fun (o : Js.Unsafe.any) -> of_js (Jv.repr o)
 
 let rec to_js x =
   match x with

@@ -6,11 +6,11 @@
   (pps schematic_ppx ppx_deriving.eq ppx_deriving.show))
  (libraries alcotest base fmt hlist js_of_ocaml schematic schematic_jsoo))
 
-(test
- (name json)
+(tests
+ (names json json_string json_ezjsonm)
  (package schematic-jsoo)
  (modes js wasm)
- (modules json)
+ (modules json json_string json_ezjsonm)
  (wasm_of_ocaml
   (compilation_mode whole_program)
   (flags --effects=cps)
