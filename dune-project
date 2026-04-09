@@ -111,7 +111,7 @@
   (schematic
    (= :version))
   uri
-  wasm_of_ocaml-compiler))
+  (wasm_of_ocaml-compiler :with-test)))
 
 (package
  (name schematic-sexp)
