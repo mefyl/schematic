@@ -23,7 +23,6 @@ depends: [
   "ptime-macos"
   "schematic-macos" {= version}
   "uri-macos"
-  "wasm_of_ocaml-compiler"
 ]
 build: [
   ["dune" "subst"] {dev}

@@ -23,7 +23,6 @@ depends: [
   "ptime-windows"
   "schematic-windows" {= version}
   "uri-windows"
-  "wasm_of_ocaml-compiler"
 ]
 build: [
   ["dune" "subst"] {dev}
