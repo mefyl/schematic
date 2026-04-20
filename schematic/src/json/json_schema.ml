@@ -46,86 +46,89 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
     | Some doc ->
       { schema with metadata = { schema.metadata with description = Some doc } }
   in
-  let rec of_schema : type u. state -> u Schema.t -> t * state =
+  let rec of_schema : type u. state -> u Schema.t -> t * type_ list * state =
    fun state -> function
      | { id = None; documentation; descriptor; _ } ->
-       let schema, state = of_descriptor state descriptor in
-       (with_documentation documentation schema, state)
+       let schema, types, state = of_descriptor state descriptor in
+       (with_documentation documentation schema, types, state)
      | { id = Some id; _ } when Set.mem state.marks id ->
        let ref_str =
          match reference with `Defs -> "#/$defs/" ^ id | `Ids -> id_name id
        in
-       (make ~core:(make_core ~ref:ref_str ()) (), state)
+       (make ~core:(make_core ~ref:ref_str ()) (), [], state)
      | { id = Some id; documentation; descriptor; _ } -> (
        let state = { state with marks = Set.add state.marks id } in
-       let schema, state = of_descriptor state descriptor in
+       let schema, types, state = of_descriptor state descriptor in
        let schema = with_documentation documentation schema in
        match reference with
        | `Defs ->
          let state = { state with defs = (id, schema) :: state.defs } in
          let schema = make ~core:(make_core ~ref:("#/$defs/" ^ id) ()) () in
-         (schema, state)
+         (schema, types, state)
        | `Ids ->
          let schema =
            { schema with core = { schema.core with id = Some (id_name id) } }
          in
-         (schema, state))
-  and of_descriptor : type u. state -> u Schema.descriptor -> t * state =
+         (schema, types, state))
+  and of_descriptor : type u.
+      state -> u Schema.descriptor -> t * type_ list * state =
    fun state -> function
-     | Any _ -> (make (), state)
+     | Any _ -> (make (), [], state)
      | Bool ->
        let validation = make_validation ~type_:[ Boolean ] () in
-       (make ~validation (), state)
+       (make ~validation (), [ Boolean ], state)
      | Coding { f } -> of_descriptor state (f None)
      | Date -> of_descriptor state date_tuple_schema.descriptor
      | Fixpoint s -> of_descriptor state (Lazy.force s)
      | Float ->
        let validation = make_validation ~type_:[ Number ] () in
-       (make ~validation (), state)
-     | Ignore -> (make (), state)
+       (make ~validation (), [ Number ], state)
+     | Ignore -> (make (), [], state)
      | Int | Int64 ->
        let validation = make_validation ~type_:[ Integer ] () in
-       (make ~validation (), state)
-     | Json -> (make (), state)
+       (make ~validation (), [ Integer ], state)
+     | Json -> (make (), [], state)
      | List schema ->
-       let item, state = of_schema state schema in
+       let item, _, state = of_schema state schema in
        list_schema state item
      | Map { descriptor; _ } -> of_descriptor state descriptor
      | Mapping { item; _ } ->
-       let schema, state = of_schema state item in
+       let schema, _, state = of_schema state item in
        let applicator =
          make_applicator ~additionalProperties:(Properties_schema schema) ()
        and validation = make_validation ~type_:[ Object ] () in
-       (make ~applicator ~validation (), state)
-     | Null -> (null, state)
+       (make ~applicator ~validation (), [ Object ], state)
+     | Null -> (null, [ Null ], state)
      | Nullable s ->
-       let t, state = of_descriptor state s.descriptor in
-       let type_ =
-         Null :: t.validation.type_ |> List.dedup_and_sort ~compare:Poly.compare
-       and any_of =
+       let t, inner_types, state = of_descriptor state s.descriptor in
+       let any_of =
          match t.applicator.any_of with [] -> [] | cases -> null :: cases
+       in
+       let type_ =
+         Null :: inner_types |> List.dedup_and_sort ~compare:Poly.compare
        in
        ( {
            t with
            applicator = { t.applicator with any_of };
            validation = { t.validation with type_ };
          },
+         type_,
          state )
      | Sequence { item; _ } ->
-       let item, state = of_schema state item in
+       let item, _, state = of_schema state item in
        list_schema state item
      | String ->
        let validation = make_validation ~type_:[ String ] () in
-       (make ~validation (), state)
+       (make ~validation (), [ String ], state)
      | String_const v ->
        let validation = string_const_validation v in
-       (make ~validation (), state)
+       (make ~validation (), [ String ], state)
      | Time ->
        let validation = make_validation ~type_:[ String ] () in
-       (make ~validation (), state)
+       (make ~validation (), [ String ], state)
      | Time_local ->
        let validation = make_validation ~type_:[ String ] () in
-       (make ~validation (), state)
+       (make ~validation (), [ String ], state)
      | Object _ as o -> (
        let properties, state =
          let f =
@@ -149,7 +152,7 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
                       state
                     ->
                       let schema = Schema.field_schema schema in
-                      let t, state = of_schema state schema
+                      let t, _, state = of_schema state schema
                       and to_json v =
                         Json_coding.to_ezjsonm @@ Json_coding.encode schema v
                       in
@@ -185,10 +188,12 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
                ())
            properties
        with
-       | [ applicator ] -> (make ~applicator ~validation (), state)
+       | [ applicator ] -> (make ~applicator ~validation (), [ Object ], state)
        | l ->
          let any_of = List.map ~f:(fun applicator -> make ~applicator ()) l in
-         (make ~applicator:(make_applicator ~any_of ()) ~validation (), state))
+         ( make ~applicator:(make_applicator ~any_of ()) ~validation (),
+           [ Object ],
+           state ))
      | Schema.Tuple { items; _ } ->
        let fields, state =
          let rec tuple_applicator : type u.
@@ -196,7 +201,7 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
           fun state -> function
             | Schema.ItemEnd -> ([], state)
             | Schema.Item { schema; rest } ->
-              let head, state = of_schema state schema in
+              let head, _, state = of_schema state schema in
               let tail, state = tuple_applicator state rest in
               (head :: tail, state)
          in
@@ -205,11 +210,12 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
        ( make
            ~applicator:(make_applicator ~items:(Tuple_schema fields) ())
            ~validation (),
+         [ Array ],
          state )
      | Schema.Union { cases; key; _ } ->
-       let state, schemas =
+       let state, schemas_with_types =
          let f state (Schema.Case { name; schema; _ }) =
-           let schema, state = of_schema state schema in
+           let schema, types, state = of_schema state schema in
            let schema =
              match (key, schema) with
              | ( Some key,
@@ -245,48 +251,30 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
                }
              | _ -> schema
            in
-           (state, schema)
+           (state, (schema, types))
          in
          List.fold_map ~f ~init:state cases
        in
-       let applicator = make_applicator ~any_of:schemas ()
-       and validation =
-         (* When using $defs references, case schemas are stubs with no type_
-            information — the actual type lives in state.defs under the
-            referenced id. Look it up so the union carries the correct type. *)
-         let type_of schema =
-           match schema.core.ref with
-           | None -> schema.validation.type_
-           | Some ref_str -> (
-             let id =
-               match String.chop_prefix ~prefix:"#/$defs/" ref_str with
-               | Some id -> id
-               | None -> (
-                 match String.chop_prefix ~prefix:"#" ref_str with
-                 | Some id -> id
-                 | None -> ref_str)
-             in
-             match List.Assoc.find state.defs ~equal:String.equal id with
-             | Some def -> def.validation.type_
-             | None -> schema.validation.type_)
-         in
+       let schemas = List.map ~f:fst schemas_with_types in
+       let applicator = make_applicator ~any_of:schemas () in
+       let validation =
          make_validation
            ~type_:
-             (List.concat_map schemas ~f:type_of
+             (List.concat_map schemas_with_types ~f:snd
              |> List.dedup_and_sort ~compare:Poly.compare)
            ()
        in
-       (make ~applicator ~validation (), state)
+       (make ~applicator ~validation (), validation.type_, state)
   and list_schema state item =
     let applicator = make_applicator ~items:(Items_schema item) ()
     and validation = make_validation ~type_:[ Array ] () in
-    (make ~applicator ~validation (), state)
+    (make ~applicator ~validation (), [ Array ], state)
   in
   match reference with
   | `Defs ->
-    let result, state =
-      of_descriptor empty_state schema.descriptor |> fun (s, st) ->
-      (with_documentation schema.documentation s, st)
+    let result, _, state =
+      of_descriptor empty_state schema.descriptor |> fun (s, types, st) ->
+      (with_documentation schema.documentation s, types, st)
     in
     { result with core = { result.core with defs = List.rev state.defs } }
-  | `Ids -> of_schema empty_state schema |> fst
+  | `Ids -> of_schema empty_state schema |> fun (s, _, _) -> s
