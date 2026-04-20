@@ -251,11 +251,28 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
        in
        let applicator = make_applicator ~any_of:schemas ()
        and validation =
-         let f = function { validation = { type_; _ }; _ } -> type_ in
+         (* When using $defs references, case schemas are stubs with no type_
+            information — the actual type lives in state.defs under the
+            referenced id. Look it up so the union carries the correct type. *)
+         let type_of schema =
+           match schema.core.ref with
+           | None -> schema.validation.type_
+           | Some ref_str -> (
+             let id =
+               match String.chop_prefix ~prefix:"#/$defs/" ref_str with
+               | Some id -> id
+               | None -> (
+                 match String.chop_prefix ~prefix:"#" ref_str with
+                 | Some id -> id
+                 | None -> ref_str)
+             in
+             match List.Assoc.find state.defs ~equal:String.equal id with
+             | Some def -> def.validation.type_
+             | None -> schema.validation.type_)
+         in
          make_validation
            ~type_:
-             (List.map ~f schemas
-             |> List.concat
+             (List.concat_map schemas ~f:type_of
              |> List.dedup_and_sort ~compare:Poly.compare)
            ()
        in
