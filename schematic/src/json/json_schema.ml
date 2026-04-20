@@ -75,18 +75,21 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
    fun state -> function
      | Any _ -> (make (), [], state)
      | Bool ->
-       let validation = make_validation ~type_:[ Boolean ] () in
-       (make ~validation (), [ Boolean ], state)
+       let type_ = [ Boolean ] in
+       let validation = make_validation ~type_ () in
+       (make ~validation (), type_, state)
      | Coding { f } -> of_descriptor state (f None)
      | Date -> of_descriptor state date_tuple_schema.descriptor
      | Fixpoint s -> of_descriptor state (Lazy.force s)
      | Float ->
-       let validation = make_validation ~type_:[ Number ] () in
-       (make ~validation (), [ Number ], state)
+       let type_ = [ Number ] in
+       let validation = make_validation ~type_ () in
+       (make ~validation (), type_, state)
      | Ignore -> (make (), [], state)
      | Int | Int64 ->
-       let validation = make_validation ~type_:[ Integer ] () in
-       (make ~validation (), [ Integer ], state)
+       let type_ = [ Integer ] in
+       let validation = make_validation ~type_ () in
+       (make ~validation (), type_, state)
      | Json -> (make (), [], state)
      | List schema ->
        let item, _, state = of_schema state schema in
@@ -94,10 +97,11 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
      | Map { descriptor; _ } -> of_descriptor state descriptor
      | Mapping { item; _ } ->
        let schema, _, state = of_schema state item in
+       let type_ = [ Object ] in
        let applicator =
          make_applicator ~additionalProperties:(Properties_schema schema) ()
-       and validation = make_validation ~type_:[ Object ] () in
-       (make ~applicator ~validation (), [ Object ], state)
+       and validation = make_validation ~type_ () in
+       (make ~applicator ~validation (), type_, state)
      | Null -> (null, [ Null ], state)
      | Nullable s ->
        let t, inner_types, state = of_descriptor state s.descriptor in
@@ -118,17 +122,21 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
        let item, _, state = of_schema state item in
        list_schema state item
      | String ->
-       let validation = make_validation ~type_:[ String ] () in
-       (make ~validation (), [ String ], state)
+       let type_ = [ String ] in
+       let validation = make_validation ~type_ () in
+       (make ~validation (), type_, state)
      | String_const v ->
+       let type_ = [ String ] in
        let validation = string_const_validation v in
-       (make ~validation (), [ String ], state)
+       (make ~validation (), type_, state)
      | Time ->
-       let validation = make_validation ~type_:[ String ] () in
-       (make ~validation (), [ String ], state)
+       let type_ = [ String ] in
+       let validation = make_validation ~type_ () in
+       (make ~validation (), type_, state)
      | Time_local ->
-       let validation = make_validation ~type_:[ String ] () in
-       (make ~validation (), [ String ], state)
+       let type_ = [ String ] in
+       let validation = make_validation ~type_ () in
+       (make ~validation (), type_, state)
      | Object _ as o -> (
        let properties, state =
          let f =
@@ -180,7 +188,8 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
                 }
          in
          f state
-       and validation = make_validation ~type_:[ Object ] () in
+       and type_ = [ Object ] in
+       let validation = make_validation ~type_ () in
        match
          List.map
            ~f:(fun properties ->
@@ -188,11 +197,11 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
                ())
            properties
        with
-       | [ applicator ] -> (make ~applicator ~validation (), [ Object ], state)
+       | [ applicator ] -> (make ~applicator ~validation (), type_, state)
        | l ->
          let any_of = List.map ~f:(fun applicator -> make ~applicator ()) l in
          ( make ~applicator:(make_applicator ~any_of ()) ~validation (),
-           [ Object ],
+           type_,
            state ))
      | Schema.Tuple { items; _ } ->
        let fields, state =
@@ -206,11 +215,12 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
               (head :: tail, state)
          in
          tuple_applicator state items
-       and validation = make_validation ~type_:[ Array ] () in
+       and type_ = [ Array ] in
+       let validation = make_validation ~type_ () in
        ( make
            ~applicator:(make_applicator ~items:(Tuple_schema fields) ())
            ~validation (),
-         [ Array ],
+         type_,
          state )
      | Schema.Union { cases; key; _ } ->
        let state, schemas_with_types =
@@ -266,9 +276,10 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
        in
        (make ~applicator ~validation (), validation.type_, state)
   and list_schema state item =
+    let type_ = [ Array ] in
     let applicator = make_applicator ~items:(Items_schema item) ()
-    and validation = make_validation ~type_:[ Array ] () in
-    (make ~applicator ~validation (), [ Array ], state)
+    and validation = make_validation ~type_ () in
+    (make ~applicator ~validation (), type_, state)
   in
   match reference with
   | `Defs ->
