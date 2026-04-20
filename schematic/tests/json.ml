@@ -1,5 +1,11 @@
 open Base
 
+module Schemas_library = struct
+  type Schematic.Schema.library += V
+
+  let v = V
+end
+
 module Parse_error = struct
   let empty () = Schematic.Json.of_string ""
 
@@ -63,6 +69,41 @@ module Pretty_print = struct
 }|}
 end
 
+module Schema_nullable_union_ref = struct
+  type variant_a = { x : string } [@@deriving schema]
+  type variant_b = { y : int } [@@deriving schema]
+
+  type variant =
+    | A of variant_a
+    | B of variant_b
+  [@@deriving schema]
+
+  type container = { v : variant option [@schematic.default None] }
+  [@@deriving schema]
+
+  let nullable_union_ref () =
+    let json =
+      Schematic.Json.Schema.of_schema ~reference:`Defs container_schema
+      |> Schematic.Json.encode Schematic.Json.Schema.schema
+    in
+    let v_type =
+      match json with
+      | `O fields -> (
+        match List.Assoc.find fields ~equal:String.equal "properties" with
+        | Some (`O props) -> (
+          match List.Assoc.find props ~equal:String.equal "v" with
+          | Some (`O v_fields) ->
+            List.Assoc.find v_fields ~equal:String.equal "type"
+          | _ -> None)
+        | _ -> None)
+      | _ -> None
+    in
+    Alcotest.(check ~here:[%here] (option (module Schematic.Json)))
+      "nullable union with $ref cases: type should be [null, object]"
+      (Some (`A [ `String "null"; `String "object" ]))
+      v_type
+end
+
 module Equal = struct
   let object_ () =
     Alcotest.check'
@@ -97,4 +138,10 @@ let () =
           test_case "object" Pretty_print.object_;
         ] );
       ("equal", [ test_case "object" Equal.object_ ]);
+      ( "schema",
+        [
+          test_case
+            "nullable union with $ref cases: type should be [null,object]"
+            Schema_nullable_union_ref.nullable_union_ref;
+        ] );
     ]

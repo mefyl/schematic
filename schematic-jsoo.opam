@@ -26,7 +26,7 @@ depends: [
   "ppx_yojson" {>= "1.2.0" & with-test}
   "schematic" {= version}
   "uri"
-  "wasm_of_ocaml-compiler"
+  "wasm_of_ocaml-compiler" {with-test}
   "odoc" {with-doc}
 ]
 build: [

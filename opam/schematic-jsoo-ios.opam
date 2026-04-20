@@ -23,7 +23,6 @@ depends: [
   "ptime-ios"
   "schematic-ios" {= version}
   "uri-ios"
-  "wasm_of_ocaml-compiler"
 ]
 build: [
   ["dune" "subst"] {dev}

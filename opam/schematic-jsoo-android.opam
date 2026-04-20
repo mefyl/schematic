@@ -23,7 +23,6 @@ depends: [
   "ptime-android"
   "schematic-android" {= version}
   "uri-android"
-  "wasm_of_ocaml-compiler"
 ]
 build: [
   ["dune" "subst"] {dev}
