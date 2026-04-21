@@ -103,7 +103,7 @@ and _ descriptor =
   | Coding : {
       f : 'coding. 'coding Coding_intf.t option -> 'a descriptor;
     }
-      -> 'a descriptor
+      -> 'a descriptor  (** Switch descriptor based on the coding at runtime. *)
   | Date : Ptime.date descriptor
   | Fixpoint : 'a descriptor Lazy.t -> 'a descriptor
   | Float : float descriptor
