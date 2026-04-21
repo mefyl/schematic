@@ -1,5 +1,5 @@
 variables:
-  PACKAGES: "binaryen coreutils gmp-dev gradle zstd-dev"
+  PACKAGES: "binaryen coreutils gmp-dev zstd-dev"
 
 include:
   - local: '/.logistic/ci/dune/.gitlab-ci.yml'
