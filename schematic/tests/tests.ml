@@ -1939,7 +1939,7 @@ struct
     let inline_keyed =
       let module T = struct
         type t = { keyed : Polymorphic_variant.keyed [@schematic.inline] }
-        [@@deriving eq, schema, show]
+        [@@schematic.name "inline_keyed"] [@@deriving eq, schema, show]
       end in
       let test ~here name value expected =
         Test
