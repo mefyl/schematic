@@ -279,7 +279,8 @@ module Parser = struct
     match descriptor with
     | Any (module Coding) -> raise (NotYetImplemented "Any")
     | Bool -> (atom (Simple "Boolean"), marks)
-    | Coding { f = _ } -> raise (NotYetImplemented "Coding")
+    | Coding { f } ->
+      descriptor_to_kotlin_marks marks schema_documentation @@ f None
     | Date -> (atom (Simple "LocalDate"), marks)
     | Fixpoint lazy_descriptor ->
       descriptor_to_kotlin_marks marks None (Lazy.force lazy_descriptor)
@@ -720,6 +721,8 @@ module Generator = struct
       Fmt.pf f "<%a>" Fmt.(list ~sep:comma pp_kotlin_type) kotlin_types
 end
 
+type _ Coding.coding += Coding : Ezjsonm.value Coding.coding
+
 (** Module responsible for encoding into/decoding from Kotlin-compatible JSON.
 *)
 module Json = struct
@@ -744,11 +747,7 @@ module Json = struct
              (Fmt.str "encode does not support descriptor %a"
                 pp_debug_descriptor descriptor))
       | Bool -> fun v -> `Bool v
-      | Coding { f = _ } ->
-        raise
-          (NotYetImplemented
-             (Fmt.str "encode does not support descriptor %a"
-                pp_debug_descriptor descriptor))
+      | Coding { f } -> encode_descriptor @@ f @@ Some Coding
       | Date -> fun v -> v |> Date.to_string |> encode Schemas.string_schema
       | Fixpoint lazy_descriptor ->
         fun v -> encode_descriptor (Lazy.force lazy_descriptor) v
@@ -953,16 +952,7 @@ module Json = struct
             }
       | Bool -> (
         function `Bool v -> Ok v | json -> type_error "boolean" json)
-      | Coding { f = _ } ->
-        fun json ->
-          Error
-            {
-              context with
-              reason =
-                Fmt.str
-                  "decode does not support descriptor %a while decoding %a"
-                  pp_debug_descriptor descriptor Json.pp json;
-            }
+      | Coding { f } -> decode_descriptor context @@ f @@ Some Coding
       | Date -> (
         function
         | `String s ->
