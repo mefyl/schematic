@@ -2259,14 +2259,12 @@ struct
           {
             "field_a" :
             {
-              "$schema" : "https://json-schema.org/draft/2020-12/schema",
               "title" : "Field_a",
               "description" : "Describe A",
               "type" : "integer"
             },
             "field_b" :
             {
-              "$schema" : "https://json-schema.org/draft/2020-12/schema",
               "title" : "Field_b",
               "description" : "Describe B",
               "type" : "integer"
@@ -2294,14 +2292,12 @@ struct
           {
             "a" :
             {
-              "$schema" : "https://json-schema.org/draft/2020-12/schema",
               "title" : "A",
               "default": 358,
               "type" : "integer"
             },
             "b" :
             {
-              "$schema" : "https://json-schema.org/draft/2020-12/schema",
               "title" : "B",
               "default": "359",
               "type" : "string"
@@ -2355,7 +2351,6 @@ struct
           {
             "value" :
             {
-              "$schema" : "https://json-schema.org/draft/2020-12/schema",
               "title" : "Value",
               "description" : "The documented value field",
               "type" : "integer"
@@ -2381,7 +2376,6 @@ struct
           {
             "field" :
             {
-              "$schema" : "https://json-schema.org/draft/2020-12/schema",
               "title" : "Field",
               "description" : "Field with \"quotes\" and a backslash \\",
               "type" : "integer"
@@ -2431,12 +2425,10 @@ struct
           "additionalProperties": false,
           "properties": {
             "a": {
-              "$schema": "https://json-schema.org/draft/2020-12/schema",
               "title": "A",
               "$ref": "#/$defs/point"
             },
             "b": {
-              "$schema": "https://json-schema.org/draft/2020-12/schema",
               "title": "B",
               "$ref": "#/$defs/point"
             }
@@ -2447,19 +2439,16 @@ struct
               "additionalProperties": false,
               "properties": {
                 "x": {
-                  "$schema": "https://json-schema.org/draft/2020-12/schema",
                   "title": "X",
                   "description": "Ox coordinate",
                   "type": "integer"
                 },
                 "y": {
-                  "$schema": "https://json-schema.org/draft/2020-12/schema",
                   "title": "Y",
                   "description": "Oy coordinate",
                   "type": "integer"
                 }
               },
-              "$schema": "https://json-schema.org/draft/2020-12/schema",
               "description": "A point in the 2D plane",
               "type": "object"
             }

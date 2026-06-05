@@ -33,11 +33,18 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
   let module Inline_marks = Schema.Make_inline (State_monad.Make (struct
     type t = state
   end)) in
-  let make ?(core = make_core ()) =
-    let core =
-      { core with schema = Some "https://json-schema.org/draft/2020-12/schema" }
-    in
-    make ~core
+  (* [$schema] declares the dialect for a schema resource; it belongs only at
+     the document root, not on every nested subschema (which would otherwise
+     read as embedded resources). It is stamped once on the final result. *)
+  let with_schema t =
+    {
+      t with
+      core =
+        {
+          t.core with
+          schema = Some "https://json-schema.org/draft/2020-12/schema";
+        };
+    }
   in
   let id_name s = "#" ^ s in
   let with_documentation documentation schema =
@@ -285,5 +292,6 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
       of_descriptor empty_state schema.descriptor |> fun (s, types, st) ->
       (with_documentation schema.documentation s, types, st)
     in
-    { result with core = { result.core with defs = List.rev state.defs } }
-  | `Ids -> of_schema empty_state schema |> fun (s, _, _) -> s
+    with_schema
+      { result with core = { result.core with defs = List.rev state.defs } }
+  | `Ids -> with_schema (of_schema empty_state schema |> fun (s, _, _) -> s)
