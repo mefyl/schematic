@@ -35,7 +35,7 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
   end)) in
   let make ?(core = make_core ()) =
     let core =
-      { core with schema = Some "https://json-schema.org/draft/2019-09/schema" }
+      { core with schema = Some "https://json-schema.org/draft/2020-12/schema" }
     in
     make ~core
   in
@@ -67,7 +67,7 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
          (schema, types, state)
        | `Ids ->
          let schema =
-           { schema with core = { schema.core with id = Some (id_name id) } }
+           { schema with core = { schema.core with anchor = Some id } }
          in
          (schema, types, state))
   and of_descriptor : type u.
@@ -217,9 +217,7 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
          tuple_applicator state items
        and type_ = [ Array ] in
        let validation = make_validation ~type_ () in
-       ( make
-           ~applicator:(make_applicator ~items:(Tuple_schema fields) ())
-           ~validation (),
+       ( make ~applicator:(make_applicator ~prefixItems:fields ()) ~validation (),
          type_,
          state )
      | Schema.Union { cases; key; _ } ->
@@ -277,7 +275,7 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
        (make ~applicator ~validation (), validation.type_, state)
   and list_schema state item =
     let type_ = [ Array ] in
-    let applicator = make_applicator ~items:(Items_schema item) ()
+    let applicator = make_applicator ~items:item ()
     and validation = make_validation ~type_ () in
     (make ~applicator ~validation (), type_, state)
   in

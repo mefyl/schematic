@@ -2259,21 +2259,21 @@ struct
           {
             "field_a" :
             {
-              "$schema" : "https://json-schema.org/draft/2019-09/schema",
+              "$schema" : "https://json-schema.org/draft/2020-12/schema",
               "title" : "Field_a",
               "description" : "Describe A",
               "type" : "integer"
             },
             "field_b" :
             {
-              "$schema" : "https://json-schema.org/draft/2019-09/schema",
+              "$schema" : "https://json-schema.org/draft/2020-12/schema",
               "title" : "Field_b",
               "description" : "Describe B",
               "type" : "integer"
             }
           },
-          "$id" : "#description",
-          "$schema" : "https://json-schema.org/draft/2019-09/schema",
+          "$anchor" : "description",
+          "$schema" : "https://json-schema.org/draft/2020-12/schema",
           "type" : "object"
       }|}
 
@@ -2294,21 +2294,21 @@ struct
           {
             "a" :
             {
-              "$schema" : "https://json-schema.org/draft/2019-09/schema",
+              "$schema" : "https://json-schema.org/draft/2020-12/schema",
               "title" : "A",
               "default": 358,
               "type" : "integer"
             },
             "b" :
             {
-              "$schema" : "https://json-schema.org/draft/2019-09/schema",
+              "$schema" : "https://json-schema.org/draft/2020-12/schema",
               "title" : "B",
               "default": "359",
               "type" : "string"
             }
           },
-          "$id" : "#default",
-          "$schema" : "https://json-schema.org/draft/2019-09/schema",
+          "$anchor" : "default",
+          "$schema" : "https://json-schema.org/draft/2020-12/schema",
           "type" : "object"
        }|}
       in
@@ -2355,14 +2355,14 @@ struct
           {
             "value" :
             {
-              "$schema" : "https://json-schema.org/draft/2019-09/schema",
+              "$schema" : "https://json-schema.org/draft/2020-12/schema",
               "title" : "Value",
               "description" : "The documented value field",
               "type" : "integer"
             }
           },
-          "$id" : "#documented",
-          "$schema" : "https://json-schema.org/draft/2019-09/schema",
+          "$anchor" : "documented",
+          "$schema" : "https://json-schema.org/draft/2020-12/schema",
           "description" : "A documented type for JSON schema",
           "type" : "object"
       }|}
@@ -2381,14 +2381,14 @@ struct
           {
             "field" :
             {
-              "$schema" : "https://json-schema.org/draft/2019-09/schema",
+              "$schema" : "https://json-schema.org/draft/2020-12/schema",
               "title" : "Field",
               "description" : "Field with \"quotes\" and a backslash \\",
               "type" : "integer"
             }
           },
-          "$id" : "#special_chars",
-          "$schema" : "https://json-schema.org/draft/2019-09/schema",
+          "$anchor" : "special_chars",
+          "$schema" : "https://json-schema.org/draft/2020-12/schema",
           "description" : "Type with \"quotes\" and a backslash \\",
           "type" : "object"
       }|}
@@ -2427,16 +2427,16 @@ struct
     let point =
       test_schema "json-schema-defs-point" segment_schema
         {|{
-          "$schema": "https://json-schema.org/draft/2019-09/schema",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "additionalProperties": false,
           "properties": {
             "a": {
-              "$schema": "https://json-schema.org/draft/2019-09/schema",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
               "title": "A",
               "$ref": "#/$defs/point"
             },
             "b": {
-              "$schema": "https://json-schema.org/draft/2019-09/schema",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
               "title": "B",
               "$ref": "#/$defs/point"
             }
@@ -2447,19 +2447,19 @@ struct
               "additionalProperties": false,
               "properties": {
                 "x": {
-                  "$schema": "https://json-schema.org/draft/2019-09/schema",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
                   "title": "X",
                   "description": "Ox coordinate",
                   "type": "integer"
                 },
                 "y": {
-                  "$schema": "https://json-schema.org/draft/2019-09/schema",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
                   "title": "Y",
                   "description": "Oy coordinate",
                   "type": "integer"
                 }
               },
-              "$schema": "https://json-schema.org/draft/2019-09/schema",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
               "description": "A point in the 2D plane",
               "type": "object"
             }
