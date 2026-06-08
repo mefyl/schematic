@@ -13,10 +13,6 @@ and type_ =
 and 't additional_properties =
   | Properties_schema of 't
   | Allowed of bool
-
-and 't items =
-  | Items_schema of 't
-  | Tuple_schema of 't list
 [@@deriving eq, schema]
 
 type core = {
@@ -24,23 +20,23 @@ type core = {
   schema : uri option; [@schematic.as "$schema"]
   anchor : string option; [@schematic.as "$anchor"]
   ref : uri_reference option; [@schematic.as "$ref"]
-  recursive_ref : uri_reference option; [@schematic.as "$recursiveRef"]
-  recursive_anchor : bool; [@schematic.as "$recursiveAnchor"] [@default false]
+  dynamic_ref : uri_reference option; [@schematic.as "$dynamicRef"]
+  dynamic_anchor : string option; [@schematic.as "$dynamicAnchor"]
   vocabulary : (uri * bool) list; [@schematic.as "$vocabulary"] [@default []]
   comment : string option; [@schematic.as "$comment"]
   defs : (string * t) list; [@schematic.as "$defs"] [@default []]
 }
 
 and applicator = {
-  additionalItems : t option;
   unevaluatedItems : t option;
-  items : t items option;
+  prefixItems : t list; [@default []]
+  items : t option;
   contains : t option;
   additionalProperties : t additional_properties; [@default Allowed true]
   unevaluatedProperties : t option;
   properties : (string * t) list; [@default []]
   patternProperties : (string * t) list; [@default []]
-  dependentSchema : (string * t) list; [@default []]
+  dependentSchemas : (string * t) list; [@default []]
   propertyNames : t option;
   if_ : t option;
   then_ : t option;
