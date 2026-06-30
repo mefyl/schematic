@@ -170,6 +170,12 @@ module V0_22_3 = struct
           | ( :: ) : ('t, 'req) field * 'tail t -> ('req -> 'tail) t
       end
 
+      module Schemas : module type of Hlist.Make (struct
+        type nonrec 'a t = 'a t
+      end)
+
+      val bool : bool descriptor
+
       (** [case ~decoder ~encoder name schema]. *)
       val case :
         decoder:('case -> 't) ->
@@ -179,6 +185,8 @@ module V0_22_3 = struct
         string ->
         'case t ->
         't case
+
+      val date : Ptime.date descriptor
 
       val field :
         ?description:string ->
@@ -193,6 +201,11 @@ module V0_22_3 = struct
         't field_schema ->
         ('t, 'requirement) field
 
+      val float : float descriptor
+      val int : int descriptor
+      val int64 : int64 descriptor
+      val json : Json.t descriptor
+
       (** [list element_schema]. *)
       val list : 't t -> 't list descriptor
 
@@ -203,6 +216,8 @@ module V0_22_3 = struct
         'mapped descriptor ->
         't descriptor
 
+      val null : unit descriptor
+
       (** [nullable schema]. *)
       val nullable : 't t -> 't option descriptor
 
@@ -211,6 +226,18 @@ module V0_22_3 = struct
         decode:('fields Hlist.t -> 't) ->
         encode:('t -> 'fields Hlist.t) ->
         'fields Fields.t ->
+        't descriptor
+
+      val string : string descriptor
+      val string_const : string -> unit descriptor
+      val time : Ptime.t descriptor
+      val time_local : (Ptime.t * Ptime.tz_offset_s) descriptor
+
+      (** [tuple ~decode ~encode items_schemas]. *)
+      val tuple :
+        decode:('items Hlist.t -> 't) ->
+        encode:('t -> 'items Hlist.t) ->
+        'items Schemas.t ->
         't descriptor
 
       (** [union ?key cases]. *)
