@@ -105,47 +105,58 @@ end
     [{ error = _ }] objects respectively, preventing such collisions. *)
 val object_wrap : string -> 't t -> 't t
 
-(** [case ~decoder ~encoder name schema]. *)
-val case :
-  decoder:('case -> 't) ->
-  encoder:('t -> 'case option) ->
-  ?inline:bool ->
-  ?since:Semver.t * library ->
-  string ->
-  'case t ->
-  't case
+module Descriptor : sig
+  module Fields : sig
+    type 't t =
+      | [] : unit t
+      | ( :: ) : ('t, 'req) field * 'tail t -> ('req -> 'tail) t
+  end
 
-val field :
-  ?description:string ->
-  ?examples:'t list ->
-  ?maximum:int ->
-  ?minimum:int ->
-  ?omit:bool ->
-  requirement:('t, 'requirement) requirement ->
-  ?since:Semver.t * library ->
-  ?title:string ->
-  string ->
-  't field_schema ->
-  ('t, 'requirement) field
+  (** [case ~decoder ~encoder name schema]. *)
+  val case :
+    decoder:('case -> 't) ->
+    encoder:('t -> 'case option) ->
+    ?inline:bool ->
+    ?since:Semver.t * library ->
+    string ->
+    'case t ->
+    't case
 
-module Fields : sig
-  type 't t =
-    | [] : unit t
-    | ( :: ) : ('t, 'req) field * 'tail t -> ('req -> 'tail) t
+  val field :
+    ?description:string ->
+    ?examples:'t list ->
+    ?maximum:int ->
+    ?minimum:int ->
+    ?omit:bool ->
+    requirement:('t, 'requirement) requirement ->
+    ?since:Semver.t * library ->
+    ?title:string ->
+    string ->
+    't field_schema ->
+    ('t, 'requirement) field
+
+  (** [list element_schema]. *)
+  val list : 't t -> 't list descriptor
+
+  (** [map ~decode ~encode mapped_schema]. *)
+  val map :
+    decode:('mapped -> ('t, string) Result.t) ->
+    encode:('t -> 'mapped) ->
+    'mapped descriptor ->
+    't descriptor
+
+  (** [nullable schema]. *)
+  val nullable : 't t -> 't option descriptor
+
+  (** [object' ~decode ~encode fields]. *)
+  val object' :
+    decode:('fields Hlist.t -> 't) ->
+    encode:('t -> 'fields Hlist.t) ->
+    'fields Fields.t ->
+    't descriptor
+
+  (** [union ?key cases]. *)
+  val union : ?key:string -> 't case list -> 't descriptor
+
+  type 'a t = 'a descriptor
 end
-
-(** [list element_schema]. *)
-val list : 't t -> 't list descriptor
-
-(** [nullable schema]. *)
-val nullable : 't t -> 't option descriptor
-
-(** [object' ~decode ~encode fields]. *)
-val object' :
-  decode:('fields Hlist.t -> 't) ->
-  encode:('t -> 'fields Hlist.t) ->
-  'fields Fields.t ->
-  't descriptor
-
-(** [union ?key cases]. *)
-val union : ?key:string -> 't case list -> 't descriptor
