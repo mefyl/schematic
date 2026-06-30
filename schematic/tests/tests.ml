@@ -1,6 +1,7 @@
 open Base
 open Poly
 open Schematic.Schemas
+module Schema = Schematic.Schema.Unversioned
 
 module Schemas_library = struct
   type Schematic.Schema.library += V

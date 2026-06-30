@@ -611,15 +611,11 @@ let close ~configuration:_ ~context ~type_context schema =
       let f param exp =
         match param with
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
-          let combine =
-            if context.global.inside then [%expr Schema.Name.combine]
-            else [%expr Schematic.Schema.Name.combine]
-          in
           [%expr
             match [%e exp] with
             | None -> None
             | Some id ->
-              [%e combine]
+              Schematic_schema__.Name.combine
                 [%e Ast.evar (param_prefix ^ schema_name_versioned name)]
                 id]
         | [%type: _], _ -> exp
@@ -686,7 +682,7 @@ let close ~configuration:_ ~context ~type_context schema =
                     with
                     | Some schema -> schema
                     | None ->
-                      Schema.fixpoint (fun __schematic_self ->
+                      Schematic_schema__.fixpoint (fun __schematic_self ->
                           match
                             Base.Map.find !__schematic_cache
                               __schematic_schema_version
@@ -709,10 +705,7 @@ let close ~configuration:_ ~context ~type_context schema =
               else params_wrap c.descriptor]
           in
           let __schematic_parametric :
-              [%t
-                if context.global.inside then [%type: _ Schema.parametric]
-                else [%type: _ Schematic.Schema.parametric]]
-              option =
+              [%t [%type: _ Schematic_schema__.parametric]] option =
             match [%e schema_id] with
             | None -> None
             | Some __schematic_schema_id -> [%e parametric]
@@ -723,9 +716,9 @@ let close ~configuration:_ ~context ~type_context schema =
                 match __schematic_parametric with
                 | None -> [%e id]
                 | Some parametric -> (
-                  match Schema.Name.of_parametric parametric with
+                  match Schematic_schema__.Name.of_parametric parametric with
                   | None -> None
-                  | Some name -> Some (Schema.Name.to_id name))]
+                  | Some name -> Some (Schematic_schema__.Name.to_id name))]
               [%expr __schematic_parametric]]],
         cache )
     | Expression e ->
@@ -739,17 +732,6 @@ let close ~configuration:_ ~context ~type_context schema =
       in
       (e, false)
   in
-  let schema =
-    if context.global.inside then
-      [%expr
-        let module Schematic_schema__ = Schema in
-        [%e schema]]
-    else
-      [%expr
-        let module Schematic_schema__ = Schematic.Schema.Unversioned in
-        [%e schema]]
-  in
-
   let name, name_versioned =
     let name =
       match context.gadt_variant with
@@ -765,7 +747,7 @@ let close ~configuration:_ ~context ~type_context schema =
     let body =
       if context.global.inside then
         [%expr
-          fun (__schematic_version : Schema.version) ->
+          fun (__schematic_version : Schematic_schema__.version) ->
             let __schematic_schema_version =
               __schematic_version Schemas_library.v
             in
@@ -801,7 +783,7 @@ let close ~configuration:_ ~context ~type_context schema =
                Ast.ptyp_constr
                  (Ast.Located.lident type_context.name)
                  (List.map ~f:fst type_context.params)]
-             Schema.t]),
+             Schematic_schema__.t]),
       Ast.pvar name_versioned )
   in
   let with_warnings binding =
