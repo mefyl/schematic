@@ -104,3 +104,48 @@ end
     Wrapping each case will serialize values as [{ value = _ }] and
     [{ error = _ }] objects respectively, preventing such collisions. *)
 val object_wrap : string -> 't t -> 't t
+
+(** [case ~decoder ~encoder name schema]. *)
+val case :
+  decoder:('case -> 't) ->
+  encoder:('t -> 'case option) ->
+  ?inline:bool ->
+  ?since:Semver.t * library ->
+  string ->
+  'case t ->
+  't case
+
+val field :
+  ?description:string ->
+  ?examples:'t list ->
+  ?maximum:int ->
+  ?minimum:int ->
+  ?omit:bool ->
+  requirement:('t, 'requirement) requirement ->
+  ?since:Semver.t * library ->
+  ?title:string ->
+  string ->
+  't field_schema ->
+  ('t, 'requirement) field
+
+module Fields : sig
+  type 't t =
+    | [] : unit t
+    | ( :: ) : ('t, 'req) field * 'tail t -> ('req -> 'tail) t
+end
+
+(** [list element_schema]. *)
+val list : 't t -> 't list descriptor
+
+(** [nullable schema]. *)
+val nullable : 't t -> 't option descriptor
+
+(** [object' ~decode ~encode fields]. *)
+val object' :
+  decode:('fields Hlist.t -> 't) ->
+  encode:('t -> 'fields Hlist.t) ->
+  'fields Fields.t ->
+  't descriptor
+
+(** [union ?key cases]. *)
+val union : ?key:string -> 't case list -> 't descriptor

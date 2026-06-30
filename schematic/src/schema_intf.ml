@@ -54,7 +54,9 @@ type _ case =
           (** Whether the tuple or record argument is inlined in the OCaml
               memory representation of the constructor. *)
       name : string;
-      raw_name : string;  (** Only used for the C ABI. *)
+      raw_name : string;
+          (** FIXME: Only used for the C ABI, dead code since schematic-ffi was
+              discontinued *)
       schema : 'a t;
       since : (Semver.t * library) option;
     }
@@ -159,7 +161,9 @@ and _ descriptor =
   | Union : {
       key : string option;
       cases : 't case list;
-      polymorphic : bool;  (** Whether this is a polymorphic variant in OCaml. *)
+      polymorphic : bool;
+          (** Whether this is a polymorphic variant in OCaml. FIXME: dead since
+              schematic-ffi was discontinued. *)
     }
       -> 't descriptor
 

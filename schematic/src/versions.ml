@@ -25,6 +25,7 @@ module V0_22_3 = struct
     include Schema
     module Unversioned = Schema
 
+    (* FIXME: Drop when we break compatibility. *)
     type 't t = 't Schema_intf.t = private {
       id : string option;
       documentation : string option;
