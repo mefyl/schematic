@@ -298,18 +298,20 @@ let add ~inside ~jsoo ~version =
             ~type_context:
               { attributes = Attributes.empty; loc; name = ""; params = [] }
             type'
-          |> Schema.schema_of_expanded ~context ~loc
+          |> Schema.schema_of_expanded ~loc
         in
         if versioned then
           [%expr
             begin[@warning "-unused-open"]
               let open Schematic.Schemas in
+              let module Schematic_schema__ = Schematic.Schema.Unversioned in
               fun __schematic_version -> [%e schema]
             end]
         else
           [%expr
             begin[@warning "-unused-open"]
               let open Schematic.Schemas in
+              let module Schematic_schema__ = Schematic.Schema.Unversioned in
               let __schematic_version _ = None in
               [%e schema]
             end]

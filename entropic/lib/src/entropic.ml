@@ -171,7 +171,7 @@ module Make (Entropy : Entropy.S) = struct
          of_descriptor size descriptor >>=! fun v -> return (decode v)
        | Mapping { construct; deconstruct; item; length } ->
          of_descriptor size
-           (Sequence
+           (Schematic.Schema.Unversioned.Sequence
               {
                 construct;
                 deconstruct;
@@ -225,7 +225,7 @@ module Make (Entropy : Entropy.S) = struct
          in
          decode fields
        | Sequence { construct; item; _ } ->
-         of_descriptor size (List item)
+         of_descriptor size (Schematic.Schema.Unversioned.List item)
          >>|! Base.Sequence.of_list
          >>=! Fn.compose Monad.return construct
        | String -> string
@@ -318,7 +318,7 @@ module Make (Entropy : Entropy.S) = struct
         of_descriptor buffer descriptor @@ encode value
       | Mapping { construct; deconstruct; item; length } ->
         of_descriptor buffer
-          (Sequence
+          (Schematic.Schema.Unversioned.Sequence
              {
                construct;
                deconstruct;
@@ -367,7 +367,7 @@ module Make (Entropy : Entropy.S) = struct
         value
         |> deconstruct
         |> Base.Sequence.to_list
-        |> of_descriptor buffer (List item)
+        |> of_descriptor buffer (Schematic.Schema.Unversioned.List item)
       | String -> string buffer value
       | String_const _ -> ()
       | Time -> time buffer value
