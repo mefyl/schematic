@@ -52,6 +52,9 @@ let object' ~decode ~encode fields =
   in
   Object { decode; encode; fields = _fields fields }
 
+let sequence ~construct ~deconstruct ~length item =
+  Sequence { construct; deconstruct; item; length }
+
 let string = String
 let string_const string = String_const string
 let time = Time

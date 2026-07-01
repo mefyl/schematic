@@ -228,6 +228,13 @@ module V0_22_3 = struct
         'fields Fields.t ->
         't descriptor
 
+      val sequence :
+        construct:('item Base.Sequence.t -> ('t, string) result) ->
+        deconstruct:('t -> 'item Base.Sequence.t) ->
+        length:('t -> int) ->
+        'item t ->
+        't descriptor
+
       val string : string descriptor
       val string_const : string -> unit descriptor
       val time : Ptime.t descriptor
