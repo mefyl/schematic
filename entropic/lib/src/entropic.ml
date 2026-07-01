@@ -171,13 +171,8 @@ module Make (Entropy : Entropy.S) = struct
          of_descriptor size descriptor >>=! fun v -> return (decode v)
        | Mapping { construct; deconstruct; item; length } ->
          of_descriptor size
-           (Schematic.Schema.Unversioned.Sequence
-              {
-                construct;
-                deconstruct;
-                item = Schematic.Schemas.(Pair.schema string_schema item);
-                length;
-              })
+           (Schematic.Schema.Descriptor.sequence ~construct ~deconstruct ~length
+              Schematic.Schemas.(Pair.schema string_schema item))
        | Null -> return (Result.return ())
        | Nullable d ->
          let*! some = bool in
@@ -225,7 +220,7 @@ module Make (Entropy : Entropy.S) = struct
          in
          decode fields
        | Sequence { construct; item; _ } ->
-         of_descriptor size (Schematic.Schema.Unversioned.List item)
+         of_descriptor size (Schematic.Schema.Descriptor.list item)
          >>|! Base.Sequence.of_list
          >>=! Fn.compose Monad.return construct
        | String -> string
@@ -318,13 +313,8 @@ module Make (Entropy : Entropy.S) = struct
         of_descriptor buffer descriptor @@ encode value
       | Mapping { construct; deconstruct; item; length } ->
         of_descriptor buffer
-          (Schematic.Schema.Unversioned.Sequence
-             {
-               construct;
-               deconstruct;
-               item = Schematic.Schemas.(Pair.schema string_schema item);
-               length;
-             })
+          (Schematic.Schema.Descriptor.sequence ~construct ~deconstruct ~length
+             Schematic.Schemas.(Pair.schema string_schema item))
           value
       | Null -> ()
       | Nullable d -> (
@@ -367,7 +357,7 @@ module Make (Entropy : Entropy.S) = struct
         value
         |> deconstruct
         |> Base.Sequence.to_list
-        |> of_descriptor buffer (Schematic.Schema.Unversioned.List item)
+        |> of_descriptor buffer (Schematic.Schema.Descriptor.list item)
       | String -> string buffer value
       | String_const _ -> ()
       | Time -> time buffer value
