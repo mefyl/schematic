@@ -316,7 +316,9 @@ let expand_sig ~(context : context) ~(configuration : configuration)
   else
     let params = List.map ~f:fst type_context.params in
     let params_wrap init =
-      let f param type_ = [%type: [%t param] Schema.t -> [%t type_]] in
+      let f param type_ =
+        [%type: [%t param] Schematic.Schema.t -> [%t type_]]
+      in
       List.fold_right ~init ~f params
     in
     let caml_type = ptyp_constr (Located.lident type_context.name) params
