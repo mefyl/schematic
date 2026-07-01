@@ -129,6 +129,8 @@ and _ descriptor =
       -> 't descriptor
       (** A dictionary.
 
+          FIXME: Rename to dictionary in 0.23.0.
+
           Some backend will specialize this case, for instance JSON will
           represent this as and object and not a list of pairs. *)
   | Null : unit descriptor

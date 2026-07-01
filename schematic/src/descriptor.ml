@@ -19,6 +19,9 @@ let case ~decoder ~encoder ?(inline = false) ?since name schema =
 
 let date = Date
 
+let dictionary ~construct ~deconstruct ~length item =
+  Mapping { construct; deconstruct; item; length }
+
 let field ?description ?(examples = []) ?maximum ?minimum ?(omit = false)
     ~requirement ?since ?title name schema =
   {

@@ -188,6 +188,13 @@ module V0_22_3 = struct
 
       val date : Ptime.date descriptor
 
+      val dictionary :
+        construct:((string * 'item) Base.Sequence.t -> ('t, string) result) ->
+        deconstruct:('t -> (string * 'item) Base.Sequence.t) ->
+        length:('t -> int) ->
+        'item t ->
+        't descriptor
+
       val field :
         ?description:string ->
         ?examples:'t list ->
