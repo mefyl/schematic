@@ -84,11 +84,14 @@ module Input = struct
 
   (** Ensure we have at least one 8 byte block available. *)
   let ensure t =
-    if t.position = t.length then
+    match t.length - t.position with
+    | 0 ->
       let () = t.position <- 0 in
       let () = t.length <- t.fill ~until:(Bytes.length t.buffer) t.buffer in
       (* all input file size must be a multiple of 8 *)
-      if t.length < 8 then fail "premature end of file"
+      if t.length < 8 then fail "premature end of input"
+    | n when n >= 8 -> ()
+    | _ -> fail "premature end of input"
 
   let eof t =
     if
