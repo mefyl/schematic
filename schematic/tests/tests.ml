@@ -1,6 +1,7 @@
 open Base
 open Poly
 open Schematic.Schemas
+module Schema = Schematic.Schema.Unversioned
 
 module Schemas_library = struct
   type Schematic.Schema.library += V
@@ -2886,11 +2887,7 @@ struct
       let decode (inner : inner) : (outer, string) Result.t =
         Result.return { id = "glouglou"; content = inner }
       and encode ({ content = { content }; _ } : outer) : inner = { content } in
-      let descriptor =
-        Schematic.Schema.Map
-          { decode; encode; descriptor = inner_schema.descriptor }
-      in
-      Schematic.Schema.make descriptor
+      Schematic.Schema.map ~decode ~encode inner_schema
 
     type t = {
       t_ : outer;
