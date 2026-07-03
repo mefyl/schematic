@@ -54,7 +54,9 @@ type _ case =
           (** Whether the tuple or record argument is inlined in the OCaml
               memory representation of the constructor. *)
       name : string;
-      raw_name : string;  (** Only used for the C ABI. *)
+      raw_name : string;
+          (** FIXME: Only used for the C ABI, dead code since schematic-ffi was
+              discontinued *)
       schema : 'a t;
       since : (Semver.t * library) option;
     }
@@ -103,7 +105,7 @@ and _ descriptor =
   | Coding : {
       f : 'coding. 'coding Coding_intf.t option -> 'a descriptor;
     }
-      -> 'a descriptor
+      -> 'a descriptor  (** Switch descriptor based on the coding at runtime. *)
   | Date : Ptime.date descriptor
   | Fixpoint : 'a descriptor Lazy.t -> 'a descriptor
   | Float : float descriptor
@@ -126,6 +128,8 @@ and _ descriptor =
     }
       -> 't descriptor
       (** A dictionary.
+
+          FIXME: Rename to dictionary in 0.23.0.
 
           Some backend will specialize this case, for instance JSON will
           represent this as and object and not a list of pairs. *)
@@ -159,7 +163,9 @@ and _ descriptor =
   | Union : {
       key : string option;
       cases : 't case list;
-      polymorphic : bool;  (** Whether this is a polymorphic variant in OCaml. *)
+      polymorphic : bool;
+          (** Whether this is a polymorphic variant in OCaml. FIXME: dead since
+              schematic-ffi was discontinued. *)
     }
       -> 't descriptor
 

@@ -16,6 +16,6 @@
   "author": "mefyl@gruntech.org",
   "license": "LGPL-3.0-or-later",
   "dependencies": {
-    "jsonschema": "^1.4.0"
+    "@cfworker/json-schema": "^4.1.1"
   }
 }

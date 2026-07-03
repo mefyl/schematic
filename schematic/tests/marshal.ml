@@ -31,6 +31,13 @@ let trailing_garbage () =
   @@ Schematic.Marshal.of_string [%schema: int]
        "\x00\x00\x00\x00\x00\x00\x00\x00xxx"
 
+let end_of_input_in_string_header () =
+  Alcotest.(check ~here:[%here] (result string string))
+    "incomplete string length is rejected"
+    (Result.Error "premature end of input")
+  @@ Schematic.Marshal.of_string [%schema: string]
+       "\xff\xff\xff\xff\xff\xff\x00\x00"
+
 type point = {
   x : int;
   y : int;
@@ -177,5 +184,10 @@ let () =
                |> Base.Map.set ~key:"two" ~data:2
                |> Base.Map.set ~key:"three" ~data:3);
         ] );
-      ("serialization data", [ test_case "trailing garbage" trailing_garbage ]);
+      ( "serialization data",
+        [
+          test_case "trailing garbage" trailing_garbage;
+          test_case "end of input in string header"
+            end_of_input_in_string_header;
+        ] );
     ]

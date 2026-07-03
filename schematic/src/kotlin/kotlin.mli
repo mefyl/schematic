@@ -22,6 +22,9 @@ val pp : Format.formatter -> t -> unit
 *)
 val pp_file : ?package:string -> Format.formatter -> t list -> unit
 
+(** The Kotlin JSON {!Coding.coding} tag *)
+type _ Coding.coding += Coding : Ezjsonm.value Coding.coding
+
 (** [to_json schema a] encodes [a] into JSON using [schema]. Compatibility is
     only guaranteed with JSON parsing from either:
     - [from_json schema json]

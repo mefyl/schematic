@@ -357,7 +357,7 @@ module Parser = struct
     match descriptor with
     | Any (module Coding) -> raise (NotYetImplemented "Any")
     | Bool -> (Atom { alias = Simple "Swift.Bool"; documentation }, marks)
-    | Coding { f = _ } -> raise (NotYetImplemented "Coding")
+    | Coding { f } -> descriptor_to_swift_marks marks documentation @@ f None
     | Date ->
       (Atom { alias = Simple "Routine.TimelessDate"; documentation }, marks)
     | Fixpoint lazy_descriptor ->
@@ -833,6 +833,8 @@ public enum Routine {
   |}
 end
 
+type _ Coding.coding += Coding : Ezjsonm.value Coding.coding
+
 (** Module responsible for encoding into/decoding from Swift-compatible JSON. *)
 module Json = struct
   (** [with_sorted_keys f json] is [f json'] where [json'] is similar to [json],
@@ -872,11 +874,7 @@ module Json = struct
              (Fmt.str "encode does not support descriptor %a"
                 pp_debug_descriptor descriptor))
       | Bool -> fun v -> `Bool v
-      | Coding { f = _ } ->
-        raise
-          (NotYetImplemented
-             (Fmt.str "encode does not support descriptor %a"
-                pp_debug_descriptor descriptor))
+      | Coding { f } -> encode_descriptor @@ f @@ Some Coding
       | Date -> fun v -> v |> Date.of_ptime |> encode Date.schema
       | Fixpoint lazy_descriptor ->
         fun v -> encode_descriptor (Lazy.force lazy_descriptor) v
