@@ -177,42 +177,56 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           (t, r) Schema.requirement ->
           Coding.t option ->
           (r, 'error) Result.t =
-       fun omit context field schema ->
-        let decode schema v =
-          decode_schema { context with path = field :: context.path } schema v
-        in
-        function
-        | Default default -> (
-          function
-          | Some v -> (
-            if omit then Result.return default
-            else
-              match (Coding.to_option v, schema.descriptor) with
-              | Some None, Nullable nullable -> (
-                match decode nullable v with
-                | Result.Ok v -> Result.return (Some v)
-                | Result.Error _ -> decode schema v)
-              | Some None, _ -> decode schema v
-              | Some (Some v), _ -> decode schema v
-              | None, _ -> type_error context "option" v None)
-          | None -> Result.return default)
-        | Computed -> fun _ -> Result.Ok None
-        | Computed_optional -> fun _ -> Result.Ok None
-        | Optional -> (
-          function
-          | Some v -> (
-            match Coding.to_option v with
-            | Some None -> (
-              match decode schema v with
+       fun omit context field schema requirement value ->
+        match (requirement, value) with
+        | Default default, Some v -> (
+          if omit then Result.return default
+          else
+            match (Coding.to_option v, schema.descriptor) with
+            | Some None, Nullable nullable -> (
+              match
+                decode_schema
+                  { context with path = field :: context.path }
+                  nullable v
+              with
               | Result.Ok v -> Result.return (Some v)
-              | Result.Error _ -> Result.return None)
-            | Some (Some v) -> Result.map ~f:Option.return @@ decode schema v
-            | None -> type_error context "option" v None)
-          | None -> Result.return None)
-        | Required -> (
-          function
-          | Some v -> decode schema v
-          | None -> Error.fmt context "missing required field %S" [ field ])
+              | Result.Error _ ->
+                decode_schema
+                  { context with path = field :: context.path }
+                  schema v)
+            | Some None, _ ->
+              decode_schema
+                { context with path = field :: context.path }
+                schema v
+            | Some (Some v), _ ->
+              decode_schema
+                { context with path = field :: context.path }
+                schema v
+            | None, _ -> type_error context "option" v None)
+        | Default default, None -> Result.return default
+        | Computed, _ -> Result.Ok None
+        | Computed_optional, _ -> Result.Ok None
+        | Optional, Some v -> (
+          match Coding.to_option v with
+          | Some None -> (
+            match
+              decode_schema
+                { context with path = field :: context.path }
+                schema v
+            with
+            | Result.Ok v -> Result.return (Some v)
+            | Result.Error _ -> Result.return None)
+          | Some (Some v) ->
+            Result.map ~f:Option.return
+            @@ decode_schema
+                 { context with path = field :: context.path }
+                 schema v
+          | None -> type_error context "option" v None)
+        | Optional, None -> Result.return None
+        | Required, Some v ->
+          decode_schema { context with path = field :: context.path } schema v
+        | Required, None ->
+          Error.fmt context "missing required field %S" [ field ]
       and decode_descriptor : type t.
           Error.t -> t Schema.descriptor -> Coding.t -> (t, Error.t) Result.t =
        fun context schema v ->
