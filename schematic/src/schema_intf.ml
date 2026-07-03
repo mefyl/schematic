@@ -55,6 +55,12 @@ type _ case =
       inline : bool;
           (** Whether the tuple or record argument is inlined in the OCaml
               memory representation of the constructor. *)
+      key : string option;
+          (** Discriminant field name. If set, this case matches iff the field
+              exists in the decoded value.
+
+              Note that a previous matching case can still match and
+              short-circuit this one. *)
       name : string;
       raw_name : string;
           (** FIXME: Only used for the C ABI, dead code since schematic-ffi was

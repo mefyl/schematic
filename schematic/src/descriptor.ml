@@ -14,8 +14,8 @@ module Schemas = Hlist.Make (Schema)
 
 let bool = Bool
 
-let case ~decoder ~encoder ?(inline = false) ?since name schema =
-  Case { decoder; encoder; inline; name; raw_name = name; schema; since }
+let case ~decoder ~encoder ?(inline = false) ?key ?since name schema =
+  Case { decoder; encoder; inline; key; name; raw_name = name; schema; since }
 
 let date = Date
 
