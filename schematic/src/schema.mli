@@ -104,3 +104,12 @@ end
     Wrapping each case will serialize values as [{ value = _ }] and
     [{ error = _ }] objects respectively, preventing such collisions. *)
 val object_wrap : string -> 't t -> 't t
+
+(** Make schema and its payload type identifiable at runtime. *)
+module Well_known (T : S) : sig
+  include S with type t = T.t
+
+  (** [schema_well_known s] is whether [s] is exactly [schema], with a type
+      equality witness. *)
+  val schema_well_known : 't schema -> ('t, t) Stdlib.Type.eq option
+end

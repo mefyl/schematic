@@ -46,6 +46,8 @@ module Library_versions = struct
       | _ -> version)
 end
 
+type 't well_known = ..
+
 type _ case =
   | Case : {
       decoder : 'a -> 't;
@@ -166,6 +168,11 @@ and _ descriptor =
       polymorphic : bool;
           (** Whether this is a polymorphic variant in OCaml. FIXME: dead since
               schematic-ffi was discontinued. *)
+    }
+      -> 't descriptor
+  | Well_known : {
+      descriptor : 't descriptor;
+      tag : 't well_known;
     }
       -> 't descriptor
 

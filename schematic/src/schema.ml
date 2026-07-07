@@ -139,6 +139,7 @@ let rec pp_descriptor : type u. Marks.t -> u descriptor Fmt.t =
         const
           (pp_container ~indent ~delimiters:("Union {", "}") (pp_case marks))
         @@ Stdlib.List.to_seq cases
+      | Well_known { descriptor; _ } -> const (pp_descriptor marks) descriptor
     in
     fmt f ()
 
@@ -215,6 +216,7 @@ let rec walk_fields : type t res.
       cases
     |> Result.all
     |> Result.map ~f:List.concat
+  | Well_known { descriptor; _ } -> walk_fields descriptor f
   | s ->
     Result.fail (Fmt.str "inline field is not an object: %a" pp_descriptor s)
 
@@ -237,6 +239,7 @@ let rec flatten : type t. t descriptor -> t flatten =
     let decode v = d_decode v >>= decode
     and encode v = encode v |> d_encode in
     Flatten { descriptor; decode; encode }
+  | Well_known { descriptor; _ } -> flatten descriptor
   | descriptor -> Flatten { descriptor; decode = Result.return; encode = Fn.id }
 
 let compare schema =
@@ -345,6 +348,7 @@ let compare schema =
           | Some l, Some r -> Some (compare schema.descriptor l r)
         in
         Option.value ~default:0 @@ List.find_map ~f cases
+    | Well_known { descriptor; _ } -> compare descriptor
   in
   compare schema.descriptor
 
@@ -533,6 +537,7 @@ module Make_inline (M : Base.Monad.S) = struct
         let res = List.concat res in
         (* Add base case for optional unions to support None case *)
         if is_optional req then res @ [ [] ] else res
+      | Well_known { descriptor; _ } -> inline descriptor req f
       | s ->
         Result.fail
           (Fmt.str "inline field is not an object: %a" pp_descriptor s)
@@ -684,6 +689,7 @@ module Make_inline (M : Base.Monad.S) = struct
           match List.find_map cases ~f:(fun case -> case v) with
           | Some case -> case
           | None -> failwith "no union cased matched in inline_f")
+      | Well_known { descriptor; _ } -> inline_descriptor descriptor
       | s ->
         Result.fail
           (Fmt.str "inline field is not an object: %a" pp_descriptor s)
@@ -756,6 +762,7 @@ module Walk (W : WALK) = struct
     | Union { cases; key; polymorphic } ->
       let cases = List.map ~f:(case key) cases |> W.M.all in
       W.union ~id ~polymorphic cases
+    | Well_known { descriptor = d; _ } -> descriptor ~id d
 
   and case : type t. string option -> t case -> W.case W.M.t =
    fun key (Case { inline; name; raw_name; schema = s; since; _ }) ->
@@ -879,6 +886,8 @@ module Name = struct
     | { descriptor = Time_local; _ } -> Some (Id "time_local")
     | { descriptor = Tuple _; _ } -> None
     | { descriptor = Union _; _ } -> None
+    | { descriptor = Well_known { descriptor; _ }; _ } as schema ->
+      of_schema { schema with descriptor }
 
   and of_parametric : type a. a parametric -> Name.t option =
    fun parametric ->
@@ -971,6 +980,7 @@ and descriptor_to_sexp : type a. a descriptor -> Sexp.t = function
       | None -> tail
     in
     List (Atom "Union" :: tail)
+  | Well_known { descriptor; _ } -> descriptor_to_sexp descriptor
 
 and case_to_sexp : type f. f case -> Sexp.t =
  fun (Case { name; schema; _ }) -> List [ Atom name; to_sexp schema ]
@@ -1014,3 +1024,27 @@ let object_wrap name schema =
     id = None;
     parametric = None;
   }
+
+module Well_known (T : S) = struct
+  include T
+
+  type 't Schema_intf.well_known += Tag : t Schema_intf.well_known
+
+  let schema_versioned version =
+    let schema = schema_versioned version in
+    {
+      schema with
+      descriptor = Well_known { descriptor = schema.descriptor; tag = Tag };
+    }
+
+  let schema =
+    {
+      schema with
+      descriptor = Well_known { descriptor = schema.descriptor; tag = Tag };
+    }
+
+  let schema_well_known : type a. a schema -> (a, t) Stdlib.Type.eq option =
+    function
+    | { descriptor = Well_known { tag = Tag; _ }; _ } -> Some Stdlib.Type.Equal
+    | _ -> None
+end

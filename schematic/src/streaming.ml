@@ -170,6 +170,7 @@ module Make (Impl : IMPL) = struct
           let value = read_schema case.schema reader in
           let () = R.union_pop reader in
           case.decoder value
+        | Well_known { descriptor; _ } -> read_descriptor descriptor reader
       and read_schema : type t. t Schema.t -> t reader =
        fun schema input -> read_descriptor schema.descriptor input
       and[@inline] read_sequence : type a. a Schema.t -> a Sequence.t reader =
@@ -369,6 +370,8 @@ module Make (Impl : IMPL) = struct
                 write_with_keys [ (key, name) ] schema case_v))
         in
         search cases
+      | Well_known { descriptor; _ } ->
+        write_descriptor context descriptor v writer
     and write_fields : type t.
         E.decoding -> t Hlist.t Schema.fields -> t Hlist.t -> W.t -> unit =
      fun context fields v writer ->

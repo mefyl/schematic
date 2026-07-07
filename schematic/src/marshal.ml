@@ -278,6 +278,7 @@ module Input = struct
           | Some (Case case) ->
             let value = read_schema case.schema reader in
             case.decoder value)
+        | Well_known { descriptor; _ } -> read_descriptor descriptor reader
       and read_schema : type a. a Schema.t -> t -> a =
        fun schema input -> read_descriptor schema.descriptor input
       and[@inline] read_sequence : type a. a Schema.t -> t -> a Sequence.t =
@@ -480,6 +481,7 @@ module Output = struct
               ())
         in
         search 0 cases
+      | Well_known { descriptor; _ } -> write_descriptor descriptor v writer
     and write_schema : type a. a Schema.t -> a -> t -> unit =
      fun schema writer -> write_descriptor schema.descriptor writer
     and[@inline] write_sequence : type a.
