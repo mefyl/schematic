@@ -36,6 +36,7 @@ let pp_debug_descriptor : type a. a Schema.descriptor Fmt.t =
   | Time_local -> "Time_local"
   | Tuple _ -> "Tuple"
   | Union _ -> "Union"
+  | Well_known _ -> "Well_known"
 
 let to_pascal_case s =
   String.split_on_chars ~on:[ '_'; '-'; '.'; '\''; '$' ] s
@@ -402,6 +403,8 @@ module Parser = struct
           }
       in
       (kotlin, marks)
+    | Well_known { descriptor; _ } ->
+      descriptor_to_kotlin_marks marks None descriptor
 
   and list_to_kotlin_marks : type a.
       string option -> Marks.t -> a Schema.t -> kotlin * Marks.t =
@@ -818,6 +821,7 @@ module Json = struct
           match List.find_map ~f:(fun case -> case v) cases with
           | Some res -> res
           | None -> Fmt.failwith "unmatched variant case in schema")
+      | Well_known { descriptor; _ } -> fun v -> encode_descriptor descriptor v
 
     and encode_tuple : type t.
         t Hlist.t Schema.tuple -> t Hlist.t -> Ezjsonm.value =
@@ -986,20 +990,6 @@ module Json = struct
             jsons
           |> Result.all
         | json -> type_error "array" json)
-      | Sequence { construct; item; _ } -> (
-        function
-        | `A v ->
-          let* items =
-            v
-            |> List.map ~f:(fun json ->
-                decode { context with path = context.path @ [ "[]" ] } item json)
-            |> Result.all
-          in
-          items
-          |> Base.Sequence.of_list
-          |> construct
-          |> Result.map_error ~f:(function reason -> { context with reason })
-        | json -> type_error "array" json)
       | Map { descriptor; decode = cons; _ } ->
         fun json ->
           let* underlying = decode_descriptor context descriptor json in
@@ -1042,6 +1032,20 @@ module Json = struct
           in
           let* fields_hlist = decode_fields context fields json_fields in
           Ok (cons fields_hlist)
+      | Sequence { construct; item; _ } -> (
+        function
+        | `A v ->
+          let* items =
+            v
+            |> List.map ~f:(fun json ->
+                decode { context with path = context.path @ [ "[]" ] } item json)
+            |> Result.all
+          in
+          items
+          |> Base.Sequence.of_list
+          |> construct
+          |> Result.map_error ~f:(function reason -> { context with reason })
+        | json -> type_error "array" json)
       | String -> (
         function `String v -> Ok v | json -> type_error "string" json)
       | String_const _s -> (
@@ -1113,6 +1117,7 @@ module Json = struct
           in
           Ok (decoder decoded_value)
         | json -> type_error "object with 2 fields #type and value" json)
+      | Well_known { descriptor; _ } -> decode_descriptor context descriptor
 
     and decode_tuple : type t tuple.
         E.decoding ->

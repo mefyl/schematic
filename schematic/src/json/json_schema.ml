@@ -210,7 +210,7 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
          ( make ~applicator:(make_applicator ~any_of ()) ~validation (),
            type_,
            state ))
-     | Schema.Tuple { items; _ } ->
+     | Tuple { items; _ } ->
        let fields, state =
          let rec tuple_applicator : type u.
              state -> u Schema.tuple -> t list * state =
@@ -227,7 +227,7 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
        ( make ~applicator:(make_applicator ~prefixItems:fields ()) ~validation (),
          type_,
          state )
-     | Schema.Union { cases; key; _ } ->
+     | Union { cases; key; _ } ->
        let state, schemas_with_types =
          let f state (Schema.Case { name; schema; _ }) =
            let schema, types, state = of_schema state schema in
@@ -280,6 +280,7 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
            ()
        in
        (make ~applicator ~validation (), validation.type_, state)
+     | Well_known { descriptor; _ } -> of_descriptor state descriptor
   and list_schema state item =
     let type_ = [ Array ] in
     let applicator = make_applicator ~items:item ()

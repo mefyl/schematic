@@ -401,6 +401,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
             | Some res -> res
             | None ->
               Error.fmt context "invalid key field %S = %S" [ key; key_value ]))
+        | Well_known { descriptor; _ } -> decode_descriptor context descriptor v
       and decode_schema : type t.
           Error.t -> t Schema.t -> Coding.t -> (t, Error.t) Result.t =
        fun context schema v ->
@@ -559,6 +560,7 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
               Fmt.failwith "unmatched variant case in schema %a"
                 Fmt.(option string)
                 context.schema)
+        | Well_known { descriptor; _ } -> encode_descriptor context descriptor
       and encode_schema : type t. Error.t -> t Schema.t -> t -> Coding.t =
        fun context schema v ->
         encode_descriptor

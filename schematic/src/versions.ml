@@ -107,6 +107,11 @@ module V0_22_3 = struct
               (** Whether this is a polymorphic variant in OCaml. *)
         }
           -> 't descriptor
+      | Well_known : {
+          descriptor : 't descriptor;
+          tag : 't Schema_intf.well_known;
+        }
+          -> 't descriptor
 
     and ('t, 'req) field = ('t, 'req) Schema_intf.field = private {
       description : string option;

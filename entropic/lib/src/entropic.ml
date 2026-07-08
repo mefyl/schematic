@@ -145,6 +145,8 @@ module Make (Entropy : Entropy.S) = struct
         Entropy.t ->
         Entropy.t * (t, string) Result.t =
      fun size -> function
+       | Any (module Coding) ->
+         (* FIXME *) return (Result.return (Coding.null ()))
        | Bool -> bool
        | Coding { f } -> of_descriptor size (f None)
        | Date ->
@@ -259,8 +261,7 @@ module Make (Entropy : Entropy.S) = struct
          let (Case { schema; decoder; _ }) = List.nth_exn cases pick in
          let+! value = of_descriptor (Size.decr size) schema.descriptor in
          decoder value
-       | Any (module Coding) ->
-         (* FIXME *) return (Result.return (Coding.null ()))
+       | Well_known { descriptor; _ } -> of_descriptor size descriptor
     in
     of_descriptor (Size.of_int size) schema.Schematic.Schema.descriptor entropy
     |> snd
@@ -287,6 +288,7 @@ module Make (Entropy : Entropy.S) = struct
         Buffer.t -> t Schematic.Schema.descriptor -> t -> unit =
      fun buffer descriptor value ->
       match descriptor with
+      | Any (module Coding) -> (* FIXME *) ()
       | Bool -> bool buffer value
       | Coding { f } -> of_descriptor buffer (f None) value
       | Date ->
@@ -299,7 +301,8 @@ module Make (Entropy : Entropy.S) = struct
           diff date_time epoch |> Span.to_d_ps |> fst
         in
         int16 buffer days
-      | Fixpoint _d -> of_descriptor buffer descriptor value
+      | Fixpoint descriptor ->
+        of_descriptor buffer (Lazy.force descriptor) value
       | Float -> float buffer value
       | Ignore -> ()
       | Int -> int buffer value
@@ -386,7 +389,7 @@ module Make (Entropy : Entropy.S) = struct
             | None -> write_case (n + 1) tail)
         in
         write_case 0 cases
-      | Any (module Coding) -> (* FIXME *) ()
+      | Well_known { descriptor; _ } -> of_descriptor buffer descriptor value
     in
     let buffer = Buffer.create 1024 in
     let () = of_descriptor buffer schema.Schematic.Schema.descriptor value in

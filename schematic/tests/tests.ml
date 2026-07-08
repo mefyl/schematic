@@ -3397,4 +3397,11 @@ Union {
       (name, Base.List.map ~f:test_case_to_alcotest_test_case test_cases)
     in
     Base.List.map ~f:test_group_to_alcotest_group test_descriptions
+
+  let roundtrip ?here test schema v repr =
+    let encoded = Coding.encode schema v in
+    let () = Alcotest.(check ?here Coding.t "encoded" repr encoded) in
+    let decoded = Coding.decode schema encoded in
+    Alcotest.(
+      check (result test decoding_error) "decoded" (Result.Ok v) decoded)
 end
