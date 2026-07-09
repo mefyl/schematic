@@ -354,24 +354,33 @@ module Make (Coding : IMPL) : S with type t = Coding.t = struct
           decode_tuple items v |> Result.map ~f:t_decode
         | Union { cases; key; _ } -> (
           match key with
-          | None -> (
-            let conv (Schema.Case { decoder; schema; _ }) =
-              match
-                decode_descriptor
-                  {
-                    context with
-                    schema = Option.first_some schema.id context.schema;
-                  }
-                  schema.descriptor v
-              with
-              | Result.Ok v -> Some (decoder v)
-              | Result.Error _ -> None
+          | None ->
+            let decode_case (Schema.Case { decoder; schema; _ }) =
+              decode_descriptor
+                {
+                  context with
+                  schema = Option.first_some schema.id context.schema;
+                }
+                schema.descriptor v
+              |> Result.map ~f:decoder
             in
-            match List.find_map ~f:conv cases with
-            | Some res -> Result.return res
-            | None ->
-              Error.fmt context "no union case was matched for @[%a@]"
-                [ Coding.pp; v ])
+            let present key =
+              match key_get context v key with
+              | Result.Ok (Some _) -> true
+              | Result.Ok None | Result.Error _ -> false
+            in
+            let rec try_cases = function
+              | [] ->
+                Error.fmt context "no union case was matched for @[%a@]"
+                  [ Coding.pp; v ]
+              | (Schema.Case { key = Some key; _ } as case) :: rest ->
+                if present key then decode_case case else try_cases rest
+              | case :: rest -> (
+                match decode_case case with
+                | Result.Ok _ as res -> res
+                | Result.Error _ -> try_cases rest)
+            in
+            try_cases cases
           | Some key -> (
             let* key_value =
               let* v =

@@ -393,7 +393,7 @@ and expand_any_variant ~context ~type_context poly options =
              ~f:(Fn.compose Ast.elist (List.map ~f:Ast.estring))
              (Ast.elist []) aliases)
     in
-    let schema, inline, ctor_pattern, ctor_value, pattern, value =
+    let schema, inline, ctor_pattern, ctor_value, pattern, value, case_key =
       match constructor_arguments_normalize ~loc pcd_args with
       | None ->
         let schema =
@@ -422,6 +422,7 @@ and expand_any_variant ~context ~type_context poly options =
                             parametric = None;
                           };
                         inline = false;
+                        key = None;
                         encoder = (fun () -> Some ());
                         decoder = (fun () -> ());
                         since = [%e esince ~loc since];
@@ -445,31 +446,51 @@ and expand_any_variant ~context ~type_context poly options =
                     decode = (fun Hlist.[] -> ());
                   }]
         in
-        (schema, false, None, None, None, None)
+        (schema, false, None, None, None, None, [%expr None])
       | Some { ctor_pattern; ctor_value; inline; pattern; type_; value; _ } ->
         let p i = Ast.pvar (Fmt.str "f%i" i)
         and v i _ = Ast.evar (Fmt.str "f%i" i) in
-        let schema =
+        let schema, case_key =
           match (aliases, pcd_args) with
           | { loc; _ } :: _, _ ->
-            expanded_of_descriptor ~loc:type_context.loc
-              [%expr
-                [%ocaml.error
-                  "schematic.aliases attribute not supported on record \
-                   payloads yet"]]
+            ( expanded_of_descriptor ~loc:type_context.loc
+                [%expr
+                  [%ocaml.error
+                    "schematic.aliases attribute not supported on record \
+                     payloads yet"]],
+              [%expr None] )
           | [], Pcstr_record fields ->
             let computed_fields = Attributes.fields_of_computed ~loc computed in
-            _expand_record true ~context ~type_context
-              (List.map ~f:(Plugin.expand_field context) fields
-              @ computed_fields)
-          | [], _ -> encode_type ~context ~type_context type_
+            let fields =
+              List.map ~f:(Plugin.expand_field context) fields @ computed_fields
+            in
+            let key =
+              match
+                List.filter_map fields ~f:(fun (field : Attributes.field) ->
+                    if field.key then
+                      Some
+                        (version_match ~f:Ast.estring
+                           (Ast.estring (rename field.name))
+                           field.alias)
+                    else None)
+              with
+              | [] -> [%expr None]
+              | [ key ] -> [%expr Some [%e key]]
+              | _ ->
+                Ppxlib.Location.raise_errorf ~loc
+                  "schematic-ppx: at most one schematic.key field is allowed \
+                   per case"
+            in
+            (_expand_record true ~context ~type_context fields, key)
+          | [], _ -> (encode_type ~context ~type_context type_, [%expr None])
         in
         ( schema,
           inline,
           Some (ctor_pattern p),
           Some (ctor_value v),
           Some (pattern p),
-          Some (value v) )
+          Some (value v),
+          case_key )
     in
     let construct =
       let pattern =
@@ -493,6 +514,7 @@ and expand_any_variant ~context ~type_context poly options =
             decoder = [%e destruct];
             encoder = [%e construct];
             inline = [%e Ast.ebool inline];
+            key = [%e case_key];
             name = [%e name];
             raw_name = [%e Ast.estring txt];
             schema =

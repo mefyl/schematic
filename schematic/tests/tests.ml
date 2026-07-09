@@ -724,6 +724,83 @@ struct
                 error);
       }
 
+    type discriminated =
+      | Circle of { radius : int [@schematic.key] }
+      | Rectangle of {
+          width : int;
+          height : int; [@schematic.key "h"]
+        }
+    [@@deriving eq, schema, show]
+
+    let discriminated_testable =
+      Alcotest.testable pp_discriminated equal_discriminated
+
+    let discriminated =
+      let mk_test name value expected =
+        Test
+          {
+            name;
+            here = [%here];
+            decoded = None;
+            value_testable = discriminated_testable;
+            schema = discriminated_schema;
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled = false;
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = false;
+          }
+      in
+      {
+        name = "discriminated variant";
+        speed = `Quick;
+        tests =
+          [
+            mk_test "circle" (Circle { radius = 5 }) [%ezjsonm { radius = 5 }];
+            mk_test "rectangle"
+              (Rectangle { width = 3; height = 4 })
+              [%ezjsonm { width = 3; h = 4 }];
+          ];
+        additional_test =
+          Some
+            (fun () ->
+              (* A present discriminant commits to its case: decoding failures
+                 surface that case's error instead of a generic no-match. *)
+              let () =
+                Alcotest.(
+                  check ~here:[%here]
+                    (result discriminated_testable decoding_error))
+                  "present discriminant commits to the case"
+                  (make_error ~schema:"discriminated"
+                     {|missing required field "width"|})
+                  (Schematic.Json.decode discriminated_schema
+                     [%ezjsonm { h = 4 }])
+              (* The first case whose discriminant is present wins, even if
+                 another case's fields are also present. *)
+              and () =
+                Alcotest.(
+                  check ~here:[%here]
+                    (result discriminated_testable decoding_error))
+                  "first present discriminant wins"
+                  (Result.Ok (Circle { radius = 5 }))
+                  (Schematic.Json.decode discriminated_schema
+                     [%ezjsonm { radius = 5; width = 99 }])
+              (* The discriminant is looked up under its (renamed) JSON name;
+                 using the OCaml field name discards the case. *)
+              and () =
+                Alcotest.(
+                  check ~here:[%here]
+                    (result discriminated_testable decoding_error))
+                  "renamed discriminant is honored"
+                  (make_error ~schema:"discriminated"
+                     {|no union case was matched for {"width": 3, "height": 4}|})
+                  (Schematic.Json.decode discriminated_schema
+                     [%ezjsonm { width = 3; height = 4 }])
+              in
+              ());
+      }
+
     type null_object =
       | Object of { x : int }
       | Null of unit
@@ -3303,6 +3380,7 @@ Union {
             Variant.singleton;
             Variant.computed;
             Variant.no_match;
+            Variant.discriminated;
             Variant.null_object;
             Variant.nested_inline;
             Polymorphic_variant.payload;

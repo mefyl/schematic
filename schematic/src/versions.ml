@@ -40,6 +40,8 @@ module V0_22_3 = struct
           inline : bool;
               (** Whether the tuple or record argument is inlined in the OCaml
                   memory representation of the constructor. *)
+          key : string option;
+              (** Discriminant field name (from [\@schematic.key]). *)
           name : string;
           raw_name : string;  (** Only used for the C ABI. *)
           schema : 'a t;
@@ -186,6 +188,7 @@ module V0_22_3 = struct
         decoder:('case -> 't) ->
         encoder:('t -> 'case option) ->
         ?inline:bool ->
+        ?key:string ->
         ?since:Semver.t * library ->
         string ->
         'case t ->

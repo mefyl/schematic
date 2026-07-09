@@ -96,6 +96,7 @@ module Either = struct
                 {
                   name = "first";
                   raw_name = "First";
+                  key = None;
                   schema = first;
                   inline = false;
                   encoder = (function First x -> Some x | Second _ -> None);
@@ -106,6 +107,7 @@ module Either = struct
                 {
                   name = "second";
                   raw_name = "Second";
+                  key = None;
                   schema = second;
                   inline = false;
                   encoder = (function Second x -> Some x | First _ -> None);
@@ -163,6 +165,7 @@ module Result = struct
                 {
                   name = "t";
                   raw_name = "Ok";
+                  key = None;
                   schema = Schema.object_wrap "value" t;
                   inline = false;
                   encoder = (function Ok x -> Some x | Error _ -> None);
@@ -173,6 +176,7 @@ module Result = struct
                 {
                   name = "error";
                   raw_name = "Error";
+                  key = None;
                   schema = Schema.object_wrap "error" error;
                   inline = false;
                   encoder =
