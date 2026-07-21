@@ -586,7 +586,7 @@ module Make_inline (M : Base.Monad.S) = struct
           t Schema_intf.t ->
           (req -> ('res list * Library_versions.t) M.t, string) Result.t =
        fun schema ->
-        let+ f = inline_descriptor schema.descriptor in
+        let+ f = inline_descriptor ~field_name:field.name schema.descriptor in
         match field.requirement with
         | Required -> (f : req -> ('res list * Library_versions.t) M.t)
         | Default _ -> f
@@ -621,78 +621,84 @@ module Make_inline (M : Base.Monad.S) = struct
             and++ tail, tail_version = tail tl in
             (head @ tail, Library_versions.union tail_version head_version)
     and inline_descriptor : type t.
+        field_name:string ->
         t descriptor ->
-        (t -> ('res list * Library_versions.t) M.t, string) Result.t = function
-      | Ignore ->
-        Result.return (fun () -> M.return ([], Library_versions.empty))
-      | Fixpoint d ->
-        (* Break infinite recursion. Would be better to have a fixpoint here
-           too. *)
-        Result.return (fun v ->
-            (inline_descriptor (Lazy.force d) |> Result.ok_or_failwith) v)
-      | Map { descriptor; encode; _ } ->
-        let+ f = inline_descriptor descriptor in
-        fun v -> f (encode v)
-      | Nullable schema -> (
-        let+ f = inline_descriptor schema.descriptor in
-        function Some v -> f v | None -> M.return ([], Library_versions.empty))
-      | Object { fields; encode; _ } ->
-        let+ f = inline_fields fields in
-        fun v -> f (encode v)
-      | Union { cases; key; _ } -> (
-        let+ cases =
-          let f (Case { encoder; name; schema; since; _ }) =
-            let+ res = inline_descriptor schema.descriptor in
-            let key =
-              match key with
-              | None -> None
-              | Some key ->
-                Some
-                  (f.f
-                     {
-                       name = key;
-                       schema = Outline (make (String_const name));
-                       description = None;
-                       examples = [];
-                       maximum = None;
-                       minimum = None;
-                       omit = false;
-                       requirement = Required;
-                       since = None;
-                       title = None;
-                     })
-            in
-            fun v ->
-              match encoder v with
-              | None -> None
-              | Some v -> (
-                let result =
-                  match key with
-                  | None -> res v
-                  | Some key ->
-                    let++ key = key ()
-                    and++ res, versions = res v in
-                    (key :: res, versions)
-                in
-                match since with
-                | None -> Some result
-                | Some (version, library) ->
-                  Some
-                    (let++ res, versions = result in
-                     ( res,
-                       Library_versions.with_version library version versions ))
-                )
-          in
-          List.map ~f cases |> Result.all
-        in
-        fun v ->
-          match List.find_map cases ~f:(fun case -> case v) with
-          | Some case -> case
-          | None -> failwith "no union cased matched in inline_f")
-      | Well_known { descriptor; _ } -> inline_descriptor descriptor
-      | s ->
-        Result.fail
-          (Fmt.str "inline field is not an object: %a" pp_descriptor s)
+        (t -> ('res list * Library_versions.t) M.t, string) Result.t =
+     fun ~field_name -> function
+       | Ignore ->
+         Result.return (fun () -> M.return ([], Library_versions.empty))
+       | Fixpoint d ->
+         (* Break infinite recursion. Would be better to have a fixpoint here
+            too. *)
+         Result.return (fun v ->
+             (inline_descriptor ~field_name (Lazy.force d)
+             |> Result.ok_or_failwith)
+               v)
+       | Map { descriptor; encode; _ } ->
+         let+ f = inline_descriptor ~field_name descriptor in
+         fun v -> f (encode v)
+       | Nullable schema -> (
+         let+ f = inline_descriptor ~field_name schema.descriptor in
+         function Some v -> f v | None -> M.return ([], Library_versions.empty))
+       | Object { fields; encode; _ } ->
+         let+ f = inline_fields fields in
+         fun v -> f (encode v)
+       | Union { cases; key; _ } -> (
+         let+ cases =
+           let f (Case { encoder; name; schema; since; _ }) =
+             let+ res = inline_descriptor ~field_name schema.descriptor in
+             let key =
+               match key with
+               | None -> None
+               | Some key ->
+                 Some
+                   (f.f
+                      {
+                        name = key;
+                        schema = Outline (make (String_const name));
+                        description = None;
+                        examples = [];
+                        maximum = None;
+                        minimum = None;
+                        omit = false;
+                        requirement = Required;
+                        since = None;
+                        title = None;
+                      })
+             in
+             fun v ->
+               match encoder v with
+               | None -> None
+               | Some v -> (
+                 let result =
+                   match key with
+                   | None -> res v
+                   | Some key ->
+                     let++ key = key ()
+                     and++ res, versions = res v in
+                     (key :: res, versions)
+                 in
+                 match since with
+                 | None -> Some result
+                 | Some (version, library) ->
+                   Some
+                     (let++ res, versions = result in
+                      ( res,
+                        Library_versions.with_version library version versions
+                      )))
+           in
+           List.map ~f cases |> Result.all
+         in
+         fun v ->
+           match List.find_map cases ~f:(fun case -> case v) with
+           | Some case -> case
+           | None -> failwith "no union cased matched in inline_f")
+       | Well_known { descriptor; _ } ->
+         inline_descriptor ~field_name descriptor
+       | s ->
+         Result.fail
+           (Fmt.str "inline field %S is not an object: %a" field_name
+              pp_descriptor s)
     in
     inline_fields fields
 
