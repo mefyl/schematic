@@ -126,6 +126,10 @@ let () =
 
       method toJs o = o_of_js_exn o |> Schematic_jsoo.Jsoo.encode o_schema
 
+      method jsonRoundtrip v =
+        Schematic_jsoo.Json.to_js
+        @@ Schematic_jsoo.Json.of_js (Js.Unsafe.inject v)
+
       method variantRoundtrip (js : variant_js) =
         of_result
         @@

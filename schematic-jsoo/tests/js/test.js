@@ -2,7 +2,7 @@
 
 const assert = require('assert');
 
-const { any, toJs, ofJs, ofString, toString, variantRoundtrip } = require('./test.bc.js');
+const { any, toJs, ofJs, ofString, toString, variantRoundtrip, jsonRoundtrip } = require('./test.bc.js');
 
 const value = { i : 42, s : 'enyleme', b: true, a: [0, 1, 2], pair: [true, false] }
 
@@ -41,3 +41,8 @@ assert.deepEqual(variantRoundtrip(24), 24)
 assert.deepEqual(variantRoundtrip("this"), "this")
 assert.throws(() => variantRoundtrip("that"))
 assert.deepEqual(any({ any: { content: value } }), value)
+
+// Check unicode characters in keys roundtrip properly.
+assert.deepEqual(
+  jsonRoundtrip({ "ascii": 1, "⏰ Time": 42, "💲 Billable": "paid" }),
+  { "ascii": 1, "⏰ Time": 42, "💲 Billable": "paid" })
