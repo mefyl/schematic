@@ -33,27 +33,18 @@ let expanded_of_descriptor ~loc ?(id = [%expr None])
     ?(documentation = [%expr None]) ?(parametric = [%expr None]) descriptor =
   Components { descriptor; documentation; id; parametric }
 
-let schema_of_components ~context ~loc descriptor documentation id parametric =
-  if context.global.inside then
-    [%expr
-      {
-        Schema.descriptor = [%e descriptor];
-        documentation = [%e documentation];
-        id = [%e id];
-        parametric = [%e parametric];
-      }]
-  else
-    [%expr
-      {
-        Schematic.Schema.descriptor = [%e descriptor];
-        documentation = [%e documentation];
-        id = [%e id];
-        parametric = [%e parametric];
-      }]
+let schema_of_components ~loc descriptor documentation id parametric =
+  [%expr
+    {
+      Schematic_schema__.descriptor = [%e descriptor];
+      documentation = [%e documentation];
+      id = [%e id];
+      parametric = [%e parametric];
+    }]
 
-let schema_of_expanded ~context ~loc = function
+let schema_of_expanded ~loc = function
   | Components { descriptor; documentation; id; parametric } ->
-    schema_of_components ~context ~loc descriptor documentation id parametric
+    schema_of_components ~loc descriptor documentation id parametric
   | Expression e -> e
 
 let eopt ~loc ~f = function
@@ -89,8 +80,7 @@ let rec encode_type ~context ~type_context core_type =
         [%expr
           (mapping_schema
              [%e
-               schema_of_expanded ~context ~loc
-               @@ encode_type ~context ~type_context t])
+               schema_of_expanded ~loc @@ encode_type ~context ~type_context t])
             .descriptor]
     (* Plain type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, []); _ } ->
@@ -102,17 +92,14 @@ let rec encode_type ~context ~type_context core_type =
     | [%type: [%t? t] list] ->
       expanded_of_descriptor ~loc
         [%expr
-          Schema.List
-            [%e
-              schema_of_expanded ~context ~loc
-              @@ encode_type ~context ~type_context t]]
+          Schematic_schema__.List
+            [%e schema_of_expanded ~loc @@ encode_type ~context ~type_context t]]
     (* Parametric type *)
     | { ptyp_desc = Ptyp_constr ({ txt; loc }, args); _ } ->
       let schema_f = Ast.pexp_ident { loc; txt = schema_id_versioned ~loc txt }
       and f t =
         ( Nolabel,
-          schema_of_expanded ~context ~loc
-          @@ encode_type ~context ~type_context t )
+          schema_of_expanded ~loc @@ encode_type ~context ~type_context t )
       in
       Expression
         (Ast.pexp_apply schema_f
@@ -134,7 +121,7 @@ let rec encode_type ~context ~type_context core_type =
       let body =
         let mapper ~construct ~deconstruct =
           [%expr
-            Schema.Tuple
+            Schematic_schema__.Tuple
               {
                 decode = [%e construct];
                 encode = [%e deconstruct];
@@ -167,8 +154,7 @@ and tuple_items ~context ~type_context types =
     let args =
       List.map
         ~f:(fun d ->
-          schema_of_expanded ~context ~loc
-          @@ encode_type ~context ~type_context d)
+          schema_of_expanded ~loc @@ encode_type ~context ~type_context d)
         types
     in
     let init = [%expr ItemEnd] in
@@ -249,8 +235,7 @@ and _expand_record as_tuple ~context ~type_context
         let schema =
           version_match
             ~f:(fun schema -> [%expr [%e schema] __schematic_version])
-            (schema_of_expanded ~context ~loc
-            @@ encode_type ~context ~type_context type_)
+            (schema_of_expanded ~loc @@ encode_type ~context ~type_context type_)
             schema
         in
         match Option.value ~default:Outline inline with
@@ -335,7 +320,7 @@ and _expand_record as_tuple ~context ~type_context
   in
   let mapped ~construct ~deconstruct =
     [%expr
-      Schema.Object
+      Schematic_schema__.Object
         {
           decode = [%e construct];
           encode = [%e deconstruct];
@@ -408,7 +393,7 @@ and expand_any_variant ~context ~type_context poly options =
              ~f:(Fn.compose Ast.elist (List.map ~f:Ast.estring))
              (Ast.elist []) aliases)
     in
-    let schema, inline, ctor_pattern, ctor_value, pattern, value =
+    let schema, inline, ctor_pattern, ctor_value, pattern, value, case_key =
       match constructor_arguments_normalize ~loc pcd_args with
       | None ->
         let schema =
@@ -424,7 +409,7 @@ and expand_any_variant ~context ~type_context poly options =
               expanded_of_descriptor ~loc
                 [%expr
                   let __schematic_case name =
-                    Schema.Case
+                    Schematic_schema__.Case
                       {
                         name;
                         (* FIXME: see above. *)
@@ -437,6 +422,7 @@ and expand_any_variant ~context ~type_context poly options =
                             parametric = None;
                           };
                         inline = false;
+                        key = None;
                         encoder = (fun () -> Some ());
                         decoder = (fun () -> ());
                         since = [%e esince ~loc since];
@@ -460,31 +446,51 @@ and expand_any_variant ~context ~type_context poly options =
                     decode = (fun Hlist.[] -> ());
                   }]
         in
-        (schema, false, None, None, None, None)
+        (schema, false, None, None, None, None, [%expr None])
       | Some { ctor_pattern; ctor_value; inline; pattern; type_; value; _ } ->
         let p i = Ast.pvar (Fmt.str "f%i" i)
         and v i _ = Ast.evar (Fmt.str "f%i" i) in
-        let schema =
+        let schema, case_key =
           match (aliases, pcd_args) with
           | { loc; _ } :: _, _ ->
-            expanded_of_descriptor ~loc:type_context.loc
-              [%expr
-                [%ocaml.error
-                  "schematic.aliases attribute not supported on record \
-                   payloads yet"]]
+            ( expanded_of_descriptor ~loc:type_context.loc
+                [%expr
+                  [%ocaml.error
+                    "schematic.aliases attribute not supported on record \
+                     payloads yet"]],
+              [%expr None] )
           | [], Pcstr_record fields ->
             let computed_fields = Attributes.fields_of_computed ~loc computed in
-            _expand_record true ~context ~type_context
-              (List.map ~f:(Plugin.expand_field context) fields
-              @ computed_fields)
-          | [], _ -> encode_type ~context ~type_context type_
+            let fields =
+              List.map ~f:(Plugin.expand_field context) fields @ computed_fields
+            in
+            let key =
+              match
+                List.filter_map fields ~f:(fun (field : Attributes.field) ->
+                    if field.key then
+                      Some
+                        (version_match ~f:Ast.estring
+                           (Ast.estring (rename field.name))
+                           field.alias)
+                    else None)
+              with
+              | [] -> [%expr None]
+              | [ key ] -> [%expr Some [%e key]]
+              | _ ->
+                Ppxlib.Location.raise_errorf ~loc
+                  "schematic-ppx: at most one schematic.key field is allowed \
+                   per case"
+            in
+            (_expand_record true ~context ~type_context fields, key)
+          | [], _ -> (encode_type ~context ~type_context type_, [%expr None])
         in
         ( schema,
           inline,
           Some (ctor_pattern p),
           Some (ctor_value v),
           Some (pattern p),
-          Some (value v) )
+          Some (value v),
+          case_key )
     in
     let construct =
       let pattern =
@@ -503,23 +509,25 @@ and expand_any_variant ~context ~type_context poly options =
     in
     Some
       [%expr
-        Schema.Case
+        Schematic_schema__.Case
           {
             decoder = [%e destruct];
             encoder = [%e construct];
             inline = [%e Ast.ebool inline];
+            key = [%e case_key];
             name = [%e name];
             raw_name = [%e Ast.estring txt];
             schema =
               [%e
-                let s = schema_of_expanded ~context ~loc schema in
+                let s = schema_of_expanded ~loc schema in
                 match case_documentation with
                 | None -> s
                 | Some doc ->
                   [%expr
                     {
                       ([%e s]) with
-                      Schema.documentation = Some [%e Ast.estring doc];
+                      Schematic_schema__.documentation =
+                        Some [%e Ast.estring doc];
                     }]];
             since = [%e esince ~loc since];
           }]
@@ -530,7 +538,7 @@ and expand_any_variant ~context ~type_context poly options =
   in
   expanded_of_descriptor ~loc
     [%expr
-      Schema.Union
+      Schematic_schema__.Union
         {
           polymorphic = [%e Ast.ebool poly];
           cases = [%e Ast.elist (List.filter_map ~f options)];
@@ -625,15 +633,11 @@ let close ~configuration:_ ~context ~type_context schema =
       let f param exp =
         match param with
         | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
-          let combine =
-            if context.global.inside then [%expr Schema.Name.combine]
-            else [%expr Schematic.Schema.Name.combine]
-          in
           [%expr
             match [%e exp] with
             | None -> None
             | Some id ->
-              [%e combine]
+              Schematic_schema__.Name.combine
                 [%e Ast.evar (param_prefix ^ schema_name_versioned name)]
                 id]
         | [%type: _], _ -> exp
@@ -653,14 +657,14 @@ let close ~configuration:_ ~context ~type_context schema =
         | _ ->
           let init =
             [%expr
-              Plain
+              Schematic_schema__.Plain
                 { name = __schematic_schema_id; descriptor = [%e descriptor] }]
           and f i parametric arg =
             match arg with
             | { ptyp_desc = Ptyp_var name; ptyp_loc = loc; _ }, _ ->
               let schema_name = schema_name_versioned name in
               [%expr
-                Parametric
+                Schematic_schema__.Parametric
                   {
                     name = [%e Ast.estring name];
                     parameter = [%e Ast.evar @@ param_prefix ^ schema_name];
@@ -671,7 +675,7 @@ let close ~configuration:_ ~context ~type_context schema =
             | { ptyp_desc = Ptyp_any; ptyp_loc = loc; _ }, _ ->
               let schema_name = schema_anonymous_name_versioned i in
               [%expr
-                Parametric
+                Schematic_schema__.Parametric
                   {
                     name = [%e Ast.estring (Fmt.str "anonymous_%i" i)];
                     parameter = [%e Ast.evar @@ param_prefix ^ schema_name];
@@ -700,7 +704,7 @@ let close ~configuration:_ ~context ~type_context schema =
                     with
                     | Some schema -> schema
                     | None ->
-                      Schema.fixpoint (fun __schematic_self ->
+                      Schematic_schema__.fixpoint (fun __schematic_self ->
                           match
                             Base.Map.find !__schematic_cache
                               __schematic_schema_version
@@ -723,41 +727,30 @@ let close ~configuration:_ ~context ~type_context schema =
               else params_wrap c.descriptor]
           in
           let __schematic_parametric :
-              [%t
-                if context.global.inside then [%type: _ Schema.parametric]
-                else [%type: _ Schematic.Schema.parametric]]
-              option =
+              [%t [%type: _ Schematic_schema__.parametric]] option =
             match [%e schema_id] with
             | None -> None
             | Some __schematic_schema_id -> [%e parametric]
           in
           [%e
-            schema_of_components ~context ~loc descriptor schema_documentation
+            schema_of_components ~loc descriptor schema_documentation
               [%expr
                 match __schematic_parametric with
                 | None -> [%e id]
                 | Some parametric -> (
-                  match Schema.Name.of_parametric parametric with
+                  match Schematic_schema__.Name.of_parametric parametric with
                   | None -> None
-                  | Some name -> Some (Schema.Name.to_id name))]
+                  | Some name -> Some (Schematic_schema__.Name.to_id name))]
               [%expr __schematic_parametric]]],
         cache )
     | Expression e ->
       let e =
-        if context.global.inside then
-          [%expr
-            {
-              ([%e e]) with
-              Schema.id = [%e id];
-              documentation = [%e schema_documentation];
-            }]
-        else
-          [%expr
-            {
-              ([%e e]) with
-              Schematic.Schema.id = [%e id];
-              documentation = [%e schema_documentation];
-            }]
+        [%expr
+          {
+            ([%e e]) with
+            Schematic_schema__.id = [%e id];
+            documentation = [%e schema_documentation];
+          }]
       in
       (e, false)
   in
@@ -776,7 +769,7 @@ let close ~configuration:_ ~context ~type_context schema =
     let body =
       if context.global.inside then
         [%expr
-          fun (__schematic_version : Schema.version) ->
+          fun (__schematic_version : Schematic_schema__.version) ->
             let __schematic_schema_version =
               __schematic_version Schemas_library.v
             in
@@ -812,7 +805,7 @@ let close ~configuration:_ ~context ~type_context schema =
                Ast.ptyp_constr
                  (Ast.Located.lident type_context.name)
                  (List.map ~f:fst type_context.params)]
-             Schema.t]),
+             Schematic_schema__.t]),
       Ast.pvar name_versioned )
   in
   let with_warnings binding =

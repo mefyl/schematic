@@ -38,6 +38,9 @@ val pp : Format.formatter -> t -> unit
     All basic type imports are also included (e.g. [Foundation]). *)
 val pp_file : Format.formatter -> t list -> unit
 
+(** The Swift JSON {!Coding.coding} tag *)
+type _ Coding.coding += Coding : Ezjsonm.value Coding.coding
+
 (** [to_json schema a] encodes [a] into JSON using [schema]. Compatibility is
     only guaranteed with JSON parsing from either:
     - [from_json schema json]

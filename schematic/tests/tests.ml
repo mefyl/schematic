@@ -1,6 +1,7 @@
 open Base
 open Poly
 open Schematic.Schemas
+module Schema = Schematic.Schema.Unversioned
 
 module Schemas_library = struct
   type Schematic.Schema.library += V
@@ -721,6 +722,83 @@ struct
                        {|no union case was matched for {"invalid": "payload"}|};
                    })
                 error);
+      }
+
+    type discriminated =
+      | Circle of { radius : int [@schematic.key] }
+      | Rectangle of {
+          width : int;
+          height : int; [@schematic.key "h"]
+        }
+    [@@deriving eq, schema, show]
+
+    let discriminated_testable =
+      Alcotest.testable pp_discriminated equal_discriminated
+
+    let discriminated =
+      let mk_test name value expected =
+        Test
+          {
+            name;
+            here = [%here];
+            decoded = None;
+            value_testable = discriminated_testable;
+            schema = discriminated_schema;
+            value;
+            expected;
+            kotlin_class_name = None;
+            is_kotlin_roundtrip_enabled = false;
+            swift_class_name = None;
+            is_swift_roundtrip_enabled = false;
+          }
+      in
+      {
+        name = "discriminated variant";
+        speed = `Quick;
+        tests =
+          [
+            mk_test "circle" (Circle { radius = 5 }) [%ezjsonm { radius = 5 }];
+            mk_test "rectangle"
+              (Rectangle { width = 3; height = 4 })
+              [%ezjsonm { width = 3; h = 4 }];
+          ];
+        additional_test =
+          Some
+            (fun () ->
+              (* A present discriminant commits to its case: decoding failures
+                 surface that case's error instead of a generic no-match. *)
+              let () =
+                Alcotest.(
+                  check ~here:[%here]
+                    (result discriminated_testable decoding_error))
+                  "present discriminant commits to the case"
+                  (make_error ~schema:"discriminated"
+                     {|missing required field "width"|})
+                  (Schematic.Json.decode discriminated_schema
+                     [%ezjsonm { h = 4 }])
+              (* The first case whose discriminant is present wins, even if
+                 another case's fields are also present. *)
+              and () =
+                Alcotest.(
+                  check ~here:[%here]
+                    (result discriminated_testable decoding_error))
+                  "first present discriminant wins"
+                  (Result.Ok (Circle { radius = 5 }))
+                  (Schematic.Json.decode discriminated_schema
+                     [%ezjsonm { radius = 5; width = 99 }])
+              (* The discriminant is looked up under its (renamed) JSON name;
+                 using the OCaml field name discards the case. *)
+              and () =
+                Alcotest.(
+                  check ~here:[%here]
+                    (result discriminated_testable decoding_error))
+                  "renamed discriminant is honored"
+                  (make_error ~schema:"discriminated"
+                     {|no union case was matched for {"width": 3, "height": 4}|})
+                  (Schematic.Json.decode discriminated_schema
+                     [%ezjsonm { width = 3; height = 4 }])
+              in
+              ());
       }
 
     type null_object =
@@ -1939,7 +2017,7 @@ struct
     let inline_keyed =
       let module T = struct
         type t = { keyed : Polymorphic_variant.keyed [@schematic.inline] }
-        [@@deriving eq, schema, show]
+        [@@schematic.name "inline_keyed"] [@@deriving eq, schema, show]
       end in
       let test ~here name value expected =
         Test
@@ -2259,21 +2337,19 @@ struct
           {
             "field_a" :
             {
-              "$schema" : "https://json-schema.org/draft/2019-09/schema",
               "title" : "Field_a",
               "description" : "Describe A",
               "type" : "integer"
             },
             "field_b" :
             {
-              "$schema" : "https://json-schema.org/draft/2019-09/schema",
               "title" : "Field_b",
               "description" : "Describe B",
               "type" : "integer"
             }
           },
-          "$id" : "#description",
-          "$schema" : "https://json-schema.org/draft/2019-09/schema",
+          "$anchor" : "description",
+          "$schema" : "https://json-schema.org/draft/2020-12/schema",
           "type" : "object"
       }|}
 
@@ -2294,21 +2370,19 @@ struct
           {
             "a" :
             {
-              "$schema" : "https://json-schema.org/draft/2019-09/schema",
               "title" : "A",
               "default": 358,
               "type" : "integer"
             },
             "b" :
             {
-              "$schema" : "https://json-schema.org/draft/2019-09/schema",
               "title" : "B",
               "default": "359",
               "type" : "string"
             }
           },
-          "$id" : "#default",
-          "$schema" : "https://json-schema.org/draft/2019-09/schema",
+          "$anchor" : "default",
+          "$schema" : "https://json-schema.org/draft/2020-12/schema",
           "type" : "object"
        }|}
       in
@@ -2355,14 +2429,13 @@ struct
           {
             "value" :
             {
-              "$schema" : "https://json-schema.org/draft/2019-09/schema",
               "title" : "Value",
               "description" : "The documented value field",
               "type" : "integer"
             }
           },
-          "$id" : "#documented",
-          "$schema" : "https://json-schema.org/draft/2019-09/schema",
+          "$anchor" : "documented",
+          "$schema" : "https://json-schema.org/draft/2020-12/schema",
           "description" : "A documented type for JSON schema",
           "type" : "object"
       }|}
@@ -2381,14 +2454,13 @@ struct
           {
             "field" :
             {
-              "$schema" : "https://json-schema.org/draft/2019-09/schema",
               "title" : "Field",
               "description" : "Field with \"quotes\" and a backslash \\",
               "type" : "integer"
             }
           },
-          "$id" : "#special_chars",
-          "$schema" : "https://json-schema.org/draft/2019-09/schema",
+          "$anchor" : "special_chars",
+          "$schema" : "https://json-schema.org/draft/2020-12/schema",
           "description" : "Type with \"quotes\" and a backslash \\",
           "type" : "object"
       }|}
@@ -2427,16 +2499,14 @@ struct
     let point =
       test_schema "json-schema-defs-point" segment_schema
         {|{
-          "$schema": "https://json-schema.org/draft/2019-09/schema",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "additionalProperties": false,
           "properties": {
             "a": {
-              "$schema": "https://json-schema.org/draft/2019-09/schema",
               "title": "A",
               "$ref": "#/$defs/point"
             },
             "b": {
-              "$schema": "https://json-schema.org/draft/2019-09/schema",
               "title": "B",
               "$ref": "#/$defs/point"
             }
@@ -2447,19 +2517,16 @@ struct
               "additionalProperties": false,
               "properties": {
                 "x": {
-                  "$schema": "https://json-schema.org/draft/2019-09/schema",
                   "title": "X",
                   "description": "Ox coordinate",
                   "type": "integer"
                 },
                 "y": {
-                  "$schema": "https://json-schema.org/draft/2019-09/schema",
                   "title": "Y",
                   "description": "Oy coordinate",
                   "type": "integer"
                 }
               },
-              "$schema": "https://json-schema.org/draft/2019-09/schema",
               "description": "A point in the 2D plane",
               "type": "object"
             }
@@ -2897,11 +2964,7 @@ struct
       let decode (inner : inner) : (outer, string) Result.t =
         Result.return { id = "glouglou"; content = inner }
       and encode ({ content = { content }; _ } : outer) : inner = { content } in
-      let descriptor =
-        Schematic.Schema.Map
-          { decode; encode; descriptor = inner_schema.descriptor }
-      in
-      Schematic.Schema.make descriptor
+      Schematic.Schema.map ~decode ~encode inner_schema
 
     type t = {
       t_ : outer;
@@ -3317,6 +3380,7 @@ Union {
             Variant.singleton;
             Variant.computed;
             Variant.no_match;
+            Variant.discriminated;
             Variant.null_object;
             Variant.nested_inline;
             Polymorphic_variant.payload;
@@ -3411,4 +3475,11 @@ Union {
       (name, Base.List.map ~f:test_case_to_alcotest_test_case test_cases)
     in
     Base.List.map ~f:test_group_to_alcotest_group test_descriptions
+
+  let roundtrip ?here test schema v repr =
+    let encoded = Coding.encode schema v in
+    let () = Alcotest.(check ?here Coding.t "encoded" repr encoded) in
+    let decoded = Coding.decode schema encoded in
+    Alcotest.(
+      check (result test decoding_error) "decoded" (Result.Ok v) decoded)
 end

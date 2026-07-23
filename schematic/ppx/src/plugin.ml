@@ -98,6 +98,21 @@ let expand_field _
             "schematic-ppx: inline specified multiple times"
       | _ ->
         Ppxlib.Location.raise_errorf ~loc "schematic-ppx: no payload expected")
+    | "schematic.key" -> (
+      if attrs.key then
+        Ppxlib.Location.raise_errorf ~loc
+          "schematic-ppx: duplicate schematic.key annotation on field"
+      else
+        match attr_payload with
+        | PStr [] -> { attrs with key = true }
+        | _ ->
+          let pattern = Ast_pattern.(versioned (estring __) (estring __)) in
+          {
+            attrs with
+            key = true;
+            alias =
+              { txt = expect ~loc pattern attr_payload; loc } :: attrs.alias;
+          })
     | "schematic.omit" -> default Attributes_intf.Source.schematic true true
     | "schematic.omit_opt" ->
       default Attributes_intf.Source.schematic false true

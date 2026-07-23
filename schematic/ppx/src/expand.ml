@@ -89,9 +89,13 @@ let expand ~context types gadt jsoo plugins =
       Schema_expander.expand ~configuration:() ~context types @ contents
     in
     if Option.is_some jsoo then
-      [%str open Schematic_jsoo.Schemas [@@warning "-unused-open"]] @ contents
+      [%stri open Schematic_jsoo.Schemas [@@warning "-unused-open"]]
+      :: [%stri module Schematic_schema__ = Schematic.Schema.Unversioned]
+      :: contents
     else if context.global.inside then
-      [%str open Schemas [@@warning "-unused-open"]] @ contents
+      [%stri open Schemas [@@warning "-unused-open"]]
+      :: [%stri module Schematic_schema__ = Schema]
+      :: contents
     else
       (* We are not including Schematic.Schemas anymore to avoid hiding user code.
        * This causes us to:
@@ -102,7 +106,7 @@ let expand ~context types gadt jsoo plugins =
        *)
       [%str
         open struct
-          module Schema = Schematic.Schema
+          module Schematic_schema__ = Schematic.Schema.Unversioned
 
           let array_schema = Schematic.Schemas.array_schema
           let array_schema_versioned = Schematic.Schemas.array_schema_versioned
@@ -298,18 +302,20 @@ let add ~inside ~jsoo ~version =
             ~type_context:
               { attributes = Attributes.empty; loc; name = ""; params = [] }
             type'
-          |> Schema.schema_of_expanded ~context ~loc
+          |> Schema.schema_of_expanded ~loc
         in
         if versioned then
           [%expr
             begin[@warning "-unused-open"]
               let open Schematic.Schemas in
+              let module Schematic_schema__ = Schematic.Schema.Unversioned in
               fun __schematic_version -> [%e schema]
             end]
         else
           [%expr
             begin[@warning "-unused-open"]
               let open Schematic.Schemas in
+              let module Schematic_schema__ = Schematic.Schema.Unversioned in
               let __schematic_version _ = None in
               [%e schema]
             end]

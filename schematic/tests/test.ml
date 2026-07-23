@@ -76,10 +76,33 @@ let streaming_lazy_sequence () =
     }
   @@ Bytesrw.Bytes.Writer.of_buffer ~slice_length:1 buffer
 
+let well_known () =
+  let module Uri = struct
+    include Uri
+    include Schematic.Schema.Well_known (Schematic.Schemas.Uri)
+  end in
+  let encode_uris (type t) (schema : t Schematic.Schema.t) :
+      t Schematic.Schema.t =
+    match Uri.schema_well_known schema with
+    | Some Equal ->
+      let encode uri = uri |> Uri.to_string |> Uri.pct_encode
+      and decode s = s |> Uri.pct_decode |> Uri.of_string |> Result.return in
+      Schematic.Schema.map ~decode ~encode [%schema: string]
+    | None -> schema
+  in
+  Tests.roundtrip ~here:[%here]
+    (module Uri)
+    (encode_uris Uri.schema)
+    (Uri.of_string "https://routine.co")
+    (`String "https:%2F%2Froutine.co");
+  Tests.roundtrip ~here:[%here] Alcotest.string [%schema: string]
+    "https://routine.co" (`String "https://routine.co")
+
 let () =
   Alcotest.run "Schematic.Schema"
   @@ Tests.tests
   @ [
       ( "Streaming",
         [ Alcotest.test_case "lazy sequence" `Quick streaming_lazy_sequence ] );
+      ("Well known", [ Alcotest.test_case "well known" `Quick well_known ]);
     ]

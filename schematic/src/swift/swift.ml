@@ -38,6 +38,7 @@ let pp_debug_descriptor : type a. a Schema.descriptor Fmt.t =
   | Time_local -> "Time_local"
   | Tuple _ -> "Tuple"
   | Union _ -> "Union"
+  | Well_known _ -> "Well_known"
 
 let to_pascal_case s =
   String.split_on_chars ~on:[ '_'; '-'; '.'; '\''; '$' ] s
@@ -357,7 +358,7 @@ module Parser = struct
     match descriptor with
     | Any (module Coding) -> raise (NotYetImplemented "Any")
     | Bool -> (Atom { alias = Simple "Swift.Bool"; documentation }, marks)
-    | Coding { f = _ } -> raise (NotYetImplemented "Coding")
+    | Coding { f } -> descriptor_to_swift_marks marks documentation @@ f None
     | Date ->
       (Atom { alias = Simple "Routine.TimelessDate"; documentation }, marks)
     | Fixpoint lazy_descriptor ->
@@ -484,6 +485,8 @@ module Parser = struct
       in
       let swift = Enum { cases; generics = [ (* TODO *) ]; documentation } in
       (swift, marks)
+    | Well_known { descriptor; _ } ->
+      descriptor_to_swift_marks marks None descriptor
 
   and list_to_swift_marks : type a.
       documentation:string option -> Marks.t -> a Schema.t -> swift * Marks.t =
@@ -833,6 +836,8 @@ public enum Routine {
   |}
 end
 
+type _ Coding.coding += Coding : Ezjsonm.value Coding.coding
+
 (** Module responsible for encoding into/decoding from Swift-compatible JSON. *)
 module Json = struct
   (** [with_sorted_keys f json] is [f json'] where [json'] is similar to [json],
@@ -872,11 +877,7 @@ module Json = struct
              (Fmt.str "encode does not support descriptor %a"
                 pp_debug_descriptor descriptor))
       | Bool -> fun v -> `Bool v
-      | Coding { f = _ } ->
-        raise
-          (NotYetImplemented
-             (Fmt.str "encode does not support descriptor %a"
-                pp_debug_descriptor descriptor))
+      | Coding { f } -> encode_descriptor @@ f @@ Some Coding
       | Date -> fun v -> v |> Date.of_ptime |> encode Date.schema
       | Fixpoint lazy_descriptor ->
         fun v -> encode_descriptor (Lazy.force lazy_descriptor) v
@@ -954,6 +955,7 @@ module Json = struct
           match List.find_map ~f:(fun case -> case v) cases with
           | Some res -> res
           | None -> Fmt.failwith "unmatched variant case in schema")
+      | Well_known { descriptor; _ } -> encode_descriptor descriptor
 
     and encode_tuple : type t.
         t Hlist.t Schema.tuple -> t Hlist.t -> Ezjsonm.value =
@@ -1245,6 +1247,7 @@ module Json = struct
           in
           Ok (decoder decoded_value)
         | json -> type_error "object with a type matching the enum case" json)
+      | Well_known { descriptor; _ } -> decode_descriptor context descriptor
 
     and decode_tuple : type t tuple.
         E.decoding ->

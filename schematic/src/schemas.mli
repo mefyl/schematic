@@ -1,5 +1,4 @@
 open Base
-module Schema : module type of Schema
 
 type json = Ezjsonm.value
 type ignore = unit

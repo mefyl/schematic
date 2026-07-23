@@ -44,6 +44,9 @@ type field = {
   alias : string versioned; [@default []]
   computed : expression option;
   inline : inline option;
+  key : bool; [@default false]
+      (** [\@schematic.key] attribute: mark this field as a discriminant of the
+          enclosing variant case. *)
   loc : location;
   mutable_ : bool; [@default false]
   name : string; [@main]

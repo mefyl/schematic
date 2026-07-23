@@ -33,11 +33,18 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
   let module Inline_marks = Schema.Make_inline (State_monad.Make (struct
     type t = state
   end)) in
-  let make ?(core = make_core ()) =
-    let core =
-      { core with schema = Some "https://json-schema.org/draft/2019-09/schema" }
-    in
-    make ~core
+  (* [$schema] declares the dialect for a schema resource; it belongs only at
+     the document root, not on every nested subschema (which would otherwise
+     read as embedded resources). It is stamped once on the final result. *)
+  let with_schema t =
+    {
+      t with
+      core =
+        {
+          t.core with
+          schema = Some "https://json-schema.org/draft/2020-12/schema";
+        };
+    }
   in
   let id_name s = "#" ^ s in
   let with_documentation documentation schema =
@@ -67,7 +74,7 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
          (schema, types, state)
        | `Ids ->
          let schema =
-           { schema with core = { schema.core with id = Some (id_name id) } }
+           { schema with core = { schema.core with anchor = Some id } }
          in
          (schema, types, state))
   and of_descriptor : type u.
@@ -203,7 +210,7 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
          ( make ~applicator:(make_applicator ~any_of ()) ~validation (),
            type_,
            state ))
-     | Schema.Tuple { items; _ } ->
+     | Tuple { items; _ } ->
        let fields, state =
          let rec tuple_applicator : type u.
              state -> u Schema.tuple -> t list * state =
@@ -217,12 +224,10 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
          tuple_applicator state items
        and type_ = [ Array ] in
        let validation = make_validation ~type_ () in
-       ( make
-           ~applicator:(make_applicator ~items:(Tuple_schema fields) ())
-           ~validation (),
+       ( make ~applicator:(make_applicator ~prefixItems:fields ()) ~validation (),
          type_,
          state )
-     | Schema.Union { cases; key; _ } ->
+     | Union { cases; key; _ } ->
        let state, schemas_with_types =
          let f state (Schema.Case { name; schema; _ }) =
            let schema, types, state = of_schema state schema in
@@ -275,9 +280,10 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
            ()
        in
        (make ~applicator ~validation (), validation.type_, state)
+     | Well_known { descriptor; _ } -> of_descriptor state descriptor
   and list_schema state item =
     let type_ = [ Array ] in
-    let applicator = make_applicator ~items:(Items_schema item) ()
+    let applicator = make_applicator ~items:item ()
     and validation = make_validation ~type_ () in
     (make ~applicator ~validation (), type_, state)
   in
@@ -287,5 +293,6 @@ let of_schema ?(reference = `Ids) (schema : _ Schema.t) =
       of_descriptor empty_state schema.descriptor |> fun (s, types, st) ->
       (with_documentation schema.documentation s, types, st)
     in
-    { result with core = { result.core with defs = List.rev state.defs } }
-  | `Ids -> of_schema empty_state schema |> fun (s, _, _) -> s
+    with_schema
+      { result with core = { result.core with defs = List.rev state.defs } }
+  | `Ids -> with_schema (of_schema empty_state schema |> fun (s, _, _) -> s)

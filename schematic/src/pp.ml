@@ -94,6 +94,7 @@ and of_descriptor : type t. t Schema.descriptor -> t Fmt.t =
     let printer = composite '(' (of_tuple items) ')' in
     fun fmt v -> printer fmt (t_encode v)
   | Union { cases; _ } -> of_cases cases
+  | Well_known { descriptor; _ } -> of_descriptor descriptor
 
 and of_tuple : type t. t Hlist.t Schema.tuple -> t Hlist.t Fmt.t = function
   | ItemEnd -> nop
