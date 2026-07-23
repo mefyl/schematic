@@ -22,6 +22,10 @@ build:
 
 lint:
 	time $(DUNE) build $(WORKSPACE_OPT) @fmt
+	time $(DUNE) build --profile pedantic $(WORKSPACE_OPT)
+	# Check there is no diff in generated files, like *.opam
+	git diff --exit-code
+
 
 check:
 	if test -d /root/node_modules; then ln -s /root/node_modules; fi

@@ -370,7 +370,7 @@ let () =
                  {
                    value with
                    pelem =
-                     pin_depend "ocamlformat" "0.27.0"
+                     pin_depend "ocamlformat" "0.28.1"
                      :: { pelem = String "opam-file-format"; pos }
                      :: { pelem = String "ocaml-index"; pos }
                      :: { pelem = String "sexplib"; pos }
