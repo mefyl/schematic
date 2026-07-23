@@ -8,7 +8,7 @@
  (complete true)
  (used
   ((source
-    ssh://git@gitlab.routine.co/routine/opam#d561988c2f6cf8a4dd398894c5fb037cb4fe3ebc))
+    ssh://git@gitlab.routine.co/routine/opam#7d4d8a6ec435f362c85803104deaa31f1a476f68))
   ((source
     https://github.com/ocaml/opam-repository.git#4f056bfedf536e66065c3783e694e6aa0b38261a))
   ((source

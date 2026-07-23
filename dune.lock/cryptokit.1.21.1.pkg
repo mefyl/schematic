@@ -15,4 +15,4 @@
  (fetch
   (url https://github.com/xavierleroy/cryptokit/archive/release1211.tar.gz)
   (checksum
-   sha256=186fda8b2063882688e1c2621c8234c35acdf4e10cfdd3213ee04bef16902953)))
+   sha512=9bbe610b226d719f2b1a478e1584adbd2d12515190ebea6d88259772df6b66f7184914efe5baf43b9074bb1f0424224c6d8cf890e126cacf6f94744c78d83636)))
