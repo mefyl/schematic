@@ -18,9 +18,7 @@ let of_js =
       else if Jstr.equal type' const_boolean then `Bool (Jv.to_bool o)
       else
         let keys = Jv.to_list Jv.to_jstr @@ Jv.call object' "keys" [| o |] in
-        let f key =
-          (Jstr.to_string key, of_js @@ Jv.get o (Jstr.to_string key))
-        in
+        let f key = (Jstr.to_string key, of_js @@ Jv.get' o key) in
         `O (List.map ~f keys)
   in
   fun (o : Js.Unsafe.any) -> of_js (Jv.repr o)
