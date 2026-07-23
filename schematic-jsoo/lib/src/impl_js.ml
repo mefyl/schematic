@@ -9,7 +9,7 @@ let of_js =
   and const_string = Jstr.v "string"
   and object' = Jv.get Jv.global "Object" in
   let rec of_js o =
-    if Jv.is_null o then `Null
+    if Jv.is_none o then `Null
     else if Jv.is_array o then `A (Jv.to_list of_js o)
     else
       let type' = Jv.typeof o in
