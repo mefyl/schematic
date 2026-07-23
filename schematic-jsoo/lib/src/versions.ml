@@ -7,3 +7,4 @@ end
 module V0_22_1 = V0_22_0
 module V0_22_2 = V0_22_1
 module V0_22_3 = V0_22_2
+module V0_22_4 = V0_22_3
